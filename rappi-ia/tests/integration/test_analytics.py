@@ -12,6 +12,7 @@ from rappi_ia.analytics import queries
 from rappi_ia.concepts.pipeline import build_concepts
 from rappi_ia.concepts.store import seed_taxonomy
 from rappi_ia.concepts.taxonomy import load_taxonomy
+from rappi_ia.demo.seed import seed_demo
 from rappi_ia.events import store as events
 from rappi_ia.events.synth import generate
 
@@ -421,11 +422,13 @@ def test_some_synthetic_sessions_find_products_and_leave_without_adding(simulate
 
 def test_the_multi_vertical_retention_compares_both_groups_with_the_default_history(db, monkeypatch):
     """Es la hipótesis del proyecto y no se veía: con 20 semanas solo ~130 usuarios tenían 120 días de historia y
-    casi todos eran multi-vertical (todas las personas compraban en varias). Ningún estrato tenía los dos grupos."""
-    simulated_db, _ = _simulated_catalog(db)
+    casi todos eran multi-vertical (todas las personas compraban en varias). Ningún estrato tenía los dos grupos.
+    Con el catálogo de la demo: los simulados piden sobre todo en Restaurantes y Turbo (la mezcla de Rappi), y el
+    catálogo chico de arriba solo tiene Súper, Licores y Express."""
+    seed_demo(db)
     monkeypatch.setattr(queries, "MIN_GROUP_USERS", 5)  # catálogo de prueba chico: grupos chicos
-    generate(simulated_db, seed=3, until=date(2026, 9, 27))  # usuarios y semanas por defecto
-    rows = queries.multi_vertical_retention(simulated_db, "synthetic")
+    generate(db, seed=3, until=date(2026, 9, 27))  # usuarios y semanas por defecto
+    rows = queries.multi_vertical_retention(db, "synthetic")
     groups = {}
     for row in rows:
         groups.setdefault(row["estrato"], set()).add(row["grupo"])

@@ -953,6 +953,7 @@ def test_the_gluten_free_persona_prefers_items_with_the_attribute(db, monkeypatc
         next(p for p in synth.PERSONAS if p.id == "sin-gluten"), share=1.0, interests={"supermercado": {"galletas": 1}}
     )
     monkeypatch.setattr(synth, "PERSONAS", [persona])
+    monkeypatch.setattr(synth, "ARCHETYPES", {"retail": 1.0})  # pide en el súper: el único vertical del catálogo
     synth.generate(db, users=60, weeks=20, seed=5, until=date(2026, 9, 27))
 
     build_segments(db, "synthetic", now=datetime(2026, 9, 27, 12, tzinfo=UTC))

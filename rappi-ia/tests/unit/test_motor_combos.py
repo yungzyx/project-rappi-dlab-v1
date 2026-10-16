@@ -64,3 +64,9 @@ def test_learned_retention_needs_enough_people_and_blends():
 def test_next_step_uses_learned_retention():
     learned = {"rest+turbo": (400, 0.40), "rest+retail": (400, 0.95)}  # lo aprendido invierte el orden
     assert next_step("rest", learned)[:2] == ("retail", "rest+retail")
+
+
+def test_next_step_skips_combos_not_built_from_the_groups():
+    """Favor tiene fila en la tabla de Rappi pero no es un grupo: no hay paso siguiente (antes lanzaba ValueError)."""
+    assert next_step("favor") is None
+    assert next_step("otra+rest") is None

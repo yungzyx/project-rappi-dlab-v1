@@ -5,19 +5,31 @@ supuestos explícitos. El panel muestra la mecánica, no evidencia: por construc
 "confirman" en los gráficos.
 
 SUPUESTOS (editables aquí):
-- Personas con verticales, conceptos y ritmo de compra propios (PERSONAS); dos compran en una sola vertical.
+- Cada persona simulada recibe un arquetipo de combinación (ARCHETYPES) sorteado con la mezcla de la tabla de Rappi
+  (motor/combos.toml, sin Favor, renormalizada): dice en qué grupos (rest, turbo, retail) pide. Su perfil (PERSONAS)
+  dice qué conceptos, las horas, el abandono y el atributo que prefiere; solo cuentan sus verticales de los grupos del
+  arquetipo. Si a un grupo no le queda ninguno, Turbo copia lo del súper y Express de la persona (sin alcohol, bebé,
+  salud ni sensibles) y, si no hay, usa GENERIC_INTERESTS, como Restaurantes y Retail; con un catálogo, lo copiado se
+  queda con lo que ese vertical vende.
+- El ritmo sale de los pedidos por persona de su arquetipo: una sesión cada 30 / (pedidos × SESSIONS_PER_ORDER) días,
+  porque no toda sesión termina en pedido. Ya no lo fija el perfil.
+- La retención es la M+1 de la tabla de Rappi para la combinación de sus pedidos de los últimos 30 días (la de su
+  arquetipo si no tiene pedidos): en cada sesión sigue activa con probabilidad retención^(días desde la anterior / 30).
+- SUPUESTO EXPLÍCITO: la tabla es una correlación (quien pide mucho usa más grupos y además vuelve más), pero aquí se
+  trata como efecto. Aceptar una sugerencia que la hace pedir en otro grupo cambia su combinación de verdad, y con ella
+  su retención. Por construcción, el panel "confirma" que sumar grupos retiene: no es evidencia.
 - Personas pequeñas que ejercitan los segmentos de la capa de perfiles (sin gluten, vegana, mamá con bebé, perro, gato,
   fitness, nocturno, cazaofertas, gamer, cafetera, chocolatera, parrillera); algunas prefieren ítems con un atributo.
   La oficinista ya existe como «oficina». Los pesos (`share`) se normalizan al sortear: no hace falta que sumen 1.
 - Una persona asiática (sushi, comida asiática y su despensa, snacks y bebidas en Restaurantes, Súper, Turbo y Express)
   alimenta el perfil de gusto principal; su peso sale del de la persona de carrete.
 - 26 semanas: la retención (días 61 a 120) necesita usuarios con 120 días de historia.
-- Quien no encuentra lo que busca (demanda no satisfecha) o abandona carros, se va antes (CHURN_*).
+- Quien no encuentra lo que busca (demanda no satisfecha) o abandona carros, se va antes (CHURN_*): cada búsqueda sin
+  resultado o carro abandonado de las últimas 4 semanas acelera la pérdida.
 - Parte de quienes encuentran productos se va sin agregar nada al carro (BROWSE_ONLY).
 - Algunas sesiones hablan de un viaje (TRIP: RappiTravel y su gancho) y a quien no encuentra lo que busca se le
   ofrece RappiFavor (FAVOR_OFFER).
 - Parte de los carros abandonados alcanza a iniciar el pago (CHECKOUT_ABANDON_SHARE); el resto se va antes.
-- Quien compra en 2+ verticales se va menos (MULTI_VERTICAL_RETENTION): es la hipótesis del proyecto.
 - Aceptar una sugerencia cruzada acorta un poco el ritmo de compra (SUGGESTION_CADENCE_BOOST).
 - Algunos antojos no existen en el catálogo y crecen con el tiempo (WISHES): alimentan "oportunidades".
 """
@@ -34,6 +46,9 @@ from datetime import date, datetime, timedelta, timezone
 from psycopg import Connection
 
 from ..agent.verticals import ranked_verticals
+from ..concepts.taxonomy import load_taxonomy
+from ..motor.combos import GROUP_ORDER, NONE_COMBO, SERVICE_COMBO, combo_of_verticals, expected_retention, load_combos
+from ..offers.guards import is_offerable
 
 log = logging.getLogger(__name__)
 CHILE = timezone(timedelta(hours=-3))
@@ -43,11 +58,9 @@ CHILE = timezone(timedelta(hours=-3))
 class Persona:
     id: str
     share: float  # fracción de usuarios
-    cadence_days: float  # días entre pedidos (mediana)
     hours: tuple[int, ...]  # horas típicas de uso
     interests: dict[str, dict[str, float]]  # vertical → concepto → peso
     abandon: float  # probabilidad de abandonar un carro
-    churn: float  # riesgo semanal base
     prefer: str | None = None  # atributo que prefiere al elegir ítem (`sin-gluten`, `vegano`…) si el concepto lo tiene
 
 
@@ -55,7 +68,6 @@ PERSONAS = [
     Persona(
         "carrete",
         0.14,  # eran 0,22: 0,08 pasó al asiático (el carrete es el perfil secundario; el principal es el sushi)
-        10,
         (19, 20, 21, 22, 23),
         {
             "licores": {"cerveza": 5, "pisco": 3, "ron": 1.5, "vodka": 1, "snacks-salados": 2, "hielo": 0.5},
@@ -63,14 +75,12 @@ PERSONAS = [
             "restaurantes": {"pizza": 3, "hamburguesa": 2, "sushi": 1},
         },
         0.35,
-        0.035,
     ),
     # El perfil principal de la demo (offers/perfiles.toml): sushi y comida asiática hecha, y lo que se lleva a casa
     # para prepararla (despensa, snacks y bebidas asiáticas) en Súper, Turbo y Express.
     Persona(
         "asiatico",
         0.08,
-        8,
         (12, 13, 19, 20, 21),
         {
             "restaurantes": {"sushi": 4, "asiatica": 3},
@@ -79,12 +89,10 @@ PERSONAS = [
             "conveniencia": {"snacks-asiaticos": 1.5, "bebidas-asiaticas": 1},
         },
         0.28,
-        0.025,
     ),
     Persona(
         "familia",
         0.26,
-        9,
         (10, 11, 17, 18, 19),
         {
             "supermercado": {
@@ -101,24 +109,20 @@ PERSONAS = [
             "chocolateria": {"pasteleria": 0.5},
         },
         0.25,
-        0.02,
     ),
     Persona(
         "oficina",
         0.2,
-        6,
         (12, 13, 14),
         {
             "restaurantes": {"ensaladas-bowls": 3, "sandwiches": 2.5, "sushi": 2, "pastas": 1.5, "asiatica": 1.5},
             "conveniencia": {"cafe": 2, "energizantes": 1, "galletas": 1},
         },
         0.3,
-        0.03,
     ),
     Persona(
         "foodie",
         0.14,
-        12,
         (20, 21, 22),
         {
             "restaurantes": {"sushi": 3, "pastas": 2.5, "postres": 2, "helados": 1.5, "carnes": 1.5},
@@ -126,56 +130,46 @@ PERSONAS = [
             "licores": {"vino": 2, "espumante": 1},
         },
         0.28,
-        0.025,
     ),
     Persona(
         "mascotero",
         0.1,
-        20,
         (9, 10, 18, 19),
         {
             "supermercado": {"alimento-perro": 4, "alimento-gato": 3, "accesorios-mascota": 1.5, "limpieza": 1},
             "conveniencia": {"alimento-perro": 1},
         },
         0.2,
-        0.015,
     ),
     Persona(
         "hogar",
         0.08,
-        30,
         (11, 16, 21),
         {
             "mall": {"cocina-menaje": 3, "decoracion": 2.5, "juguetes-infantiles": 2, "textil-hogar": 1.5, "audio": 1},
             "supermercado": {"limpieza": 1.5},
         },
         0.4,
-        0.03,
     ),
     # Compran en una sola vertical: sin ellas, «¿retiene más quien usa dos verticales?» no tenía contra qué comparar.
     # El agente igual puede llevarlas a otra con una sugerencia aceptada.
     Persona(
         "rutina",
         0.14,
-        8,
         (9, 10, 19, 20),
         {"supermercado": {"lacteos": 4, "frutas": 3, "panaderia": 2.5, "limpieza": 2, "snacks-salados": 1.5}},
         0.25,
-        0.03,
     ),
     Persona(
         "delivery",
         0.12,
-        7,
         (13, 20, 21),
         {"restaurantes": {"pizza": 3, "hamburguesa": 3, "sushi": 2, "pollo-preparado": 2}},
         0.3,
-        0.035,
     ),
     Persona(
         "sin-gluten",
         0.02,
-        8,
         (10, 11, 18, 19),
         {
             "supermercado": {
@@ -190,13 +184,11 @@ PERSONAS = [
             }
         },
         0.25,
-        0.02,
         "sin-gluten",
     ),
     Persona(
         "vegana",
         0.02,
-        8,
         (11, 12, 19, 20),
         {
             "supermercado": {
@@ -210,43 +202,35 @@ PERSONAS = [
             "restaurantes": {"ensaladas-bowls": 2, "asiatica": 1.5},
         },
         0.25,
-        0.02,
         "vegano",
     ),
     Persona(
         "mama-bebe",
         0.03,
-        7,
         (9, 10, 16, 17),
         {
             "supermercado": {"panales": 5, "alimentacion-bebe": 4, "articulos-bebe": 2, "lacteos": 2},
             "farmacia": {"panales": 1.5, "articulos-bebe": 1},
         },
         0.2,
-        0.015,
     ),
     Persona(
         "perro",
         0.03,
-        14,
         (8, 9, 18, 19),
         {"supermercado": {"alimento-perro": 5, "accesorios-mascota": 2}, "conveniencia": {"alimento-perro": 1}},
         0.2,
-        0.015,
     ),
     Persona(
         "gato",
         0.025,
-        14,
         (9, 10, 19, 20),
         {"supermercado": {"alimento-gato": 5, "accesorios-mascota": 2}, "conveniencia": {"alimento-gato": 1}},
         0.2,
-        0.015,
     ),
     Persona(
         "fitness",
         0.025,
-        7,
         (7, 8, 18, 19),
         {
             "supermercado": {"frutas": 3, "lacteos": 2, "carnes": 2, "cereales": 1.5, "barras-cereal": 2},
@@ -254,13 +238,11 @@ PERSONAS = [
             "mall": {"articulos-deportivos": 2},
         },
         0.25,
-        0.02,
         "alto-proteina",
     ),
     Persona(
         "nocturno",
         0.025,
-        8,
         (22, 23, 0, 1, 2),
         {
             "licores": {"cerveza": 3, "pisco": 1, "snacks-salados": 1.5},
@@ -268,25 +250,21 @@ PERSONAS = [
             "conveniencia": {"gaseosas": 2, "snacks-salados": 2},
         },
         0.3,
-        0.03,
     ),
     Persona(
         "cazaofertas",
         0.025,
-        6,
         (10, 11, 17, 18),
         {
             "supermercado": {"lacteos": 2, "limpieza": 2, "carnes": 2, "frutas": 1.5, "snacks-salados": 1.5},
             "mall": {"electrohogar": 1},
         },
         0.35,
-        0.03,
         "con-descuento",
     ),
     Persona(
         "gamer",
         0.02,
-        12,
         (21, 22, 23),
         {
             "mall": {"videojuegos": 4, "audio": 2, "computacion": 2, "celulares": 1},
@@ -294,12 +272,10 @@ PERSONAS = [
             "conveniencia": {"energizantes": 3, "snacks-salados": 2},
         },
         0.3,
-        0.03,
     ),
     Persona(
         "cafetera",
         0.025,
-        8,
         (8, 9, 16, 17),
         {
             "conveniencia": {"cafe": 4, "galletas": 1.5, "snacks-salados": 1},
@@ -307,24 +283,20 @@ PERSONAS = [
             "restaurantes": {"desayuno": 1.5},
         },
         0.25,
-        0.025,
     ),
     Persona(
         "chocolatera",
         0.025,
-        10,
         (15, 16, 20, 21),
         {
             "chocolateria": {"chocolates": 4, "pasteleria": 2},
             "supermercado": {"chocolates": 3, "helados": 1.5, "postres": 1.5, "golosinas": 1.5},
         },
         0.25,
-        0.025,
     ),
     Persona(
         "parrillero",
         0.03,
-        14,
         (11, 12, 17, 18),
         {
             "supermercado": {"carnes": 4, "carbon": 2.5, "aceites-condimentos": 1},
@@ -332,7 +304,6 @@ PERSONAS = [
             "conveniencia": {"carbon": 1.5, "hielo": 1},
         },
         0.3,
-        0.025,
     ),
 ]
 
@@ -349,7 +320,20 @@ WISHES = [
 CHURN_UNMET = 0.35  # +35% de riesgo por cada búsqueda sin resultado en las últimas 4 semanas
 CHURN_ABANDON = 0.2  # +20% por cada carro abandonado en las últimas 4 semanas
 CHECKOUT_ABANDON_SHARE = 0.4  # de los carros abandonados, la parte que alcanza a iniciar el pago
-MULTI_VERTICAL_RETENTION = 0.55  # riesgo × 0,55 si compró en 2+ verticales en 60 días
+SESSIONS_PER_ORDER = 1.3  # sesiones que no terminan en pedido: búsquedas sin resultado, carros abandonados, solo mirar
+COMBO_WINDOW_DAYS = 30  # la combinación de una persona: los grupos de sus pedidos de los últimos 30 días
+_COMBOS = load_combos()
+# Las 7 combinaciones de la tabla de Rappi (sin Favor, que no tiene catálogo) con su parte de usuarios, sumando 1.
+_SHARES = {combo: row.pct_users for combo, row in _COMBOS.rappi.items() if combo != SERVICE_COMBO}
+ARCHETYPES: dict[str, float] = {combo: share / sum(_SHARES.values()) for combo, share in _SHARES.items()}
+# Lo que pide quien cae en un grupo sin verticales en su perfil (sin alcohol, bebé ni salud).
+GENERIC_INTERESTS: dict[str, dict[str, float]] = {
+    "turbo": {"snacks-salados": 2, "gaseosas": 2, "lacteos": 1.5, "frutas": 1},
+    "restaurantes": {"pizza": 3, "hamburguesa": 2.5, "sushi": 2, "pollo-preparado": 1.5},
+    "supermercado": {"lacteos": 3, "frutas": 2, "limpieza": 2, "panaderia": 1.5},
+}
+_GROUP_FALLBACK = {"rest": "restaurantes", "turbo": "turbo", "retail": "supermercado"}  # vertical del grupo vacío
+_TURBO_SOURCES = ("supermercado", "conveniencia")  # de dónde copia Turbo cuando el perfil no lo tiene
 TRIP = 0.03  # sesiones que hablan de un viaje (RappiTravel)
 TRAVEL_OPEN = 0.35  # de ellas, las que abren RappiTravel
 FAVOR_OFFER = 0.6  # búsquedas sin resultado donde el agente ofrece RappiFavor (en «Propuesta»)
@@ -391,6 +375,8 @@ class UserState:
     persona: Persona
     city: str
     cadence: float
+    archetype: str  # combinación de Rappi sorteada (ARCHETYPES)
+    interests: dict[str, dict[str, float]]  # los de la persona en los grupos del arquetipo (`effective_interests`)
     active: bool = True
     orders_by_vertical: dict[str, list[datetime]] = field(default_factory=dict)
     recent_unmet: list[datetime] = field(default_factory=list)
@@ -440,6 +426,49 @@ def load_catalog(conn: Connection, per_concept: int = 40) -> Catalog:
     return Catalog(items, edges, names, ranked, preferred)
 
 
+def draw_archetype(rng: random.Random) -> str:
+    """Una combinación de grupos sorteada con la mezcla de la tabla de Rappi."""
+    return rng.choices(list(ARCHETYPES), weights=list(ARCHETYPES.values()))[0]
+
+
+def archetype_cadence(archetype: str) -> float:
+    """Días entre sesiones según los pedidos por persona de la combinación en la tabla de Rappi."""
+    return 30 / (_COMBOS.rappi[archetype].orders_per_user * SESSIONS_PER_ORDER)
+
+
+def effective_interests(
+    persona: Persona, archetype: str, catalog: Catalog | None = None
+) -> dict[str, dict[str, float]]:
+    """Los intereses de la persona solo en los verticales de los grupos del arquetipo. Un grupo sin verticales en el
+    perfil toma otros: Turbo, lo ofrecible del súper y Express de la persona (o GENERIC_INTERESTS); Restaurantes y
+    Retail, GENERIC_INTERESTS. Con `catalog`, lo tomado se queda con lo que ese vertical vende, si algo vende."""
+    groups = set(archetype.split("+"))
+    group_of = _COMBOS.group_of
+    interests = {v: dict(c) for v, c in persona.interests.items() if group_of[v] in groups}
+    have = {group_of[v] for v in interests}
+    for group in (g for g in GROUP_ORDER if g in groups - have):
+        vertical = _GROUP_FALLBACK[group]
+        options = [GENERIC_INTERESTS[vertical]]
+        if group == "turbo":
+            options.insert(0, _offerable_copy(persona, _TURBO_SOURCES))
+        options = [o for o in options if o]
+        sold = [{c: w for c, w in o.items() if (vertical, c) in catalog.items} for o in options] if catalog else options
+        interests[vertical] = next((o for o in sold if o), options[-1])
+    return interests
+
+
+def _offerable_copy(persona: Persona, verticals: tuple[str, ...]) -> dict[str, float]:
+    """Los conceptos de esos verticales de la persona que se pueden llevar a otro: sin alcohol, bebé, salud ni
+    sensibles (`is_offerable`). Un concepto en dos verticales suma sus pesos."""
+    concepts = load_taxonomy().concepts
+    copied: dict[str, float] = {}
+    for vertical in verticals:
+        for concept, weight in persona.interests.get(vertical, {}).items():
+            if concept in concepts and is_offerable(concepts[concept]):
+                copied[concept] = copied.get(concept, 0) + weight
+    return copied
+
+
 def generate(conn: Connection, users: int = 1500, weeks: int = 26, seed: int = 7, until: date | None = None) -> dict:
     """Borra los datos simulados anteriores y genera nuevos (reproducible con la misma semilla y fecha)."""
     rng = random.Random(seed)
@@ -452,11 +481,14 @@ def generate(conn: Connection, users: int = 1500, weeks: int = 26, seed: int = 7
     counts = {"usuarios": 0, "eventos": 0, "pedidos": 0}
     for n in range(users):
         persona = rng.choices(PERSONAS, weights=[p.share for p in PERSONAS])[0]
+        archetype = draw_archetype(rng)
         state = UserState(
             user_id=f"syn-{seed}-{n:05d}",
             persona=persona,
             city=rng.choices(["Santiago", "Valparaíso", "Concepción", "Antofagasta"], [0.7, 0.12, 0.1, 0.08])[0],
-            cadence=persona.cadence_days * math.exp(rng.gauss(0, 0.35)),
+            cadence=archetype_cadence(archetype) * math.exp(rng.gauss(0, 0.35)),
+            archetype=archetype,
+            interests=effective_interests(persona, archetype, catalog),
         )
         signup = start + timedelta(days=rng.uniform(0, weeks * 7 * 0.6))
         _write(buffers["users"], state.user_id, "synthetic", persona.id, state.city, rng.random() < 0.4, _iso(signup))
@@ -492,7 +524,7 @@ def _simulate_user(
             break
         ts = day.replace(hour=rng.choice(s.persona.hours), minute=rng.randrange(60))
         _session(rng, catalog, s, ts, start, buffers, counts)
-        s.active = rng.random() > _weekly_churn(s, ts) * (gap / 7)
+        s.active = rng.random() < _stay_probability(s, ts, gap)
 
 
 def _session(rng, catalog: Catalog, s: UserState, ts: datetime, start: datetime, buffers, counts) -> None:
@@ -569,8 +601,8 @@ def _session(rng, catalog: Catalog, s: UserState, ts: datetime, start: datetime,
             )
         return
 
-    vertical = _weighted(rng, {v: sum(c.values()) for v, c in s.persona.interests.items()})
-    concept = _weighted(rng, s.persona.interests[vertical])
+    vertical = _weighted(rng, {v: sum(c.values()) for v, c in s.interests.items()})
+    concept = _weighted(rng, s.interests[vertical])
     prefer = s.persona.prefer
     item = catalog.pick(rng, vertical, concept, prefer)
     kind = "ask" if rng.random() < 0.3 else "search"
@@ -669,13 +701,18 @@ def _session(rng, catalog: Catalog, s: UserState, ts: datetime, start: datetime,
         s.orders_by_vertical.setdefault(order_vertical, []).append(ts)
 
 
-def _weekly_churn(s: UserState, now: datetime) -> float:
+def _stay_probability(s: UserState, now: datetime, gap: float) -> float:
+    """Probabilidad de seguir activa después de una sesión: la retención M+1 de Rappi de su combinación de los últimos
+    30 días (la del arquetipo si no pidió), llevada a los días desde la sesión anterior. Las búsquedas sin resultado y
+    los carros abandonados de las últimas 4 semanas multiplican el riesgo (el exponente)."""
     window = now - timedelta(days=28)
     unmet = sum(1 for t in s.recent_unmet if t >= window)
     abandon = sum(1 for t in s.recent_abandon if t >= window)
-    recent_verticals = [v for v, ts in s.orders_by_vertical.items() if any(t >= now - timedelta(days=60) for t in ts)]
-    risk = s.persona.churn * (1 + CHURN_UNMET * unmet) * (1 + CHURN_ABANDON * abandon)
-    return risk * (MULTI_VERTICAL_RETENTION if len(recent_verticals) >= 2 else 1.0)
+    since = now - timedelta(days=COMBO_WINDOW_DAYS)
+    combo = combo_of_verticals(v for v, ts in s.orders_by_vertical.items() if any(t >= since for t in ts))
+    retention = expected_retention(s.archetype if combo == NONE_COMBO else combo)
+    risk = (1 + CHURN_UNMET * unmet) * (1 + CHURN_ABANDON * abandon)
+    return retention ** (gap / 30 * risk)
 
 
 def _maybe_wish(rng, week: float):

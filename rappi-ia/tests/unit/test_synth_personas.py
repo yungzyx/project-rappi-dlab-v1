@@ -5,6 +5,7 @@ Sin base de datos: el catálogo se arma a mano con los ítems que cada persona p
 
 import io
 import random
+from collections import Counter
 from datetime import datetime, timedelta
 
 import pytest
@@ -14,6 +15,7 @@ from rappi_ia.events import synth
 
 ASIAN_CONCEPTS = {"sushi", "asiatica", "despensa-asiatica", "bebidas-asiaticas", "snacks-asiaticos"}
 ASIAN_VERTICALS = {"restaurantes", "supermercado", "turbo", "conveniencia"}
+ALL_GROUPS = "rest+turbo+retail"  # el arquetipo que deja a la persona con todos sus verticales
 START = datetime(2026, 4, 1, tzinfo=synth.CHILE)
 END = START + timedelta(weeks=26)
 
@@ -39,7 +41,14 @@ def _simulate(persona: synth.Persona, users: int = 60, seed: int = 7) -> dict[st
     buffers = {key: io.StringIO() for key in ("users", "events", "orders", "lines")}
     counts = {"usuarios": 0, "eventos": 0, "pedidos": 0}
     for n in range(users):
-        state = synth.UserState(f"syn-{seed}-{n:05d}", persona, "Santiago", persona.cadence_days)
+        state = synth.UserState(
+            f"syn-{seed}-{n:05d}",
+            persona,
+            "Santiago",
+            8.0,
+            ALL_GROUPS,
+            synth.effective_interests(persona, ALL_GROUPS),
+        )
         synth._simulate_user(rng, catalog, state, START + timedelta(days=n % 40), END, START, buffers, counts)
     return {key: buffer.getvalue() for key, buffer in buffers.items()}
 
@@ -95,3 +104,63 @@ def test_the_generator_is_deterministic_with_the_same_seed():
 
     assert _simulate(persona, seed=11) == _simulate(persona, seed=11)
     assert _simulate(persona, seed=11) != _simulate(persona, seed=12)
+
+
+def test_archetypes_follow_rappi_shares():
+    rng = random.Random(1)
+    n = 20000
+    counts = Counter(synth.draw_archetype(rng) for _ in range(n))
+    assert counts["rest"] / n == pytest.approx(62.6 / 93.4, abs=0.015)  # 93.4 = suma de las 7 filas sin favor
+    assert set(counts) == {"rest", "turbo", "rest+turbo", "retail", "rest+retail", "rest+turbo+retail", "turbo+retail"}
+    assert sum(synth.ARCHETYPES.values()) == pytest.approx(1)
+
+
+def test_effective_interests_stay_in_the_archetype_groups():
+    familia = _persona("familia")
+    eff = synth.effective_interests(familia, "rest+turbo")
+    assert set(eff) <= {"restaurantes", "turbo"} and eff["turbo"]  # turbo sale del súper de la familia
+    assert "panales" not in eff["turbo"] and "alimentacion-bebe" not in eff["turbo"]  # sin bebé fuera del súper
+    assert eff["restaurantes"] == familia.interests["restaurantes"]
+
+
+def test_what_goes_to_turbo_has_no_alcohol_baby_health_or_sensitive_concepts():
+    concepts = load_taxonomy().concepts
+    for persona in synth.PERSONAS:
+        for archetype in synth.ARCHETYPES:
+            eff = synth.effective_interests(persona, archetype)
+            copied = set(eff.get("turbo", {})) - set(persona.interests.get("turbo", {}))
+            for concept in copied:
+                c = concepts[concept]
+                assert not (c.sensitive or c.age_restricted or c.parent in ("bebe", "salud")), (persona.id, concept)
+
+
+def test_missing_groups_use_the_generic_interests():
+    delivery = _persona("delivery")  # solo restaurantes
+    eff = synth.effective_interests(delivery, "turbo+retail")
+    assert eff == {"turbo": synth.GENERIC_INTERESTS["turbo"], "supermercado": synth.GENERIC_INTERESTS["supermercado"]}
+    rutina = _persona("rutina")  # solo súper
+    assert synth.effective_interests(rutina, "rest")["restaurantes"] == synth.GENERIC_INTERESTS["restaurantes"]
+
+
+def test_generic_interests_have_no_alcohol_baby_health_or_sensitive_concepts():
+    concepts = load_taxonomy().concepts
+    for interests in synth.GENERIC_INTERESTS.values():
+        for concept in interests:
+            c = concepts[concept]
+            assert not (c.sensitive or c.age_restricted or c.parent in ("bebe", "salud")), concept
+
+
+def test_fallback_concepts_prefer_what_the_catalog_has():
+    """Con un catálogo, lo que se copia a un grupo vacío se queda con lo que ese vertical vende: sin eso, toda la
+    persona del arquetipo terminaría en búsquedas sin resultado."""
+    familia = _persona("familia")
+    catalog = synth.Catalog(
+        items={("turbo", "gaseosas"): [("catalog_item", "t-1", 990.0)]}, edges={}, names={}, ranked={}
+    )
+    assert synth.effective_interests(familia, "turbo", catalog) == {"turbo": {"gaseosas": 2}}
+
+
+def test_cadence_follows_orders_per_user():
+    assert synth.archetype_cadence("rest+turbo+retail") < synth.archetype_cadence("rest+turbo")
+    assert synth.archetype_cadence("rest+turbo") < synth.archetype_cadence("rest")
+    assert synth.archetype_cadence("rest") == pytest.approx(30 / (1.9 * synth.SESSIONS_PER_ORDER))

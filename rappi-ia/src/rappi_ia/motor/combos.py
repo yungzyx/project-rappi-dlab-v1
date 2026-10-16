@@ -127,13 +127,14 @@ def expected_retention(combo: str, learned: dict[str, tuple[int, float]] | None 
 
 def next_step(combo: str, learned: dict[str, tuple[int, float]] | None = None) -> tuple[str, str, float] | None:
     """El grupo que más retención gana al sumarlo: `(grupo_a_sumar, combinación_objetivo, ganancia)`. `None` si la
-    persona no tiene pedidos, ya usa los tres grupos o ningún grupo suma retención."""
-    if combo == NONE_COMBO:
+    persona no tiene pedidos, ya usa los tres grupos, ningún grupo suma retención o la combinación no se arma con los
+    grupos (Favor)."""
+    have = combo.split("+")
+    if not set(have) <= set(GROUP_ORDER):  # también `ninguna`
         return None
     current = expected_retention(combo, learned)
     if current is None:
         return None
-    have = combo.split("+")
     best: tuple[str, str, float] | None = None
     for group in GROUP_ORDER:
         if group in have:
