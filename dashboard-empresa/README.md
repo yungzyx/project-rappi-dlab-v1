@@ -117,7 +117,7 @@ Todo el panel se lee como un informe: cada sección abre con su titular numéric
 - **Afinidad dirigida A → B**: confianza P(B | A), lift y usuarios. Las aristas aprendidas de datos simulados **no las usa el agente**.
 - **Retención multi-vertical vs un vertical por estrato**, con el mismo número de compras en cada comparación (una compra es un carro: dividido en dos verticales son dos pedidos). Descarta la explicación más evidente (quien pide más también usa más verticales), pero no mide causa: eso solo lo da un A/B con grupo de control (holdout). En la simulación la diferencia existe por construcción (ver el aviso de arriba).
 
-![Entre verticales: sugerencias del agente, afinidad y retención](docs/screenshots/4-verticales-escritorio-claro.jpg)
+![Entre verticales: sugerencias del agente, servicios sin catálogo, afinidad, retención, combinaciones de verticales (la tabla de Rappi junto a la medida con datos simulados) y la evaluación del motor](docs/screenshots/4-verticales-escritorio-claro.jpg)
 
 *Datos simulados: muestran la mecánica, no evidencia.*
 

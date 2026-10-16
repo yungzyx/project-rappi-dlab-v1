@@ -1,13 +1,13 @@
-# rappi-dlab · Que Rappi se conozca más allá de una vertical
+# rappi-dlab · Un motor que conecta las verticales de Rappi
 
-Propuesta para Rappi Chile: un **prototipo navegable de la app** en el que Mochi, la mochila de Rappi con bigote, vive en la Home, busca contigo y te invita a descubrir verticales que no usas. Detrás hay datos reales: el catálogo público de rappi.cl en Postgres + pgvector, una búsqueda híbrida evaluada y una capa de datos que entiende qué es cada producto.
+Propuesta para Rappi Chile: un **motor multivertical** en la base de datos que aprende, de cada persona y de la población, qué verticales usa, cuál conviene sumarle y qué le toca pedir de nuevo. Un **prototipo navegable de la app** lo muestra: la Home ordena sus accesos según el uso de cada persona y Mochi, la mochila de Rappi con bigote, propone la siguiente vertical siguiendo la escalera Restaurantes → Turbo → Retail, que parte de la tabla de combinaciones que compartió el equipo de Rappi. Detrás hay datos reales: el catálogo público de rappi.cl en Postgres + pgvector, una búsqueda híbrida evaluada y una capa de datos que entiende qué es cada producto.
 
 > [!NOTE]
 > Proyecto independiente: no está afiliado a Rappi ni cuenta con su respaldo. Rappi y las demás marcas mencionadas pertenecen a sus respectivos dueños.
 
 [![CI](https://github.com/yungzyx/rappi-dlab/actions/workflows/ci.yml/badge.svg)](https://github.com/yungzyx/rappi-dlab/actions/workflows/ci.yml)
 
-<img src="prototipo-app/docs/screenshots/00-modo-demo.jpg" width="320" alt="Prototipo final: Mochi en la Home y el buscador con Mochi">
+<img src="prototipo-app/docs/screenshots/00-modo-demo.jpg" width="320" alt="Prototipo final: la Home con la barra «Busca o pídele ideas a Mochi», los accesos Restaurantes y Turbo, la fila de verticales y Mochi saludando">
 
 *El prototipo final. El interruptor de arriba (tecla **D**) alterna con la app como es hoy.*
 
@@ -15,77 +15,116 @@ Propuesta para Rappi Chile: un **prototipo navegable de la app** en el que Mochi
 
 Vista desde fuera, como usuarios de la app, cada vertical de Rappi parece funcionar como un silo: lo que una persona compra o busca en el supermercado no parece cambiar lo que se le recomienda en licores, farmacia o restaurantes. La hipótesis: muchas personas usan una o dos verticales y no llegan a las demás.
 
-La señal existe: cada búsqueda y cada pedido dice algo de quien lo hace. Pero no se ve que cruce de una vertical a otra, y con ella se pueden perder venta cruzada y frecuencia. El proyecto no tiene acceso a datos internos: con ellos, Rappi puede confirmarlo o descartarlo. Detalle en [docs/contexto-y-problema.md](docs/contexto-y-problema.md).
+La tabla que compartió el equipo de Rappi apunta en esa dirección. La mayoría usa una sola vertical en el mes, y quienes combinan más vuelven más al mes siguiente:
+
+| Verticales usadas en el mes | % de usuarios | Pedidos por usuario | Vuelven al mes siguiente |
+|---|---:|---:|---:|
+| Solo Restaurantes | 62,6 % | 1,9 | 47 % |
+| Restaurantes + Turbo | 6,6 % | 5,5 | 82 % |
+| Restaurantes + Retail | 5,4 % | 4,7 | 76 % |
+| Restaurantes + Turbo + Retail | 4,7 % | 10,5 | 93 % |
+| Todo Chile | 100 % | 3,0 | 55 % |
+
+*Dato compartido por Rappi: cohortes de enero a junio de 2026, agrupación gruesa de verticales. Tabla completa en la [especificación del motor](docs/superpowers/specs/2026-10-16-motor-multivertical-design.md#3-dato-de-partida-chile--verticals-used-together).*
+
+Es una **correlación, no un efecto**: quien ya pide mucho usa más verticales y además vuelve más. No prueba que sumarle una vertical a alguien lo retenga; eso solo lo mide un experimento A/B con grupo de control. Más contexto en [docs/contexto-y-problema.md](docs/contexto-y-problema.md).
 
 ## La propuesta
 
-**Buscar dentro de la vertical, entender a través de las verticales, e invitar a descubrir las que la persona no usa.** El prototipo final lo muestra en dos piezas:
+**Buscar dentro de la vertical, entender a través de las verticales, e invitar a descubrir las que la persona no usa.**
+
+- **Buscar dentro de la vertical:** la búsqueda responde en las verticales que corresponden a la consulta y muestra un grupo por vertical, sin mezclar sus índices.
+- **Entender a través de las verticales:** los intereses se guardan como conceptos comunes a todas (cerveza, snacks salados, pañales…), y el motor suma lo que la persona hace en cada vertical.
+- **Invitar a descubrir:** la tabla de Rappi es el punto de partida para elegir qué vertical sumar. Quien pide en Restaurantes ve primero Turbo; quien ya combina esas dos, Retail. El motor lo mezcla con lo que aprende de la población (hoy simulada) y cada sugerencia dice por qué.
+
+### Lo que está construido
 
 | Pieza | Qué hace |
 |---|---|
-| **Mochi en la Home** | Mochi de cuerpo entero vive en la Home, sin canal aparte para escribirle. Saluda, acompaña el plan del día («¿Qué plan tienes hoy?», un kit de varias verticales) y, al tocarlo, propone una vertical por probar. |
-| **Recomendaciones conectadas** | Mochi sugiere la siguiente vertical siguiendo la escalera **Restaurantes → Turbo → Retail**, que parte de la tabla de combinaciones que compartió Rappi (qué combinaciones retienen más), y la mezcla con lo que el motor aprende de la población. Cada sugerencia dice por qué («Porque pides …. Para acompañar: …, en ….»), sin afirmar lo que hace la población (la fuente queda en la `basis`). También propone repetir lo que la persona pide con ritmo («¿Repetimos …? Pides cada 14 días.»). |
-| **Home que aprende el orden** | Los accesos pequeños de la Home (Grocery, Pharmacy, Retail, Liquor, Express, Chocolates) se ordenan según lo que cada persona pide y abre: sus pedidos y sus toques. Quien no tiene historial ve el orden fijo. Restaurantes y Turbo no se mueven, Loyalty y Benefits Pro quedan siempre al final y «Rappi hoy» no cambia. Es un pedido del equipo de Rappi. |
-| **Buscador con Mochi** | La barra de la Home abre el buscador de siempre con lo que Mochi sabe de ti: lo aprendido (con «Olvidar»), ideas para tocar («Arma un carrete»), búsqueda de tiendas y productos y «Descubre con Mochi». Se toca; no se escribe. |
+| **Motor multivertical** | En la base de datos, siete tablas con vistas estables en el esquema `capa`. Guarda la afinidad de cada persona por cada vertical, las transiciones entre verticales y las combinaciones con su retención (la tabla de Rappi medida con los datos propios). Suma la compra cruzada entre verticales, lo más pedido y lo que sube, y la recompra (qué concepto pide cada persona con ritmo y cuándo le toca). Se evalúa por fechas (entrenar, validar, probar) y elige sus pesos en validación. Lo personal sale de los datos de cada persona; lo de la población, de una fuente declarada en cada oferta (hoy, personas simuladas). |
+| **Home que aprende el orden** | Los seis accesos pequeños de la Home (Grocery, Pharmacy, Retail, Liquor, Express, Chocolates) se ordenan según lo que cada persona pide y abre, con la leyenda «Ordenadas según lo que más usas». Quien no tiene historial ve el orden fijo. Restaurantes y Turbo no se mueven, Loyalty y Benefits Pro quedan siempre al final y «Rappi hoy» no aprende. Es un pedido del equipo de Rappi. |
+| **Mochi en la Home, con recomendaciones conectadas** | Mochi de cuerpo entero vive en la Home, sin un canal aparte para escribirle. Saluda, acompaña el plan del día («¿Qué plan tienes hoy?», un kit de varias verticales) y, al tocarlo, propone la siguiente vertical de la escalera con su porqué. Dentro de esa vertical ofrece lo que suelen sumar quienes piden lo mismo o, si no hay un patrón, lo más pedido ahí. Cuando a la persona le toca, propone repetir («¿Repetimos …? Pides cada N días.»). |
+| **Buscador con Mochi** | La barra de la Home abre el buscador de siempre con lo que Mochi sabe de la persona: lo aprendido (con «Olvidar»), ideas para tocar («Arma un carrete»), búsqueda de tiendas y productos, y «Descubre con Mochi». Se toca; no se escribe. |
 
-| La Home | El buscador con Mochi |
-|:---:|:---:|
-| <img src="prototipo-app/docs/screenshots/01-home-final.jpg" width="190" alt="Home con Mochi"> | <img src="prototipo-app/docs/screenshots/20-asistente.jpg" width="190" alt="Buscador con Mochi"> |
+| La Home que aprende | Mochi propone una vertical | «¿Repetimos?» | El buscador con Mochi |
+|:---:|:---:|:---:|:---:|
+| <img src="prototipo-app/docs/screenshots/03-home-dinamica.jpg" width="170" alt="Home con los accesos reordenados: Chocolates y Retail primero, con la leyenda «Ordenadas según lo que más usas»"> | <img src="prototipo-app/docs/screenshots/22-vertical-por-probar.jpg" width="170" alt="Mochi en la Home pregunta «¿Y si pruebas algo de Súper?» y, en «¿Por qué?», dice «Porque aún no pides en el súper», con los botones Abrir el súper y Después"> | <img src="prototipo-app/docs/screenshots/21-recompra.jpg" width="170" alt="Bloque de ejemplo «¿Repetimos café? Pides cada 7 días.» con un café molido del catálogo, Ver producto y Después"> | <img src="prototipo-app/docs/screenshots/20-asistente.jpg" width="170" alt="Buscador con Mochi tras tocar «Arma un carrete»: cervezas y botillerías"> |
+| Alguien abrió dos veces Chocolates y una vez Retail: esos accesos suben. | Esa persona solo abrió accesos y nunca pidió: Mochi le propone el súper y dice por qué. | Ejemplo armado con la respuesta de muestra de la API y un café real del catálogo; no es un hábito medido. | «Arma un carrete» junta productos y tiendas para la ocasión. |
 
 ### Cómo cruza las verticales
 
-La app busca en las verticales que corresponden a la consulta (las de su concepto o su ocasión, como «carrete»; sin ninguno, en todas, y quedan solo las que calzan las palabras o se parecen mucho) y muestra un grupo por vertical, con la de la pantalla primero. Los intereses se guardan como **conceptos** comunes a todas (cerveza, snacks salados, pañales…), y una recomendación cruzada sigue tres pasos: concepto → complemento → búsqueda en la otra vertical.
+La app busca en las verticales que corresponden a la consulta (las de su concepto o su ocasión, como «carrete»; sin ninguno, en todas, y quedan solo las que calzan las palabras o se parecen mucho) y muestra un grupo por vertical, con la de la pantalla primero. Una recomendación cruzada sigue tres pasos: concepto → complemento → búsqueda en la otra vertical.
 
 | Lo que hace la persona | Concepto | Complemento | Dónde se busca | Qué ve |
 |---|---|---|---|---|
 | Pide cerveza bajo $3.000 en Licores | cerveza | snacks salados | la vertical donde el concepto es más típico entre las que tienen oferta suficiente (Express) | «De Express · ¿Te tinca sumar snacks salados? Porque llevas cerveza», con «Ver más en Express» |
 | Compra pañales en el supermercado | pañales | alimentación de bebé | la vertical donde ese concepto es más típico (farmacia), no la de más ítems | «De Farmacia · ¿Te tinca sumar alimentación de bebé? Porque llevas pañales» |
 
-Las sugerencias siguen reglas para no perder la confianza del cliente: como máximo una sugerencia cruzada por respuesta y con su razón visible; nunca productos sensibles por iniciativa propia (medicamentos, salud sexual, tabaco y vapeo; Farmacia se puede jugar pero nunca se propone); Mochi nunca ofrece alcohol por su cuenta: solo aparece en el kit de una ocasión que la persona eligió, siempre con el aviso +18; y lo aprendido se ve y se borra («Olvidar»).
+**La escalera.** Para elegir qué vertical sumarle a cada persona, el motor parte de la tabla de Rappi y la mezcla con la retención aprendida de la población. Dentro de la vertical elegida, la compra cruzada mezcla lo más pedido con las reglas aprendidas («quien pide A en una vertical pide B en otra»), con un peso λ que se elige en validación. Si la persona compra una marca, esa marca gana a la combinación en un empate. Cada oferta dice en su `basis` de qué fuente salió, y el texto no afirma lo que hace la población («Porque pides …. Para acompañar: …, en ….»).
 
-**La escalera.** El motor decide qué vertical sumarle a cada persona con la tabla de combinaciones de Rappi como punto de partida (es una correlación, no un efecto: quien pide mucho usa más verticales y además vuelve más) y la mezcla con la retención aprendida de la población, que hoy es simulada. Quien pide en Restaurantes ve primero Turbo, y quien ya combina esas dos, Retail. Dentro de la vertical elegida ofrece lo que quienes piden lo mismo suelen sumar (compra cruzada); si no hay un patrón, lo más pedido ahí. Si la persona compra una marca, esa marca gana a la combinación en un empate. Cómo aprende y cuánto se equivoca: [Motor multivertical](#motor-multivertical-datos-simulados-prueban-la-mecánica-no-el-efecto).
-
-El efecto real (frecuencia, venta cruzada, verticales nuevas por persona) solo se puede medir con datos de Rappi y un experimento A/B con grupo de control.
+Las sugerencias siguen reglas para no perder la confianza del cliente: como máximo una sugerencia cruzada por respuesta, con su razón visible; nunca productos sensibles por iniciativa propia (medicamentos, salud sexual, tabaco y vapeo). Farmacia y Licores solo suben en la Home por señales de la propia persona y nunca se proponen por iniciativa propia. Mochi nunca ofrece alcohol por su cuenta: solo aparece en el kit de una ocasión que la persona eligió, siempre con el aviso +18. Lo aprendido se ve y se borra («Olvidar»).
 
 ## Cómo funciona
 
-![Flujo de datos por etapas: descarga, Postgres, IA offline, consulta, prototipo y panel](docs/diagramas/rag-datos.png)
+![Motor multivertical: señales y pedidos de la persona, y la tabla de Rappi, pasan por afinidad, recompra, paso de combinación y compra cruzada hasta la Home dinámica y las ofertas de Mochi](docs/diagramas/motor-flujo.png)
+
+*El motor: lo de la persona (verde) ordena la Home y decide la recompra; la tabla de Rappi y lo aprendido de la población (gris) eligen la vertical por probar y sus productos. [Versión interactiva](docs/diagramas/motor-flujo.html).*
 
 1. **Descarga (semanal).** `rappi refresh` lee las páginas públicas de rappi.cl y guarda catálogo, menús y precios con historial.
 2. **Postgres + pgvector.** El catálogo (capa 1) y `search_documents`, una partición por vertical.
-3. **IA offline.** Cada producto y plato recibe un concepto (capa 2), y los conceptos se enlazan con sus complementos. Una capa de datos suma atributos, medidas, marcas, un grafo de conocimiento y segmentos, y los expone en el esquema `capa` ([docs/capa-de-datos.md](docs/capa-de-datos.md)). Cada documento recibe un embedding de un modelo local multilingüe (e5), con un índice vectorial por vertical. Opcionalmente, y solo en este proceso semanal, Jev (el modelo «System One» de TypeSafe) etiqueta las categorías nuevas y suma un juez a la evaluación; viene apagado hasta que se ponga una clave y un piloto lo apruebe ([docs/jev.md](docs/jev.md)).
-4. **Consulta.** Búsqueda híbrida por vertical (la app consulta las verticales de la consulta, las de su concepto o su ocasión, o todas si no detecta ninguno, y muestra un grupo por vertical): por palabras y por significado, combinadas por posición (RRF) y reforzadas por el concepto pedido. Mochi arma la respuesta y la sugerencia cruzada.
-5. **Prototipo.** La API (FastAPI, puerto 8000) atiende al prototipo (5174). El prototipo no abre sin la API: muestra «Sin conexión con Mochi» (se levantan juntos con `make mvp`). Las verticales, las tiendas con sus pasillos, los restaurantes con su menú, Turbo, Ofertas, Favoritos y la Home leen el catálogo real de la API (`/catalog`); el buscador y Mochi (preguntas, kits, comentarios, «Para ti» y lo aprendido) también salen de la API, sin datos ni respuestas locales.
+3. **IA offline.** Cada producto y plato recibe un concepto (capa 2), y los conceptos se enlazan con sus complementos. Una capa de datos suma atributos, medidas, marcas, un grafo de conocimiento y segmentos, y al final el **motor multivertical** (`make layers`, también dentro de `make post-refresh`), todo expuesto en el esquema `capa` ([docs/capa-de-datos.md](docs/capa-de-datos.md#motor-multivertical)). Cada documento recibe un embedding de un modelo local multilingüe (e5), con un índice vectorial por vertical. Opcionalmente, y solo en este proceso semanal, Jev (el modelo «System One» de TypeSafe) etiqueta las categorías nuevas y suma un juez a la evaluación; viene apagado hasta que se ponga una clave y un piloto lo apruebe ([docs/jev.md](docs/jev.md)).
+4. **Consulta.** Búsqueda híbrida por vertical: por palabras y por significado, combinadas por posición (RRF) y reforzadas por el concepto pedido. Mochi arma la respuesta y la sugerencia cruzada.
+5. **API y prototipo.** La API (FastAPI, puerto 8000) atiende al prototipo (5174) y al panel (5175). El orden de la Home sale de `GET /profile/{id}/verticales` y las ofertas de Mochi de `POST /agent/offer` (vertical por probar, recompra, carro, próximo pedido…). Después de cada pedido, la API recalcula la afinidad y la recompra de esa persona. Las verticales, las tiendas con sus pasillos, los restaurantes con su menú, Turbo, Ofertas y Favoritos leen el catálogo real (`/catalog`). El prototipo no abre sin la API: muestra «Sin conexión con Mochi».
 
-**Mochi** en la API responde solo por texto (`POST /agent/ask`); el prototipo lo usa como buscador. Su nombre visible sale de `AGENT_NAME` (rappi-ia) y de `prototipo-app/src/agent/name.js`. Reconoce servicios sin catálogo (un viaje lleva a **RappiTravel**, un envío o trámite a **RappiFavor**). Arma perfiles de gusto (el sushi abre «Amante de lo asiático») y ofrece lo de ese gusto en otras verticales, de a un peldaño; la API los sirve y la app todavía no los usa. Sin clave de API responde con plantillas; con clave, Claude solo redacta sobre lo que el código ya recuperó y verificó. Diseño completo: [docs/diseno-ia.md](docs/diseno-ia.md).
+![Flujo de datos por etapas: descarga, Postgres, IA offline con el motor, consulta, prototipo y panel](docs/diagramas/rag-datos.png)
+
+**Mochi** en la API responde solo por texto (`POST /agent/ask`); el prototipo lo usa como buscador y con ofertas. Su nombre visible sale de `AGENT_NAME` (rappi-ia) y de `prototipo-app/src/agent/name.js`. Reconoce servicios sin catálogo (un viaje lleva a **RappiTravel**, un envío o trámite a **RappiFavor**). También arma perfiles de gusto (el sushi abre «Amante de lo asiático») y ofrece lo de ese gusto en otras verticales, de a un peldaño; la API los sirve y la app todavía no los usa. Sin clave de API responde con plantillas; con clave, Claude solo redacta sobre lo que el código ya recuperó y verificó. Diseño completo: [docs/diseno-ia.md](docs/diseno-ia.md).
 
 ## Grafos y diagramas
 
 | Qué | Para qué | Dónde |
 |---|---|---|
+| Motor multivertical | De las señales y pedidos de la persona, y de la tabla de Rappi, a la Home dinámica y las ofertas de Mochi | [PNG](docs/diagramas/motor-flujo.png) · [interactivo](docs/diagramas/motor-flujo.html) |
+| Flujo de datos | Del catálogo a la respuesta de Mochi, con el motor | [PNG](docs/diagramas/rag-datos.png) · [interactivo](docs/diagramas/rag-datos.html) |
+| Arquitectura por carriles | Qué hace cada pieza de la IA | [PNG](docs/diagramas/arquitectura-ia.png) · [interactivo](docs/diagramas/arquitectura-ia.html) |
 | Mapa multivertical | Qué productos y conceptos comparten las verticales, con complementos, sustitutos y «nunca junto» | [docs/mapas/mapa-multivertical.html](docs/mapas/mapa-multivertical.html) (descargar y abrir; se regenera con `rappi-ia multivertical`) |
 | Mapa de conceptos | Cada concepto junto a la vertical donde es más típico (la regla de Mochi) | [docs/mapas/mapa-conceptos.jpg](docs/mapas/mapa-conceptos.jpg) |
-| Flujo de datos | Del catálogo a la respuesta de Mochi | [PNG](docs/diagramas/rag-datos.png) · [interactivo](docs/diagramas/rag-datos.html) |
-| Arquitectura por carriles | Qué hace cada pieza de la IA | [PNG](docs/diagramas/arquitectura-ia.png) · [interactivo](docs/diagramas/arquitectura-ia.html) |
 | Scraper | Cómo se descarga el catálogo | [PNG](docs/diagramas/scraper-flujo.png) · [interactivo](docs/diagramas/scraper-flujo.html) |
 | Despliegue | El MVP en un servidor: Caddy con la puerta, la API, Postgres y los respaldos | [PNG](docs/diagramas/despliegue.png) · [interactivo](docs/diagramas/despliegue.html) |
 
-<img src="docs/mapas/mapa-conceptos.jpg" width="520" alt="Mapa de conceptos: cada concepto junto a la vertical donde es más típico">
-
 ## Resultados
 
-Cada cifra dice qué tipo de dato es: real, evaluación automática, estimación o simulación.
+Cada cifra dice qué tipo de dato es: real, evaluación automática, estimación, simulación o dato compartido por Rappi.
+
+### Motor multivertical (datos simulados: prueban la mecánica, no el efecto)
+
+Corrida del 16-10-2026 (`rappi-ia motor`) sobre una copia del catálogo real y **3.000 personas simuladas**, con tramos por fecha: entrenar, validar y probar (28 días cada uno de los dos últimos). Son las cifras vigentes, después de la mejora continua de la etapa 5. Informe completo, intentos descartados y ruido entre semillas: [docs/resultados/motor-2026-10-16.md](docs/resultados/motor-2026-10-16.md#resultado-final-código-de-esta-etapa-semilla-7-rappi-ia-motor).
+
+| Qué | Métrica (tramo de prueba) | Valor | Tipo de dato |
+|---|---|---|---|
+| Próximo vertical | nDCG@8 | combinado 0,958 · solo afinidad 0,957 · popularidad 0,898 · orden fijo 0,892 | Simulado |
+| Compra cruzada | precisión@3 | mezcla 0,128 · lo más pedido 0,128. En validación λ quedó en 0, así que hoy las reglas no cambian lo que se ofrece. Entre las 47 personas con alguna regla: reglas 0,128 frente a 0,106 de lo más pedido (pocas personas) | Simulado |
+| Recompra | acierto ±7 días | 0,114 (9 de 79 predicciones), error mediano de 9 días | Simulado |
+| Generador simulado | distancia a la tabla de Rappi | 23,3 → 18,2 (se acercó al sumar Turbo a las sugerencias simuladas) | Simulado, comparado con el dato compartido por Rappi |
+
+Cómo leerlo: la ventaja del combinado viene casi entera de la afinidad de cada persona, y el generador hace que cada persona repita sus verticales, así que en parte acierta por construcción. El generador se calibró con la tabla de Rappi y la trata como efecto, así que sus cifras no prueban que sumar verticales retenga. La agrupación de verticales en `rest`, `turbo` y `retail` es un supuesto propio. Detalle: [docs/capa-de-datos.md](docs/capa-de-datos.md#motor-multivertical).
+
+**Revisión sobre el catálogo real** ([QA del 16-10-2026](docs/resultados/qa-motor-2026-10-16.md), en solo lectura, con 200 personas simuladas y las 44 del prototipo): las guardias (Farmacia, Licores, bebé, salud, conceptos sensibles, alcohol) dieron **0 casos en 2.851 productos ofrecidos**, y la ruta más lenta (`/recommendations`) respondió con p95 de 222 ms con el modelo de texto.
+
+### Catálogo, conceptos y búsqueda
 
 | Ámbito | Métrica | Valor | Tipo de dato | Fuente |
 |---|---|---|---|---|
 | Catálogo | Documentos de búsqueda | 253.945: 84.024 productos, 165.623 platos y 4.298 tiendas | Real (catálogo público) | Base `rappi`, descarga del 04-10-2026 (contada el 05-10) |
 | Catálogo | Documentos con embedding | 100 % (`intfloat/multilingual-e5-base`, 768 dim, HNSW por vertical) | Real | Base `rappi`, 04-10-2026 |
-| Capa 2 | Taxonomía | 133 conceptos · 103 complementos curados · 818 categorías con mapeo revisado | Curado a mano; mapa de categorías generado con LLM y versionado | `make concepts`, 06-10-2026 |
+| Capa 2 | Taxonomía | 136 conceptos (116 tipos de producto en 20 grupos) · 106 complementos curados · 900 categorías, secciones de menú y cocinas con mapeo revisado | Curado a mano; mapa de categorías generado con LLM y versionado | `taxonomy.toml`, `complements.toml` y `category_map.csv`, contados el 16-10-2026 |
 | Capa 2 | Precisión de la asignación | 86 % por regla de nombre, 88 % por mapeo y 88 % por vecinos, en una muestra nueva tras corregir las reglas (antes: 81, 82 y 57 %) | **Estimación** con jueces LLM | [antes](docs/resultados/capas-precision-2026-10-06.md) · [después](docs/resultados/capas-precision-2026-10-06-nueva-muestra.md) |
 | Capa de datos | Atributos, marcas y grafo | 83 atributos sobre 79.617 ítems · 6.359 marcas · 23.534 productos canónicos · 32.105 aristas en 12 relaciones | Real, con reglas propias; atributos 92 % y marcas 97 a 99 % de precisión estimada | `make layers`, 06-10-2026 |
 | Búsqueda | nDCG@10 | híbrido 0,917 · sin refuerzo por concepto 0,860 · vectorial 0,849 · léxico 0,776 | Evaluación automática | [reporte del 06-10](docs/resultados/busqueda-2026-10-06.md) |
 | Búsqueda | «Sin resultado» | precisión 1,00 (0 falsas alarmas) · recall 0,73 (30 de 41) | Evaluación automática | [reporte del 06-10](docs/resultados/busqueda-2026-10-06.md) |
-| Calidad | Tests (11-10-2026) | scraper 262 · rappi-ia 1638 · prototipo 732 · panel 114 | Verificación local y CI | `make test` · `npm test` (conteo con `pytest --collect-only -q` y `npm test`) |
+| Calidad | Tests (16-10-2026) | rappi-ia 2.416 · scraper 271 · prototipo 560 · panel 129 | Verificación local y CI | `make test` · `npm test` |
+
+La búsqueda se evaluó con 124 consultas positivas en las 8 verticales y 41 negativas, con relevancia juzgada automáticamente por concepto ([`queries.json`](rappi-ia/src/rappi_ia/eval/queries.json)). Por tipo de consulta, el híbrido logra 0,988 en las exactas, 0,973 sin tildes y 0,712 en necesidades en lenguaje natural («algo para el carrete»), frente a 0,563 del léxico. Detalle por vertical y con la historia de cada reevaluación: [docs/resultados/](docs/resultados/).
 
 ### Catálogo por vertical
 
@@ -102,26 +141,11 @@ Cada cifra dice qué tipo de dato es: real, evaluación automática, estimación
 
 Documentos al 04-10-2026 (segunda descarga semanal automática); «Con concepto», del 06-10. En tiendas es una muestra: la página pública muestra hasta 24 productos por sub-pasillo. Turbo quedó con los precios del 27-09 (ver [Límites](#límites)).
 
-### Motor multivertical (datos simulados: prueban la mecánica, no el efecto)
-
-Corrida del 16-10-2026 (`rappi-ia motor`) sobre una copia del catálogo real y **3.000 personas simuladas**, con tramos por fecha: entrenar, validar y probar (28 días cada uno de los dos últimos; 365 personas en la prueba). Cifras después de la mejora continua de la etapa 5 (un generador más cercano a la tabla de Rappi; la recompra no cambió). Informe completo, intentos descartados y ruido entre semillas en [docs/resultados/motor-2026-10-16.md](docs/resultados/motor-2026-10-16.md#mejora-continua-etapa-5-datos-simulados).
-
-| Qué | Métrica | Valor | Tipo de dato |
-|---|---|---|---|
-| Próximo vertical | nDCG@8 | combinado 0,958 · solo afinidad 0,957 · popularidad 0,898 · orden fijo 0,892 | Simulado |
-| Compra cruzada | precisión@3 | **mezcla** de lo más pedido y las reglas 0,128 · lo más pedido 0,128 (365 personas). En validación λ quedó en 0, así que hoy las reglas no cambian lo que se ofrece; en la prueba, entre las 47 con regla, reglas 0,128 frente a 0,106 de lo más pedido (pocas personas) | Simulado |
-| Recompra | acierto ±7 días | 0,114 sobre 79 predicciones (volvieron a comprar el 24 %; error mediano de 9 días). Una variante más estricta (4 compras) subió a 0,177 en la prueba, pero no en validación y se descartó | Simulado |
-
-El generador de datos simulados se calibró con la tabla de combinaciones de verticales y retención que **compartió el equipo de Rappi** (dato compartido por Rappi, cohortes de enero a junio de 2026): es una correlación, no un efecto, y el simulador la trata como efecto, así que sus cifras no prueban que sumar verticales retenga. La agrupación de verticales en `rest`, `turbo` y `retail` es un supuesto propio. Detalle: [docs/capa-de-datos.md](docs/capa-de-datos.md#motor-multivertical).
-
-### Búsqueda
-
-124 consultas positivas en las 8 verticales y 41 negativas, con relevancia juzgada automáticamente por concepto ([`queries.json`](rappi-ia/src/rappi_ia/eval/queries.json)). Por tipo de consulta, el híbrido logra 0,988 en las exactas, 0,973 sin tildes y 0,712 en necesidades en lenguaje natural («algo para el carrete»), frente a 0,563 del léxico. Detalle, por vertical y con la historia de cada reevaluación: [docs/resultados/](docs/resultados/).
-
 > [!IMPORTANT]
 > **Qué no es evidencia**
 >
-> - **Usuarios y eventos simulados.** Los segmentos y las métricas de negocio usan personas simuladas (`source = 'synthetic'`): muestran la mecánica, no un resultado.
+> - **Usuarios y eventos simulados.** El motor, los segmentos y las métricas de negocio usan personas simuladas (`source = 'synthetic'`): muestran la mecánica, no un resultado.
+> - **La tabla de Rappi** es una correlación: no dice que sumar una vertical retenga.
 > - **La ventaja del híbrido.** La relevancia se juzga por concepto y el híbrido recibe un refuerzo por ese mismo concepto; sin él, no se distingue del vectorial (0,860 frente a 0,849). Falta un juicio humano.
 > - **Las precisiones de la capa 2 y de la capa de datos** son estimaciones con jueces LLM.
 > - **Lo que Mochi aprende de la persona y sus pedidos** es de demo: se guardan en el servidor bajo un id seudónimo del navegador, sin cuenta; la persona los borra con «Borrar mis datos» (Cuenta).
@@ -131,7 +155,7 @@ El generador de datos simulados se calibró con la tabla de combinaciones de ver
 
 ### El MVP (`make mvp`)
 
-Un comando levanta la API de rappi-ia (:8000), la app (:5174) y el panel (:5175). **La app no corre sin la API:** si no responde, muestra «Sin conexión con Mochi» con un botón «Reintentar». Ya no hay una versión que funcione sola en el navegador.
+Un comando levanta la API de rappi-ia (:8000), la app (:5174) y el panel (:5175). **La app no corre sin la API:** si no responde, muestra «Sin conexión con Mochi» con un botón «Reintentar».
 
 Requisitos (el detalle, en [docs/instalacion.md](docs/instalacion.md)):
 
@@ -145,13 +169,13 @@ make mvp LAN=1    # abre la API y la app a la red local, para el iPhone (solo en
 make mvp-check    # recorre el MVP con Chrome contra un catálogo inventado, sin tocar la base real (7 revisiones)
 ```
 
-`make mvp` revisa las dependencias, los puertos y la base (`rappi-ia doctor`, solo lectura), aplica las migraciones pendientes (no las de una rama sin fusionar: `MIGRATE=1` lo fuerza, ver [docs/instalacion.md](docs/instalacion.md#5-el-mvp)), arranca los tres con sus registros prefijados y avisa cuando responden. La API tarda en estar lista porque carga los modelos. No descarga nada de rappi.cl. Qué revisa `make mvp-check`, en [docs/instalacion.md](docs/instalacion.md#5-el-mvp).
+`make mvp` revisa las dependencias, los puertos y la base (`rappi-ia doctor`, solo lectura), aplica las migraciones pendientes (no las de una rama sin fusionar: `MIGRATE=1` lo fuerza, ver [docs/instalacion.md](docs/instalacion.md#5-el-mvp)), arranca los tres con sus registros prefijados y avisa cuando responden. La API tarda en estar lista porque carga los modelos. No descarga nada de rappi.cl. Qué revisa `make mvp-check` (entre otras cosas, la Home dinámica y la combinación), en [docs/instalacion.md](docs/instalacion.md#5-el-mvp).
 
-La tecla **D** (o Account → Settings → Modo demo en el celular) alterna «Prototipo final» y «Rappi hoy». Guion de demo: [docs/demo.md](docs/demo.md).
+La tecla **D** (o Account → Settings → Modo demo en el celular) alterna «Prototipo final» y «Rappi hoy». Guion de demo, con la Home que aprende y la escalera: [docs/demo.md](docs/demo.md).
 
 ### Con el catálogo real
 
-La API lee la base `rappi`, que se restaura desde un respaldo (o se descarga) y se deja al día con la capa de IA: ver [docs/instalacion.md](docs/instalacion.md), secciones 3 y 4. Con ella, Mochi busca en el catálogo real con precios vigentes. En local la API no tiene puerta de acceso (los datos de cada persona sí piden su token de sesión) y por defecto escucha solo en el equipo local (`make mvp LAN=1` y `make serve-lan` la abren a la red, solo en una red de confianza). `make schedule` en `rappi-scraper/` programa la actualización semanal (domingos 03:00) seguida de `make post-refresh` en rappi-ia.
+La API lee la base `rappi`, que se restaura desde un respaldo (o se descarga) y se deja al día con la capa de IA y el motor: ver [docs/instalacion.md](docs/instalacion.md), secciones 3 y 4. Con ella, Mochi busca en el catálogo real con precios vigentes. En local la API no tiene puerta de acceso (los datos de cada persona sí piden su token de sesión) y por defecto escucha solo en el equipo local (`make mvp LAN=1` y `make serve-lan` la abren a la red, solo en una red de confianza). `make schedule` en `rappi-scraper/` programa la actualización semanal (domingos 03:00) seguida de `make post-refresh` en rappi-ia.
 
 ### En un servidor
 
@@ -160,49 +184,54 @@ Una demo cerrada en un servidor Linux con Docker Compose: Caddy con TLS y una pu
 ## Qué es real y qué es simulado
 
 - **Real:** el catálogo, los precios y los menús (de rappi.cl), los conceptos, la capa de datos, la búsqueda y las respuestas de Mochi con la API. Las tiendas, productos, precios, menús y ofertas que muestran las pantallas del prototipo salen de la API; su diseño (títulos, categorías, banners) sigue siendo de recortes de capturas de la app. Lo que la API no sabe (tiempo de entrega, nota, costo de envío) no se muestra.
-- **Simulado:** el pago, el seguimiento del pedido (llega a los 20 s), y los usuarios y eventos para segmentos y métricas.
+- **Simulado:** el pago, el seguimiento del pedido (llega a los 20 s) y las personas, eventos y pedidos de los que el motor aprende la población y con los que se calculan segmentos y métricas.
+- **Compartido por Rappi:** la tabla de combinaciones de verticales y su retención (cohortes de enero a junio de 2026), en `rappi-ia/src/rappi_ia/motor/combos.toml`. Es una correlación, no un efecto.
+- **Uso del MVP:** lo que hicieron en la app las pocas personas que la probaron (`source = 'prototype'`). El panel lo rotula «uso del MVP, pocas personas: no es evidencia».
 - **Uso responsable:** solo páginas públicas sin barreras técnicas, sin APIs internas ni inicio de sesión, una descarga a la vez con pausas de 1,5 a 3 s y una actualización por semana. Sin datos personales: los usuarios son simulados o del prototipo (id seudónimo). Los datos descargados no se publican ni están en el repositorio. Fines de investigación y demostración; un uso comercial requeriría autorización de Rappi.
 
 ## Límites
 
+- **El motor aprende de una población simulada:** sin pedidos reales, las transiciones, las combinaciones, la compra cruzada y lo más pedido salen de personas simuladas (`MOTOR_POBLACION`; con datos de Rappi se cambia la fuente, no el mecanismo). Como en validación λ quedó en 0, la variante «Para tu pedido de …» no aparece en la demo y sale «Lo más pedido en …». Ver [docs/decisiones.md](docs/decisiones.md).
+- **La escalera parte de una correlación:** la tabla de Rappi no prueba que sumar una vertical retenga, y la agrupación en `rest`, `turbo` y `retail` es un supuesto propio. El efecto (frecuencia, retención, verticales por persona) solo se mide con datos de Rappi y un grupo de control.
 - **Cobertura parcial en tiendas:** hasta 24 productos por sub-pasillo y una sucursal por marca o formato. No se listan las tiendas sin ofertas vigentes en un pasillo de primer nivel, ni Mascotas (la base no tiene esa vertical).
 - **Mochi no ofrece por su cuenta alcohol, farmacia, bebé ni salud:** solo el kit de una ocasión que la persona elige puede traer alcohol, con +18. Consecuencia aceptada: hay menos complementos (por ejemplo, «playa» ya no sugiere protector solar). Ver [docs/decisiones.md](docs/decisiones.md).
 - **Turbo sin actualizar:** sus tiendas ya no aparecen como Turbo en los listados públicos que recorre el scraper; sus precios son del 27-09.
-- **Evaluación automática:** no hay juicio humano, y el refuerzo por concepto favorece al híbrido.
-- **«Sin resultado»:** detecta 30 de 41 negativas; el reporte explica las demás.
+- **Evaluación automática:** no hay juicio humano, y el refuerzo por concepto favorece al híbrido. «Sin resultado» detecta 30 de 41 negativas; el reporte explica las demás.
 - **Demo cerrada:** sin cuentas ni lanzamiento abierto. En local la API no tiene puerta de acceso y la instalación está pensada para macOS (Homebrew, launchd); en un servidor, todo el sitio va detrás de usuario y clave.
 - **Cambios del sitio:** si rappi.cl cambia su frontend, hay que ajustar los parsers; el reporte de cada corrida marca las respuestas anómalas.
+
+## Panel de negocio
+
+[`dashboard-empresa/`](dashboard-empresa/) es el panel para la empresa y forma parte del MVP: lee las métricas de la API (`/analytics`) y `make mvp` lo levanta junto a la app. Convierte la conducta de compra y lo que la gente pide en decisiones: tendencias por concepto, demanda no satisfecha, usuarios en riesgo, rendimiento de las sugerencias cruzadas y salud del catálogo. En **Entre verticales** muestra además **Combinaciones de verticales** (la tabla de Rappi junto a la misma tabla medida con los datos propios) y el **Motor** (pesos y evaluación). Se elige la fuente de los datos y nunca se mezclan:
+
+- **Simulados** (por defecto): usuarios, eventos y pedidos de un generador con semilla. Muestran la mecánica del panel, no un resultado. La pestaña Catálogo es real (muestra pública de rappi.cl).
+- **Prototipo**: lo que la gente hizo en la app del MVP, con la vista **Uso del MVP** en tres secciones: las ofertas del agente por momento (plan, carro, antes de pagar, próximo pedido, sin resultado, vertical por probar, recompra, perfil de gusto, pregunta y «Para ti»), las búsquedas sin resultado por vertical y concepto, y los **Accesos de la Home** (los toques con los que la Home aprende el orden). Es uso de pocas personas y el panel lo rotula «uso del MVP, pocas personas: no es evidencia». Sin nombres ni textos: personas contadas, nunca nombradas.
+
+```bash
+make mvp   # panel en http://localhost:5175/?vista=mvp&fuente=prototipo (sin la API, «Uso del MVP» no muestra cifras: dice «La API no responde»)
+```
+
+La misma carpeta trae una página de presentación de la propuesta (`http://localhost:5175/presentacion.html`).
 
 ## Estructura del repositorio
 
 ```text
 .
-├── prototipo-app/          el prototipo final (Vite + React): Mochi y buscador con Mochi
-├── rappi-ia/               conceptos, embeddings, búsqueda, capa de datos, Mochi y API (comando `rappi-ia`)
+├── prototipo-app/          el prototipo final (Vite + React): la Home que aprende, Mochi y el buscador con Mochi
+├── rappi-ia/               conceptos, embeddings, búsqueda, capa de datos, motor multivertical, Mochi y API (comando `rappi-ia`)
 ├── rappi-scraper/          descarga del catálogo público → Postgres + pgvector (comando `rappi`; migraciones de toda la base)
-├── dashboard-empresa/      panel de negocio, parte del MVP (Vite + React; lee la API)
+├── dashboard-empresa/      panel de negocio, parte del MVP (Vite + React; lee la API), y la página de presentación
 ├── docs/                   propuesta, diseño, decisiones, demo, instalación y resultados
 │   ├── diagramas/          diagramas (PNG e interactivos) y sus fuentes en diagramas-fuente/
 │   ├── mapas/              mapa multivertical y mapa de conceptos
 │   └── resultados/         reportes de evaluación versionados (fuente de las cifras)
 ├── deploy/                 despliegue en un servidor: compose, Caddy, Dockerfiles, roles de la base, respaldos y timers
 ├── Makefile, scripts/      `make mvp` y `make mvp-check`: levantan y recorren el MVP
-├── .github/workflows/      CI (scraper y rappi-ia contra Postgres + pgvector; prototipo y panel con lint, tests y build; `make mvp-check`, los scripts y el stack de Docker)
+├── .github/workflows/      CI (scraper y rappi-ia contra Postgres + pgvector; prototipo y panel con lint, formato, tests y build; `make mvp-check`, los scripts y el stack de Docker)
 └── CLAUDE.md               convenciones para asistentes de código
 ```
 
 **Fuera del repositorio:** la base Postgres `rappi`, `rappi-scraper/data/` y `rappi-ia/data/`. Los datos descargados no se versionan.
-
-## Panel de negocio
-
-[`dashboard-empresa/`](dashboard-empresa/) es el panel para la empresa y forma parte del MVP: lee las métricas de la API (`/analytics`) y `make mvp` lo levanta junto a la app. Convierte la conducta de compra y lo que la gente pide en decisiones (tendencias por concepto, demanda no satisfecha, usuarios en riesgo, rendimiento de las sugerencias cruzadas y salud del catálogo). Se elige la fuente de los datos y nunca se mezclan:
-
-- **Simulados** (por defecto): usuarios, eventos y pedidos de un generador con semilla. Muestran la mecánica del panel, no un resultado. La pestaña Catálogo es real (muestra pública de rappi.cl).
-- **Prototipo**: lo que la gente hizo en la app del MVP, con la vista **Uso del MVP**: las ofertas del agente por momento (plan, carro, antes de pagar, próximo pedido, sin resultado, vertical por probar, pregunta y «Para ti») y las búsquedas sin resultado por vertical y concepto. Es uso de pocas personas y el panel lo rotula «uso del MVP, pocas personas: no es evidencia». Sin nombres ni textos: personas contadas, nunca nombradas.
-
-```bash
-make mvp   # panel en http://localhost:5175/?vista=mvp&fuente=prototipo (sin la API, «Uso del MVP» no muestra cifras: dice «La API no responde»)
-```
 
 ## Historial del proyecto
 
