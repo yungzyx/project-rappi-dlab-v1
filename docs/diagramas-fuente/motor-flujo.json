@@ -103,11 +103,10 @@
       "id": "combos",
       "type": "external",
       "label": "Tabla de Rappi",
-      "sublabel": "dato compartido por Rappi",
+      "sublabel": "combos.toml",
       "stage": 0,
       "row": 2,
-      "tag": "combos.toml",
-      "width": 124
+      "tag": "dato compartido por Rappi"
     },
     {
       "id": "afinidad",

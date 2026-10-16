@@ -172,7 +172,7 @@
       "id": "motor",
       "type": "backend",
       "label": "Motor multivertical",
-      "sublabel": "6 tablas · semanal",
+      "sublabel": "7 tablas · semanal",
       "stage": 2,
       "row": 2,
       "tag": "pesos en validación"
@@ -220,7 +220,7 @@
       "sublabel": "synth · prototipo",
       "stage": 3,
       "row": 3,
-      "tag": "purga 90 días"
+      "tag": "consultas 90 días"
     },
     {
       "id": "panel",
