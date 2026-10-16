@@ -41,12 +41,16 @@ class Signal:
 
 
 def _filters(
-    source: str, user_id: str | None, before: datetime | None, table: str, since: datetime | None = None
+    source: str, user_id: str | list[str] | None, before: datetime | None, table: str, since: datetime | None = None
 ) -> tuple[str, list]:
-    """Las condiciones comunes: fuente de la persona y del registro, persona y cortes de tiempo opcionales."""
+    """Las condiciones comunes: fuente de la persona y del registro, persona (o lista de personas) y cortes de tiempo
+    opcionales."""
     sql = f"u.source = %s AND {table}.source = %s"
     params: list = [source, source]
-    if user_id is not None:
+    if isinstance(user_id, list):
+        sql += f" AND {table}.user_id = ANY(%s)"
+        params.append(user_id)
+    elif user_id is not None:
         sql += f" AND {table}.user_id = %s"
         params.append(user_id)
     if before is not None:
@@ -61,12 +65,12 @@ def _filters(
 def load_orders(
     conn: Connection,
     source: str,
-    user_id: str | None = None,
+    user_id: str | list[str] | None = None,
     before: datetime | None = None,
     since: datetime | None = None,
 ) -> list[Order]:
-    """Los pedidos `propuesta` de la fuente (de una persona, anteriores a `before` y posteriores a `since`, si se
-    piden), en orden de `ts`."""
+    """Los pedidos `propuesta` de la fuente (de una persona o de una lista, anteriores a `before` y posteriores a
+    `since`, si se piden), en orden de `ts`."""
     where, params = _filters(source, user_id, before, "o", since)
     rows = conn.execute(
         f"""SELECT o.order_id, o.user_id, o.cart_id, o.ts, o.vertical, o.total,
@@ -90,7 +94,7 @@ def load_orders(
 
 
 def load_signals(
-    conn: Connection, source: str, user_id: str | None = None, before: datetime | None = None
+    conn: Connection, source: str, user_id: str | list[str] | None = None, before: datetime | None = None
 ) -> list[Signal]:
     """Las señales de afinidad de la fuente en orden de `ts`: cada pedido `propuesta` (`kind="order"`) y los eventos
     con vertical de `EVENT_KINDS`, sin los hechos en «Rappi hoy»."""

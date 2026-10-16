@@ -97,8 +97,9 @@ class RappiAgent:
         }
 
     def reply(self, conn: Connection, message: str, ctx: Context | None = None, offer: bool = False) -> dict:
-        """Con `offer`, la respuesta es algo que el agente propone sin que se lo pidan (el «Como te gusta…» de «qué me
-        recomiendas»): sus productos pasan por las guardias de offers/guards.py (`search_products(..., offer=True)`).
+        """Con `offer`, la respuesta es algo que el agente propone sin que se lo pidan (el «Por tu interés en…» de
+        «qué me recomiendas»): sus productos pasan por las guardias de offers/guards.py
+        (`search_products(..., offer=True)`).
 
         Un turno embebe cada texto una sola vez (con tope de precio, detalle o reintento la misma consulta se busca
         varias veces): corre en una copia del agente con su propia memoria, porque el mismo agente atiende varios
@@ -117,7 +118,7 @@ class RappiAgent:
                 return self._small_talk(replace(intent, kind="ayuda"), ctx)
             concept = self.taxonomy.concepts[interest]
             response = self._reply(conn, concept.name, ctx, offer=True)
-            response["text"] = f"Como te gusta {concept.label.lower()} 😉 " + response["text"]
+            response["text"] = f"Por tu interés en {concept.label.lower()} 😉 " + response["text"]
             return response
         if intent.kind in (
             "saludo",
@@ -513,7 +514,7 @@ class RappiAgent:
 
     def _top_interest(self, profile: dict[str, float]) -> str | None:
         concepts = self.taxonomy.concepts
-        # Lo recomienda el agente por su cuenta («Como te gusta…», «Veo que te gusta…»): solo intereses que puede
+        # Lo recomienda el agente por su cuenta («Por tu interés en…», «Veo tu interés en…»): solo intereses que puede
         # proponer.
         allowed = {c: s for c, s in profile.items() if c in concepts and is_offerable(concepts[c])}
         return max(allowed, key=allowed.get) if allowed else None

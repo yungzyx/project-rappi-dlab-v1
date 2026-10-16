@@ -106,7 +106,7 @@ def test_not_the_current_vertical_nor_one_already_shown_and_only_with_room(clien
     product_trends(db, "supermercado", ["91004"])
 
     rows = for_you(client, vertical="turbo")
-    assert rows[0]["reason"] == "Porque te interesa 🍕 pizza" and rows[0]["vertical"] == "conveniencia"
+    assert rows[0]["reason"] == "Por tu interés en 🍕 pizza" and rows[0]["vertical"] == "conveniencia"
     assert "kind" not in rows[0]
     # Turbo es la pantalla y conveniencia ya tiene su fila: el súper.
     assert [(row.get("kind"), row["vertical"]) for row in rows[1:]] == [("lo_mas_pedido", "supermercado")]

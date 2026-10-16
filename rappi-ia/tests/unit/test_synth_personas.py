@@ -209,6 +209,71 @@ def test_simulated_suggestions_follow_the_offer_guards():
     assert synth._suggestion(catalog, "frutas", "supermercado") is None  # salud
 
 
+def test_simulated_suggestions_skip_items_the_agent_would_not_offer():
+    """El agente real no ofrece un producto que en esa vertical solo venden tiendas Farmacia, Sex shop o Smoking shop,
+    ni uno cuyo nombre dice bebé: el simulado tampoco lo sugiere, y una vertical sin otro ítem del concepto se salta."""
+    ok, blocked = ("catalog_item", "1", 990.0), ("catalog_item", "2", 990.0)
+    catalog = synth.Catalog(
+        items={("supermercado", "gaseosas"): [blocked], ("conveniencia", "gaseosas"): [blocked, ok]},
+        edges={"pizza": [("gaseosas", 0.6)]},
+        names={},
+        ranked={"gaseosas": ["supermercado", "conveniencia"]},
+        unofferable={("supermercado", "catalog_item", "2"), ("conveniencia", "catalog_item", "2")},
+    )
+    assert synth._suggestion(catalog, "pizza", "restaurantes") == ("gaseosas", "conveniencia", 0.6)
+    rng = random.Random(1)
+    assert {catalog.pick(rng, "conveniencia", "gaseosas", offer=True) for _ in range(20)} == {ok}
+    assert blocked in {catalog.pick(rng, "conveniencia", "gaseosas") for _ in range(20)}  # pedirlo, sí
+
+
+class _Coin:
+    """Un `rng` que siempre saca lo mismo: 0 (cae bajo cualquier probabilidad) o 0,99."""
+
+    def __init__(self, value: float):
+        self.value, self.draws = value, 0
+
+    def random(self) -> float:
+        self.draws += 1
+        return self.value
+
+
+def test_a_suggestion_can_go_to_turbo_when_turbo_sells_the_concept():
+    """Con la moneda a favor, el complemento va a Turbo si Turbo lo vende (con algo que el agente ofrecería); si no,
+    o sin `rng`, al primero del orden del agente. Solo se sortea cuando Turbo es una alternativa."""
+    ok, blocked = ("catalog_item", "1", 990.0), ("catalog_item", "2", 990.0)
+    catalog = synth.Catalog(
+        items={("supermercado", "gaseosas"): [ok], ("turbo", "gaseosas"): [ok], ("turbo", "galletas"): [blocked],
+               ("supermercado", "galletas"): [ok]},
+        edges={"pizza": [("gaseosas", 0.6)], "cafe": [("galletas", 0.5)]},
+        names={},
+        ranked={"gaseosas": ["supermercado", "turbo"], "galletas": ["supermercado", "turbo"]},
+        unofferable={("turbo", "catalog_item", "2")},
+    )  # fmt: skip
+    assert synth._suggestion(catalog, "pizza", "restaurantes", _Coin(0.0)) == ("gaseosas", "turbo", 0.6)
+    assert synth._suggestion(catalog, "pizza", "restaurantes", _Coin(0.99)) == ("gaseosas", "supermercado", 0.6)
+    assert synth._suggestion(catalog, "pizza", "restaurantes") == ("gaseosas", "supermercado", 0.6)
+    no_turbo = _Coin(0.0)
+    assert synth._suggestion(catalog, "cafe", "conveniencia", no_turbo) == ("galletas", "supermercado", 0.5)
+    assert synth._suggestion(catalog, "pizza", "turbo", no_turbo) == ("gaseosas", "supermercado", 0.6)
+    assert no_turbo.draws == 0  # sin Turbo como alternativa no se gasta el azar: lo demás no cambia
+
+
+def test_a_preferred_item_offered_by_the_agent_passes_the_same_guard():
+    """Con un atributo preferido, lo que el agente ofrece tampoco trae un ítem que no ofrecería."""
+    ok, blocked = ("catalog_item", "1", 990.0), ("catalog_item", "2", 990.0)
+    catalog = synth.Catalog(
+        items={("supermercado", "galletas"): [blocked, ok]},
+        edges={},
+        names={},
+        ranked={},
+        preferred={("supermercado", "galletas", "sin-gluten"): [blocked]},
+        unofferable={("supermercado", "catalog_item", "2")},
+    )
+    rng = random.Random(1)
+    assert {catalog.pick(rng, "supermercado", "galletas", "sin-gluten", offer=True) for _ in range(30)} == {ok}
+    assert blocked in {catalog.pick(rng, "supermercado", "galletas", "sin-gluten") for _ in range(30)}  # pedirlo, sí
+
+
 def test_signups_spread_over_the_whole_period():
     """Las altas llegan parejas, como cohortes mensuales: el último cuarto del período recibe cerca de un cuarto."""
     rng = random.Random(1)

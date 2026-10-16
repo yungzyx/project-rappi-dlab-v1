@@ -11,9 +11,12 @@ def _table(header: list[str], rows: list[tuple]) -> list[str]:
 
 def layer_report(conn: Connection, sample: int = 20) -> str:
     out = ["# Capas de perfiles", ""]
+    # Una por capa y fuente: `motor` corre una vez por cada una (la fuente va en `counts`).
     runs = conn.execute(
-        """SELECT DISTINCT ON (layer) layer, rules_version, status, finished_at::date, counts::text
-           FROM layer_runs ORDER BY layer, run_id DESC"""
+        """SELECT DISTINCT ON (layer, counts->>'fuente')
+                  layer || coalesce(' (' || (counts->>'fuente') || ')', ''), rules_version, status, finished_at::date,
+                  counts::text
+           FROM layer_runs ORDER BY layer, counts->>'fuente', run_id DESC"""
     ).fetchall()
     out += (
         ["## Última corrida de cada capa", ""] + _table(["Capa", "Reglas", "Estado", "Fecha", "Conteos"], runs) + [""]

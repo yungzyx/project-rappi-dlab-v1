@@ -73,10 +73,10 @@ def test_what_is_due_today_comes_with_the_last_product_and_says_why(client, db):
     assert reply.status_code == 200, reply.text
     body = reply.json()
     assert body["moment"] == "recompra"
-    assert body["text"] == "¿Repetimos café? Lo pides cada 7 días."
+    assert body["text"] == "¿Repetimos café? Pides cada 7 días."
     assert body["reason"] == {
         "concept": "cafe",
-        "text": "Porque lo pides cada 7 días y tu último pedido fue hace 7 días.",
+        "text": "Porque pides café cada 7 días y tu último pedido fue hace 7 días.",
         "basis": [{"kind": "recompra", "id": "cafe", "source": "pedidos"}],
     }
     assert body["vertical"] == "supermercado" and body["prototype_vertical"] == "grocery"
@@ -108,7 +108,7 @@ def test_the_most_overdue_concept_goes_first(client, db):
     body = repeat(client).json()
 
     assert body["reason"]["concept"] == "galletas"
-    assert body["reason"]["text"] == "Porque lo pides cada 7 días y tu último pedido fue hace 10 días."
+    assert body["reason"]["text"] == "Porque pides galletas cada 7 días y tu último pedido fue hace 10 días."
 
 
 def test_a_product_no_longer_sold_in_the_vertical_is_replaced_by_one_of_the_concept(client, db):
@@ -164,8 +164,8 @@ def test_a_daily_rhythm_reads_every_day(client, db):
 
     body = repeat(client).json()
 
-    assert body["text"] == "¿Repetimos café? Lo pides cada día."
-    assert body["reason"]["text"] == "Porque lo pides cada día y tu último pedido fue ayer."
+    assert body["text"] == "¿Repetimos café? Pides cada día."
+    assert body["reason"]["text"] == "Porque pides café cada día y tu último pedido fue ayer."
 
 
 def test_every_reads_in_spanish():

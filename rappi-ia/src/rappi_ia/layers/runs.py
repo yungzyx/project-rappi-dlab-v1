@@ -8,9 +8,12 @@ from psycopg import Connection
 from psycopg.types.json import Jsonb
 
 
-def start_layer_run(conn: Connection, layer: str, rules_version: str) -> int:
+def start_layer_run(conn: Connection, layer: str, rules_version: str, counts: dict | None = None) -> int:
+    """Abre la corrida (`running`); `counts` deja algo a la vista desde el inicio (p. ej., la fuente del motor), por si
+    no llega a terminar."""
     row = conn.execute(
-        "INSERT INTO layer_runs (layer, rules_version) VALUES (%s, %s) RETURNING run_id", (layer, rules_version)
+        "INSERT INTO layer_runs (layer, rules_version, counts) VALUES (%s, %s, %s) RETURNING run_id",
+        (layer, rules_version, Jsonb(counts or {})),
     ).fetchone()
     return row[0]
 

@@ -53,7 +53,7 @@ class TemplateComposer:
 
     def main(self, d: Draft) -> str:
         if d.kind == "saludo":
-            extra = f" Veo que te gusta {d.interest_label}." if d.interest_label else ""
+            extra = f" Veo tu interés en {d.interest_label}." if d.interest_label else ""
             return f"¡Hola! Soy {config.AGENT_NAME} 🧡.{extra} ¿Qué se te antoja hoy?"
         if d.kind == "gracias":
             return "¡De nada! Aquí estoy si necesitas algo más 🧡"
@@ -104,7 +104,7 @@ class TemplateComposer:
             cheapest = f" El más barato que encontré cuesta {d.cheapest}." if d.cheapest else ""
             return f"No encontré {d.concept_label or d.query} bajo {d.price_max} en {d.vertical_label}.{cheapest}"
         if d.kind == "sin_resultado":
-            noted = " Lo anoté para que el equipo sepa que lo buscas 📝" if d.unmet else ""
+            noted = " Lo anoté para que el equipo sepa que buscas eso 📝" if d.unmet else ""
             return f"No encontré «{d.query}» en {d.vertical_label}.{noted}"
         what = _mid_sentence(d.concept_label) if d.concept_label else f"«{d.query}»"
         budget = f" bajo {d.price_max}" if d.price_max else ""

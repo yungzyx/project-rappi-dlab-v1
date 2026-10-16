@@ -174,7 +174,7 @@ def test_recommendations_respect_the_guards(demo_client):
 
 
 def test_recommendations_never_name_an_unofferable_interest(demo, demo_client):
-    """«Porque te interesa 🍺 cerveza» es Mochi nombrando alcohol (o salud) por su cuenta: esos intereses no son
+    """«Por tu interés en 🍺 cerveza» es Mochi nombrando alcohol (o salud) por su cuenta: esos intereses no son
     fuente de una recomendación, como en `_top_interest`. Uno ofrecible, aunque pese menos, sí."""
     db, _ = demo
     db.execute(  # vitaminas → jugos (jugos se ofrece y el súper de prueba vende jugo): sin la regla, sería una fila
@@ -192,7 +192,7 @@ def test_recommendations_never_name_an_unofferable_interest(demo, demo_client):
     assert body["interests"][:2] == ["cerveza", "vitaminas"]  # el perfil los guarda: solo no se ofrecen
 
     reasons = [row["reason"] for row in body["rows"]]
-    assert reasons == ["Porque te interesa 🍕 pizza"]
+    assert reasons == ["Por tu interés en 🍕 pizza"]
     assert not any(p["age_restricted"] for row in body["rows"] for p in row["products"])
 
 

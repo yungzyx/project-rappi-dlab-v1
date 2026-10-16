@@ -15,7 +15,7 @@ test('muestra una tarjeta por fila de recomendaciones y abre su vertical', () =>
 
   expect(screen.getByRole('heading', { name: 'Descubre con Mochi' })).toBeTruthy()
   const [card] = document.querySelectorAll('.discover-card')
-  expect(card.textContent).toContain('Porque te interesa 🍕 pizza')
+  expect(card.textContent).toContain('Por tu interés en 🍕 pizza')
   expect(card.textContent).toContain('Gaseosas en Express')
   fireEvent.click(card)
   expect(onOpen).toHaveBeenCalledWith('express')
