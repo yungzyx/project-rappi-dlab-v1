@@ -2,7 +2,7 @@
 
 Conecta el catálogo que descarga [`rappi-scraper`](../rappi-scraper/) con el asistente **Mochi** del [prototipo](../prototipo-app/). Diseño completo en [docs/diseno-ia.md](../docs/diseno-ia.md).
 
-**Regla:** *buscar dentro del vertical, entender al usuario a través de los verticales*. La búsqueda nunca mezcla verticales. El puente entre ellos son los **conceptos**: una taxonomía propia de 136 conceptos (116 tipos de producto en 20 grupos), con 106 complementos curados entre sí (contados el 16-10-2026). Una recomendación cruzada va del concepto que le interesa al usuario a su complemento, y de ahí a una búsqueda en el otro vertical (p. ej., cerveza en licores → snacks salados de otra tienda).
+**Regla:** *buscar dentro del vertical, entender al usuario a través de los verticales*. La búsqueda nunca mezcla verticales. El puente entre ellos son los **conceptos**: una taxonomía propia de 136 conceptos (116 tipos de producto en 20 grupos), con 240 complementos curados entre sí (contados el 16-10-2026; cada concepto que se puede ofrecer tiene al menos dos). Una recomendación cruzada va del concepto que le interesa al usuario a su complemento, y de ahí a una búsqueda en el otro vertical (p. ej., cerveza en licores → snacks salados de otra tienda).
 
 ![Flujo de datos por etapas: Descarga → Postgres → IA offline → Consulta → Prototipo y panel](../docs/diagramas/rag-datos.png)
 

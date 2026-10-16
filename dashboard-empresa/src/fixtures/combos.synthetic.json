@@ -4,40 +4,30 @@
     "propio": [
       {
         "combo": "rest",
-        "gasto_por_usuario": 28499.41176470588,
+        "gasto_por_usuario": 23969.41176470588,
         "meses_usuario": 17,
-        "pct_pedidos": 43.396225,
-        "pct_usuarios": 60.714287,
-        "pedidos_por_usuario": 1.3529412,
+        "pct_pedidos": 63.414635,
+        "pct_usuarios": 73.91304,
+        "pedidos_por_usuario": 1.5294118,
         "retencion_m1": null,
-        "retencion_n": 6
+        "retencion_n": 3
       },
       {
-        "combo": "rest+turbo",
-        "gasto_por_usuario": 44521.666666666664,
-        "meses_usuario": 6,
-        "pct_pedidos": 41.509434,
-        "pct_usuarios": 21.428572,
-        "pedidos_por_usuario": 3.6666667,
-        "retencion_m1": null,
-        "retencion_n": 2
-      },
-      {
-        "combo": "retail",
-        "gasto_por_usuario": 23973.333333333332,
-        "meses_usuario": 3,
-        "pct_pedidos": 7.5471697,
-        "pct_usuarios": 10.714286,
-        "pedidos_por_usuario": 1.3333334,
+        "combo": "rest+retail",
+        "gasto_por_usuario": 25052.5,
+        "meses_usuario": 4,
+        "pct_pedidos": 26.829268,
+        "pct_usuarios": 17.391304,
+        "pedidos_por_usuario": 2.75,
         "retencion_m1": null,
         "retencion_n": 0
       },
       {
-        "combo": "rest+retail",
-        "gasto_por_usuario": 16470.0,
+        "combo": "rest+turbo",
+        "gasto_por_usuario": 7980.0,
         "meses_usuario": 1,
-        "pct_pedidos": 3.7735848,
-        "pct_usuarios": 3.5714285,
+        "pct_pedidos": 4.878049,
+        "pct_usuarios": 4.347826,
         "pedidos_por_usuario": 2.0,
         "retencion_m1": null,
         "retencion_n": 0
@@ -46,8 +36,8 @@
         "combo": "turbo+retail",
         "gasto_por_usuario": 24930.0,
         "meses_usuario": 1,
-        "pct_pedidos": 3.7735848,
-        "pct_usuarios": 3.5714285,
+        "pct_pedidos": 4.878049,
+        "pct_usuarios": 4.347826,
         "pedidos_por_usuario": 2.0,
         "retencion_m1": null,
         "retencion_n": 0
