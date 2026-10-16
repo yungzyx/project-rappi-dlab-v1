@@ -225,7 +225,9 @@ function requireWritesAllowed() {
 async function requireApi() {
   const response = await fetch(API_HEALTH, { signal: AbortSignal.timeout(3000) }).catch(() => null)
   if (response?.ok) return
-  console.error('Las capturas necesitan el MVP corriendo: `make mvp`')
+  console.error(
+    'Las capturas necesitan el MVP corriendo sobre una copia: `DATABASE_URL=postgresql:///rappi_staging make mvp`',
+  )
   process.exit(1)
 }
 
