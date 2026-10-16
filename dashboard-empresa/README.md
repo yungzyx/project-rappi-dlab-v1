@@ -1,6 +1,6 @@
 # Panel de negocio (demo)
 
-> **Parte del MVP.** `make mvp` lo levanta junto a la API y la app, y lee la API (`/analytics`). Con la fuente **Simulados** muestra la mecánica del panel; con la fuente **Prototipo**, la vista **Uso del MVP** muestra lo que la gente hizo en la app (ofertas del agente por momento y búsquedas sin resultado), siempre rotulado «uso del MVP, pocas personas: no es evidencia».
+> **Parte del MVP.** `make mvp` lo levanta junto a la API y la app, y lee la API (`/analytics`). Con la fuente **Simulados** muestra la mecánica del panel; con la fuente **Prototipo**, la vista **Uso del MVP** muestra lo que la gente hizo en la app (ofertas del agente por momento, búsquedas sin resultado y accesos de la Home), siempre rotulado «uso del MVP, pocas personas: no es evidencia».
 
 > Proyecto independiente: no está afiliado a Rappi ni cuenta con su respaldo. Las marcas pertenecen a sus dueños. La etiqueta «Rappi Chile · propuesta» del encabezado es parte de la maqueta.
 
@@ -10,6 +10,7 @@ Panel de demostración que muestra cómo la conducta de compra y lo que la gente
 - demanda no satisfecha como oportunidad de negocio (en la simulación, el generador inventa una demanda creciente de «comida peruana» para mostrar cómo se ve una oportunidad; no describe la oferta real de Rappi);
 - usuarios en riesgo según su propio ritmo de compra;
 - rendimiento de las sugerencias cruzadas del agente entre verticales;
+- combinaciones de verticales (la tabla que compartió Rappi junto a la medida con datos propios) y la evaluación del motor;
 - salud real del catálogo.
 
 Las definiciones de cada métrica y la redacción vienen de [docs/diseno-ia.md §5](../docs/diseno-ia.md#5-panel-para-la-empresa-vale-la-pena). Los datos salen de la API de [`rappi-ia`](../rappi-ia/).
@@ -56,7 +57,7 @@ La URL de la API se cambia con `VITE_API_URL`, por ejemplo `VITE_API_URL=http://
 | `npm test` | Tests (Vitest + Testing Library, sin red: usan `src/fixtures/`) |
 | `npm run lint` | ESLint (reglas de React Hooks 7) |
 | `npm run build` | Build de producción en `dist/` |
-| `npm run fixtures` | Vuelve a guardar las respuestas de la API en `src/fixtures/` (correr tras `make synth` o una actualización del catálogo). Las de «Uso del MVP» (ofertas y búsquedas sin resultado) no pasan por aquí: las escribe `make contract` en `rappi-ia/` y el CI falla si quedan desactualizadas |
+| `npm run fixtures` | Vuelve a guardar las respuestas de la API en `src/fixtures/` (correr tras `make synth` o una actualización del catálogo). Las de «Uso del MVP» (ofertas, búsquedas sin resultado y accesos de la Home), las combinaciones y el motor no pasan por aquí: las escribe `make contract` en `rappi-ia/` y el CI falla si quedan desactualizadas |
 | `npm run screenshots` | Regenera `docs/screenshots/` con el Chrome instalado y un Vite propio en el 5198 |
 
 Tests: las cifras vigentes están en [README.md#resultados](../README.md#resultados) (fila «Calidad»). CI en GitHub Actions: lint, tests y build.
@@ -114,8 +115,10 @@ Todo el panel se lee como un informe: cada sección abre con su titular numéric
 ### 4. Entre verticales
 
 - **Sugerencias del agente**: cuántas se mostraron, aceptaron y convirtieron.
-- **Afinidad dirigida A → B**: confianza P(B | A), lift y usuarios. Las aristas aprendidas de datos simulados **no las usa el agente**.
+- **Afinidad dirigida A → B**: confianza P(B | A), lift y usuarios. Estas aristas aprendidas de datos simulados **no las usa el agente**; el motor sí aprende su compra cruzada de la población de `MOTOR_POBLACION` (simulada en la demo) y declara la fuente en cada oferta ([decisiones](../docs/decisiones.md#datos-simulados-y-panel)).
 - **Retención multi-vertical vs un vertical por estrato**, con el mismo número de compras en cada comparación (una compra es un carro: dividido en dos verticales son dos pedidos). Descarta la explicación más evidente (quien pide más también usa más verticales), pero no mide causa: eso solo lo da un A/B con grupo de control (holdout). En la simulación la diferencia existe por construcción (ver el aviso de arriba).
+- **Combinaciones de verticales**: el conjunto de verticales que una persona usó en un mes y su retención M+1. A la izquierda, la tabla que compartió Rappi («Dato compartido por Rappi», cohortes ene–jun 2026; el gasto va en la moneda de la fuente); a la derecha, la misma tabla medida con la fuente elegida. Es una correlación, no un efecto: el motor la toma como punto de partida.
+- **Motor**: la evaluación por fechas (entrenar, validar y probar) del próximo vertical, la compra cruzada y la recompra contra líneas base, con los pesos y el λ elegidos en validación y la fecha de la última corrida ([resultados](../docs/resultados/motor-2026-10-16.md)).
 
 ![Entre verticales: sugerencias del agente, servicios sin catálogo, afinidad, retención, combinaciones de verticales (la tabla de Rappi junto a la medida con datos simulados) y la evaluación del motor](docs/screenshots/4-verticales-escritorio-claro.jpg)
 
@@ -137,10 +140,11 @@ Aparte va **surtido vs demanda**, marcado «demanda simulada»: cruza el surtido
 
 ### 6. Uso del MVP
 
-Lo que la gente hizo en la app del MVP, en dos secciones. Con la fuente **Prototipo** cada una lleva el rótulo «uso del MVP, pocas personas: no es evidencia» y cuántas personas hay detrás; con **Simulados** dice «Datos simulados» y muestra la mecánica (el simulador no guarda el momento de la oferta, y el panel lo avisa en vez de inventar una tabla).
+Lo que la gente hizo en la app del MVP, en tres secciones. Con la fuente **Prototipo** cada una lleva el rótulo «uso del MVP, pocas personas: no es evidencia» y cuántas personas hay detrás; con **Simulados** dice «Datos simulados» y muestra la mecánica (el simulador no guarda el momento de la oferta, y el panel lo avisa en vez de inventar una tabla).
 
-- **Ofertas del agente por momento.** Mostradas y aceptadas según dónde se hizo la oferta: en un plan, con el carro armado, antes de pagar, para el próximo pedido, cuando una búsqueda no encontró nada, para probar otro vertical, al preguntarle al agente o en «Para ti». Aceptada: la oferta se agregó al carro. Los servicios sin catálogo van aparte, en «Entre verticales». La tasa de aceptación aparece desde 10 mostradas; antes, solo las cuentas.
+- **Ofertas del agente por momento.** Mostradas y aceptadas según dónde se hizo la oferta: en un plan, con el carro armado, antes de pagar, para el próximo pedido, cuando una búsqueda no encontró nada, para probar otro vertical, en la recompra («¿Repetimos …?»), en un perfil de gusto, al preguntarle al agente o en «Para ti». Aceptada: la oferta se agregó al carro (también en la recompra, aunque su botón sea «Ver producto»). Los servicios sin catálogo van aparte, en «Entre verticales». La tasa de aceptación aparece desde 10 mostradas; antes, solo las cuentas.
 - **Búsquedas sin resultado.** Por vertical y concepto reconocido: es demanda que el catálogo no cubre. No muestra lo que escribió cada persona ni conceptos sensibles; una búsqueda sin vertical se rotula «Sin vertical».
+- **Accesos de la Home.** Cuántas personas tocaron cada vertical en la Home y cuántos toques hubo: con ellos la Home aprende el orden de los accesos de cada persona. «Rappi hoy» y los servicios sin catálogo no cuentan; los datos simulados no traen toques.
 
 Las definiciones están en [docs/diseno-ia.md §5](../docs/diseno-ia.md#5-panel-para-la-empresa-vale-la-pena). `make mvp-check` abre esta vista con la fuente del prototipo (puerto 5185) y comprueba que muestra lo que dejaron las revisiones anteriores (qué revisa, en [docs/instalacion.md](../docs/instalacion.md#5-el-mvp)).
 

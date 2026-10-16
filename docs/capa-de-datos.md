@@ -15,7 +15,7 @@ Todo lo que ve una herramienta externa vive en el esquema **`capa`**: vistas con
 | **Segmentos de usuario** | «¿Qué tipo de persona es?»: 144 segmentos por comportamiento en 12 familias, con puntaje, nivel y evidencia | `concepts/segments.toml`, `layers/segments.py` |
 | **Motor multivertical** | «¿Qué vertical conviene sumarle?» y «¿qué le toca pedir de nuevo?»: afinidad por vertical, transiciones, combinaciones de verticales con su retención, compra cruzada, tendencias y recompra | `rappi_ia/motor/`, `motor/combos.toml` |
 
-Los conceptos (la taxonomía propia de 133 conceptos: 113 tipos de producto en 20 grupos) vienen de la capa de IA y son el eje que une todo.
+Los conceptos (la taxonomía propia de 136 conceptos: 116 tipos de producto en 20 grupos, contados el 16-10-2026) vienen de la capa de IA y son el eje que une todo.
 
 ## Vistas de `capa`
 
