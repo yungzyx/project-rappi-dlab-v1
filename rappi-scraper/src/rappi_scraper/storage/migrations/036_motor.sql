@@ -7,6 +7,8 @@ ALTER TABLE layer_runs DROP CONSTRAINT layer_runs_layer_check;
 ALTER TABLE layer_runs ADD CONSTRAINT layer_runs_layer_check CHECK (
     layer IN ('attributes', 'measures', 'brands', 'canonical', 'relations', 'segments', 'motor')
 );
+-- El motor sí deja registradas sus corridas en curso y las que fallan (la 026 decía que una corrida fallida no queda).
+COMMENT ON COLUMN capa.layer_runs.status IS 'running mientras corre, done al terminar, failed si falló: el motor deja registrada la corrida que falla; las demás capas la deshacen con su transacción y no queda.';
 
 -- Abrir un vertical desde la Home es una señal de afinidad: el CHECK de la 035 más `vertical_open`.
 ALTER TABLE app_events DROP CONSTRAINT app_events_type_check;
@@ -128,8 +130,8 @@ COMMENT ON VIEW capa.replenishment IS 'Qué concepto recompra cada persona y cad
 COMMENT ON COLUMN capa.user_vertical_affinity.user_id IS 'Id seudónimo de la persona.';
 COMMENT ON COLUMN capa.user_vertical_affinity.vertical IS 'Vertical (código de la tabla verticals).';
 COMMENT ON COLUMN capa.user_vertical_affinity.score IS 'Afinidad con el vertical: pedidos y señales, con menos peso cuanto más viejos.';
-COMMENT ON COLUMN capa.user_vertical_affinity.orders IS 'Pedidos de la persona en ese vertical.';
-COMMENT ON COLUMN capa.user_vertical_affinity.signals IS 'Señales que no son pedido (búsquedas, vistas, aperturas del vertical).';
+COMMENT ON COLUMN capa.user_vertical_affinity.orders IS 'Pedidos de la persona en ese vertical en los últimos 180 días.';
+COMMENT ON COLUMN capa.user_vertical_affinity.signals IS 'Señales en los últimos 180 días, pedidos incluidos (pedidos, búsquedas, vistas y aperturas del vertical).';
 COMMENT ON COLUMN capa.user_vertical_affinity.last_ts IS 'Última vez que la persona hizo algo en ese vertical.';
 COMMENT ON COLUMN capa.user_vertical_affinity.updated_at IS 'Cuándo se recalculó esta fila.';
 

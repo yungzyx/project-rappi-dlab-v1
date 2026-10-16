@@ -44,9 +44,11 @@ def latest_weights(conn: Connection, source: str) -> dict[str, float]:
 
 
 def next_verticals(
-    conn: Connection, user_id: str | None, population: str = config.MOTOR_POBLACION, now: datetime | None = None
+    conn: Connection, user_id: str | None, population: str | None = None, now: datetime | None = None
 ) -> list[VerticalScore]:
-    """Los 8 verticales en el orden en que conviene ofrecérselos a la persona (`model.rank_verticals`)."""
+    """Los 8 verticales en el orden en que conviene ofrecérselos a la persona (`model.rank_verticals`). `population`
+    por defecto es `config.MOTOR_POBLACION`, leída al llamar."""
+    population = population or config.MOTOR_POBLACION
     now = now or datetime.now(UTC)
     aff: dict[str, float] = {}
     last_vertical = None
@@ -97,11 +99,10 @@ def current_combo(conn: Connection, user_id: str, now: datetime | None = None) -
     return combo_of_verticals(r[0] for r in rows)
 
 
-def target_step(
-    conn: Connection, user_id: str, population: str = config.MOTOR_POBLACION
-) -> tuple[str, str, float] | None:
+def target_step(conn: Connection, user_id: str, population: str | None = None) -> tuple[str, str, float] | None:
     """El grupo que más retención le suma a la persona: `(grupo, combinación_objetivo, ganancia)`, con la retención de
     Rappi mezclada con la aprendida en `combo_stats` de la población; `None` si no hay paso."""
+    population = population or config.MOTOR_POBLACION
     learned = {
         combo: (n, float(retention))
         for combo, n, retention in conn.execute(

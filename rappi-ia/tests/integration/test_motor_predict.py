@@ -4,6 +4,7 @@ paso de combinación que más retención suma."""
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from psycopg.types.json import Jsonb
 
 from rappi_ia.events import store as events
 from rappi_ia.layers.runs import finish_layer_run, start_layer_run
@@ -92,8 +93,11 @@ def test_latest_weights_default_without_runs(db):
     tuned = {"afinidad": 1.0, "transicion": 0.5, "popularidad": 0.05}
     run = start_layer_run(db, "motor", "v")
     finish_layer_run(db, run, {"fuente": "prototype", "pesos": tuned})
-    running = start_layer_run(db, "motor", "v")  # todavía corriendo: no cuenta
-    assert running
+    running = start_layer_run(db, "motor", "v")  # todavía corriendo, con pesos de la misma fuente: no cuenta
+    db.execute(
+        "UPDATE layer_runs SET counts = %s WHERE run_id = %s",
+        (Jsonb({"fuente": "prototype", "pesos": {"afinidad": 9.0, "transicion": 9.0, "popularidad": 9.0}}), running),
+    )
 
     assert latest_weights(db, "prototype") == tuned
     assert latest_weights(db, "synthetic") == DEFAULT_WEIGHTS

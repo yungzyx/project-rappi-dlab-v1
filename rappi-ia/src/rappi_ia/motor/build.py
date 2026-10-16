@@ -172,7 +172,10 @@ def _personal_rows(
 
 def _write_personal(conn: Connection, affinity_rows: list[tuple], replenish_rows: list[tuple]) -> tuple[int, int]:
     """Con `ON CONFLICT`, no COPY: el recálculo de una persona después de su pedido puede guardar sus filas mientras
-    corre `build_motor` de su fuente; ninguno de los dos falla y queda el último en confirmar."""
+    corre `build_motor` de su fuente; ninguno de los dos falla y queda el último en confirmar. Las filas van en orden
+    de llave: los dos toman los candados de fila en el mismo orden y no se bloquean en cruz."""
+    affinity_rows = sorted(affinity_rows, key=lambda r: (r[0], r[1]))
+    replenish_rows = sorted(replenish_rows, key=lambda r: (r[0], r[1]))
     with conn.cursor() as cur:
         cur.executemany(
             """INSERT INTO user_vertical_affinity (user_id, vertical, score, orders, signals, last_ts)
