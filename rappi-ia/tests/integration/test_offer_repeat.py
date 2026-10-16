@@ -58,7 +58,7 @@ def bought(db, user, vertical, concept, entity, days_ago, mode="propuesta"):
     )  # fmt: skip
 
 
-def rhythm(db, user, vertical, concept, entity, last_days_ago, every=7, times=4):
+def rhythm(db, user, vertical, concept, entity, last_days_ago, every=7, times=3):
     """`times` pedidos del concepto cada `every` días; el último hace `last_days_ago` días. Recalcula su recompra."""
     for n in range(times):
         bought(db, user, vertical, concept, entity, last_days_ago + n * every)
@@ -136,12 +136,10 @@ def test_without_a_person_or_a_rhythm_there_is_nothing(client, db):
     bought(db, "u-ritmo", "supermercado", "cafe", COFFEE, 7)  # una sola vez: no hay ritmo
     refresh_user_conn(db, "u-ritmo")
     assert repeat(client).status_code == 204
-    rhythm(db, "u-tres", "supermercado", "cafe", COFFEE, last_days_ago=7, times=3)  # tres veces: todavía no
-    assert repeat(client, user_id="u-tres").status_code == 204
 
 
 def test_orders_in_rappi_hoy_do_not_teach_a_rhythm(client, db):
-    for days in (7, 14, 21, 28):
+    for days in (7, 14, 21):
         bought(db, "u-ritmo", "supermercado", "cafe", COFFEE, days, mode="actual")
     refresh_user_conn(db, "u-ritmo")
 

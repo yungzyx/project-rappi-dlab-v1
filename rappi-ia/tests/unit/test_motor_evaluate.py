@@ -178,10 +178,10 @@ def test_evaluate_stores_the_lambda_and_reports_the_mix():
 
 def test_evaluate_replenishment_error_in_days():
     cut = T0 + timedelta(days=100)
-    orders = [order("u1", d, "supermercado", "leche") for d in (60, 70, 80, 90)]  # le toca el día 100
+    orders = [order("u1", d, "supermercado", "leche") for d in (70, 80, 90)]  # le toca el día 100
     orders.append(order("u1", 103, "supermercado", "leche"))  # la compra 3 días tarde
-    orders += [order("u2", d, "turbo", "pan") for d in (73, 80, 87, 94)]  # le toca el día 101 y no vuelve
-    orders += [order("u3", d, "turbo", "cafe") for d in (0, 10, 20, 30)]  # le tocaba el día 40: fuera de la ventana
+    orders += [order("u2", d, "turbo", "pan") for d in (80, 87, 94)]  # le toca el día 101 y no vuelve
+    orders += [order("u3", d, "turbo", "cafe") for d in (10, 20, 30)]  # le tocaba el día 40: fuera de la ventana
     orders.sort(key=lambda o: o.ts)
 
     out = evaluate_replenishment(orders, frozenset(), cut, cut + timedelta(days=28))

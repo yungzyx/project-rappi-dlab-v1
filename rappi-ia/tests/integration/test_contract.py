@@ -240,7 +240,7 @@ def client(db):
     # a mediodía de Santiago de días contados desde hoy: la respuesta es la misma cada día.
     today = datetime.now(TZ).date()
     coffee = {"entity_type": "catalog_item", "entity_id": "91004", "concept_id": "cafe", "unit_price": 3990}
-    for days in (28, 21, 14, 7):
+    for days in (21, 14, 7):
         ts = datetime.combine(today - timedelta(days=days), time(12), TZ)
         cart = f"c-recompra-{days}"
         events.record_order(db, "u-recompra", f"s-recompra-{days}", cart, "supermercado", [coffee], ts=ts)

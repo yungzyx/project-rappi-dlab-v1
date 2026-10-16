@@ -99,7 +99,7 @@ Responde dos preguntas por persona: **qué vertical conviene sumarle** y **qué 
 | `combo_steps` | De qué combinación pasan a cuál al mes siguiente | Sobre los mismos meses con mes siguiente completo; quien no vuelve pasa a «ninguna» |
 | `cross_sell_rules` | «Quien pide A en X pide B en Y» | B dentro de los 14 días después de A, en otro vertical **y en otro carro**; al menos 10 personas y lift sobre 1,2. Las líneas de B que vinieron de una sugerencia del agente no cuentan, ni los conceptos sensibles |
 | `trends` | Lo más pedido y lo que sube | Las 4 semanas que terminan en el último pedido contra las 4 anteriores, por vertical, concepto y producto (los 50 más pedidos de cada vertical). `growth` = (ahora − antes) / max(antes, 5); sin conceptos sensibles |
-| `replenishment` | Qué concepto recompra una persona y cuándo le toca | Al menos 4 días de compra distintos e intervalos regulares (variación ≤ 0,8); intervalo mediano y fecha del próximo. Sin conceptos sensibles |
+| `replenishment` | Qué concepto recompra una persona y cuándo le toca | Al menos 3 días de compra distintos e intervalos regulares (variación ≤ 0,6); intervalo mediano y fecha del próximo. Sin conceptos sensibles |
 
 ### Población y persona
 
