@@ -241,6 +241,8 @@ def cross_sell(orders: Iterable[Order], sensitive: frozenset[str]) -> list[Rule]
                     break
                 if b.ts == a.ts or b.vertical == a.vertical:
                     continue
+                if a.cart_id is not None and a.cart_id == b.cart_id:  # un carro repartido en verticales: misma compra
+                    continue
                 both |= {(c, a.vertical, to, b.vertical) for c in as_from[i] for to in as_to[j]}
         users_from.update(froms)
         users_to.update(tos)
@@ -376,6 +378,7 @@ def replenishment(orders: Iterable[Order], sensitive: frozenset[str]) -> list[Re
                 interval_days=float(median),
                 cv=cv,
                 last_ts=concept_orders[-1].ts,
+                # `round` redondea al par (17,5 → 18, 14,5 → 14) a propósito: sin sesgo hacia arriba ni hacia abajo.
                 due_on=days[-1] + timedelta(days=round(median)),
             )
         )

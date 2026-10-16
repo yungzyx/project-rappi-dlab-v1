@@ -158,12 +158,20 @@ def _fillers(n=10):
     return [order(f"f{i}", day(1), "supermercado", "pan") for i in range(n)]
 
 
-def _sushi_then(users, concept, vertical, days_after=3, suggested=False):
+def _sushi_then(users, concept, vertical, after=timedelta(days=3), suggested=False, same_cart=False):
     out = []
     for i in range(users):
-        out.append(order(f"s{concept}{i}", day(0), "restaurantes", "sushi"))
+        cart = f"carro{i}" if same_cart else None
+        out.append(order(f"s{concept}{i}", day(0), "restaurantes", "sushi", cart=cart))
         out.append(
-            order(f"s{concept}{i}", day(days_after), vertical, concept, suggested=(concept,) if suggested else ())
+            order(
+                f"s{concept}{i}",
+                day(0) + after,
+                vertical,
+                concept,
+                cart=cart,
+                suggested=(concept,) if suggested else (),
+            )
         )
     return out
 
@@ -178,10 +186,27 @@ def test_cross_sell_needs_ten_people_and_lift():
     assert cross_sell(_sushi_then(9, "despensa-asiatica", "turbo") + _fillers(), SENSITIVE) == []
 
 
+def test_cross_sell_needs_lift_over_threshold():
+    # Todas las personas piden despensa asiática en Turbo: confianza 1, lift 1,0 → no es regla.
+    assert cross_sell(_sushi_then(10, "despensa-asiatica", "turbo"), SENSITIVE) == []
+
+
+def test_cross_sell_window_includes_day_fourteen():
+    rules = cross_sell(_sushi_then(10, "despensa-asiatica", "turbo", after=timedelta(days=14)) + _fillers(), SENSITIVE)
+    assert [(r.from_concept, r.to_concept) for r in rules] == [("sushi", "despensa-asiatica")]
+
+
+def test_split_cart_is_not_cross_sell():
+    # La app manda un /orders por vertical con el mismo carro, segundos después: es una sola compra.
+    split = _sushi_then(10, "despensa-asiatica", "turbo", after=timedelta(seconds=5), same_cart=True)
+    assert cross_sell(split + _fillers(), SENSITIVE) == []
+
+
 def test_cross_sell_skips_suggested_lines_and_sensitive():
     assert cross_sell(_sushi_then(10, "despensa-asiatica", "turbo", suggested=True) + _fillers(), SENSITIVE) == []
     assert cross_sell(_sushi_then(10, "preservativos", "farmacia") + _fillers(), SENSITIVE) == []
-    assert cross_sell(_sushi_then(10, "despensa-asiatica", "turbo", days_after=15) + _fillers(), SENSITIVE) == []
+    late = _sushi_then(10, "despensa-asiatica", "turbo", after=timedelta(days=15))
+    assert cross_sell(late + _fillers(), SENSITIVE) == []
     same_vertical = _sushi_then(10, "gyozas", "restaurantes") + _fillers()
     assert cross_sell(same_vertical, SENSITIVE) == []
 
@@ -247,6 +272,26 @@ def test_replenishment_needs_three_days_and_regularity():
     assert r.cv == pytest.approx(0.0)
     assert r.last_ts == day(28)
     assert r.due_on == date(2026, 9, 29) + timedelta(days=14)
+
+
+def test_replenishment_keeps_cv_at_the_limit():
+    # Intervalos 7 y 28: media 17,5, desviación 10,5 → cv = 0,6 justo en el tope: se queda.
+    orders = [order("u1", day(n), "turbo", "cafe") for n in (0, 7, 35)]
+    [r] = replenishment(orders, SENSITIVE)
+    assert r.cv == pytest.approx(0.6)
+    assert r.interval_days == pytest.approx(17.5)
+    assert r.due_on == date(2026, 10, 6) + timedelta(days=18)  # round(17,5) = 18 (al par)
+
+
+def test_replenishment_vertical_tie_goes_to_the_most_recent():
+    orders = [
+        order("u1", day(0), "turbo", "cafe"),
+        order("u1", day(14), "supermercado", "cafe"),
+        order("u1", day(28), "turbo", "cafe"),
+        order("u1", day(42), "supermercado", "cafe"),
+    ]
+    [r] = replenishment(orders, SENSITIVE)
+    assert r.vertical == "supermercado"
 
 
 # Popularidad y ranking

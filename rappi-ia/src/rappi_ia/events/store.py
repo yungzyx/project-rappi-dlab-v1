@@ -33,7 +33,7 @@ EVENT_TYPES = {
     "recommendation_click",
     "service_shown",  # el agente ofreció un servicio sin catálogo (payload.servicio)
     "service_opened",  # se tocó el botón que abre ese servicio
-    "vertical_open",  # se abrió un vertical desde la Home (payload.vertical); alimenta la afinidad del motor
+    "vertical_open",  # se abrió un vertical desde la Home (en el campo `vertical`); alimenta la afinidad del motor
 }
 # Lo que el cliente puede mandar a /events: `order_placed` nace solo en /orders, con un pedido guardado detrás.
 CLIENT_EVENT_TYPES = EVENT_TYPES - {"order_placed"}

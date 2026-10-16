@@ -179,15 +179,15 @@ COMMENT ON COLUMN capa.trends.entity_id IS 'Id del producto o del plato, como te
 COMMENT ON COLUMN capa.trends.orders_now IS 'Pedidos en la ventana reciente.';
 COMMENT ON COLUMN capa.trends.orders_prev IS 'Pedidos en la ventana anterior, del mismo largo.';
 COMMENT ON COLUMN capa.trends.users_now IS 'Personas distintas que pidieron en la ventana reciente.';
-COMMENT ON COLUMN capa.trends.growth IS 'Crecimiento entre las dos ventanas (0,5 = 50 % más pedidos).';
-COMMENT ON COLUMN capa.trends.rank IS 'Lugar en el ranking de su alcance y vertical (1 = el que más crece).';
+COMMENT ON COLUMN capa.trends.growth IS 'Crecimiento entre las dos ventanas: (ahora − antes) / max(antes, 5); con 5 o más pedidos antes, 0,5 = 50 % más pedidos.';
+COMMENT ON COLUMN capa.trends.rank IS 'Lugar en el ranking de su alcance y vertical (1 = el más pedido en la ventana actual).';
 COMMENT ON COLUMN capa.trends.window_end IS 'Último día de la ventana reciente.';
 COMMENT ON COLUMN capa.trends.run_id IS 'Corrida del motor que lo calculó (capa.layer_runs).';
 
 COMMENT ON COLUMN capa.replenishment.user_id IS 'Id seudónimo de la persona.';
 COMMENT ON COLUMN capa.replenishment.concept_id IS 'Concepto que recompra (concept_id).';
 COMMENT ON COLUMN capa.replenishment.vertical IS 'Vertical donde lo suele pedir.';
-COMMENT ON COLUMN capa.replenishment.orders IS 'Pedidos de ese concepto.';
+COMMENT ON COLUMN capa.replenishment.orders IS 'Días distintos con compra del concepto.';
 COMMENT ON COLUMN capa.replenishment.interval_days IS 'Días típicos entre un pedido y el siguiente.';
 COMMENT ON COLUMN capa.replenishment.cv IS 'Variación de ese intervalo (desviación sobre media): cuanto más bajo, más regular.';
 COMMENT ON COLUMN capa.replenishment.last_ts IS 'Último pedido de ese concepto.';

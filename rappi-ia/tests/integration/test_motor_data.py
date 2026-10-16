@@ -63,7 +63,9 @@ def test_load_orders_only_proposal_mode_and_one_source(people):
     first = orders[0]
     assert (first.user_id, first.cart_id, first.ts, first.vertical, first.total) == ("p1", "c1", T1, "turbo", 5000.0)
     assert first.lines == (Line("cafe", "catalog_item", "101", False), Line(None, "menu_item", "202", True))
-    assert [o.order_id for o in load_orders(people, "synthetic")] == ["o4"]
+    [synthetic] = load_orders(people, "synthetic")
+    assert synthetic.order_id == "o4"
+    assert synthetic.lines == ()  # un pedido sin líneas
     assert [o.order_id for o in load_orders(people, "prototype", before=T3)] == ["o1"]
     assert load_orders(people, "prototype", user_id="s1") == []
 
