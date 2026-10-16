@@ -22,7 +22,7 @@ SUPUESTOS (editables aquí):
   su retención. Por construcción, el panel "confirma" que sumar grupos retiene: no es evidencia.
 - El agente simulado respeta las guardias de ofertas del real (offers/guards.py: sin alcohol, bebé, salud, sensibles ni
   Farmacia o Licores) y muestra un complemento en una parte de los carros (SUGGESTION_SHOWN). Aun así, lo aceptado
-  mueve personas de «rest» a «rest+retail»: con el catálogo de la demo (1.500 personas) queda en ~10 % de los
+  mueve personas de «rest» a «rest+retail»: con el catálogo de la demo (3.000 personas) queda en ~11 % de los
   meses-persona, frente al 5,4 % de Rappi.
 - Personas pequeñas que ejercitan los segmentos de la capa de perfiles (sin gluten, vegana, mamá con bebé, perro, gato,
   fitness, nocturno, cazaofertas, gamer, cafetera, chocolatera, parrillera); algunas prefieren ítems con un atributo.

@@ -132,7 +132,7 @@ describe('MvpUsageView', () => {
     // unmet has data and is labelled as simulated, never as MVP use.
     const unmet = await screen.findByRole('table', { name: 'Búsquedas sin resultado por vertical y concepto' })
     expect(within(unmet).getByText('🥗 Ensaladas y bowls')).toBeTruthy()
-    expect(screen.getByText('39 de 110 búsquedas sin resultado')).toBeTruthy()
+    expect(screen.getByText('25 de 82 búsquedas sin resultado')).toBeTruthy()
     expect(screen.getAllByText(/Datos simulados/)).toHaveLength(2)
     expect(screen.queryByText(NOT_EVIDENCE)).toBeNull()
   })

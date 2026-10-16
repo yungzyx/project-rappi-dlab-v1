@@ -134,7 +134,7 @@ Con datos internos, estas entidades permitirían **medir directamente** el probl
 
 **Construido con datos simulados:** `app_users`, `app_events`, `app_orders` y `app_order_lines`.
 
-- Los datos vienen del generador `events/synth.py` (1.500 usuarios × 26 semanas, semilla 7; `source = 'synthetic'`) o del prototipo (`source = 'prototype'`).
+- Los datos vienen del generador `events/synth.py` (3.000 usuarios × 26 semanas, semilla 7; `source = 'synthetic'`) o del prototipo (`source = 'prototype'`).
 - Las líneas de pedido apuntan a un producto (`catalog_item`) o a un plato (`menu_item`).
 - Alimentan los segmentos y las métricas de negocio (las muestra el panel de negocio, parte del MVP: [diseno-ia.md §5](diseno-ia.md#5-panel-para-la-empresa-vale-la-pena)): muestran la mecánica, no son evidencia.
 
