@@ -177,13 +177,32 @@ def test_a_cross_sell_rule_from_the_source_is_a_candidate_and_says_so(demo):
 
 def test_a_cross_sell_rule_is_only_searched_in_the_vertical_of_the_rule(demo):
     db, embedder = demo
-    # La despensa asiática también se vende en el súper, pero la regla es de Express, donde no hay: no se ofrece.
-    rule(db, "sushi", "despensa-asiatica", "conveniencia", 4.0)
+    # El hielo solo se vende en Turbo y la regla es de Express, donde no hay: la sushi no tiene arista al hielo, así que
+    # se ofrece la primera curada de siempre (a igual peso, por id), sin compra cruzada.
+    rule(db, "sushi", "hielo", "conveniencia", 4.0)
 
     chosen = suggest_complement(db, ["sushi"], "restaurantes", embedder, user_id="u-sushi")
 
-    assert chosen is None or not any(signal["kind"] == "compra_cruzada" for signal in chosen.basis)
-    assert chosen is None or (chosen.concept, chosen.vertical) != ("despensa-asiatica", "supermercado")
+    usual = suggest_complement(db, ["sushi"], "restaurantes", embedder)
+    assert (chosen.concept, chosen.vertical, chosen.basis) == (usual.concept, usual.vertical, [])
+    assert chosen.concept == "gaseosas"
+
+
+def test_if_the_rule_finds_nothing_the_curated_edge_of_the_same_concept_is_tried_in_its_verticals(demo):
+    db, embedder = demo
+    # El café solo se vende en el súper: la regla de Turbo no encuentra nada, la arista curada sushi → café sí.
+    rule(db, "sushi", "cafe", "turbo", 4.0)
+    db.execute(
+        """INSERT INTO concept_edges (from_concept, to_concept, method, weight, data_source)
+           VALUES ('sushi', 'cafe', 'curado', 0.2, 'curado')"""
+    )
+    db.commit()
+
+    chosen = suggest_complement(db, ["sushi"], "restaurantes", embedder, user_id="u-sushi")
+
+    assert (chosen.concept, chosen.source_concept, chosen.vertical) == ("cafe", "sushi", "supermercado")
+    assert chosen.reason == "Porque llevas 🍣 sushi"
+    assert chosen.basis == []  # no la trajo la regla
 
 
 def test_without_a_recent_order_of_the_source_the_rules_of_the_person_do_not_apply(demo):

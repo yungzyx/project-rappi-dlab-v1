@@ -245,6 +245,7 @@ def suggest_complement(
     for source, target, weight in edges:
         found.setdefault(target, _Candidate(target, source, float(weight)))
     population = config.MOTOR_POBLACION
+    edges_found = dict(found)  # sin las compras cruzadas: si la regla no encuentra nada, la arista se prueba igual
     lam = None
     if user_id is not None and _ordered_lately(conn, user_id, sources):
         lam = latest_lambda(conn, population)
@@ -334,6 +335,14 @@ def suggest_complement(
             result = search(candidate, verticals_of(candidate))
         if result:
             return suggestion(candidate, result, [])
+        # La regla no encontró nada en su vertical: el mismo concepto por su arista, en sus verticales de siempre.
+        edge = edges_found.get(candidate.concept)
+        if (
+            candidate.pick
+            and edge is not None
+            and (result := search(edge, _verticals_for(conn, edge.concept, current_vertical)))
+        ):
+            return suggestion(edge, result, [])
     return None
 
 
