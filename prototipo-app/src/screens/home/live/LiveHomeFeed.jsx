@@ -25,6 +25,7 @@ import {
 } from '../HomeSections'
 import { CREDITS } from '../../../data/home'
 import '../home.css'
+import { useVerticalOrder } from '../useVerticalOrder'
 import LiveAgent from './LiveAgent'
 import { PlanBlock, openItem } from './LiveBlocks'
 import { REPLAY_EVENT, markTourSeen, session, tourSeen } from '../../../state/liveMemory'
@@ -64,6 +65,7 @@ export default function LiveHomeFeed({ push, active = true }) {
   const { add: addToCart } = useAddToCart()
   const profile = useProfile()
   const events = useEvents()
+  const verticalOrder = useVerticalOrder()
   const reduceMotion = useReducedMotion()
   const [replays, setReplays] = useState(0)
 
@@ -403,11 +405,20 @@ export default function LiveHomeFeed({ push, active = true }) {
     )
   }
 
+  /** Cada toque a un vertical de la Home le enseña al motor qué abre la persona. */
+  const openVertical = (vertical) => events.track('vertical_open', { vertical })
+
   const blocks = {
     essentials: (
       <>
-        <MainTiles push={push} />
-        <Shortcuts push={push} proposal />
+        <MainTiles push={push} onOpen={openVertical} />
+        <Shortcuts
+          push={push}
+          proposal
+          order={verticalOrder.order}
+          caption={verticalOrder.personalized ? 'Ordenadas según lo que más pides' : null}
+          onOpen={openVertical}
+        />
       </>
     ),
     promos: <Promos push={push} />,

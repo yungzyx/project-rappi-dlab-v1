@@ -67,6 +67,19 @@ describe('Home de «Rappi hoy»', () => {
     expect(document.querySelector('.search-bar')).not.toBeNull()
   })
 
+  test('mantiene el orden de hoy sin pedir el orden a la API, y tocar un vertical manda vertical_open', () => {
+    events.track.mockClear()
+    const { fetchMock } = renderHome({ 'GET /profile/*': fixture('profile-verticales') })
+    expect([...document.querySelectorAll('.home-shortcut')].map((button) => button.textContent).slice(0, 2)).toEqual([
+      'Grocery',
+      'Pharmacy',
+    ])
+    expect(fetchMock.mock.calls.some(([url]) => url.includes('/verticales'))).toBe(false)
+    expect(screen.queryByText('Ordenadas según lo que más pides')).toBeNull()
+    fireEvent.click(screen.getByText('Pharmacy'))
+    expect(events.track).toHaveBeenCalledWith('vertical_open', { vertical: 'farmacia' })
+  })
+
   test('la Home muestra el aviso de demo no oficial', () => {
     renderHome()
     expect(screen.getByText('Demo no oficial · prototipo independiente, no afiliado a Rappi')).toBeTruthy()

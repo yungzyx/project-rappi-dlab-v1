@@ -55,7 +55,11 @@ beforeEach(async () => {
 })
 
 // Una oferta por momento, con los ejemplos del contrato; los momentos sin ejemplo responden 204.
-const OFFER_FIXTURES = { plan: 'agent-offer-plan', carrito: 'agent-offer-carrito', vertical_por_probar: 'agent-offer-vertical-por-probar' }
+const OFFER_FIXTURES = {
+  plan: 'agent-offer-plan',
+  carrito: 'agent-offer-carrito',
+  vertical_por_probar: 'agent-offer-vertical-por-probar',
+}
 // Lo que dice Mochi al tocarlo: la burbuja no lleva productos, así que no promete «mira estas ofertas» como el texto de la API.
 const POKE_LINE = '¿Y si pruebas algo de Súper?'
 const stubAgent = (routes = {}) =>
@@ -66,7 +70,13 @@ const stubAgent = (routes = {}) =>
   })
 const offerRequests = (mock = api) =>
   mock.mock.calls.filter(([url]) => url.endsWith('/agent/offer')).map(([, init]) => JSON.parse(init.body))
-const LOOSE_CART = { id: 'cat-94001', name: 'Cerveza rubia lata 470 cc (prueba)', vertical: 'liquor', entityType: 'catalog_item', entityId: '94001' }
+const LOOSE_CART = {
+  id: 'cat-94001',
+  name: 'Cerveza rubia lata 470 cc (prueba)',
+  vertical: 'liquor',
+  entityType: 'catalog_item',
+  entityId: '94001',
+}
 const tracked = (type, origin) =>
   events.track.mock.calls.filter(([name, fields]) => name === type && fields.payload?.origen === origin)
 
@@ -425,7 +435,13 @@ describe('Home del prototipo final', () => {
     test('al volver no comenta lo agregado', async () => {
       quietToday()
       memory.session.played = true
-      memory.session.lastAdded = { id: 'x', name: 'Cerveza Escudo Lata 470 cc', vertical: 'liquor', entityType: 'catalog_item', entityId: '94001' }
+      memory.session.lastAdded = {
+        id: 'x',
+        name: 'Cerveza Escudo Lata 470 cc',
+        vertical: 'liquor',
+        entityType: 'catalog_item',
+        entityId: '94001',
+      }
       const { container } = await renderHome()
       await advance(3000)
       expect(status(container)).toBe('')
@@ -618,5 +634,61 @@ describe('Home del prototipo final', () => {
     localStorage.setItem('rappi-proto-demo-mode', 'actual')
     await renderHome({ tab: 'account' })
     expect(screen.queryByRole('button', { name: /Repetir escena de Mochi/ })).toBeNull()
+  })
+
+  describe('orden de los accesos', () => {
+    const tiles = (container) => [...container.querySelectorAll('.home-shortcut')].map((button) => button.textContent)
+    const opened = () => events.track.mock.calls.filter(([type]) => type === 'vertical_open')
+
+    test('con una persona que pide en Farmacia, Farmacia va primero y se ve por qué están así', async () => {
+      stubAgent({ 'GET /profile/*': fixture('profile-verticales') })
+      const { container } = await renderHome()
+      await advance(300)
+      expect(tiles(container).slice(0, 2)).toEqual(['Pharmacy', 'Grocery'])
+      expect(tiles(container).slice(-2)).toEqual(['Loyalty', 'Benefits Pro'])
+      expect(screen.getByText('Ordenadas según lo que más pides')).toBeTruthy()
+    })
+
+    test('una persona nueva ve el orden fijo y sin el texto', async () => {
+      stubAgent({ 'GET /profile/*': fixture('profile-verticales-nueva') })
+      const { container } = await renderHome()
+      await advance(300)
+      expect(tiles(container).slice(0, 6)).toEqual(['Grocery', 'Pharmacy', 'Retail', 'Liquor', 'Express', 'Chocolates'])
+      expect(screen.queryByText('Ordenadas según lo que más pides')).toBeNull()
+    })
+
+    test('con la API caída, el orden fijo y sin el texto (Loyalty y Benefits Pro al final)', async () => {
+      stubAgent({ 'GET /profile/*': 'offline' })
+      const { container } = await renderHome()
+      await advance(300)
+      expect(tiles(container)).toEqual([
+        'Grocery',
+        'Pharmacy',
+        'Retail',
+        'Liquor',
+        'Express',
+        'Chocolates',
+        'RappiTravel',
+        '🛵RappiFavor',
+        'Loyalty',
+        'Benefits Pro',
+      ])
+      expect(screen.queryByText('Ordenadas según lo que más pides')).toBeNull()
+    })
+
+    test('tocar un vertical manda vertical_open con su código; Loyalty, RappiTravel y RappiFavor no mandan nada', async () => {
+      stubAgent({ 'GET /profile/*': fixture('profile-verticales') })
+      const push = vi.fn()
+      await renderHome({ push })
+      await advance(300)
+      fireEvent.click(screen.getByText('Pharmacy'))
+      expect(events.track).toHaveBeenCalledWith('vertical_open', { vertical: 'farmacia' })
+      fireEvent.click(screen.getByText('Restaurants'))
+      fireEvent.click(screen.getByText('Turbo'))
+      expect(opened().map(([, fields]) => fields.vertical)).toEqual(['farmacia', 'restaurantes', 'turbo'])
+      for (const name of ['Loyalty', 'RappiTravel', 'RappiFavor', 'Benefits Pro'])
+        fireEvent.click(screen.getByText(name))
+      expect(opened()).toHaveLength(3)
+    })
   })
 })
