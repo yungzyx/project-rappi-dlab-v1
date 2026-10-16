@@ -43,25 +43,29 @@ function describeRequest(name, source) {
 
 class HttpError extends Error {}
 
-/** Nunca mezclar fuentes: una respuesta que no trae la fuente pedida se descarta. `data: null` es válido (`motor` sin corrida). */
-function dataFrom(body, expected) {
-  if (body?.source !== expected || body.data === undefined) {
+// Métricas cuyo `data: null` es una respuesta válida: el motor todavía sin corrida.
+const NULLABLE = ['motor']
+
+/** Nunca mezclar fuentes: una respuesta que no trae la fuente pedida (o sus datos) se descarta. */
+function dataFrom(body, expected, name) {
+  const missing = NULLABLE.includes(name) ? body?.data === undefined : body?.data == null
+  if (body?.source !== expected || missing) {
     throw new Error(`Se esperaba la fuente ${expected} y llegó ${body?.source ?? 'otra cosa'}`)
   }
   return body.data
 }
 
-async function fetchLive({ path, expected }) {
+async function fetchLive({ path, expected, name }) {
   const response = await fetch(`${API_URL}${path}`, { signal: AbortSignal.timeout(TIMEOUT_MS) })
   if (!response.ok) throw new HttpError(`respondió ${response.status}`)
-  return dataFrom(await response.json(), expected)
+  return dataFrom(await response.json(), expected, name)
 }
 
-async function fetchSaved({ key, expected }) {
+async function fetchSaved({ key, expected, name }) {
   const load = savedResponses[`../fixtures/${key}.json`]
   if (!load) throw new Error(`Sin conexión y sin datos guardados para "${key}"`)
   const body = await load()
-  return { data: dataFrom(body, expected), saved: body.guardado ?? null }
+  return { data: dataFrom(body, expected, name), saved: body.guardado ?? null }
 }
 
 /** Motivo legible de por qué no se usó la respuesta en vivo. */

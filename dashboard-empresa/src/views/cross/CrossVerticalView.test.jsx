@@ -79,8 +79,10 @@ describe('CrossVerticalView', () => {
       'Favor',
       'Todo Chile',
     ])
-    expect(rows(rappi)[2]).toEqual(['Restaurantes + Turbo', '78.000', '6,6%', '12,2%', '5,5', '82%', '$123'])
-    expect(rows(rappi).at(-1)).toEqual(['Todo Chile', '1.180.000', '100,0%', '100,0%', '3,0', '55%', '$68'])
+    expect(within(rappi).getByRole('columnheader', { name: 'Gasto/usuario (moneda de la fuente)' })).toBeTruthy()
+    expect(within(rappi).queryByText(/\$/)).toBeNull() // la moneda de Rappi no se sabe: sin «$» junto al CLP propio
+    expect(rows(rappi)[2]).toEqual(['Restaurantes + Turbo', '78.000', '6,6%', '12,2%', '5,5', '82%', '123'])
+    expect(rows(rappi).at(-1)).toEqual(['Todo Chile', '1.180.000', '100,0%', '100,0%', '3,0', '55%', '68'])
     // La propia: la retención sin 30 meses con el siguiente completo no se inventa.
     const first = combos.data.propio[0]
     expect(rows(own)[0].slice(0, 2)).toEqual(['Restaurantes', formatNumber(first.meses_usuario)])

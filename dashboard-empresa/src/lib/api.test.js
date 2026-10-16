@@ -30,6 +30,14 @@ describe('loadAnalytics', () => {
     expect(getFallbacks()).toEqual([])
   })
 
+  test('solo el motor acepta `data: null`: otra métrica con null cae a lo guardado', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ source: 'synthetic', data: null })))
+
+    const result = await loadAnalytics('kpis', 'synthetic')
+
+    expect(result).toEqual({ data: savedKpis.data, offline: true, saved: savedKpis.guardado })
+  })
+
   test('una métrica sin datos (`data: null`, el motor que no corrió) es una respuesta válida', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ source: 'prototype', data: null })))
 
