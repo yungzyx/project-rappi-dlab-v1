@@ -1,5 +1,5 @@
 """`rappi-ia deploy-migrate`: en un despliegue, migrar es un paso aparte que respalda antes (si hay algo que aplicar),
-carga las tarjetas del juego y, con `DB_API_ROLE`, da los permisos del rol de la API. En producción, ni la API ni los
+y, con `DB_API_ROLE`, da los permisos del rol de la API. En producción, ni la API ni los
 objetivos de servidor migran al arrancar."""
 
 import os
@@ -12,7 +12,6 @@ from psycopg.pq import TransactionStatus
 from rappi_scraper.storage import db as scraper_db
 
 from rappi_ia import cli
-from rappi_ia.concepts.pipeline import build_concepts
 from rappi_ia.config import PROJECT_ROOT
 from rappi_ia.db import connect
 from rappi_ia.demo import doctor
@@ -22,9 +21,7 @@ PROBE = "999_prueba.sql"
 
 @pytest.fixture
 def ready(db):
-    """Base migrada con conceptos (las tarjetas del juego se ligan a ellos), como una base restaurada de un respaldo."""
-    build_concepts(db)
-    db.commit()
+    """Base migrada, como una base restaurada de un respaldo."""
     return db
 
 
@@ -77,8 +74,6 @@ def test_deploy_migrate_backs_up_only_when_pending(ready, add_pending, tmp_path,
     assert _probe_exists(ready) and _applied(ready, PROBE)
     assert "pre-migracion_prueba.dump" in out
     assert PROBE in out
-    assert "Tarjetas del juego: 108" in out
-    assert ready.execute("SELECT count(*) FROM knowledge_cards").fetchone()[0] == 108
 
 
 def test_without_backup_flag_migrates_without_backing_up(ready, pending, capsys):
@@ -238,7 +233,7 @@ def _dry_run(target: str, **env) -> str:
 def test_production_start_does_not_migrate(target, tmp_path):
     production = _dry_run(target, API_ENV="production")
     assert "uvicorn" in production
-    for step in ("check-migrations", "rappi_ia migrate", "rappi_ia knowledge"):
+    for step in ("check-migrations", "rappi_ia migrate"):
         assert step not in production
 
     dotenv = tmp_path / ".env"

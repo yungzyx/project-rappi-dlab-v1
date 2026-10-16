@@ -68,7 +68,7 @@ services:
       retries: 20
     restart: unless-stopped
 
-  # Respalda (si hay migraciones pendientes), migra, carga las tarjetas del juego y da los permisos de rappi_api.
+  # Respalda (si hay migraciones pendientes), migra y da los permisos de rappi_api.
   migrate:
     <<: [*env, *logging]
     image: rappi-jobs

@@ -24,7 +24,6 @@ from types import SimpleNamespace
 import pytest
 
 from owner_client import OwnerClient
-from rappi_ia import config
 from rappi_ia.agent.compose import TemplateComposer
 from rappi_ia.agent.rappi_agent import RappiAgent
 from rappi_ia.api import app as api
@@ -35,7 +34,7 @@ from rappi_ia.events.synth import generate
 
 FIXTURES = Path(__file__).resolve().parents[3] / "prototipo-app" / "src" / "api" / "fixtures"
 PANEL_FIXTURES = Path(__file__).resolve().parents[3] / "dashboard-empresa" / "src" / "fixtures"
-PANEL_METRICS = ("offers", "game", "unmet")
+PANEL_METRICS = ("offers", "unmet")
 # Las métricas de /analytics que guarda `npm run fixtures` (dashboard-empresa/scripts/update-fixtures.mjs).
 PANEL_SHAPE = (
     "kpis",
@@ -92,12 +91,6 @@ CONTRACT: tuple[Example, ...] = (
         "POST",
         "/agent/ask",
         {"message": "pizza", "vertical": "restaurants", "user_id": "u-contrato", "session_id": "s-contrato"},
-    ),
-    Example(
-        "agent-ask-dato",
-        "POST",
-        "/agent/ask",
-        {"message": "pizza", "vertical": "restaurants", "user_id": "u-contrato-dato", "session_id": "s-contrato-dato"},
     ),
     Example("recommendations", "GET", "/recommendations?user_id=u-contrato&vertical=restaurants"),
     Example("agent-plans", "GET", "/agent/plans"),
@@ -157,54 +150,15 @@ CONTRACT: tuple[Example, ...] = (
     # La escalera de un perfil elegido, sin persona: lo que usa la demo.
     Example("agent-offer-perfil", "POST", "/agent/offer", {"moment": "perfil", "context": {"perfil": "asiatico"}}),
     Example("profile-gustos", "GET", "/profile/u-gustos/gustos"),
-    Example("game-cards", "GET", "/game/cards?vertical=supermercado"),
-    Example("game-challenge", "GET", "/game/challenge?vertical=supermercado&seed=0"),
-    Example(
-        "game-state-put",
-        "PUT",
-        "/game/state/u-contrato",
-        {
-            "state": {
-                "version": 1,
-                "xp": 10,
-                "discovered": {"supermercado": ["supermercado-01"]},
-                "correct": {},
-                "answered": {},
-                "cards": ["supermercado-01"],
-                "opened": [],
-                "daily": {"date": "2026-10-10", "discovered": 1, "correct": 0, "opened": 0, "done": False},
-                "streak": {"count": 0, "lastDate": None},
-                "seenIntro": True,
-                "visited": ["supermercado"],
-            }
-        },
-    ),
-    Example("game-state", "GET", "/game/state/u-contrato", after="game-state-put"),
     # Se reclama el id viejo de un navegador (de antes de la sesión firmada): la respuesta no cambia en cada corrida.
     # El token sale del secreto de los tests (tests/conftest.py), que no sirve fuera de ellos.
     Example("session", "POST", "/session", {"legacy_user_id": "proto-0123456789abcdef"}),
 )
 
 
-GAME_STATE = {
-    "version": 1,
-    "xp": 0,
-    "discovered": {},
-    "correct": {},
-    "answered": {},
-    "cards": [],
-    "opened": [],
-    "daily": {"date": "2026-10-10", "discovered": 0, "correct": 0, "opened": 0, "done": False},
-    "streak": {"count": 0, "lastDate": None},
-    "seenIntro": True,
-    "visited": [],
-}
-
-
 @pytest.fixture
-def client(db, monkeypatch):
+def client(db):
     seed_demo(db)
-    monkeypatch.setattr(config, "GAME_MIN_ITEMS", 1)  # el catálogo de prueba es chico: sus conceptos tienen 1 a 7 ítems
     # /health estima los documentos con las estadísticas de Postgres: si el autovacuum analizara solo algunas
     # particiones, la cifra saldría parcial. Con pocas filas ANALYZE las lee todas y la estimación es exacta.
     db.execute("ANALYZE search_documents")
@@ -250,10 +204,6 @@ def client(db, monkeypatch):
         assert (
             test_client.post("/orders", json={**order, "vertical": "restaurants", "lines": [line]}).status_code == 200
         )
-    # Ya descubrió el dato de la pizza: `agent-ask` (pizza) es la respuesta sin «¿Sabías que…?», y `agent-ask-dato`
-    # (otro usuario, sin progreso) la que lo trae. `game-state-put` reemplaza este estado, así que no lo afecta.
-    discovered = {**GAME_STATE, "discovered": {"restaurantes": ["restaurantes-01"]}, "cards": ["restaurantes-01"]}
-    assert test_client.put("/game/state/u-contrato", json={"state": discovered}).status_code == 200
     # Una persona de antes de la identidad firmada, para el ejemplo de `/session`.
     db.execute("INSERT INTO app_users (user_id, source) VALUES ('proto-0123456789abcdef', 'prototype')")
     db.commit()
@@ -323,16 +273,14 @@ def test_contract_examples_are_up_to_date(client, example):
 
 
 def prototype_journey(client) -> None:
-    """Lo que manda la app en un recorrido corto: acepta un plan, ve una oferta en el carro, termina una ronda del
-    juego con dos tarjetas nuevas y busca algo que no hay."""
+    """Lo que manda la app en un recorrido corto: acepta un plan, ve una oferta en el carro y busca algo que no hay."""
     plan = client.post("/agent/offer", json={"moment": "plan", "context": {"occasion": "carrete"}}).json()
     cart = client.post(
         "/agent/offer",
         json={"moment": "carrito", "context": {"product": {"entity_type": "catalog_item", "entity_id": "94001"}}},
     ).json()
-    cards = [card["id"] for card in client.get("/game/cards?vertical=supermercado").json()["cards"][:2]]
     search = client.get("/search?q=xyzzy&current=supermercado").json()
-    assert len(cards) == 2 and search["unmet"]
+    assert search["unmet"]
 
     def offered(kind, offer):
         product = offer["products"][0]
@@ -344,17 +292,10 @@ def prototype_journey(client) -> None:
             "payload": {"origen": f"agent-{offer['moment']}"},
         }
 
-    game = {"vertical_juego": "supermercado"}
     sent = [
         offered("suggestion_shown", plan),
         offered("suggestion_accepted", plan),
         offered("suggestion_shown", cart),
-        {
-            "type": "game_round_finished",
-            "session_id": "s-panel",
-            "payload": {**game, "estrellas": 2, "aciertos": 4, "preguntas": 5},
-        },
-        *({"type": "game_card_discovered", "session_id": "s-panel", "payload": {**game, "tarjeta": c}} for c in cards),
         {
             "type": "search",
             "session_id": "s-panel",

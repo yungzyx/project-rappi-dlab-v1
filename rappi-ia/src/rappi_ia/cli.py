@@ -4,8 +4,6 @@ Flujo típico (después de cada `rappi refresh` del scraper):
     rappi-ia migrate
     rappi-ia concepts                # capa 2: taxonomía, complementos, mapeos y conceptos por ítem
     rappi-ia concepts --solo-reporte # cobertura sin recalcular
-    rappi-ia knowledge               # tarjetas del juego y sus ligas a conceptos (después de `concepts`)
-    rappi-ia knowledge --jev-propuestas  # Jev propone un concepto por tarjeta en un CSV para revisar (no liga nada)
     rappi-ia map-categories          # categorías sin mapeo revisado, con concepto sugerido, a un CSV para revisar
     rappi-ia map-categories --jev    # Jev propone su concepto (solo con clave y adopción); --exportar para revisarlas
     rappi-ia embed-text              # embeddings e5 de search_documents (incremental) + HNSW por vertical
@@ -19,7 +17,7 @@ Flujo típico (después de cada `rappi refresh` del scraper):
     rappi-ia seed-demo               # catálogo de prueba inventado, SOLO en la base DATABASE_URL_TEST (_test)
     rappi-ia doctor                  # revisa (solo lectura) que DATABASE_URL tenga catálogo; sale 1 si no
     rappi-ia check-migrations        # se niega a migrar la base real desde una rama sin fusionar (MIGRATE=1 lo fuerza)
-    rappi-ia deploy-migrate          # paso del despliegue: respalda si hay pendientes, migra, tarjetas y permisos
+    rappi-ia deploy-migrate          # paso del despliegue: respalda si hay pendientes, migra y da permisos
     rappi-ia token proto-…           # token (X-User-Token) de una persona, firmado con el secreto de la API
 """
 
@@ -43,7 +41,6 @@ from .concepts.taxonomy import load_taxonomy
 from .db import changed_migrations, connect, database_url, migrate
 from .demo.doctor import check_database, check_pending_migrations, pending_migrations
 from .demo.seed import ensure_test_database, reset_test_database, seed_demo
-from .game.cards import load_knowledge
 from .layers.attributes import build_attributes
 from .layers.brands import build_brands
 from .layers.canonical import build_canonical
@@ -87,37 +84,6 @@ def cmd_concepts(conn, args) -> None:
                 log.warning("Sin el extra `ml` (sentence-transformers): conceptos solo por categoría y reglas")
         build_concepts(conn, embedder)
     print(render_text(coverage_report(conn)))
-
-
-def cmd_knowledge(conn, args) -> None:
-    if getattr(args, "jev_propuestas", False):
-        _card_proposals_with_jev()
-        return
-    try:
-        counts = load_knowledge(conn)
-    except ValueError as exc:
-        raise SystemExit(str(exc)) from exc
-    print(f"Tarjetas del juego: {counts['tarjetas']}, ligas a conceptos: {counts['ligas']}")
-
-
-def _card_proposals_with_jev() -> None:
-    from . import jev
-    from .game import cards
-
-    client = jev.client_or_none()
-    if client is None:
-        print("Sin TYPESAFE_API_KEY: Jev no propone conceptos para las tarjetas.")
-        return
-    rows = cards.propose_card_concepts(client, cards.read_cards(), cards.read_links(), load_taxonomy())
-    out = cards.write_card_proposals(rows)
-    differ = sum(
-        r["concepto_propuesto"] not in ("", "ninguno") and r["concepto_propuesto"] not in r["ligas_revisadas"].split()
-        for r in rows
-    )
-    print(f"{len(rows)} tarjetas en {out}; Jev propone {differ} conceptos que hoy no están ligados.")
-    print("Son propuestas: revisarlas y, si corresponde, agregarlas a mano en src/rappi_ia/game/card_concepts.toml.")
-    if client.stats.stopped_by_cap:
-        print(f"⚠ Se llegó al tope de {config.JEV_MAX_REQUESTS} llamadas (JEV_MAX_REQUESTS): faltaron tarjetas.")
 
 
 def cmd_attributes(conn, args) -> None:
@@ -557,8 +523,8 @@ PRE_MIGRATION_BACKUP = "pre-migracion"
 
 def deploy_migrate(conn, backup: Callable[[], Path] | None, grants_file: Path = GRANTS_FILE) -> None:
     """Migrar como paso del despliegue (el servicio `migrate`): si hay migraciones pendientes, primero `backup` (si
-    falla, no migra; `None` es --sin-respaldo); después `migrate`, las tarjetas del juego y, con DB_API_ROLE, los
-    permisos de ese rol (`grants_file`, idempotente). Dice qué hizo; sale con un mensaje (sin traceback) si algo falla.
+    falla, no migra; `None` es --sin-respaldo); después `migrate` y, con DB_API_ROLE, los permisos de ese rol
+    (`grants_file`, idempotente). Dice qué hizo; sale con un mensaje (sin traceback) si algo falla.
 
     Todo va con el candado de `migrate` (MIGRATE_LOCK, de sesión; `migrate` lo vuelve a tomar en la misma sesión): un
     segundo despliegue a la vez espera al primero y ya no encuentra nada que respaldar ni aplicar."""
@@ -605,12 +571,6 @@ def _deploy_migrate_locked(conn, backup: Callable[[], Path] | None, role: str | 
             f"La migración {failed} falló y no se aplicó ({type(exc).__name__}; el detalle quedó en el registro)."
         ) from exc
     print("Migraciones aplicadas: " + (", ".join(applied) if applied else "ninguna (al día)"))
-    try:
-        counts = load_knowledge(conn)
-    except ValueError as exc:
-        raise SystemExit(f"Tarjetas del juego: {exc}") from exc
-    conn.commit()
-    print(f"Tarjetas del juego: {counts['tarjetas']}, ligas a conceptos: {counts['ligas']}")
     if role:
         conn.execute(sql.SQL(grants_file.read_text(encoding="utf-8")).format(api_role=sql.Identifier(role)))
         conn.commit()
@@ -658,7 +618,6 @@ COMMANDS = {
     "analytics": cmd_analytics,
     "migrate": cmd_migrate,
     "concepts": cmd_concepts,
-    "knowledge": cmd_knowledge,
     "map-categories": cmd_map_categories,
     "embed-text": cmd_embed_text,
     "search": cmd_search,
@@ -685,12 +644,6 @@ def build_parser() -> argparse.ArgumentParser:
     concepts = sub.add_parser("concepts", help="capa 2: conceptos, complementos y mapeo de productos y platos")
     concepts.add_argument("--solo-reporte", action="store_true", help="solo muestra la cobertura actual")
     concepts.add_argument("--sin-knn", action="store_true", help="sin refinar con vecinos cercanos (embeddings)")
-    kn = sub.add_parser("knowledge", help="tarjetas del juego en la base, con sus ligas revisadas a conceptos")
-    kn.add_argument(
-        "--jev-propuestas",
-        action="store_true",
-        help="Jev propone un concepto por tarjeta en data/eval/tarjetas-jev.csv (no toca la base ni las ligas)",
-    )
     sub.add_parser("attributes", help="capa de perfiles: atributos de cada ítem (sin gluten, vegano, familiar…)")
     lr = sub.add_parser("layer-report", help="reporte de calidad de las capas de perfiles (data/eval/capas.md)")
     lr.add_argument("--muestra", type=int, default=20, help="ítems de muestra por atributo")
@@ -773,8 +726,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     dm = sub.add_parser(
         "deploy-migrate",
-        help="paso del despliegue: si hay migraciones pendientes respalda la base y las aplica; después las tarjetas "
-        "del juego y, con DB_API_ROLE, los permisos de la API (deploy/db/grants.sql)",
+        help="paso del despliegue: si hay migraciones pendientes respalda la base y las aplica; después, con "
+        "DB_API_ROLE, los permisos de la API (deploy/db/grants.sql)",
     )
     dm.add_argument("--sin-respaldo", action="store_true", help="migra sin respaldar antes")
     token = sub.add_parser(

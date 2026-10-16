@@ -1,7 +1,7 @@
 """Identidad anónima firmada: un id que aparece en un log ya no basta para leer, escribir ni borrar datos de alguien.
 
 `POST /session` da a cada navegador un id del prototipo y su token, `<id>.<HMAC-SHA256 del id, en base64url>`, firmado
-con API_SECRET. Las rutas con datos de una persona (`/profile/{user_id}`, `/game/state/{user_id}`, el `user_id` de una
+con API_SECRET. Las rutas con datos de una persona (`/profile/{user_id}`, el `user_id` de una
 query o de un cuerpo) exigen la cabecera X-User-Token de ese mismo id: sin token, 401; con el de otro, 403. Sin
 `user_id`, una ruta sigue anónima. Se decide siempre sobre el id ya validado, el mismo que usa la ruta: no sobre el
 JSON crudo (la limpieza de `Clean` puede cambiar sus claves) ni sobre otro lugar del request. No es una cuenta: el

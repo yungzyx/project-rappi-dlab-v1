@@ -33,15 +33,13 @@ EVENT_TYPES = {
     "recommendation_click",
     "service_shown",  # el agente ofreció un servicio sin catálogo (payload.servicio)
     "service_opened",  # se tocó el botón que abre ese servicio
-    "game_round_finished",  # payload: vertical_juego, estrellas, aciertos, preguntas
-    "game_card_discovered",  # payload: vertical_juego, tarjeta
 }
 # Lo que el cliente puede mandar a /events: `order_placed` nace solo en /orders, con un pedido guardado detrás.
 CLIENT_EVENT_TYPES = EVENT_TYPES - {"order_placed"}
 QUERY_RETENTION_DAYS = 90
 HALF_LIFE_DAYS = 14  # el interés se reduce a la mitad cada 2 semanas sin actividad
 # Solo señales positivas del propio usuario. Lo que el agente mostró (suggestion_shown), lo que rechazó
-# (suggestion_dismissed) o sacó del carro (cart_remove) no suma interés; jugar tampoco (game_*).
+# (suggestion_dismissed) o sacó del carro (cart_remove) no suma interés.
 WEIGHTS = {
     "order_placed": 5.0,
     "cart_add": 3.0,
@@ -326,7 +324,7 @@ def forget(conn: Connection, user_id: str, concept_id: str | None = None) -> int
 
 
 def purge_inactive_users(conn: Connection, days: int) -> int:
-    """Borra a las personas del prototipo sin actividad en `days` días: sin eventos, pedidos ni progreso del juego en
+    """Borra a las personas del prototipo sin actividad en `days` días: sin eventos ni pedidos en
     ese tiempo, y creadas antes (con sus eventos, pedidos y segmentos, en cascada). Los usuarios simulados no se tocan.
     Devuelve cuántas."""
     return conn.execute(
@@ -334,8 +332,7 @@ def purge_inactive_users(conn: Connection, days: int) -> int:
            DELETE FROM app_users u USING cutoff
            WHERE u.source = 'prototype' AND u.created_at < cutoff.ts
              AND NOT EXISTS (SELECT 1 FROM app_events e WHERE e.user_id = u.user_id AND e.ts >= cutoff.ts)
-             AND NOT EXISTS (SELECT 1 FROM app_orders o WHERE o.user_id = u.user_id AND o.ts >= cutoff.ts)
-             AND NOT EXISTS (SELECT 1 FROM game_state g WHERE g.user_id = u.user_id AND g.updated_at >= cutoff.ts)""",
+             AND NOT EXISTS (SELECT 1 FROM app_orders o WHERE o.user_id = u.user_id AND o.ts >= cutoff.ts)""",
         (days,),
     ).rowcount
 

@@ -495,44 +495,6 @@ def offers(conn: Connection, source: str = "synthetic") -> dict:
     return row
 
 
-MIN_GAME_ROUNDS = 5  # rondas mínimas para mostrar el promedio de estrellas
-
-
-def game(conn: Connection, source: str = "synthetic") -> dict:
-    """Juego de verticales: personas que jugaron, rondas terminadas, estrellas promedio y tarjetas descubiertas, en
-    total y por vertical del juego. Un payload sin estrellas numéricas cuenta como ronda pero no entra al promedio."""
-    _check(source)
-    params = {"source": source}
-    played = """FROM app_events WHERE source = %(source)s AND type IN ('game_round_finished', 'game_card_discovered')"""
-    # Una tarjeta cuenta una vez por persona: «Repetir escena» conserva el id y no debe sumarla otra vez.
-    cards = "count(DISTINCT (user_id, payload ->> 'tarjeta')) FILTER (WHERE type = 'game_card_discovered')"
-    [row] = _rows(
-        conn,
-        f"""SELECT count(DISTINCT user_id) AS personas,
-                   count(*) FILTER (WHERE type = 'game_round_finished') AS rondas,
-                   round(avg(CASE WHEN type = 'game_round_finished' AND jsonb_typeof(payload -> 'estrellas') = 'number'
-                                  THEN least(greatest((payload ->> 'estrellas')::numeric, 0), 3) END), 1)
-                       AS estrellas_promedio,  -- de 0 a 3, como en la app
-                   {cards} AS tarjetas
-            {played}""",
-        params,
-    )
-    if row["rondas"] < MIN_GAME_ROUNDS:
-        row["estrellas_promedio"] = None
-    row["por_vertical"] = _rows(
-        conn,
-        f"""SELECT payload ->> 'vertical_juego' AS vertical_juego,
-                   count(*) FILTER (WHERE type = 'game_round_finished') AS rondas,
-                   {cards} AS tarjetas
-            {played} AND payload ->> 'vertical_juego' IS NOT NULL
-            GROUP BY payload ->> 'vertical_juego'
-            ORDER BY count(*) DESC, (payload ->> 'vertical_juego') COLLATE "C"  -- el mismo orden en cualquier base
-            """,
-        params,
-    )
-    return row
-
-
 MAX_UNMET_ROWS = 20
 
 

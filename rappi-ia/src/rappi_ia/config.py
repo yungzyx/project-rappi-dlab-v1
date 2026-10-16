@@ -31,9 +31,6 @@ HNSW_MAINTENANCE_WORK_MEM = os.environ.get("HNSW_MAINTENANCE_WORK_MEM", "1GB")
 # Nombre con que el agente se presenta ante la persona. Es el único lugar del backend donde vive.
 AGENT_NAME = os.environ.get("AGENT_NAME", "Mochi")
 
-# Productos que un concepto necesita en una vertical para que el juego diga que «pertenece» a ella.
-GAME_MIN_ITEMS = int(os.environ.get("GAME_MIN_ITEMS", "20"))
-
 # Ciudad de los restaurantes que ofrece la escalera de un perfil de gusto cuando la persona no tiene ciudad
 # (`app_users.city`; la app no la pide). Es una ciudad del scraper («Santiago de Chile», «Viña del Mar»): ver
 # offers/profiles.py, CITY_COMUNAS.
