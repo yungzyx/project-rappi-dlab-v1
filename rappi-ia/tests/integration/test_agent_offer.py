@@ -182,7 +182,7 @@ def test_checkout_offer_skips_items_already_in_cart(client):
     body = both.json()
     assert body["moment"] == "checkout" and without_why(body["reason"]) == {"concept": "hielo", "from_concept": "pisco"}
     assert {p["entity_id"] for p in body["products"]}.isdisjoint({PISCO, COLA})
-    assert body["text"].startswith("Antes de pagar") and "pisco" not in body["text"].lower()
+    assert body["text"].startswith("Para completar lo que llevas") and "pisco" not in body["text"].lower()
     assert_offerable(body)
 
     mixed = offer(client, "checkout", {"cart": [item(BEER), item(CHIPS), item(DIAPERS)]}).json()
@@ -423,7 +423,7 @@ def test_every_moment_has_reason_text_and_basis(client):
     for moment, reply in replies.items():
         assert reply.status_code == 200, (moment, reply.text)
         reason = reply.json()["reason"]
-        assert reason["text"].startswith("Porque "), moment
+        assert reason["text"].startswith(("Porque ", "Por tu ", "Para ")), moment
         assert isinstance(reason["basis"], list), moment
 
     assert replies["plan"].json()["reason"]["text"] == "Porque elegiste «Carrete»."
@@ -442,6 +442,6 @@ def test_every_moment_has_reason_text_and_basis(client):
 def test_a_non_offerable_origin_is_not_named_in_the_reason(client):
     beer = offer(client, "carrito", {"product": item(BEER)}).json()["reason"]
 
-    assert beer["text"] == "Porque combina con lo que llevas." and beer["basis"] == []
+    assert beer["text"] == "Para completar lo que llevas." and beer["basis"] == []
     pisco = offer(client, "checkout", {"cart": [item(PISCO)]}).json()["reason"]
-    assert pisco["text"] == "Porque combina con lo que llevas." and pisco["basis"] == []
+    assert pisco["text"] == "Para completar lo que llevas." and pisco["basis"] == []

@@ -423,7 +423,7 @@ def recommendations(
     libres, una más con lo más pedido de la vertical que mejor le calza (`_top_row`)."""
     interests = list(events.profile(conn, user_id))
     taxonomy = load_taxonomy()
-    # La razón nombra el interés («Porque te interesa…»): el agente no nombra por su cuenta alcohol, salud ni lo
+    # La razón nombra el interés («Por tu interés en…»): el agente no nombra por su cuenta alcohol, salud ni lo
     # sensible, así que esos intereses no son fuente de una fila (como en `RappiAgent._top_interest`). El perfil los
     # conserva.
     sources = [c for c in interests if c in taxonomy.concepts and is_offerable(taxonomy.concepts[c])]
@@ -437,7 +437,7 @@ def recommendations(
             rows.append(
                 {
                     # En el inicio no hay carro: la razón es el interés aprendido, no "porque llevas".
-                    "reason": f"Porque te interesa {interest.emoji} {interest.name.lower()}",
+                    "reason": f"Por tu interés en {interest.emoji} {interest.name.lower()}",
                     "concept": suggestion.concept,
                     "vertical": suggestion.vertical,
                     "prototype_vertical": PROTOTYPE_VERTICALS.get(suggestion.vertical),

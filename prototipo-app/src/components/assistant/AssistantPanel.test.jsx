@@ -668,7 +668,7 @@ describe('Para ti y Descubre con Mochi', () => {
 
     expect(bubbles()[0]).toBe('¡Hola! Soy Mochi, tu asistente Rappi 🧡 ¿Qué se te antoja hoy?')
     expect(screen.getByText('Gaseosa cola 500 cc (prueba)')).toBeTruthy()
-    expect(document.querySelector('.agent-msg-reason').textContent).toBe('Porque te interesa 🍕 pizza')
+    expect(document.querySelector('.agent-msg-reason').textContent).toBe('Por tu interés en 🍕 pizza')
     // Una sola petición sirve a «Para ti» y a «Descubre con Mochi».
     expect(fetchMock.mock.calls.filter(([url]) => url.includes('/recommendations'))).toHaveLength(1)
     const shown = tracked('suggestion_shown').filter((fields) => fields.payload.origen === 'para-ti')
@@ -725,7 +725,7 @@ describe('Para ti y Descubre con Mochi', () => {
     const [row] = data.rows
     data.rows = [
       row,
-      { ...row, concept: 'helados', prototype_vertical: 'grocery', vertical: 'supermercado', reason: 'Porque te interesa 🍫 chocolate' },
+      { ...row, concept: 'helados', prototype_vertical: 'grocery', vertical: 'supermercado', reason: 'Por tu interés en 🍫 chocolate' },
       { ...row, concept: 'snacks-salados', prototype_vertical: 'liquor', vertical: 'licores' },
       { ...row, concept: 'jugos', prototype_vertical: 'restaurants', vertical: 'restaurantes' },
     ]

@@ -1,4 +1,4 @@
-"""El texto del momento `perfil` (offers/engine.py): «Como te gusta {gusto}…», con el `gusto` de cada perfil
+"""El texto del momento `perfil` (offers/engine.py): «Por tu gusto por {gusto}…», con el `gusto` de cada perfil
 (offers/perfiles.toml); sin él, el agente nombra el perfil."""
 
 from dataclasses import replace
@@ -12,11 +12,11 @@ from rappi_ia.offers.profiles import load_profiles
 @pytest.mark.parametrize(
     ("profile_id", "text"),
     [
-        ("asiatico", "Como te gusta lo asiático, mira esto en otras verticales."),
-        ("cafe", "Como te gusta el café, mira esto en otras verticales."),
-        ("italiano", "Como te gusta lo italiano, mira esto en otras verticales."),
-        ("mascotas", "Como te gusta consentir a tu perro, mira esto en otras verticales."),
-        ("carrete", "Como te gusta armar carrete, mira esto en otras verticales."),
+        ("asiatico", "Por tu gusto por lo asiático, mira esto en otras verticales."),
+        ("cafe", "Por tu gusto por el café, mira esto en otras verticales."),
+        ("italiano", "Por tu gusto por lo italiano, mira esto en otras verticales."),
+        ("mascotas", "Por tu gusto por consentir a tu perro, mira esto en otras verticales."),
+        ("carrete", "Por tu gusto por armar carrete, mira esto en otras verticales."),
     ],
 )
 def test_the_profile_text_says_what_the_person_likes(profile_id, text):

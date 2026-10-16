@@ -308,11 +308,11 @@ def test_unmet_demand_is_flagged_and_said(rappi_agent):
 
 
 def test_greeting_mentions_only_offerable_interests(rappi_agent):
-    """Mochi no saluda con «Veo que te gusta…» de algo sensible, alcohol, salud ni bebé: pasa al siguiente interés."""
+    """Mochi no saluda con «Veo tu interés en…» de algo sensible, alcohol, salud ni bebé: pasa al siguiente interés."""
     agent, db = rappi_agent
     blocked = {"cigarrillos": 9.0, "cerveza": 3.0, "panales": 2.5, "vitaminas": 2.0, "medicamentos": 1.5}
     for profile in (blocked, {"cerveza": 1.0}, {"panales": 1.0}, {"vitaminas": 1.0}):
-        assert "Veo que" not in agent.reply(db, "hola", Context(profile=profile))["text"], profile
+        assert "Veo tu interés" not in agent.reply(db, "hola", Context(profile=profile))["text"], profile
     hello = agent.reply(db, "hola", Context(profile={**blocked, "snacks-salados": 0.5}))
     assert "snacks salados" in hello["text"].lower() and "cerveza" not in hello["text"].lower()
 
@@ -1098,7 +1098,7 @@ def test_cheap_shows_the_cheapest_first(rappi_agent):
 def test_a_recommendation_uses_what_the_user_likes(rappi_agent):
     agent, db = rappi_agent
     liked = agent.reply(db, "qué me recomiendas", Context(profile={"snacks-salados": 3.0}))
-    assert liked["text"].startswith("Como te gusta 🥨 snacks salados 😉") and liked["products"]
+    assert liked["text"].startswith("Por tu interés en 🥨 snacks salados 😉") and liked["products"]
     unknown = agent.reply(db, "qué me recomiendas", Context())
     assert unknown["intent"]["kind"] == "ayuda" and unknown["actions"]
 
@@ -1110,13 +1110,13 @@ def test_a_recommendation_never_pushes_alcohol_baby_or_health_interests(rappi_ag
     for profile in ({"cerveza": 3.0}, {"panales": 3.0}, {"vitaminas": 3.0}, {"cerveza": 3.0, "cigarrillos": 9.0}):
         r = agent.reply(db, "qué me recomiendas", Context(profile=profile))
         assert r["intent"]["kind"] == "ayuda" and r["actions"] and not r["products"], profile
-        assert "Como te gusta" not in r["text"]
+        assert "Por tu interés en" not in r["text"]
     r = agent.reply(db, "qué me recomiendas", Context(profile={"cerveza": 3.0, "panales": 2.0, "snacks-salados": 0.5}))
-    assert r["text"].startswith("Como te gusta 🥨 snacks salados") and "cerveza" not in r["text"].lower()
+    assert r["text"].startswith("Por tu interés en 🥨 snacks salados") and "cerveza" not in r["text"].lower()
 
 
 def test_a_recommendation_is_an_offer_so_it_skips_blocked_stores_and_adult_products(rappi_agent):
-    """«Como te gusta…» lo propone Mochi sin que se lo pidan: no trae un producto que solo vende una tienda que Rappi
+    """«Por tu gusto por…» lo propone Mochi sin que se lo pidan: no trae un producto que solo vende una tienda que Rappi
     rotula Smoking shop, ni uno +18 bajo un concepto corriente (a quien lo pide por su nombre sí se le muestra)."""
     agent, db = rappi_agent
     add_store(db, 4, "mall", "Smoking shop del mall")
@@ -1136,12 +1136,12 @@ def test_a_recommendation_is_an_offer_so_it_skips_blocked_stores_and_adult_produ
     liked = agent.reply(db, "qué me recomiendas", Context(profile={"snacks-salados": 3.0}))
 
     assert {"110", "111"} & asked  # pedidos por su nombre, se encuentran
-    assert liked["text"].startswith("Como te gusta 🥨 snacks salados") and liked["products"]
+    assert liked["text"].startswith("Por tu interés en 🥨 snacks salados") and liked["products"]
     assert not {"110", "111"} & {p["entity_id"] for p in liked["products"]}
 
 
 def test_an_unasked_recommendation_does_not_list_licores_pharmacy_or_their_stores_in_also_in(rappi_agent, monkeypatch):
-    """El «También en» de «Como te gusta…» (Mochi lo dice sola) no nombra Licores ni Farmacia ni una tienda que Rappi
+    """El «También en» de «Por tu gusto por…» (Mochi lo dice sola) no nombra Licores ni Farmacia ni una tienda que Rappi
     rotula Farmacia; en una respuesta pedida sí aparecen, como siempre."""
     agent, db = rappi_agent
     monkeypatch.setattr(verticals, "MIN_ITEMS_ELSEWHERE", 1)  # el catálogo de prueba es chico
@@ -1163,7 +1163,7 @@ def test_an_unasked_recommendation_does_not_list_licores_pharmacy_or_their_store
     liked = agent.reply(db, "qué me recomiendas", Context(profile={"snacks-salados": 3.0}))
 
     assert {v["vertical"] for v in asked["also_in"]["verticals"]} >= {"licores", "conveniencia", "chocolateria"}
-    assert liked["text"].startswith("Como te gusta 🥨 snacks salados")
+    assert liked["text"].startswith("Por tu interés en 🥨 snacks salados")
     elsewhere = {v["vertical"] for v in liked["also_in"]["verticals"]}
     assert elsewhere and not elsewhere & {"licores", "farmacia", "conveniencia"}  # esta última: solo una «Farmacia»
     stores = {s["name"] for v in liked["also_in"]["verticals"] for s in v["stores"]}

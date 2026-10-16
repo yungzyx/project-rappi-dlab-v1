@@ -18,6 +18,7 @@ from rappi_ia.embeddings.text_store import embed_search_documents
 from rappi_ia.events import store as events
 from rappi_ia.layers.runs import finish_layer_run, start_layer_run
 from rappi_ia.motor.recommend import CrossPick
+from rappi_ia.offers import engine
 from rappi_ia.offers.engine import _cross_offer, _top_offer
 from rappi_ia.offers.guards import is_offerable
 
@@ -337,8 +338,6 @@ def test_a_comeback_to_the_supermarket_contracts_the_article(client, db):
 
 
 OFFERABLE = [c for c in load_taxonomy().concepts.values() if is_offerable(c)]
-# Singulares («sushi»), plurales («frutas»), compuestos con «y» («sándwiches y completos») y con comas.
-SAMPLE_CONCEPTS = [c.id for c in OFFERABLE]
 
 
 def _all_texts(offer):
@@ -353,14 +352,14 @@ def _assert_reads_well(texts, name):
         assert " de el " not in text and " a el " not in text, text
 
 
-@pytest.mark.parametrize("origin_id", SAMPLE_CONCEPTS)
+# Singulares («sushi»), plurales («frutas»), compuestos con «y» («sándwiches y completos») y con comas.
+@pytest.mark.parametrize("origin_id", [c.id for c in OFFERABLE])
 def test_cross_texts_read_well_with_any_concept_as_origin_and_destination(origin_id):
     concepts = load_taxonomy().concepts
     origin = concepts[origin_id]
     combo = {"kind": "combinacion", "id": "rest→rest+turbo", "source": "rappi"}
     for destination_id in (origin_id, "frutas", "sandwiches"):
-        if destination_id not in concepts:
-            continue
+        assert destination_id in concepts
         pick = CrossPick(destination_id, "turbo", 1.0, origin_id, 5.0)
         offer = _cross_offer("turbo", [], pick, origin, combo, "synthetic")
         name = concepts[destination_id].name.lower()
@@ -383,3 +382,50 @@ def test_a_rule_without_a_nameable_origin_never_claims_the_most_ordered(vertical
     assert new.text.startswith("Para sumar en ") and new.reason["text"].startswith("Porque aún no pides en ")
     assert back.text.startswith("Vuelve a") and back.reason["text"].startswith("Porque hace más de un mes")
     assert plain.text.startswith("Lo más pedido en ")  # sin regla, sí son lo más pedido de la población
+
+
+VERBS_THAT_AGREE = ("combina", "te gusta", "te interesa", "lo pides", "los pides", "las pides", "lo llevas")
+
+
+TEMPLATES = (
+    "CART_TEXT",
+    "CART_TEXT_ANONYMOUS",
+    "CHECKOUT_TEXT",
+    "NEXT_ORDER_TEXT",
+    "NO_RESULT_TEXT",
+    "REASON_CART",
+    "REASON_CART_ANONYMOUS",
+    "REASON_NEXT",
+    "REASON_NEXT_ANONYMOUS",
+    "REASON_REPEAT",
+    "REPEAT_TEXT",
+    "REASON_LIKES_VERTICAL",
+    "REASON_LIKES_OCCASION",
+    "PROFILE_TEXT",
+    "TO_TRY_CROSS_TEXT",
+    "REASON_TO_TRY_CROSS",
+    "TO_TRY_SAME_TEXT",
+    "REASON_TO_TRY_SAME",
+)
+
+
+@pytest.mark.parametrize("concept", OFFERABLE, ids=lambda c: c.id)
+def test_every_person_facing_template_reads_well_with_any_concept(concept):
+    """Ninguna plantilla conjuga un verbo ni un pronombre con el nombre del concepto (singular, plural o compuesto)."""
+    name = concept.name.lower()
+    args = {
+        "destino": name,
+        "origen": name,
+        "name": name,
+        "emoji": concept.emoji,
+        "vertical": "Turbo",
+        "cada": "cada 7 días",
+        "hace": "ayer",
+        "likes": name,
+        "query": name,
+        "occasion": name,
+    }
+    for const in TEMPLATES:
+        text = getattr(engine, const).format(**args)
+        _assert_reads_well([text], name)
+        assert not any(verb in text.lower() for verb in VERBS_THAT_AGREE), (const, text)

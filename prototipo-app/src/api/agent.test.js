@@ -66,7 +66,7 @@ describe('agent', () => {
     const api = stubApi({ '/agent/plans': fixture('agent-plans-afin') })
     const list = await plans()
     expect(new URL(api.mock.calls[0][0], 'http://localhost').searchParams.get('user_id')).toBe(userId())
-    expect(list[0].reason.text).toMatch(/^Porque te gusta/)
+    expect(list[0].reason.text).toMatch(/^Por tu interés en/)
     expect(list.at(-1).reason).toBeUndefined()
   })
 

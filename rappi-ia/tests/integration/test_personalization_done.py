@@ -84,7 +84,7 @@ def test_two_users_with_different_histories_get_different_offers(people, db):
     assert (first_plans[SWEET]["id"], first_plans[GRILL]["id"]) == ("antojo", "asado")
     for user, history in histories.items():
         reason = first_plans[user]["reason"]
-        assert reason["text"].startswith("Porque te gusta")
+        assert reason["text"].startswith("Por tu interés en")
         assert names_top_concept_of_basis(reason), reason
         assert_traceable(db, user, reason, history)
 

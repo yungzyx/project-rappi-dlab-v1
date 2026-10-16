@@ -219,7 +219,7 @@ def test_a_valid_profile_file_loads(tmp_path):
 
 
 def test_each_profile_says_what_the_person_likes():
-    """La frase que sigue a «Como te gusta…» en el momento `perfil`."""
+    """La frase que sigue a «Por tu gusto por…» en el momento `perfil`."""
     assert {p.id: p.likes for p in load_profiles().values()} == {
         "asiatico": "lo asiático",
         "cafe": "el café",

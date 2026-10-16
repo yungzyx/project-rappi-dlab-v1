@@ -117,8 +117,8 @@ PLAN_TEXT = "Tu kit «{occasion}»: {concepts}, de {verticals}."  # el nombre de
 PLAN_ACTION = "Más ideas"
 CART_TEXT = "Para acompañar {origen}: {destino}, en {vertical}."
 CART_TEXT_ANONYMOUS = "Para completar tu pedido: {destino}, en {vertical}."
-CHECKOUT_TEXT = "Antes de pagar: {destino}, en {vertical}. Combina con lo que llevas."
-NEXT_ORDER_TEXT = "Para tu próximo pedido: {destino}, en {vertical}. Combina con lo que pediste."
+CHECKOUT_TEXT = "Para completar lo que llevas: {destino}, en {vertical}."
+NEXT_ORDER_TEXT = "Para tu próximo pedido: {destino}, en {vertical}, para acompañar lo que pediste."
 NO_RESULT_TEXT = "No encontré «{query}», pero {destino} sí hay en {vertical}."
 TO_TRY_TEXT = "Aún no pides en {vertical}: mira {what}."
 TO_TRY_DEALS = "estas ofertas"
@@ -126,9 +126,9 @@ TO_TRY_DISHES = "lo que más piden"
 # Por qué se ofrece (`reason.text`). {emoji} {name} es el concepto de lo que ya hay en el carrito o en el pedido.
 REASON_PLAN = "Porque elegiste «{occasion}»."
 REASON_CART = "Porque llevas {emoji} {name}."
-REASON_CART_ANONYMOUS = "Porque combina con lo que llevas."
+REASON_CART_ANONYMOUS = "Para completar lo que llevas."
 REASON_NEXT = "Porque pediste {emoji} {name}."
-REASON_NEXT_ANONYMOUS = "Porque combina con lo que pediste."
+REASON_NEXT_ANONYMOUS = "Para acompañar lo que pediste."
 REASON_NO_RESULT = "Porque buscaste «{query}» y aquí sí hay."
 REASON_TO_TRY = "Porque aún no pides en {vertical}."
 # La vertical por probar del paso del motor: con compra cruzada, {origen} es el concepto de la persona que dispara la
@@ -151,17 +151,17 @@ BACK_RULE = "estos productos"
 REASON_BACK = "Porque hace más de un mes que no pides en {vertical}."
 # La recompra: {destino} es el concepto, {cada} cada cuánto lo pide («cada día» o «cada N días», `_every`) y {hace}
 # «hoy», «ayer» o «hace N días».
-REPEAT_TEXT = "¿Repetimos {destino}? Lo pides {cada}."
-REASON_REPEAT = "Porque lo pides {cada} y tu último pedido fue {hace}."
+REPEAT_TEXT = "¿Repetimos {destino}? Pides {cada}."
+REASON_REPEAT = "Porque pides {destino} {cada} y tu último pedido fue {hace}."
 REPEAT_ACTION = "Ver producto"  # abre su tienda con el producto destacado; la aceptación cuenta al agregarlo al carro
 REPEAT_AHEAD_DAYS = 2  # se ofrece desde 2 días antes del día en que le toca
 SEE_ACTION = "Ver {destino}"
 OPEN_ACTION = "Abrir {vertical}"
-REASON_LIKES_VERTICAL = "Porque te gusta {emoji} {name}, y en {vertical} hay más."
-REASON_LIKES_OCCASION = "Porque te gusta {emoji} {name}."
+REASON_LIKES_VERTICAL = "Por tu interés en {emoji} {name}: en {vertical} hay más."
+REASON_LIKES_OCCASION = "Por tu interés en {emoji} {name}."
 REASON_BRAND = " Es {brand}, la marca que compras."  # se suma al porqué de un complemento de su marca
-# El momento `perfil`: «Como te gusta» y el `gusto` del perfil (offers/perfiles.toml); sin él, el nombre del perfil.
-PROFILE_TEXT = "Como te gusta {likes}, mira esto en otras verticales."
+# El momento `perfil`: «Por tu gusto por» y el `gusto` del perfil (offers/perfiles.toml); sin él, el nombre del perfil.
+PROFILE_TEXT = "Por tu gusto por {likes}, mira esto en otras verticales."
 PROFILE_TEXT_NAMED = "Para tu perfil {emoji} {name}: mira esto en otras verticales."
 REASON_PROFILE = "Porque elegiste «{name}»."  # sin persona, o con un perfil que no es suyo
 TRIP_SERVICE = "rappitravel"  # el servicio de la taxonomía al que lleva el viaje (sin catálogo)
@@ -238,7 +238,7 @@ def home_occasions(conn: Connection, interests: Interests) -> list[dict]:
 
 
 def _likes_reason(template: str, contributions: dict[str, float], interests: Interests, **format_args: str) -> dict:
-    """«Porque te gusta…»: el concepto que más aporta da el texto y la `basis`, las señales de los que más aportan."""
+    """«Por tu interés en…»: el concepto que más aporta da el texto y la `basis`, las señales de los que más aportan."""
     top = sorted(contributions, key=lambda c: (-contributions[c], c))[:BASIS_CONCEPTS]
     concept = load_taxonomy().concepts[top[0]]
     text = template.format(emoji=concept.emoji, name=concept.name.lower(), **format_args)
@@ -514,8 +514,8 @@ def _usual_offer(
     basis: tuple[dict, ...] = (),
     back: bool = False,
 ) -> Offer:
-    """La oferta de siempre de una vertical por probar: «Aún no pides en…» y, si algo de ahí le gusta, «Porque te
-    gusta…»; `basis` va antes de sus señales. Con `back` (una vertical del paso donde ya pidió), «Vuelve a…»."""
+    """La oferta de siempre de una vertical por probar: «Aún no pides en…» y, si algo de ahí le interesa, «Por tu
+    interés en…»; `basis` va antes de sus señales. Con `back` (una vertical del paso donde ya pidió), «Vuelve a…»."""
     label = VERTICAL_LABELS.get(vertical, vertical)
     what = TO_TRY_DISHES if vertical == "restaurantes" else TO_TRY_DEALS
     if back:
@@ -767,7 +767,7 @@ def repeat_offer(
             continue
         if product := _repeat_product(conn, embedder, user_id, concept, vertical):
             text = REPEAT_TEXT.format(destino=concept.name.lower(), cada=_every(days))
-            why = REASON_REPEAT.format(cada=_every(days), hace=_days_ago(today, last_ts))
+            why = REASON_REPEAT.format(destino=concept.name.lower(), cada=_every(days), hace=_days_ago(today, last_ts))
             reason = _reason(why, [{"kind": "recompra", "id": concept.id, "source": "pedidos"}], concept=concept.id)
             action = {"label": REPEAT_ACTION, "route": [SCREEN_VERTICALS[vertical]], "store_id": product["store_id"]}
             return Offer("recompra", text, [product], vertical, reason, [action])
@@ -854,7 +854,7 @@ def profile_offer(
 
 
 def _profile_text(profile: Profile) -> str:
-    """«Como te gusta lo asiático…», con el `gusto` del perfil; sin él, el nombre del perfil con su emoji."""
+    """«Por tu gusto por lo asiático…», con el `gusto` del perfil; sin él, el nombre del perfil con su emoji."""
     if profile.likes:
         return PROFILE_TEXT.format(likes=profile.likes)
     return PROFILE_TEXT_NAMED.format(emoji=profile.emoji, name=profile.name)

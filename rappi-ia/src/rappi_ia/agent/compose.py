@@ -53,7 +53,7 @@ class TemplateComposer:
 
     def main(self, d: Draft) -> str:
         if d.kind == "saludo":
-            extra = f" Veo que te gusta {d.interest_label}." if d.interest_label else ""
+            extra = f" Veo tu interés en {d.interest_label}." if d.interest_label else ""
             return f"¡Hola! Soy {config.AGENT_NAME} 🧡.{extra} ¿Qué se te antoja hoy?"
         if d.kind == "gracias":
             return "¡De nada! Aquí estoy si necesitas algo más 🧡"

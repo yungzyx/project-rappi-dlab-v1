@@ -86,7 +86,7 @@ def test_vertical_to_try_follows_affinity(client, db):
     body = to_try(client, "u1")
 
     assert body["vertical"] == "chocolateria"  # sin historia saldría el súper
-    assert body["reason"]["text"] == "Porque te gusta 🍫 chocolates, y en chocolaterías hay más."
+    assert body["reason"]["text"] == "Por tu interés en 🍫 chocolates: en chocolaterías hay más."
     assert [(s["kind"], s["id"], s["source"]) for s in body["reason"]["basis"]] == [
         ("concepto", "chocolates", "eventos")
     ]
@@ -140,7 +140,7 @@ def test_vertical_to_try_basis_has_the_three_concepts_that_contribute_most(clien
     body = to_try(client, "u1")
 
     assert body["vertical"] == "chocolateria"
-    assert body["reason"]["text"] == "Porque te gusta 🍫 chocolates, y en chocolaterías hay más."
+    assert body["reason"]["text"] == "Por tu interés en 🍫 chocolates: en chocolaterías hay más."
     assert [s["id"] for s in body["reason"]["basis"]] == ["chocolates", "galletas", "helados"]
     # NOW se toma al importar el módulo: con unos minutos de tests encima el decaimiento resta milésimas
     assert [s["score"] for s in body["reason"]["basis"]] == pytest.approx([6.0, 3.0, 3.0], abs=0.05)
@@ -161,7 +161,7 @@ def test_vertical_to_try_reason_names_the_concept_of_the_offered_vertical_not_th
 
     pastas = load_taxonomy().concepts["pastas"]
     assert body["vertical"] == "supermercado"
-    assert body["reason"]["text"] == f"Porque te gusta {pastas.emoji} {pastas.name.lower()}, y en el súper hay más."
+    assert body["reason"]["text"] == f"Por tu interés en {pastas.emoji} {pastas.name.lower()}: en el súper hay más."
     assert [s["id"] for s in body["reason"]["basis"]] == ["pastas", "cafe"]
 
 
@@ -172,7 +172,7 @@ def test_plans_order_by_interest(client, db):
     asado = next(p for p in plans(client, "u1") if p["id"] == "asado")
 
     assert ids[0] == "asado"
-    assert asado["reason"]["text"].startswith("Porque te gusta ")
+    assert asado["reason"]["text"].startswith("Por tu interés en ")
     assert {s["id"] for s in asado["reason"]["basis"]} == {"carnes", "carbon"}
     assert all(s["source"] == "eventos" for s in asado["reason"]["basis"])
 
@@ -185,7 +185,7 @@ def test_plans_with_interest_put_scored_occasions_first_and_the_rest_in_default_
 
     scored = [p for p in shown if "reason" in p]
     assert scored and [p["id"] for p in shown[: len(scored)]] == [p["id"] for p in scored]
-    assert all(p["reason"]["text"] == "Porque te gusta 🍫 chocolates." for p in scored)
+    assert all(p["reason"]["text"] == "Por tu interés en 🍫 chocolates." for p in scored)
     assert [p["id"] for p in shown if "reason" not in p] == [i for i in default if i not in {p["id"] for p in scored}]
     assert sorted(p["id"] for p in shown) == sorted(default)
     # ocasiones con chocolate: empatan y mandan HOME_OCCASIONS y la taxonomía

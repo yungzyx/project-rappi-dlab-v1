@@ -137,7 +137,7 @@ def test_the_profile_moment_for_a_person_is_their_first_profile_with_its_why(cli
     assert body["moment"] == "perfil"
     assert body["perfil"] == {**ASIAN, "nivel": "medio", "por_que": WHY}
     assert body["reason"] == {"text": WHY, "basis": basis}
-    assert body["text"] == "Como te gusta lo asiático, mira esto en otras verticales."
+    assert body["text"] == "Por tu gusto por lo asiático, mira esto en otras verticales."
     # Restaurantes deja fuera el local donde ya pidió y la otra sucursal de su cadena: queda el otro local de sushi
     assert [s["vertical"] for s in body["escalera"]] == ALL_ASIAN_STEPS
     assert [p["store_id"] for p in body["escalera"][0]["products"]] == [OTHER_SUSHI]

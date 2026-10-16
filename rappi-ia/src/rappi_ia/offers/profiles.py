@@ -110,7 +110,7 @@ class Profile:
     min_level: str
     ladder: tuple[Step, ...]
     trip: str | None = None  # id de un destino
-    likes: str | None = None  # lo que sigue a «Como te gusta…» en el momento `perfil` («lo asiático»)
+    likes: str | None = None  # lo que sigue a «Por tu gusto por…» en el momento `perfil` («lo asiático»)
 
 
 @cache

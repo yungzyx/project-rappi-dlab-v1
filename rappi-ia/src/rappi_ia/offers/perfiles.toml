@@ -10,7 +10,7 @@
 #   tenga una de esas (lo que dice la palabra sin ser lo que promete el peldaño: un limpiador «en pasta», un juguete
 #   que la tienda puso en cocina). `texto` es lo que dice el agente al ofrecerlo.
 # - `viaje`: id de un destino de destinos.toml (el último peldaño, «Idea para RappiTravel»), o nada.
-# - `gusto`: lo que sigue a «Como te gusta…» cuando el agente ofrece la escalera («lo asiático»). Sin él, el agente
+# - `gusto`: lo que sigue a «Por tu gusto por…» cuando el agente ofrece la escalera («lo asiático»). Sin él, el agente
 #   nombra el perfil.
 #
 # Las guardias de ofertas mandan (offers/guards.py): ningún peldaño nombra alcohol, farmacia, bebé, salud ni algo

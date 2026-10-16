@@ -77,7 +77,7 @@ def test_complement_prefers_the_brand_you_buy(client, db):
     body = cart_offer(client, "u1")
 
     assert [p["entity_id"] for p in body["products"]] == [second, ids[0]]
-    assert body["reason"]["text"] == "Porque combina con lo que llevas. Es Marca Bé, la marca que compras."
+    assert body["reason"]["text"] == "Para completar lo que llevas. Es Marca Bé, la marca que compras."
     assert body["reason"]["basis"] == [{"kind": "marca", "id": "marca-b", "score": 2, "source": "pedidos"}]
     assert body["reason"]["concept"] == "snacks-salados" and body["text"] == anonymous["text"]
     assert cart_offer(client) == anonymous  # sin usuario, la de siempre
