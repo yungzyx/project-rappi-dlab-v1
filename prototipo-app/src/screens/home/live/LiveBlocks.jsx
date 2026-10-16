@@ -4,8 +4,6 @@ import { ProductCard } from '../../../components/ProductCard'
 import { storeOfProduct } from '../../../api/catalog'
 import { formatPrice, parsePrice } from '../../../state/CartContext'
 import { VERTICAL_NAMES } from '../../../data/verticals'
-import { stampedVerticals, verticalLevel } from '../../../game/progress.js'
-import { GAME_TO_SCREEN, PASSPORT_GOAL, PASSPORT_ORDER } from '../../../game/verticals.js'
 
 /** Abre la tienda de un producto o plato que el agente ofreció (por su id; sin él, con el nombre y el logo que trae). */
 export function openItem(product, push) {
@@ -67,100 +65,6 @@ export function PlanBlock({ plans, plan, kit, kitReason, added, onPick, onOpen, 
       ) : (
         <p className="live-plan-empty">Elige uno y te armo todo de una, de las tiendas que hagan falta.</p>
       )}
-    </section>
-  )
-}
-
-/** Pasaporte de verticales: un sello por cada vertical probada; al llegar a la meta, envío gratis (demo). */
-// Un emoji por vertical del juego, para la cara del sello.
-export const STAMP_EMOJI = {
-  supermercado: '🛒',
-  conveniencia: '🏪',
-  turbo: '⚡',
-  licores: '🍷',
-  chocolateria: '🍫',
-  restaurantes: '🍔',
-  farmacia: '💊',
-  mall: '🛍️',
-  viajes: '✈️',
-}
-const LEVEL_NAMES = { explorador: 'Explorador', conocedor: 'Conocedor', experto: 'Experto' }
-
-/**
- * El pasaporte Rappi es el del juego de verticales: un sello por vertical (Explorador o más, jugando o abriéndola en la
- * app), con su nivel en el borde. El título abre el pasaporte del juego, «Jugar» su camino y cada sello su vertical.
- */
-export function Passport({ state, status = 'ready', onRetry, fresh, onOpenGame, onOpenStamp }) {
-  // Sin el progreso del servidor no hay cuenta de sellos que mostrar: un marcador quieto mientras carga, y «Sin conexión».
-  if (status !== 'ready') {
-    return (
-      <section className="live-passport is-pending" aria-busy={status === 'loading'}>
-        <div className="live-passport-head">
-          <h2 className="live-passport-title">Tu pasaporte Rappi</h2>
-          {status === 'offline' && (
-            <>
-              <p>Sin conexión con el juego</p>
-              <button type="button" className="live-passport-retry tap" onClick={onRetry}>
-                Reintentar
-              </button>
-            </>
-          )}
-        </div>
-      </section>
-    )
-  }
-  const count = stampedVerticals(state).length
-  const left = Math.max(PASSPORT_GOAL - count, 0)
-  return (
-    <section className={left > 0 ? 'live-passport' : 'live-passport is-complete'}>
-      <div className="live-passport-head">
-        <div className="live-passport-top">
-          <h2>
-            <button type="button" className="live-passport-title tap" onClick={() => onOpenGame('pasaporte')}>
-              Tu pasaporte Rappi <span aria-hidden="true">›</span>
-            </button>
-          </h2>
-          <button type="button" className="live-passport-play tap" onClick={() => onOpenGame('jugar')}>
-            Jugar
-          </button>
-        </div>
-        <p>
-          {left > 0
-            ? `${count} sellos · te ${left === 1 ? 'falta 1' : `faltan ${left}`} para el envío gratis`
-            : `${count} sellos · ¡envío gratis desbloqueado! 🎉`}
-        </p>
-        <div
-          className="live-passport-bar"
-          role="progressbar"
-          aria-label="Sellos para el envío gratis"
-          aria-valuemin={0}
-          aria-valuemax={PASSPORT_GOAL}
-          aria-valuenow={Math.min(count, PASSPORT_GOAL)}
-        >
-          <span style={{ '--progress': Math.min(count / PASSPORT_GOAL, 1) }} />
-        </div>
-      </div>
-      <HScroll className="live-stamps">
-        {PASSPORT_ORDER.map((vertical) => {
-          const level = verticalLevel(state, vertical)
-          const has = level !== 'ninguno'
-          const name = VERTICAL_NAMES[GAME_TO_SCREEN[vertical]]
-          return (
-            <button
-              key={vertical}
-              type="button"
-              className={`live-stamp tap is-${level}${has ? ' has' : ''}${fresh === GAME_TO_SCREEN[vertical] ? ' is-fresh' : ''}`}
-              aria-label={`${name}${has ? ` (con sello: ${LEVEL_NAMES[level]})` : ' (sin sello: juega o ábrela para sellar)'}`}
-              onClick={() => onOpenStamp(vertical)}
-            >
-              <span className="live-stamp-face" aria-hidden="true">
-                {has ? STAMP_EMOJI[vertical] : '?'}
-              </span>
-              <span className="live-stamp-name">{name}</span>
-            </button>
-          )
-        })}
-      </HScroll>
     </section>
   )
 }

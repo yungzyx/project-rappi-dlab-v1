@@ -51,7 +51,6 @@ async function run(page) {
     await page.locator('.home-shortcut', { hasText: label }).first().scrollIntoViewIfNeeded()
     await tap('.home-shortcut', label)
   }
-  const center = (selector) => page.locator(selector).first().evaluate((el) => el.scrollIntoView({ block: 'center' }))
   const reset = async () => {
     // Como quien ya vio la guía de la primera vez: sus globos taparían las capturas de la Home.
     await page.evaluate(() => {
@@ -112,17 +111,6 @@ async function run(page) {
   await tap('[role="dialog"] .search-back')
   await wait(600)
 
-
-  // Juego de verticales: se entra desde el pasaporte de la Home.
-  await center('.live-passport')
-  await tap('.live-passport-play')
-  await wait(900)
-  await tap('button', 'Ver el camino primero') // la bienvenida de Mochi, la primera vez
-  await settle(600)
-  await shot('31-juego-camino')
-  await tap('[aria-label="Volver a Rappi"]')
-  await settle(400)
-
   await tab('Offers')
   // Un producto de las bajas de precio reales: el primero con la marca +18 (como la cerveza de antes) o, si no hay, el primero.
   await page.locator('.product-card').first().waitFor() // las bajas de precio llegan juntas, de una sola llamada
@@ -138,13 +126,8 @@ async function run(page) {
   await shot('25-checkout')
   await tap('.checkout-place')
   await wait(13000)
-  await shot('26-seguimiento') // con «Juega mientras llega tu pedido»
-  await tap('.tracking-game')
-  await wait(1200)
-  await shot('32-juego-espera')
-  await wait(8000) // el pedido llega a mitad de ronda
-  await tap('.game-order button', 'Ver pedido')
-  await wait(800)
+  await shot('26-seguimiento')
+  await wait(10000) // el pedido llega
   await shot('27-entregado')
   await back()
   await settle(400)

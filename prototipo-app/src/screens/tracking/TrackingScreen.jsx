@@ -13,13 +13,10 @@ import { useAssistant } from '../../state/AssistantContext'
 import { formatPrice } from '../../state/CartContext'
 import { useDemo } from '../../state/DemoContext'
 import { useEvents } from '../../state/EventsContext'
-import { useGame } from '../../state/GameContext'
 import { isHushed, isQuiet } from '../../state/agentQuiet'
 import { useOrders } from '../../state/OrdersContext'
 import { useProfile } from '../../state/ProfileContext'
-import { VERTICAL_NAMES } from '../../data/verticals'
-import { today, waitingRoundVertical } from '../../game/progress.js'
-import { GAME_TO_SCREEN } from '../../game/verticals.js'
+import { today } from '../../utils/today'
 import TrackingMap from './TrackingMap'
 import { STEPS, minutesLeft, rideProgress, stepAt } from './progress'
 import './tracking.css'
@@ -28,7 +25,7 @@ const TICK_MS = 500
 const STARS = [1, 2, 3, 4, 5]
 
 /** Seguimiento del pedido (funcionalidad agregada): pasos que avanzan solos y el agente recorriendo el mapa. */
-export default function TrackingScreen({ back, reset, push, params }) {
+export default function TrackingScreen({ back, reset, params }) {
   const orders = useOrders()
   const demo = useDemo()
   const order = orders.find(params.orderId)
@@ -77,8 +74,6 @@ export default function TrackingScreen({ back, reset, push, params }) {
           ))}
         </ol>
 
-        {!delivered && <WaitingGame orderId={order.id} push={push} />}
-
         {delivered ? <Delivered order={order} /> : <Courier />}
 
         <OrderSummary order={order} />
@@ -99,33 +94,6 @@ const COURIER_CHAT = [
   { from: 'user', text: 'Gracias. Si no contesto el timbre, llámame.' },
   { from: 'courier', text: 'Perfecto, llego en unos minutos.' },
 ]
-
-/**
- * «Juega mientras llega tu pedido» (prototipo final): una ronda del juego de verticales en la primera vertical sin
- * sello (nunca Farmacia) o, si ya tiene todas, en la de menor nivel. Sin nada que jugar, no aparece.
- */
-function WaitingGame({ orderId, push }) {
-  const demo = useDemo()
-  const game = useGame()
-  const pick = waitingRoundVertical(game.state)
-  if (!demo.isFinal || !pick || game.status !== 'ready') return null
-  const name = VERTICAL_NAMES[GAME_TO_SCREEN[pick.vertical]]
-  return (
-    <button
-      type="button"
-      className="tracking-game tap"
-      onClick={() => push('game', { round: pick.vertical, orderId })}
-    >
-      <span className="tracking-game-icon" aria-hidden="true">
-        🎮
-      </span>
-      <span>
-        <strong>Juega mientras llega tu pedido</strong>
-        <small>1 min · {pick.isNew ? `gana el sello de ${name}` : `sube de nivel en ${name}`}</small>
-      </span>
-    </button>
-  )
-}
 
 function Courier() {
   const [chatOpen, setChatOpen] = useState(false)

@@ -353,9 +353,9 @@ export default function AssistantPanel({ push, vertical, depth = 1 }) {
     setLearnedRemote(null)
     setDiscoverRows([])
     try {
-      // Lo que ya salió (preguntas pendientes, un lote de eventos, un pedido, un guardado del juego) podría recrear lo
-      // olvidado en el servidor: forgetAll lo espera antes del DELETE, descarta lo que haya dejado en cola, y deja el
-      // navegador y el juego en cero.
+      // Lo que ya salió (preguntas pendientes, un lote de eventos, un pedido) podría recrear lo olvidado en el
+      // servidor: forgetAll lo espera antes del DELETE, descarta lo que haya dejado en cola, y deja el navegador en
+      // cero.
       await forgetEverything({ settle: () => Promise.allSettled([askQueue.current]) }) // si salió bien, la app se recarga
       setConfirmingForget(false)
     } catch {

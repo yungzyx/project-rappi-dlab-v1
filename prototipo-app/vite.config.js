@@ -13,7 +13,7 @@ export default defineConfig({
   server: { port: 5174 },
   // Sin imágenes embebidas en base64: los recortes pequeños inflaban el JS a ~500 kB.
   build: { assetsInlineLimit: 0 },
-  // Hora de Chile en las pruebas: la misión del día y la racha del juego usan la fecha local (CI corre en UTC).
+  // Hora de Chile en las pruebas: «silenciar por hoy» usa la fecha local (CI corre en UTC).
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.js'],
