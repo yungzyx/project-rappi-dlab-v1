@@ -26,11 +26,13 @@ from .model import (
     replenishment,
     transitions,
 )
+from .recommend import CROSS_SELL_LAMBDA, mix_scores
 
 WINDOW_DAYS = 28
 MIN_DAYS = 3 * WINDOW_DAYS
 GRID_B = (0, 0.1, 0.3, 0.5, 1, 2)
 GRID_C = (0, 0.05, 0.1, 0.3, 0.5, 1)
+GRID_LAMBDA = (0, 0.5, 1, 2, 4)  # el empuje de las reglas sobre lo más pedido (`recommend.mix_scores`)
 METHODS = ("orden_fijo", "popularidad", "afinidad", "transicion", "combinado")
 METRICS = ("hit1", "hit3", "mrr", "ndcg")
 CROSS_SELL_RECENT_DAYS = 30  # los conceptos de la persona que disparan reglas
@@ -48,6 +50,7 @@ LABELS = {
     "combinado": "Combinado",
     "reglas": "Reglas aprendidas",
     "lo_mas_pedido": "Lo más pedido",
+    "mezcla": "Mezcla",
 }
 
 
@@ -232,55 +235,131 @@ def _pairs(orders: list[Order], sensitive: frozenset[str], skip_suggested: bool 
     return {(c, o.vertical) for o in orders for c in _concepts(o, sensitive, skip_suggested)}
 
 
-def evaluate_cross_sell(orders: list[Order], sensitive: frozenset[str], cut: datetime, end: datetime) -> dict:
+def evaluate_cross_sell(
+    orders: list[Order], sensitive: frozenset[str], cut: datetime, end: datetime, lam: float = CROSS_SELL_LAMBDA
+) -> dict:
     """Reglas aprendidas con lo anterior a `cut`; a cada persona con pedidos antes de `cut` y en `[cut, end)` (quien no
     vuelve no cuenta: si no, se mediría el abandono), las 3 (concepto, vertical) de mayor confianza entre las reglas
     de los conceptos que pidió en los 30 días previos, sin lo que ya pidió en ese vertical. Acierto si lo pide en
     `[cut, end)` sin que se lo sugieran (como al aprender las reglas). `precision3` = media de aciertos /
     predicciones entre quienes tienen alguna; `aciertos_sobre_3`, lo mismo dividido por 3; `cobertura` = la parte de
     las personas con alguna. Línea base `lo_mas_pedido`: los pares más pedidos de los 28 días previos, los mismos para
-    todos (sin lo que la persona ya pidió)."""
-    return _cross_sell(_History(orders, []), sensitive, cut, end)
+    todos (sin lo que la persona ya pidió). `mezcla`: lo más pedido empujado por el lift de las reglas de la persona
+    (`recommend.mix_scores` con `lam`), con las mismas exclusiones y personas."""
+    return _cross_sell(_cross_sell_window(_History(orders, []), sensitive, cut, end), lam)
 
 
-def _cross_sell(history: _History, sensitive: frozenset[str], cut: datetime, end: datetime) -> dict:
+@dataclass(frozen=True)
+class _CrossSellWindow:
+    people: list[str]
+    had: dict[str, set[tuple[str, str]]]  # lo que pidió antes del corte: no se recomienda
+    lifts: dict[str, dict[tuple[str, str], float]]  # lift máximo de las reglas desde sus conceptos recientes
+    rules_pred: dict[str, list[tuple[str, str]]]
+    bought: dict[str, set[tuple[str, str]]]
+    popular: dict[tuple[str, str], float]  # cuota de pedidos de los 28 días previos
+    by_popularity: list[tuple[str, str]]
+
+
+def _cross_sell_window(history: _History, sensitive: frozenset[str], cut: datetime, end: datetime) -> _CrossSellWindow:
+    """Lo que no depende de λ: reglas, popularidad, lo ya pedido y lo comprado de cada persona evaluada."""
     before = history.orders_before(cut)
     by_concept: dict[str, list] = defaultdict(list)
     for r in cross_sell(before, sensitive):
         by_concept[r.from_concept].append(r)
     recent_start = cut - timedelta(days=CROSS_SELL_RECENT_DAYS)
-    popular = Counter(
+    counts = Counter(
         pair for o in before if o.ts >= cut - timedelta(days=WINDOW_DAYS) for pair in _pairs([o], sensitive)
     )
-    by_popularity = sorted(popular, key=lambda p: (-popular[p], p))
-
-    people = [
-        user
-        for user in sorted(history.by_user)
-        if history.user_orders(user, None, cut) and history.user_orders(user, cut, end)
-    ]
-    rules_pred: dict[str, list[tuple[str, str]]] = {}
-    baseline_pred: dict[str, list[tuple[str, str]]] = {}
-    bought: dict[str, set] = {}
-    for user in people:
+    total = sum(counts.values())
+    popular = {pair: n / total for pair, n in counts.items()}
+    window = _CrossSellWindow(
+        people=[
+            user
+            for user in sorted(history.by_user)
+            if history.user_orders(user, None, cut) and history.user_orders(user, cut, end)
+        ],
+        had={},
+        lifts={},
+        rules_pred={},
+        bought={},
+        popular=popular,
+        by_popularity=sorted(counts, key=lambda p: (-counts[p], p)),
+    )
+    for user in window.people:
         past = history.user_orders(user, None, cut)
         had = _pairs(past, sensitive)
         recent = {c for o in past if o.ts >= recent_start for c in _concepts(o, sensitive)}
         best: dict[tuple[str, str], tuple[float, float]] = {}
+        lifts: dict[tuple[str, str], float] = {}
         for concept in recent:
             for r in by_concept.get(concept, ()):
                 pair = (r.to_concept, r.to_vertical)
+                lifts[pair] = max(lifts.get(pair, 0.0), r.lift)
                 if pair not in had:
                     best[pair] = max(best.get(pair, (0.0, 0.0)), (r.confidence, r.lift))
-        rules_pred[user] = sorted(best, key=lambda p: (-best[p][0], -best[p][1], p))[:TOP_K]
-        baseline_pred[user] = [p for p in by_popularity if p not in had][:TOP_K]
-        bought[user] = _pairs(history.user_orders(user, cut, end), sensitive, skip_suggested=True)
-    out = {"personas": len(people), **_precision(rules_pred, bought, len(people))}
-    out["lo_mas_pedido"] = _precision(baseline_pred, bought, len(people))
-    # La línea base sobre las mismas personas que las reglas: así las dos precisiones se comparan sobre la misma gente.
-    same = {u: baseline_pred[u] for u, pairs in rules_pred.items() if pairs}
-    out["lo_mas_pedido"]["precision3_mismas_personas"] = _precision(same, bought, len(same))["precision3"]
+        window.had[user] = had
+        window.lifts[user] = lifts
+        window.rules_pred[user] = sorted(best, key=lambda p: (-best[p][0], -best[p][1], p))[:TOP_K]
+        window.bought[user] = _pairs(history.user_orders(user, cut, end), sensitive, skip_suggested=True)
+    return window
+
+
+def _top_popular(window: _CrossSellWindow, user: str, skip: set | dict = frozenset()) -> list[tuple[str, str]]:
+    """Los 3 pares más pedidos que la persona no pidió (ni están en `skip`)."""
+    out = []
+    for pair in window.by_popularity:
+        if pair not in window.had[user] and pair not in skip:
+            out.append(pair)
+            if len(out) == TOP_K:
+                break
     return out
+
+
+def _mixed_pred(window: _CrossSellWindow, lam: float) -> dict[str, list[tuple[str, str]]]:
+    """Las 3 de `mix_scores` por persona, sin lo que ya pidió. Solo los pares con regla cambian de puntaje: el resto
+    queda en su orden de popularidad, así que basta mezclar esos con los 3 más pedidos sin regla."""
+    pred = {}
+    for user in window.people:
+        lifts = {p: lift for p, lift in window.lifts[user].items() if p not in window.had[user]}
+        candidates = [p for p in lifts if p in window.popular] + _top_popular(window, user, lifts)
+        scores = mix_scores({p: window.popular[p] for p in candidates}, lifts, lam)
+        pred[user] = sorted(scores, key=lambda p: (-scores[p], p))[:TOP_K]
+    return pred
+
+
+def _cross_sell(window: _CrossSellWindow, lam: float) -> dict:
+    people = len(window.people)
+    baseline_pred = {user: _top_popular(window, user) for user in window.people}
+    mixed_pred = _mixed_pred(window, lam)
+    out = {"personas": people, **_precision(window.rules_pred, window.bought, people)}
+    # Lo más pedido y la mezcla, también sobre las mismas personas que las reglas: así las precisiones se comparan
+    # sobre la misma gente.
+    with_rules = [u for u, pairs in window.rules_pred.items() if pairs]
+    for key, pred in (("lo_mas_pedido", baseline_pred), ("mezcla", mixed_pred)):
+        out[key] = _precision(pred, window.bought, people)
+        same = {u: pred[u] for u in with_rules}
+        out[key]["precision3_mismas_personas"] = _precision(same, window.bought, len(same))["precision3"]
+    return out
+
+
+def _tune_lambda(history: _History, sensitive: frozenset[str], split: Split) -> tuple[float | None, float | None, int]:
+    """`(λ, precisión@3 de la mezcla en validación, personas en validación)`; sin personas, `(None, None, 0)`."""
+    window = _cross_sell_window(history, sensitive, split.train_end, split.valid_end)
+    if not window.people:
+        return None, None, 0
+    best: tuple[float, float] | None = None
+    for lam in GRID_LAMBDA:  # en orden creciente: ante un empate queda el menor
+        precision = round(_precision(_mixed_pred(window, lam), window.bought, len(window.people))["precision3"], 12)
+        if best is None or precision > best[0]:
+            best = (precision, float(lam))
+    return best[1], best[0], len(window.people)
+
+
+def tune_lambda(orders: list[Order], sensitive: frozenset[str], split: Split) -> float | None:
+    """El λ de la mezcla: el de `GRID_LAMBDA` con mejor precisión@3 en validación (reglas y popularidad con lo anterior
+    a `train_end`, aciertos en `[train_end, valid_end)`); ante un empate, el menor. `None` si nadie pidió antes y
+    durante la validación."""
+    return _tune_lambda(_History(orders, []), sensitive, split)[0]
 
 
 # Recompra
@@ -329,19 +408,25 @@ def evaluate(
     signals: list[Signal],
     sensitive: frozenset[str],
     previous_weights: dict[str, float] | None = None,
+    previous_lambda: float | None = None,
 ) -> dict | None:
-    """Elige los pesos en validación y mide en prueba el próximo vertical, la compra cruzada y la recompra. `None` si
-    no hay 84 días de datos. Si nadie se puede validar, quedan `previous_weights` (por defecto `DEFAULT_WEIGHTS`) y
-    `validacion.aviso` lo dice. Un diccionario serializable a JSON (fechas ISO, cifras con 4 decimales)."""
+    """Elige los pesos y el λ de la mezcla en validación y mide en prueba el próximo vertical, la compra cruzada y la
+    recompra. `None` si no hay 84 días de datos. Si nadie se puede validar, quedan `previous_weights` (por defecto
+    `DEFAULT_WEIGHTS`) y `previous_lambda` (por defecto `CROSS_SELL_LAMBDA`), y `validacion.aviso` lo dice. Un
+    diccionario serializable a JSON (fechas ISO, cifras con 4 decimales)."""
     split = make_split(orders)
     if split is None:
         return None
     history = _History(orders, signals)
     weights, valid_ndcg, valid_people = _tune(history, split)
-    validation = {"personas": valid_people, "ndcg_combinado": valid_ndcg}
+    # Las personas en validación son las mismas: pedidos antes de `train_end` y en `[train_end, valid_end)`.
+    lam, valid_precision, _people = _tune_lambda(history, sensitive, split)
+    validation = {"personas": valid_people, "ndcg_combinado": valid_ndcg, "precision3_mezcla": valid_precision}
     if weights is None:
         weights = dict(previous_weights or DEFAULT_WEIGHTS)
         validation["aviso"] = NO_VALIDATION
+    if lam is None:
+        lam = CROSS_SELL_LAMBDA if previous_lambda is None else float(previous_lambda)
     test = _window(history, split.valid_end, split.test_end)
     return _rounded(
         {
@@ -351,9 +436,10 @@ def evaluate(
                 "probar_hasta": split.test_end.isoformat(),
             },
             "pesos": weights,
+            "lambda_cruzada": lam,
             "validacion": validation,
             "proximo_vertical": _next_vertical(test, weights),
-            "compra_cruzada": _cross_sell(history, sensitive, split.valid_end, split.test_end),
+            "compra_cruzada": _cross_sell(_cross_sell_window(history, sensitive, split.valid_end, split.test_end), lam),
             "recompra": _replenishment(history, sensitive, split.valid_end, split.test_end),
         }
     )
@@ -406,24 +492,32 @@ def report(results: dict, source: str) -> str:
         "",
     ]
     cs = results["compra_cruzada"]
-    base = cs["lo_mas_pedido"]
+    base, mix = cs["lo_mas_pedido"], cs["mezcla"]
+    grid = ", ".join(_fmt(float(x)) for x in GRID_LAMBDA[:-1]) + f" y {_fmt(float(GRID_LAMBDA[-1]))}"
+    chosen = (
+        "el de la corrida anterior: nadie para validar"
+        if "aviso" in v
+        else f"de {grid}, el de mejor precisión@3 en validación, {_fmt(v['precision3_mezcla'])}; a igualdad, el menor"
+    )
     lines += [
         f"## Compra cruzada (prueba, {cs['personas']} personas)",
         "",
         "Personas con pedidos antes y durante la prueba. Precisión@3 = aciertos / recomendaciones hechas (hasta 3);",
         "aciertos / 3 divide siempre por 3. Las dos, en promedio entre quienes tienen alguna recomendación. Un acierto",
-        "es pedir ese concepto en ese vertical durante la prueba, sin que se lo sugieran.",
+        "es pedir ese concepto en ese vertical durante la prueba, sin que se lo sugieran. La mezcla es lo más pedido",
+        "empujado por el lift de las reglas que salen de lo que la persona pidió hace poco: popularidad × (1 + λ ×",
+        f"(lift − 1)), con λ = {_fmt(results['lambda_cruzada'])}: {chosen}.",
         "",
         "| Método | Precisión@3 | Aciertos / 3 | Cobertura | Personas con recomendación |",
         "|---|---:|---:|---:|---:|",
         *(
             f"| {LABELS[key]} | {_fmt(m['precision3'])} | {_fmt(m['aciertos_sobre_3'])} | {_fmt(m['cobertura'])} | "
             f"{m['personas_con_prediccion']} |"
-            for key, m in (("reglas", cs), ("lo_mas_pedido", base))
+            for key, m in (("reglas", cs), ("lo_mas_pedido", base), ("mezcla", mix))
         ),
         "",
-        "Lo más pedido sobre las mismas personas que tienen reglas: precisión@3 "
-        f"{_fmt(base['precision3_mismas_personas'])}.",
+        "Sobre las mismas personas que tienen reglas, precisión@3: lo más pedido "
+        f"{_fmt(base['precision3_mismas_personas'])} y la mezcla {_fmt(mix['precision3_mismas_personas'])}.",
         "",
     ]
     rp = results["recompra"]

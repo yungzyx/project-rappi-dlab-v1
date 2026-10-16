@@ -41,6 +41,7 @@ from .model import (
     trends,
 )
 from .predict import latest_weights
+from .recommend import CROSS_SELL_LAMBDA, latest_lambda
 
 log = logging.getLogger(__name__)
 
@@ -49,14 +50,13 @@ def build_motor(conn: Connection, source: str, evaluate: bool = True) -> dict:
     """Recalcula el motor de una fuente en una sola transacción: las 5 tablas de población y la afinidad y la recompra
     de todas sus personas. `now` es el último pedido de la fuente (los simulados terminan en una fecha pasada) o, en el
     prototipo, el momento actual; ahí, además, las tendencias de concepto y producto piden `PROTOTYPE_MIN_USERS`
-    personas. La
-    corrida queda en `layer_runs` (capa `motor`, con la fuente, los pesos y la evaluación en `counts`); si algo falla,
-    queda `failed` y no se escribe nada.
+    personas. La corrida queda en `layer_runs` (capa `motor`, con la fuente, los pesos, el λ de la compra cruzada y la
+    evaluación en `counts`); si algo falla, queda `failed` y no se escribe nada.
 
-    Con `evaluate` y al menos 84 días de pedidos, evalúa por fechas y guarda los pesos elegidos (`motor.evaluate`);
-    si nadie se puede validar, guarda la evaluación con su aviso y los pesos de la última corrida de la fuente. Sin
-    datos suficientes, `DEFAULT_WEIGHTS`; con `evaluate=False`, los pesos de la última corrida. En estos dos casos,
-    `"evaluacion"` es None."""
+    Con `evaluate` y al menos 84 días de pedidos, evalúa por fechas y guarda los pesos y el λ elegidos
+    (`motor.evaluate`); si nadie se puede validar, guarda la evaluación con su aviso y los de la última corrida de la
+    fuente. Sin datos suficientes, `DEFAULT_WEIGHTS` y `CROSS_SELL_LAMBDA`; con `evaluate=False`, los de la última
+    corrida. En estos dos casos, `"evaluacion"` es None."""
     run = start_layer_run(conn, "motor", rules_version(load_combos().version, COMBOS_FILE, Path(model.__file__)))
     conn.commit()  # la corrida se ve aunque lo demás falle
     start = time.perf_counter()
@@ -76,6 +76,7 @@ def build_motor(conn: Connection, source: str, evaluate: bool = True) -> dict:
 
 def _build(conn: Connection, source: str, run: int, evaluate: bool) -> dict:
     previous = latest_weights(conn, source)  # la corrida en curso no cuenta: todavía no está `done`
+    previous_lambda = latest_lambda(conn, source)
     for table in ("vertical_transitions", "combo_stats", "combo_steps", "cross_sell_rules", "trends"):
         conn.execute(f"DELETE FROM {table} WHERE data_source = %s", (source,))
     _delete_personal(conn, "user_id IN (SELECT user_id FROM app_users WHERE source = %s)", source)
@@ -90,6 +91,7 @@ def _build(conn: Connection, source: str, run: int, evaluate: bool) -> dict:
         "afinidad": 0,
         "recompra": 0,
         "pesos": dict(DEFAULT_WEIGHTS) if evaluate else previous,
+        "lambda_cruzada": CROSS_SELL_LAMBDA if evaluate else previous_lambda,
         "evaluacion": None,
     }
     orders = load_orders(conn, source)
@@ -103,9 +105,10 @@ def _build(conn: Connection, source: str, run: int, evaluate: bool) -> dict:
     signals = load_signals(conn, source)
     if evaluate:
         start = time.perf_counter()
-        counts["evaluacion"] = evaluate_motor(orders, signals, sensitive, previous)
+        counts["evaluacion"] = evaluate_motor(orders, signals, sensitive, previous, previous_lambda)
         if counts["evaluacion"] is not None:
             counts["pesos"] = counts["evaluacion"]["pesos"]
+            counts["lambda_cruzada"] = counts["evaluacion"]["lambda_cruzada"]
         log.info("Evaluación del motor (%s) en %.1f s", source, time.perf_counter() - start)
 
     probs = transitions(orders)
