@@ -30,7 +30,6 @@ Con TablePlus, Beekeeper Studio o la extensión "PostgreSQL" de VS Code:
 | Conceptos | `concepts` (taxonomía de Mochi), `item_concepts` (concepto de cada producto o plato), `concept_edges` (complementos), `concept_assortment` (surtido por concepto y vertical) |
 | Búsqueda | `search_documents` (un documento por producto, plato o tienda, por vertical) |
 | Usuarios y eventos | `app_users`, `app_events`, `app_orders`, `app_order_lines`: **simulados** (`source = 'synthetic'`) o del prototipo |
-| Juego | `knowledge_cards`, `knowledge_card_concepts`, `game_state` (progreso de cada persona del prototipo) |
 | Capa de datos | esquema `capa` (vistas estables; ver [capa-de-datos.md](../capa-de-datos.md)) |
 
 ## Buenas costumbres

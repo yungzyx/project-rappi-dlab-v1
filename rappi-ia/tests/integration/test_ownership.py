@@ -20,19 +20,6 @@ from rappi_ia.embeddings.base import HashEmbedder
 
 LEGACY = "proto-0123456789abcdef"
 NEW_ID = re.compile(r"proto-[0-9a-f]{16}")
-STATE = {
-    "version": 1,
-    "xp": 10,
-    "discovered": {},
-    "correct": {},
-    "answered": {},
-    "cards": [],
-    "opened": [],
-    "daily": {"date": "2026-10-11", "discovered": 0, "correct": 0, "opened": 0, "done": False},
-    "streak": {"count": 0, "lastDate": None},
-    "seenIntro": True,
-    "visited": [],
-}
 APP_OPEN = [{"type": "app_open", "session_id": "s1"}]
 
 
@@ -82,18 +69,6 @@ def test_delete_other_profile_is_403(client, db):
 
     assert client.get(f"/profile/{alice}", headers=as_alice).status_code == 200
     assert client.delete(f"/profile/{alice}", headers=as_alice).json()["eventos_borrados"] == 1
-
-
-def test_put_other_game_state_is_403(client, db):
-    alice, as_alice = session(client)
-    _, as_bob = session(client)
-
-    assert client.put(f"/game/state/{alice}", json={"state": STATE}, headers=as_bob).status_code == 403
-    assert client.get(f"/game/state/{alice}", headers=as_bob).status_code == 403
-    assert db.execute("SELECT count(*) FROM game_state").fetchone()[0] == 0
-
-    assert client.put(f"/game/state/{alice}", json={"state": STATE}, headers=as_alice).status_code == 200
-    assert client.get(f"/game/state/{alice}", headers=as_alice).json()["state"]["xp"] == 10
 
 
 def test_get_other_recommendations_is_403(client):
@@ -189,7 +164,6 @@ def test_missing_token_is_401(client, caplog):
             assert (reply.status_code, reply.json()) == (401, {"detail": "Falta la sesión"})
         assert client.post("/events", json={"user_id": alice, "events": APP_OPEN}).status_code == 401
         assert client.get("/recommendations", params={"user_id": alice}).status_code == 401
-        assert client.put(f"/game/state/{alice}", json={"state": STATE}).status_code == 401
 
     # Ni el id ni el token quedan en los registros de la API (los de httpx son del cliente de prueba)
     logged = "\n".join(r.getMessage() for r in caplog.records if not r.name.startswith(("httpx", "httpcore")))

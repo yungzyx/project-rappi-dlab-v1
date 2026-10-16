@@ -78,10 +78,10 @@ describe('volver al inicio y enlaces escritos a mano', () => {
     window.history.replaceState(null, '', '/')
   })
 
-  test('#/game abre el juego de verticales (no necesita parámetros)', () => {
+  test('#/game ya no existe: abre la Home', () => {
     window.location.hash = '#/game'
     const { result } = renderHook(() => useNavigation())
-    expect(names(result)).toEqual(['home', 'game'])
+    expect(names(result)).toEqual(['home'])
     window.history.replaceState(null, '', '/')
   })
 })

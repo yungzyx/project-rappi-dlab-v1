@@ -312,7 +312,6 @@ def test_purge_removes_only_inactive_prototype_users(db, capsys):
         ("p-viejo", "prototype"),
         ("p-evento", "prototype"),
         ("p-pedido", "prototype"),
-        ("p-juego", "prototype"),
         ("s-viejo", "synthetic"),
     ]:
         db.execute("INSERT INTO app_users (user_id, source, created_at) VALUES (%s, %s, %s)", (user_id, source, old))
@@ -327,12 +326,11 @@ def test_purge_removes_only_inactive_prototype_users(db, capsys):
            VALUES ('ord-1', 'p-pedido', 's', 'c', %s, 'licores', 1000, 'prototype')""",
         (recent,),
     )
-    db.execute("INSERT INTO game_state (user_id, state) VALUES ('p-juego', '{}')")
 
     assert events.purge_inactive_users(db, days=180) == 1
 
     users = {row[0] for row in db.execute("SELECT user_id FROM app_users")}
-    assert users == {"p-evento", "p-pedido", "p-juego", "p-nuevo", "s-viejo"}
+    assert users == {"p-evento", "p-pedido", "p-nuevo", "s-viejo"}
     assert db.execute("SELECT count(*) FROM app_events WHERE user_id = 'p-viejo'").fetchone()[0] == 0
     assert config.PROTOTYPE_USER_RETENTION_DAYS == 180
 

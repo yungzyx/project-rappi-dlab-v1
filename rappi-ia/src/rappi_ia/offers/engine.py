@@ -3,7 +3,7 @@ con su precio vigente) y pasando por las guardias de `offers/guards.py`.
 
 Momentos (`POST /agent/offer`): `plan` (el kit de una ocasión que la persona eligió), `carrito` (un complemento de
 otra tienda), `checkout`, `proximo_pedido`, `sin_resultado` (dónde sí está lo que buscó), `vertical_por_probar` (la
-vertical del pasaporte sin sello donde más le gusta a la persona; sin historia, la primera) y `perfil` (la escalera de
+vertical donde la persona aún no ha pedido y más le gusta; sin historia, la primera) y `perfil` (la escalera de
 un perfil de gusto, `offers/profiles.py`, con su forma propia: `ProfileOffer`). Si no hay una buena oferta, no hay
 oferta (`None`: 204): el agente no dice nada.
 
@@ -11,13 +11,13 @@ Los textos son plantillas en español. Una oferta nunca nombra un concepto que e
 de un complemento puede ser cerveza o pañales, y el texto no lo repite).
 
 Cada oferta dice por qué (`Offer.reason`): las claves de siempre (`occasion`, `concept`, `from_concept`), el `text`
-(«Porque…») y la `basis`: las señales del contexto que la motivan (`kind` carrito, pedido, busqueda, ocasion, sello o
-perfil, este último en el momento `perfil` sin persona; e `id`; `source` «contexto» y sin `score`, que es de las
-señales de una persona en `offers/personal.py`). Lo que el agente no propone no entra a la base. Cuando la oferta se
-ordena por lo que le gusta a la persona (`vertical_por_probar` y las ocasiones de la Home), la `basis` son sus señales
-(`kind` concepto, con `score` y `source`) de los conceptos que más aportan. Un complemento cuyo primer producto es de
-una marca que la persona compra lo dice en el `text` y suma esa señal (`marca`, con los pedidos como `score`). En el
-momento `perfil` de una persona, el porqué es el «por qué» de su perfil y la `basis`, la suya (`offers/profiles.py`):
+(«Porque…») y la `basis`: las señales del contexto que la motivan (`kind` carrito, pedido, busqueda, ocasion,
+sin_pedidos o perfil, este último en el momento `perfil` sin persona; e `id`; `source` «contexto» y sin `score`, que es
+de las señales de una persona en `offers/personal.py`). Lo que el agente no propone no entra a la base. Cuando la oferta
+se ordena por lo que le gusta a la persona (`vertical_por_probar` y las ocasiones de la Home), la `basis` son sus
+señales (`kind` concepto, con `score` y `source`) de los conceptos que más aportan. Un complemento cuyo primer producto
+es de una marca que la persona compra lo dice en el `text` y suma esa señal (`marca`, con los pedidos como `score`). En
+el momento `perfil` de una persona, el porqué es el «por qué» de su perfil y la `basis`, la suya (`offers/profiles.py`):
 la evidencia de sus segmentos (`source` «segmento:<id>», el peso de su nivel como `score`) y lo que pidió y buscó
 (`source` «pedidos» o «busquedas», cuántas veces como `score`).
 """
@@ -81,9 +81,8 @@ FOOD_GROUPS = ("bebidas", "snacks", "dulces", "despensa", "frescos", "comida")
 # El orden de la Home: lo que ya muestra hoy (la app tiene «Película» para panorama); después, el resto de la taxonomía.
 HOME_OCCASIONS = ("once", "carrete", "asado", "panorama", "regalo")
 
-# El pasaporte del juego (prototipo-app/src/game/verticals.js, PASSPORT_ORDER): las verticales del catálogo en ese
-# orden y Viajes, que no tiene catálogo y aquí no cuenta. Si cambia allá, cambia aquí.
-PASSPORT_ORDER = (
+# El orden en que se propone una vertical por probar cuando nada le gusta más a la persona (Viajes no tiene catálogo).
+TO_TRY_ORDER = (
     "supermercado",
     "conveniencia",
     "turbo",
@@ -103,7 +102,7 @@ CART_TEXT_ANONYMOUS = "Para completar tu pedido: {destino}, en {vertical}."
 CHECKOUT_TEXT = "Antes de pagar: {destino}, en {vertical}. Combina con lo que llevas."
 NEXT_ORDER_TEXT = "Para tu próximo pedido: {destino}, en {vertical}. Combina con lo que pediste."
 NO_RESULT_TEXT = "No encontré «{query}», pero {destino} sí hay en {vertical}."
-TO_TRY_TEXT = "Aún no pruebas {vertical}: mira {what}."
+TO_TRY_TEXT = "Aún no pides en {vertical}: mira {what}."
 TO_TRY_DEALS = "estas ofertas"
 TO_TRY_DISHES = "lo que más piden"
 # Por qué se ofrece (`reason.text`). {emoji} {name} es el concepto de lo que ya hay en el carrito o en el pedido.
@@ -113,7 +112,7 @@ REASON_CART_ANONYMOUS = "Porque combina con lo que llevas."
 REASON_NEXT = "Porque pediste {emoji} {name}."
 REASON_NEXT_ANONYMOUS = "Porque combina con lo que pediste."
 REASON_NO_RESULT = "Porque buscaste «{query}» y aquí sí hay."
-REASON_TO_TRY = "Porque aún no tienes el sello de {vertical}."
+REASON_TO_TRY = "Porque aún no pides en {vertical}."
 SEE_ACTION = "Ver {destino}"
 OPEN_ACTION = "Abrir {vertical}"
 REASON_LIKES_VERTICAL = "Porque te gusta {emoji} {name}, y en {vertical} hay más."
@@ -222,7 +221,7 @@ def make_offer(
     if moment == "sin_resultado":
         return where_is_it(conn, embedder, context["query"])
     if moment == "vertical_por_probar":
-        return vertical_to_try(conn, context["stamped"], user_interests(conn, user_id))
+        return vertical_to_try(conn, tried_verticals(conn, user_id), user_interests(conn, user_id))
     if moment == "perfil":
         return profile_offer(conn, embedder, context.get("perfil"), user_id)
     raise OfferError(f"Momento desconocido: {moment}")
@@ -416,12 +415,23 @@ def where_is_it(conn: Connection, embedder: TextEmbedder | None, query: str) -> 
 
 
 # ── vertical por probar ──────────────────────────────────────────────────────
-def vertical_to_try(conn: Connection, stamped: list[str], interests: Interests) -> Offer | None:
-    """La vertical del pasaporte sin sello que el agente puede proponer (nunca farmacia ni Licores) donde más le
-    gusta a la persona, o la primera del pasaporte si no hay afinidad (el orden de `PASSPORT_ORDER` desempata). Muestra
-    hasta tres de sus ofertas o, en restaurantes (que no tiene ofertas), sus platos más pedidos; una vertical sin nada
-    que mostrar se salta. `stamped`: códigos del backend."""
-    candidates = [v for v in PASSPORT_ORDER if v not in stamped and offerable_vertical(v)]
+def tried_verticals(conn: Connection, user_id: str | None) -> set[str]:
+    """Las verticales donde la persona ya pidió (pedidos del modo `propuesta`; «Rappi hoy» no cuenta). Vacío sin
+    persona."""
+    if user_id is None:
+        return set()
+    rows = conn.execute(
+        "SELECT DISTINCT vertical FROM app_orders WHERE user_id = %s AND mode = 'propuesta'", (user_id,)
+    ).fetchall()
+    return {vertical for (vertical,) in rows}
+
+
+def vertical_to_try(conn: Connection, tried: set[str], interests: Interests) -> Offer | None:
+    """La vertical donde la persona aún no pide (nunca farmacia ni Licores) que más le gusta, o la primera de
+    `TO_TRY_ORDER` si no hay afinidad (ese orden desempata). Muestra hasta tres de sus ofertas o, en restaurantes (que
+    no tiene ofertas), sus platos más pedidos; una vertical sin nada que mostrar se salta. `tried`: verticales del
+    backend con algún pedido suyo (`tried_verticals`)."""
+    candidates = [v for v in TO_TRY_ORDER if v not in tried and offerable_vertical(v)]
     affinity = _vertical_affinity(conn, interests) if interests.concepts else {}
     for vertical in sorted(candidates, key=lambda v: -sum(affinity.get(v, {}).values())):
         if products := _popular_dishes(conn) if vertical == "restaurantes" else _offerable_deals(conn, vertical):
@@ -433,7 +443,7 @@ def vertical_to_try(conn: Connection, stamped: list[str], interests: Interests) 
                 reason = _likes_reason(REASON_LIKES_VERTICAL, likes, interests, vertical=label)
             else:
                 reason = _reason(
-                    contract_articles(REASON_TO_TRY.format(vertical=label)), [_context_signal("sello", vertical)]
+                    contract_articles(REASON_TO_TRY.format(vertical=label)), [_context_signal("sin_pedidos", vertical)]
                 )
             return Offer("vertical_por_probar", text, products, vertical, reason, [action])
     return None

@@ -44,19 +44,16 @@ export default function ConnectionGate({ children }) {
 }
 
 /**
- * El aviso de «Conectando…» (`status` 'checking') o «Sin conexión» con «Reintentar» (`status` 'offline'): lo usan la puerta
- * de conexión y GameProvider, mientras carga sus tarjetas y su progreso. Con `onLeave`, sin conexión también ofrece «Salir»
- * (para una pantalla que oculta su propia navegación, como la ronda del juego). Con `nested` (dentro de otra pantalla,
- * que ya tiene su <main>) va como una región de alerta en vez de un segundo <main>.
+ * El aviso de «Conectando…» (`status` 'checking') o «Sin conexión» con «Reintentar» (`status` 'offline'): lo usa la puerta
+ * de conexión.
  */
-export function ConnectionNotice({ status, onRetry, onLeave, nested = false }) {
-  const Wrapper = nested ? 'section' : 'main'
+export function ConnectionNotice({ status, onRetry }) {
   return (
-    <Wrapper className="connection-gate" {...(nested ? { role: 'alert' } : {})}>
+    <main className="connection-gate">
       <div className="connection-card">
         <Mascot size={96} mood="think" />
         {/* El aviso existe siempre y solo cambia lo de adentro: los lectores de pantalla anuncian el cambio. */}
-        <div className="connection-message" role={nested ? undefined : 'status'}>
+        <div className="connection-message" role="status">
           {status === 'checking' ? (
             <p className="connection-checking">Conectando con {AGENT_NAME}…</p>
           ) : (
@@ -85,12 +82,7 @@ export function ConnectionNotice({ status, onRetry, onLeave, nested = false }) {
             Reintentar
           </button>
         )}
-        {status === 'offline' && onLeave && (
-          <button type="button" className="connection-leave tap" onClick={onLeave}>
-            Salir
-          </button>
-        )}
       </div>
-    </Wrapper>
+    </main>
   )
 }

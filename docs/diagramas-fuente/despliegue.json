@@ -26,7 +26,7 @@
           "migrate",
           "respaldos"
         ],
-        "note": "El catálogo llega una vez en un dump. Cada despliegue corre migrate: respalda, migra, carga tarjetas y da permisos."
+        "note": "El catálogo llega una vez en un dump. Cada despliegue corre migrate: respalda, migra y da permisos."
       },
       {
         "id": "respaldar",

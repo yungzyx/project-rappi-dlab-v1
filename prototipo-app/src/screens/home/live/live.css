@@ -169,161 +169,6 @@
   font-weight: 700;
 }
 
-/* ---------- Pasaporte de verticales ---------- */
-.live-passport {
-  margin: 30px 14px 0;
-  padding: 16px 0 16px;
-  border-radius: 22px;
-  background: linear-gradient(120deg, #fff8e8, #fff1ea);
-}
-
-.live-passport-head {
-  padding: 0 18px;
-}
-
-.live-passport-head h2 {
-  font-size: 16px;
-  font-weight: 700;
-}
-
-/* El título abre el pasaporte del juego y «Jugar» su camino. */
-.live-passport-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.live-passport-title {
-  min-height: 40px;
-  font: inherit;
-  text-align: left;
-}
-
-.live-passport-play {
-  min-height: 34px;
-  padding: 0 16px;
-  border-radius: 99px;
-  background: var(--live-accent);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 700;
-  box-shadow: 0 3px 0 var(--accent-deep);
-}
-
-/* Mientras el juego carga (o no hay conexión con él): el título y nada más, con la altura de un bloque quieto */
-.live-passport.is-pending {
-  min-height: 112px;
-}
-
-.live-passport-retry {
-  min-height: 44px;
-  margin-top: 4px;
-  padding: 0 4px;
-  color: var(--agent-orange);
-  font-size: 14px;
-  font-weight: 700;
-  text-decoration: underline;
-}
-
-.live-passport-bar {
-  height: 6px;
-  margin-top: 10px;
-  border-radius: 99px;
-  background: rgba(196, 61, 32, 0.14);
-  overflow: hidden;
-}
-
-.live-passport-bar span {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--live-accent);
-  transform: scaleX(var(--progress));
-  transform-origin: left;
-  transition: transform 700ms var(--live-spring);
-}
-
-.live-passport.is-complete {
-  background: linear-gradient(120deg, #fff3c4, #ffe1d2);
-}
-
-.live-passport-head p {
-  margin-top: 2px;
-  color: var(--accent-deep);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.live-stamps {
-  gap: 10px;
-  padding: 12px 18px 0;
-  scroll-padding-left: 18px;
-}
-
-.live-stamp {
-  flex: none;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 5px;
-  width: 58px;
-}
-
-.live-stamp-face {
-  display: grid;
-  place-items: center;
-  width: 48px;
-  height: 48px;
-  border: 2px dashed #c98b72;
-  border-radius: 50%;
-  color: #9a5a43; /* 5,6:1 sobre el fondo del pasaporte */
-  font-size: 20px;
-  font-weight: 700;
-}
-
-.live-stamp.has .live-stamp-face {
-  border: 2px solid var(--live-accent);
-  background: var(--surface);
-  font-size: 24px;
-  transform: rotate(-8deg);
-}
-
-/* El nivel del juego se ve en el borde: Conocedor dorado, Experto doble. */
-.live-stamp.is-conocedor .live-stamp-face {
-  border-color: #c99a1a;
-  box-shadow: 0 0 0 3px #f7e3a3;
-}
-
-.live-stamp.is-experto .live-stamp-face {
-  border-color: #c99a1a;
-  box-shadow:
-    0 0 0 3px #f7e3a3,
-    0 0 0 5px #c99a1a;
-}
-
-.live-stamp.is-fresh .live-stamp-face {
-  animation: live-stamp-thud 700ms var(--live-spring);
-}
-
-@keyframes live-stamp-thud {
-  0% {
-    transform: scale(2.2) rotate(-30deg);
-    opacity: 0;
-  }
-  60% {
-    transform: scale(0.9) rotate(-6deg);
-    opacity: 1;
-  }
-}
-
-.live-stamp-name {
-  color: var(--ink-2);
-  font-size: 11px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
 /* ---------- Mochi y su globo ---------- */
 .live-layer {
   position: absolute;
@@ -658,7 +503,6 @@
 /* ---------- Menos movimiento: sin saltos ni deslizamientos ---------- */
 @media (prefers-reduced-motion: reduce) {
   .home--live,
-  .live-passport-bar span,
   .live-agent,
   .live-card {
     transition: none;
@@ -671,8 +515,7 @@
   .live-bubble,
   .live-bubble-actions,
   .live-kit,
-  .live-item,
-  .live-stamp.is-fresh .live-stamp-face {
+  .live-item {
     animation: none !important;
   }
 }

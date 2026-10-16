@@ -8,7 +8,6 @@ const VERTICALS = {
   farmacia: 'Farmacia',
   chocolateria: 'Chocolatería',
   restaurantes: 'Restaurantes',
-  viajes: 'Viajes', // vertical del juego, sin catálogo
 }
 
 export const verticalLabel = (code) => VERTICALS[code] ?? code
@@ -38,7 +37,6 @@ const ENDPOINTS = {
   catalog: 'catálogo',
   services: 'servicios sin catálogo',
   offers: 'ofertas por momento',
-  game: 'juego',
   unmet: 'búsquedas sin resultado',
 }
 

@@ -1,4 +1,4 @@
-"""Métricas del uso del MVP en el panel: ofertas por momento, juego y búsquedas sin resultado."""
+"""Métricas del uso del MVP en el panel: ofertas por momento y búsquedas sin resultado."""
 
 import json
 from datetime import UTC, datetime
@@ -15,7 +15,6 @@ from rappi_ia.events import store as events
 NOW = datetime(2026, 10, 11, 12, tzinfo=UTC)
 EMPTY = {
     "offers": {"personas": 0, "momentos": []},
-    "game": {"personas": 0, "rondas": 0, "estrellas_promedio": None, "tarjetas": 0, "por_vertical": []},
     "unmet": {"personas": 0, "busquedas": 0, "sin_resultado": 0, "por_vertical": []},
 }
 
@@ -23,17 +22,6 @@ EMPTY = {
 def _offer(user, origen=None, kind="suggestion_shown"):
     payload = {} if origen is None else {"origen": origen}
     return events.Event(user, "s1", kind, ts=NOW, concept_id="cerveza", vertical="licores", payload=payload)
-
-
-def _round(user, vertical, stars):
-    payload = {"vertical_juego": vertical, "estrellas": stars, "aciertos": 3, "preguntas": 5}
-    return events.Event(user, "s1", "game_round_finished", ts=NOW, payload=payload)
-
-
-def _card(user, vertical, card):
-    return events.Event(
-        user, "s1", "game_card_discovered", ts=NOW, payload={"vertical_juego": vertical, "tarjeta": card}
-    )
 
 
 def _search(user, unmet, concept=None, vertical="restaurantes", query="algo", kind="search"):
@@ -136,63 +124,6 @@ def test_offers_rate_only_from_ten_shown(concepts):
     assert _moments(queries.offers(db, "prototype"))[1] == ("carrito", 10, 3, 30.0)
 
 
-def test_game_counts_rounds_cards_and_people(db):
-    events.record(
-        db,
-        [
-            *[_round("u1", "licores", stars) for stars in (3, 2, 2, 1)],
-            _card("u1", "licores", "licores-01"),
-            _card("u1", "licores", "licores-02"),
-            _card("u2", "viajes", "viajes-01"),
-        ],
-    )
-
-    data = queries.game(db, "prototype")
-    assert data == {
-        "personas": 2,
-        "rondas": 4,
-        "estrellas_promedio": None,  # con menos de 5 rondas no hay promedio
-        "tarjetas": 3,
-        "por_vertical": [
-            {"vertical_juego": "licores", "rondas": 4, "tarjetas": 2},
-            {"vertical_juego": "viajes", "rondas": 0, "tarjetas": 1},
-        ],
-    }
-
-    events.record(db, [_round("u2", "viajes", 3)])
-    data = queries.game(db, "prototype")
-    assert (data["rondas"], data["estrellas_promedio"]) == (5, 2.2)
-    assert data["por_vertical"][1] == {"vertical_juego": "viajes", "rondas": 1, "tarjetas": 1}
-
-    # Un payload raro (estrellas que no son número) se cuenta como ronda pero no rompe ni mueve el promedio.
-    events.record(db, [events.Event("u3", "s1", "game_round_finished", ts=NOW, payload={"estrellas": "mucho"})])
-    data = queries.game(db, "prototype")
-    assert (data["personas"], data["rondas"], data["estrellas_promedio"]) == (3, 6, 2.2)
-    events.record(db, [_round("u3", "viajes", 99)])  # fuera de rango: cuenta como 3, el máximo de la app
-    assert queries.game(db, "prototype")["estrellas_promedio"] == 2.3  # (11 + 3) / 6
-
-
-def test_game_counts_a_card_once_per_person_even_after_repeating_the_scene(db):
-    # «Repetir escena» deja el mismo id de persona: la misma tarjeta no suma dos veces (una vez por tarjeta y persona).
-    events.record(
-        db,
-        [
-            _card("u1", "licores", "licores-01"),
-            _card("u1", "licores", "licores-01"),
-            _card("u2", "licores", "licores-01"),
-            _card("u1", "viajes", "viajes-01"),
-        ],
-    )
-
-    data = queries.game(db, "prototype")
-
-    assert data["tarjetas"] == 3
-    assert data["por_vertical"] == [
-        {"vertical_juego": "licores", "rondas": 0, "tarjetas": 2},
-        {"vertical_juego": "viajes", "rondas": 0, "tarjetas": 1},
-    ]
-
-
 def test_unmet_totals_ignore_sensitive_concepts_too(concepts):
     db = concepts
     sensitive = next(c.id for c in load_taxonomy().concepts.values() if c.sensitive)
@@ -259,20 +190,15 @@ def test_every_new_metric_never_mixes_sources(concepts):
         _offer("s1", "agent-plan"),
         _offer("s1", "agent-plan", "suggestion_accepted"),
         _offer("s1"),
-        _round("s1", "licores", 3),
-        _card("s1", "licores", "licores-01"),
         _search("s1", True, "pizza"),
     ]
     events.record(db, simulated, source="synthetic")
     for name in EMPTY:
         assert getattr(queries, name)(db, "prototype") == EMPTY[name], name
 
-    events.record(db, [_offer("p1", "agent-carrito"), _card("p1", "viajes", "viajes-01"), _search("p1", False)])
+    events.record(db, [_offer("p1", "agent-carrito"), _search("p1", False)])
     assert _moments(queries.offers(db, "prototype")) == [("carrito", 1, 0, None)]
     assert _moments(queries.offers(db, "synthetic")) == [("plan", 1, 1, None), ("sin_momento", 1, 0, None)]
-    game = queries.game(db, "prototype")
-    assert (game["personas"], game["rondas"], game["tarjetas"]) == (1, 0, 1)
-    assert queries.game(db, "synthetic")["rondas"] == 1
     assert queries.unmet(db, "prototype") == {"personas": 1, "busquedas": 1, "sin_resultado": 0, "por_vertical": []}
     assert queries.unmet(db, "synthetic")["sin_resultado"] == 1
     with pytest.raises(ValueError):

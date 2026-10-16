@@ -1,5 +1,5 @@
-"""Caché en proceso de lo que solo cambia con el catálogo: la Home, las ofertas, las tiendas de una vertical, los datos
-del juego y los conteos por vertical de la búsqueda.
+"""Caché en proceso de lo que solo cambia con el catálogo: la Home, las ofertas, las tiendas de una vertical y los
+conteos por vertical de la búsqueda.
 
 El catálogo cambia una vez por semana (una descarga y su `make post-refresh`), pero esas pantallas lo recorrían en
 cada request. Cada valor se guarda con la versión del catálogo (`catalog_version`, la última corrida terminada) y

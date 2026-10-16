@@ -245,8 +245,6 @@ jobs:
           RESTIC_PASSWORD=
           # Solo en el CI: la imagen no trae el modelo (BAKE_MODEL=0) y la API lo descarga al arrancar.
           HF_HUB_OFFLINE=0
-          # El catálogo de prueba es chico: cualquier concepto con un producto entra al juego.
-          GAME_MIN_ITEMS=1
           EOF
           {
             echo "RAPPI_ENV_FILE=$env_file"

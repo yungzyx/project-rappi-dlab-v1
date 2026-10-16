@@ -288,7 +288,7 @@ def test_other_source_error_is_generic(client, caplog, monkeypatch):
     assert "El usuario <id> es de otra fuente" in caplog.text  # el detalle sí queda en el log, sin el id
 
 
-def test_order_and_game_other_source_errors_are_generic(client, caplog, monkeypatch):
+def test_order_other_source_errors_are_generic(client, caplog, monkeypatch):
     def other_source(*_, **__):
         raise ValueError("El usuario secret-user-1 es de otra fuente")
 
@@ -301,25 +301,10 @@ def test_order_and_game_other_source_errors_are_generic(client, caplog, monkeypa
     }
     monkeypatch.setattr(api.events, "catalog_prices", lambda conn, lines: ([{"price": 1}], 0))
     monkeypatch.setattr(api.events, "record_order", other_source)
-    monkeypatch.setattr("rappi_ia.api.game.save_state", other_source)
-    state = {
-        "version": 1,
-        "xp": 0,
-        "discovered": {},
-        "correct": {},
-        "answered": {},
-        "cards": [],
-        "opened": [],
-        "daily": {"date": None, "discovered": 0, "correct": 0, "opened": 0, "done": False},
-        "streak": {"count": 0, "lastDate": None},
-        "seenIntro": False,
-        "visited": [],
-    }
     with caplog.at_level(logging.WARNING):
-        replies = [client.post("/orders", json=order), client.put("/game/state/secret-user-1", json={"state": state})]
+        reply = client.post("/orders", json=order)
 
-    for reply in replies:
-        assert reply.status_code == 400 and reply.json() == {"detail": "Solicitud no válida"}
+    assert reply.status_code == 400 and reply.json() == {"detail": "Solicitud no válida"}
     assert "secret-user-1" not in caplog.text
 
 

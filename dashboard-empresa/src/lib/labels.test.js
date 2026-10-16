@@ -26,8 +26,8 @@ describe('describeFallbacks', () => {
 
 describe('describeFallbacks de las consultas del MVP', () => {
   test('nombra en español las métricas nuevas y los servicios', () => {
-    const fallbacks = ['offers', 'game'].map((name) => ({ name, reason: 'no responde' }))
-    expect(describeFallbacks(fallbacks)).toBe('ofertas por momento y juego (no responde)')
+    const fallbacks = ['offers', 'unmet'].map((name) => ({ name, reason: 'no responde' }))
+    expect(describeFallbacks(fallbacks)).toBe('ofertas por momento y búsquedas sin resultado (no responde)')
     expect(describeFallbacks([{ name: 'unmet', reason: 'no responde' }])).toBe('búsquedas sin resultado (no responde)')
     expect(describeFallbacks([{ name: 'services', reason: 'no responde' }])).toBe('servicios sin catálogo (no responde)')
   })
@@ -36,7 +36,6 @@ describe('describeFallbacks de las consultas del MVP', () => {
 describe('etiquetas', () => {
   test('verticales del backend con nombre visible, y el código si no se conoce', () => {
     expect(verticalLabel('mall')).toBe('Rappi Mall')
-    expect(verticalLabel('viajes')).toBe('Viajes')
     expect(verticalLabel('chocolateria')).toBe('Chocolatería')
     expect(verticalLabel('nuevo')).toBe('nuevo')
   })

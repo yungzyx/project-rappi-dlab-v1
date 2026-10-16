@@ -1,5 +1,5 @@
 """`rappi-ia deploy-migrate`: en un despliegue, migrar es un paso aparte que respalda antes (si hay algo que aplicar),
-carga las tarjetas del juego y, con `DB_API_ROLE`, da los permisos del rol de la API. En producción, ni la API ni los
+y, con `DB_API_ROLE`, da los permisos del rol de la API. En producción, ni la API ni los
 objetivos de servidor migran al arrancar."""
 
 import os
@@ -12,20 +12,11 @@ from psycopg.pq import TransactionStatus
 from rappi_scraper.storage import db as scraper_db
 
 from rappi_ia import cli
-from rappi_ia.concepts.pipeline import build_concepts
 from rappi_ia.config import PROJECT_ROOT
 from rappi_ia.db import connect
 from rappi_ia.demo import doctor
 
 PROBE = "999_prueba.sql"
-
-
-@pytest.fixture
-def ready(db):
-    """Base migrada con conceptos (las tarjetas del juego se ligan a ellos), como una base restaurada de un respaldo."""
-    build_concepts(db)
-    db.commit()
-    return db
 
 
 @pytest.fixture
@@ -58,87 +49,85 @@ def _applied(conn, name: str) -> bool:
     return conn.execute("SELECT count(*) FROM schema_migrations WHERE name = %s", (name,)).fetchone()[0] == 1
 
 
-def test_deploy_migrate_backs_up_only_when_pending(ready, add_pending, tmp_path, capsys):
+def test_deploy_migrate_backs_up_only_when_pending(db, add_pending, tmp_path, capsys):
     backups = []
 
     def backup():
-        backups.append(_probe_exists(ready))  # el respaldo va antes de migrar
+        backups.append(_probe_exists(db))  # el respaldo va antes de migrar
         return tmp_path / "pre-migracion_prueba.dump"
 
-    cli.deploy_migrate(ready, backup)  # nada pendiente: no respalda
+    cli.deploy_migrate(db, backup)  # nada pendiente: no respalda
     assert backups == []
     assert "Sin migraciones pendientes" in capsys.readouterr().out
 
     add_pending()
-    cli.deploy_migrate(ready, backup)
+    cli.deploy_migrate(db, backup)
 
     out = capsys.readouterr().out
     assert backups == [False]
-    assert _probe_exists(ready) and _applied(ready, PROBE)
+    assert _probe_exists(db) and _applied(db, PROBE)
     assert "pre-migracion_prueba.dump" in out
     assert PROBE in out
-    assert "Tarjetas del juego: 108" in out
-    assert ready.execute("SELECT count(*) FROM knowledge_cards").fetchone()[0] == 108
 
 
-def test_without_backup_flag_migrates_without_backing_up(ready, pending, capsys):
-    cli.deploy_migrate(ready, None)
+def test_without_backup_flag_migrates_without_backing_up(db, pending, capsys):
+    cli.deploy_migrate(db, None)
 
-    assert _applied(ready, PROBE)
+    assert _applied(db, PROBE)
     assert "sin respaldo" in capsys.readouterr().out
 
 
-def test_failed_backup_blocks_migration(ready, pending, capsys):
+def test_failed_backup_blocks_migration(db, pending, capsys):
     def backup():
         raise RuntimeError("pg_dump falló con código 1")
 
     with pytest.raises(SystemExit) as stopped:
-        cli.deploy_migrate(ready, backup)
+        cli.deploy_migrate(db, backup)
 
     assert stopped.value.code not in (0, None)
     assert "No se pudo respaldar la base (pg_dump falló con código 1): no migro." in str(stopped.value.code)
-    assert not _probe_exists(ready) and not _applied(ready, PROBE)
+    assert not _probe_exists(db) and not _applied(db, PROBE)
 
 
-def test_api_role_applies_the_grants_file(ready, pending, tmp_path, monkeypatch, capsys):
-    me = ready.execute("SELECT current_user").fetchone()[0]
+def test_api_role_applies_the_grants_file(db, pending, tmp_path, monkeypatch, capsys):
+    me = db.execute("SELECT current_user").fetchone()[0]
     grants = tmp_path / "grants.sql"
     grants.write_text("CREATE TABLE grants_probe (); GRANT SELECT ON grants_probe TO {api_role};", encoding="utf-8")
     monkeypatch.setenv("DB_API_ROLE", me)
 
-    cli.deploy_migrate(ready, None, grants_file=grants)
+    cli.deploy_migrate(db, None, grants_file=grants)
 
-    acl = ready.execute("SELECT relacl::text FROM pg_class WHERE relname = 'grants_probe'").fetchone()[0]
+    acl = db.execute("SELECT relacl::text FROM pg_class WHERE relname = 'grants_probe'").fetchone()[0]
     assert acl is not None and me in acl
     assert f"Permisos del rol de la API ({me})" in capsys.readouterr().out
 
 
-def test_api_role_without_grants_file_stops_before_migrating(ready, pending, tmp_path, monkeypatch):
+def test_api_role_without_grants_file_stops_before_migrating(db, pending, tmp_path, monkeypatch):
     monkeypatch.setenv("DB_API_ROLE", "rappi_api")
     missing = tmp_path / "no-existe.sql"
 
     with pytest.raises(SystemExit) as stopped:
-        cli.deploy_migrate(ready, lambda: pytest.fail("no respalda si no va a poder terminar"), grants_file=missing)
+        cli.deploy_migrate(db, lambda: pytest.fail("no respalda si no va a poder terminar"), grants_file=missing)
 
     assert "DB_API_ROLE" in str(stopped.value.code) and str(missing) in str(stopped.value.code)
-    assert not _applied(ready, PROBE)
+    assert not _applied(db, PROBE)
 
 
-def test_no_open_transaction_while_backing_up(ready, pending):
+def test_no_open_transaction_while_backing_up(db, pending):
     """pg_dump tiene las tablas tomadas (ACCESS SHARE) todo el volcado: la sesión que va a migrar no le suma una
     transacción abierta."""
     states = []
 
     def backup():
-        states.append(ready.info.transaction_status)
+        states.append(db.info.transaction_status)
         return "respaldo.dump"
 
-    cli.deploy_migrate(ready, backup)
+    cli.deploy_migrate(db, backup)
 
     assert states == [TransactionStatus.IDLE]
 
 
-def test_two_deploys_at_once_back_up_once(ready, add_pending, test_url, capsys):
+def test_two_deploys_at_once_back_up_once(db, add_pending, test_url, capsys):
     """El segundo espera al primero (el candado de `migrate`) y ya no encuentra nada que respaldar ni aplicar: nunca
     escriben dos respaldos a la vez."""
     add_pending()
@@ -166,65 +155,65 @@ def test_two_deploys_at_once_back_up_once(ready, add_pending, test_url, capsys):
 
     assert errors == []
     assert len(backups) == 1
-    assert _applied(ready, PROBE)
+    assert _applied(db, PROBE)
 
 
-def test_busy_table_stops_with_a_clear_message(ready, add_pending, test_url, monkeypatch):
+def test_busy_table_stops_with_a_clear_message(db, add_pending, test_url, monkeypatch):
     add_pending("ALTER TABLE menu_items ADD COLUMN prueba int;")
     monkeypatch.setattr(scraper_db.config, "MIGRATE_LOCK_TIMEOUT", "300ms")
     with connect(test_url) as other:
         other.execute("LOCK TABLE menu_items IN ROW EXCLUSIVE MODE")
         with pytest.raises(SystemExit) as stopped:
-            cli.deploy_migrate(ready, None)
+            cli.deploy_migrate(db, None)
         other.rollback()
 
     assert stopped.value.code == (
         "Una tabla está ocupada; la migración no se aplicó. Intenta de nuevo en unos minutos."
     )
-    assert not _applied(ready, PROBE)
+    assert not _applied(db, PROBE)
 
 
-def test_plain_migrate_on_a_busy_table_stops_with_the_same_message(ready, add_pending, test_url, monkeypatch):
+def test_plain_migrate_on_a_busy_table_stops_with_the_same_message(db, add_pending, test_url, monkeypatch):
     """`rappi-ia migrate` (el de `make mvp`) con una tabla ocupada: el mismo mensaje que deploy-migrate, sin traza."""
     add_pending("ALTER TABLE menu_items ADD COLUMN prueba int;")
     monkeypatch.setattr(scraper_db.config, "MIGRATE_LOCK_TIMEOUT", "300ms")
     with connect(test_url) as other:
         other.execute("LOCK TABLE menu_items IN ROW EXCLUSIVE MODE")
         with pytest.raises(SystemExit) as stopped:
-            cli.cmd_migrate(ready, cli.build_parser().parse_args(["migrate"]))
+            cli.cmd_migrate(db, cli.build_parser().parse_args(["migrate"]))
         other.rollback()
 
     assert stopped.value.code == (
         "Una tabla está ocupada; la migración no se aplicó. Intenta de nuevo en unos minutos."
     )
-    assert not _applied(ready, PROBE)
+    assert not _applied(db, PROBE)
 
 
-def test_check_only_migrate_stops_on_pending_and_points_to_the_deploy(ready, pending, capsys):
+def test_check_only_migrate_stops_on_pending_and_points_to_the_deploy(db, pending, capsys):
     """`rappi-ia migrate --solo-revisar` (post-refresh en producción) no migra sin respaldo: se detiene y remite al
     despliegue."""
     with pytest.raises(SystemExit) as stopped:
-        cli.cmd_migrate(ready, cli.build_parser().parse_args(["migrate", "--solo-revisar"]))
+        cli.cmd_migrate(db, cli.build_parser().parse_args(["migrate", "--solo-revisar"]))
 
     assert PROBE in stopped.value.code and "run --rm migrate" in stopped.value.code
-    assert not _applied(ready, PROBE)
+    assert not _applied(db, PROBE)
 
 
-def test_check_only_migrate_passes_when_up_to_date(ready, capsys):
-    cli.cmd_migrate(ready, cli.build_parser().parse_args(["migrate", "--solo-revisar"]))
+def test_check_only_migrate_passes_when_up_to_date(db, capsys):
+    cli.cmd_migrate(db, cli.build_parser().parse_args(["migrate", "--solo-revisar"]))
 
     assert "al día" in capsys.readouterr().out
 
 
-def test_failed_migration_stops_naming_the_file(ready, add_pending):
+def test_failed_migration_stops_naming_the_file(db, add_pending):
     add_pending("SELECT 1/0;")
 
     with pytest.raises(SystemExit) as stopped:
-        cli.deploy_migrate(ready, None)
+        cli.deploy_migrate(db, None)
 
     assert isinstance(stopped.value.code, str) and PROBE in stopped.value.code
     assert "Traceback" not in stopped.value.code
-    assert not _applied(ready, PROBE)
+    assert not _applied(db, PROBE)
 
 
 def _dry_run(target: str, **env) -> str:
@@ -238,7 +227,7 @@ def _dry_run(target: str, **env) -> str:
 def test_production_start_does_not_migrate(target, tmp_path):
     production = _dry_run(target, API_ENV="production")
     assert "uvicorn" in production
-    for step in ("check-migrations", "rappi_ia migrate", "rappi_ia knowledge"):
+    for step in ("check-migrations", "rappi_ia migrate"):
         assert step not in production
 
     dotenv = tmp_path / ".env"
@@ -259,13 +248,13 @@ def test_post_refresh_in_production_only_checks_migrations(tmp_path):
     assert "rappi_ia migrate\n" in local and "--solo-revisar" not in local
 
 
-def test_grants_file_lets_the_api_role_write_only_its_tables(ready):
+def test_grants_file_lets_the_api_role_write_only_its_tables(db):
     """El `deploy/db/grants.sql` de verdad, sobre el esquema de verdad: el rol de la API lee todo, escribe solo los
     datos de las personas y no puede borrar tablas ni crearlas. Todo en una transacción que se deshace (los roles
     también)."""
     from psycopg import errors, sql
 
-    conn = ready
+    conn = db
     role = "rappi_api_prueba"
     for name in ("rappi_owner", role):  # rappi_owner: el dueño de ALTER DEFAULT PRIVILEGES (en el servidor ya existe)
         if conn.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", (name,)).fetchone() is None:

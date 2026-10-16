@@ -1,15 +1,15 @@
 // Memoria del agente en la Home del prototipo final mientras dura la sesión: lo que ya mostró y lo último que la persona
-// agregó al carro (el agente lo comenta al volver). El pasaporte es el del juego de verticales (GameContext).
+// agregó al carro (el agente lo comenta al volver).
 import { resetQuiet } from './agentQuiet'
 
-export const session = { played: false, lastAdded: null, newStamp: null, plan: null, planPrompted: false }
+export const session = { played: false, lastAdded: null, plan: null, planPrompted: false }
 
 /** Lo último agregado al carro en el prototipo final (fuera de la Home): el agente lo comenta al volver. */
 export function rememberAdded(product) {
   session.lastAdded = product
 }
 
-/** La guía de la primera vez (3 pasos tras el saludo) ya se vio o se saltó: se recuerda en el navegador. */
+/** La guía de la primera vez (2 pasos tras el saludo) ya se vio o se saltó: se recuerda en el navegador. */
 export const TOUR_KEY = 'rappi-proto-guia-vista'
 
 export function tourSeen() {
@@ -34,12 +34,11 @@ export const AGENT_CART_EVENT = 'agent-carrito'
 /** Evento de ventana con que el botón «Repetir escena» (fuera del teléfono) avisa a la Home. */
 export const REPLAY_EVENT = 'agent-vivo-repetir'
 
-/** «Repetir la escena»: vuelve al estado de una persona que abre la Home por primera vez (el juego también se reinicia). */
+/** «Repetir la escena»: vuelve al estado de una persona que abre la Home por primera vez (el silencio también se reinicia). */
 export function resetLive() {
   Object.assign(session, {
     played: false,
     lastAdded: null,
-    newStamp: null,
     plan: null,
     planPrompted: false,
   })

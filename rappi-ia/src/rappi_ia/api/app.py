@@ -31,7 +31,6 @@ from ..analytics import queries
 from ..concepts.taxonomy import load_taxonomy
 from ..demo.doctor import pending_migrations
 from ..events import store as events
-from ..game.cards import did_you_know
 from ..layers.segments import recalculate_user_segments
 from ..offers.guards import is_offerable
 from ..offers.profiles import active_profiles
@@ -48,7 +47,6 @@ from .deps import (
     get_services,
     get_spare_connector,
 )
-from .game import router as game_router
 from .identity import owner_in_path, owner_in_query, owner_of_body
 from .limits import TOO_MANY, MaxBodySize, RateLimit, busy, concurrency_cap
 from .logs import AccessLog, configure_logging, rejected, route_template
@@ -137,7 +135,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=config.API_CORS_ORIGINS,
     allow_origin_regex=CORS_ORIGIN_REGEX,
-    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["content-type", identity.TOKEN_HEADER.lower()],
 )
 app.add_middleware(AccessLog)  # el más externo: también los 413 y 429 llevan su id y su línea
@@ -364,16 +362,6 @@ def ask(
     except ValueError as exc:
         raise rejected(exc, body.user_id) from exc
     _log_ask(conn, body.user_id, body.session_id, body.message, response, "texto", body.mode)
-    concepts = (response.get("intent") or {}).get("concepts")
-    if body.mode == "propuesta" and concepts:  # «¿Sabías que…?»: una oferta, así que no en «Rappi hoy»
-        try:
-            with conn.transaction():  # un error de la base no deja la conexión abortada ni rompe la respuesta
-                fact = did_you_know(conn, concepts, body.user_id)
-        except Error:
-            log.warning("No se pudo buscar el dato «¿Sabías que…?»; la respuesta sale sin él", exc_info=True)
-            fact = None
-        if fact:
-            response["did_you_know"] = fact
     return response
 
 
@@ -609,7 +597,6 @@ ANALYTICS = {
     "suggestions": queries.suggestions,
     "services": queries.services,
     "offers": queries.offers,
-    "game": queries.game,
     "unmet": queries.unmet,
     "multi-vertical": queries.multi_vertical_retention,
     "affinity": queries.affinity,
@@ -674,7 +661,7 @@ def _log_ask(conn, user_id, session_id, text, response, modality, mode) -> None:
         payload={"mode": mode, "intent": response.get("intent", {}).get("kind")},
     )
     try:
-        with conn.transaction():  # un error deja la conexión lista para lo que sigue («¿Sabías que…?»)
+        with conn.transaction():  # un error deja la conexión lista para lo que sigue
             events.record(conn, [event], source="prototype")
     except ValueError:  # un id de usuario simulado: la respuesta sale igual, no se registra
         return
@@ -688,4 +675,3 @@ if config.API_ENABLE_ANALYTICS:
     app.include_router(analytics_router)
 app.include_router(catalog_router)
 app.include_router(agent_router)
-app.include_router(game_router)

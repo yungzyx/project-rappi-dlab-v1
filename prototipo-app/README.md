@@ -17,7 +17,7 @@ Requiere Node 22.22+ o 24.15+ (ver `.nvmrc` en la raíz). Como la app no abre si
 ```bash
 make mvp              # API :8000, app http://localhost:5174 y panel :5175; Ctrl-C detiene los tres
 make mvp LAN=1        # abre la API y la app a la red local, para el iPhone (misma red wifi o su hotspot)
-make mvp-check        # recorre el MVP con Chrome contra un catálogo inventado, sin tocar la base real (7 revisiones)
+make mvp-check        # recorre el MVP con Chrome contra un catálogo inventado, sin tocar la base real (5 revisiones)
 ```
 
 Requisitos, qué revisa `make mvp-check` y qué hacer si falla algo: [docs/instalacion.md](../docs/instalacion.md#5-el-mvp). Para correr solo la app, con la API ya levantada por su cuenta (`cd rappi-ia && make serve`):
@@ -72,24 +72,7 @@ El interruptor junto al teléfono (tecla **D**, o Account → Modo demo en el ce
 | <img src="docs/screenshots/02-home-rappi-hoy.jpg" width="300" alt="Home de Rappi hoy"> | <img src="docs/screenshots/01-home-final.jpg" width="300" alt="Home del prototipo final con Mochi"> |
 | Buscador original | Mochi vive en la Home y la misma barra abre su buscador |
 
-En el **prototipo final** Mochi de cuerpo entero vive en la Home (`src/screens/home/live/`), sin canal aparte para escribirle. Al entrar saluda y, la primera vez, hace una guía de 3 pasos (el buscador, el pasaporte y «Jugar», con «Siguiente» y «Saltar»; no vuelve a aparecer, salvo con «Repetir escena»); no sugiere productos ni reordena la Home. La Home suma el pasaporte del juego de verticales (bajo los accesos de siempre; ver «Juego de verticales»), «¿Qué plan tienes hoy?» (un kit de varias verticales) y, al tocar a Mochi, una vertical por probar. Mochi saluda al llegar, salta, apunta y gira según lo que dice, y en espera mira alrededor, baila o se estira; sin nada que decir se asoma desde el borde y al hacer scroll se esconde, para no tapar la Home. Lo que se agrega al carro fuera de la Home lo comenta al volver, si combina con algo de otra vertical. La barra de la Home y la lupa de abajo abren el buscador con Mochi (ver más abajo), y al entregar un pedido ofrece armar el próximo. En el celular, «Repetir escena de Mochi» está en Account. «↺ Repetir escena», junto al interruptor, vuelve a empezar. Respeta «reducir movimiento» del sistema.
-
-## Juego de verticales
-
-En el prototipo final, el **pasaporte Rappi** de la Home es el del juego de verticales (traído de `rappi-juego-verticales`, que queda como histórico): 9 sellos (Súper, Express, Turbo, Licores, Chocolatería, Restaurantes, Farmacia, Rappi Mall y Viajes), uno por vertical en nivel Explorador o más. Un sello se gana jugando (descubrir un dato) o abriendo la vertical en la app (Viajes: RappiTravel); Conocedor y Experto, solo jugando, y se ven en el borde del sello. Con 4 sellos, envío gratis en la demo.
-
-- **Desde la Home:** el título del pasaporte abre el pasaporte del juego; «Jugar», su camino de verticales; cada sello, su hoja con «Jugar» y «Abrir {vertical}». Mochi, al tocarlo, propone jugar la primera vertical sin sello.
-- **Mientras llega el pedido:** el seguimiento ofrece «Juega mientras llega tu pedido», una ronda de 5 pasos en una vertical sin sello. Arriba, una franja con el tiempo que falta; si el pedido llega a mitad de ronda, avisa con «Ver pedido».
-- **El juego:** cada vertical enseña su mundo (el cacao en Chocolatería, el vino y el pisco en Licores, aviones y destinos en Viajes; Súper, Express y Turbo traen temas variados). Una ronda tiene 5 pasos: 2 datos «¿Sabías que…?» que se dan vuelta, 2 preguntas curiosas y 1 desafío del catálogo (Viajes, sin catálogo: 3 preguntas). El desafío es de uno de cuatro tipos: lo típico (qué se vende en esa vertical), arma el combo (qué complementa), si no hay (qué sustituye) y la pareja imposible (qué nunca va junto). Los datos van al álbum con su fuente, que se abre en otra pestaña. Además, XP y nivel (Conocedor: 6 de las 12 tarjetas y 3 aciertos; Experto: las 12 y 8), misión del día y racha.
-- **Contenido:** 108 tarjetas (6 datos y 6 preguntas por vertical) que sirve la API (`GET /game/cards`, desde `rappi-ia/src/rappi_ia/game/knowledge.json`), escritas con palabras propias y verificadas una por una contra su fuente ([informe](../docs/resultados/juego-verificacion-2026-10-09.md)). Las tarjetas y su revisión viven en `rappi-ia` y se cargan en la base con `rappi-ia knowledge` (corre en `make post-refresh`, y en `make mvp`, `make serve` y `make serve-lan`, después de migrar). La ronda pide su desafío a la API al abrirse (`GET /game/challenge`, armado con los conceptos y relaciones de la base; fuera de Licores solo con conceptos que el agente ofrece, sin alcohol, bebé, salud ni sensibles, y en Licores con alcohol pero nunca bebé ni salud; la misma semilla da el mismo desafío): la app no lleva datos del catálogo. En la base de prueba chica del `make mvp-check` la API se levanta con `GAME_MIN_ITEMS=1` (en la real, un concepto debe tener al menos 20 productos en la vertical para entrar en un desafío).
-- **Farmacia y Licores** se pueden jugar desde el pasaporte, pero ni Mochi ni el seguimiento las proponen (la salud y el alcohol no se empujan). Licores lleva la marca «+18».
-- **El dato del agente:** cuando lo que buscas está ligado a una tarjeta que aún no tienes, la respuesta del agente (`POST /agent/ask`) trae un bloque «¿Sabías que…?» con su fuente y lo suma al álbum. Nunca sale de Farmacia ni de Licores ni de una tarjeta ligada a un concepto sensible o +18.
-- El progreso es de demo: se guarda en el servidor, bajo el id seudónimo de este navegador (`PUT /game/state/{user_id}`). Si la API no entrega tarjetas y progreso, el juego muestra «Sin conexión» con «Reintentar» y la Home, la búsqueda y el checkout siguen funcionando (el pasaporte de la Home espera al juego y, hasta que carga, abrir una vertical no la sella ni suma a la misión; un guardado que falla se reintenta solo a los 2, 5 y 15 s, al volver la red y al cerrar la pestaña). Lo que este navegador guardó antes se sube una sola vez, si el servidor aún no tiene progreso. «Repetir escena» lo deja como al empezar.
-
-| El juego | Mientras llega el pedido |
-|:---:|:---:|
-| <img src="docs/screenshots/31-juego-camino.jpg" width="240" alt="Camino de verticales del juego"> | <img src="docs/screenshots/32-juego-espera.jpg" width="240" alt="Ronda con la franja del pedido"> |
-| Camino de verticales, misión del día y nivel | La ronda muestra cuánto falta para el pedido |
+En el **prototipo final** Mochi de cuerpo entero vive en la Home (`src/screens/home/live/`), sin canal aparte para escribirle. Al entrar saluda y, la primera vez, hace una guía de 2 pasos (el buscador y qué pasa al tocarlo, con «Siguiente» y «Saltar»; no vuelve a aparecer, salvo con «Repetir escena»); no sugiere productos ni reordena la Home. La Home suma «¿Qué plan tienes hoy?» (un kit de varias verticales) y, al tocar a Mochi, una vertical por probar. Mochi saluda al llegar, salta, apunta y gira según lo que dice, y en espera mira alrededor, baila o se estira; sin nada que decir se asoma desde el borde y al hacer scroll se esconde, para no tapar la Home. Lo que se agrega al carro fuera de la Home lo comenta al volver, si combina con algo de otra vertical. La barra de la Home y la lupa de abajo abren el buscador con Mochi (ver más abajo), y al entregar un pedido ofrece armar el próximo. En el celular, «Repetir escena de Mochi» está en Account. «↺ Repetir escena», junto al interruptor, vuelve a empezar. Respeta «reducir movimiento» del sistema.
 
 ## Lo nuevo de la propuesta
 
@@ -119,12 +102,12 @@ En el prototipo final no hay filas de sugerencias al entrar a una vertical ni en
 ### Mochi en los momentos clave
 
 - **Sin resultados:** si el buscador con Mochi no encuentra nada pero la consulta es de un tema conocido («chela» → cerveza), Mochi dice «Aquí no hay «chela», pero en Licores sí» y lleva ahí. Si no reconoce el tema, invita a buscar con otras palabras. Nunca ofrece Farmacia ni cosas de bebé por su cuenta.
-- **Pedido en camino:** en el mapa, Mochi está tímido mientras se prepara el pedido, de frente en camino y feliz con «¡Ya casi!» en el tramo final; al llegar, salta en el aviso del juego.
+- **Pedido en camino:** en el mapa, Mochi está tímido mientras se prepara el pedido, de frente en camino y feliz con «¡Ya casi!» en el tramo final; al llegar, salta.
 - **¿Me falta algo?:** en el checkout, un botón «¿Me falta algo? Pregúntale a Mochi». Solo al tocarlo, Mochi sugiere UNA cosa de otra vertical con su razón («Llevas 🍺 Cerveza → 🥩 Carnes»), «Agregar» y «Deshacer». Nada aparece por su cuenta.
 
 ### Mochi fuera de la Home
 
-En el prototipo final, Mochi flota a un costado en las demás pantallas (no en la Home, el buscador con Mochi, el juego, el checkout ni el seguimiento), sobre la barra inferior o la del carrito, y se achica al hacer scroll:
+En el prototipo final, Mochi flota a un costado en las demás pantallas (no en la Home, el buscador con Mochi, el checkout ni el seguimiento), sobre la barra inferior o la del carrito, y se achica al hacer scroll:
 
 - **Tocarlo:** salta y abre un menú: «Buscar con Mochi», «Revisar mi carrito · $total» (o «¿Qué puedo probar?» con el carro vacío), «Mover al otro lado» y «Silenciar por hoy». Escape o tocar fuera lo cierran.
 - **Moverlo:** arrastrarlo lo deja en el lado más cercano; el lado se recuerda en el navegador.
@@ -137,7 +120,7 @@ En el prototipo final, Mochi flota a un costado en las demás pantallas (no en l
 | Checkout | Seguimiento | Entregado |
 |:---:|:---:|:---:|
 | <img src="docs/screenshots/25-checkout.jpg" width="240" alt="Checkout"> | <img src="docs/screenshots/26-seguimiento.jpg" width="240" alt="Seguimiento"> | <img src="docs/screenshots/27-entregado.jpg" width="240" alt="Pedido entregado"> |
-| Delivery o retiro, propina y desglose (envío gratis con Pro). El medio de pago es un texto de ejemplo. | Simulado: los pasos avanzan solos y Mochi recorre la ruta en el mapa; se puede jugar mientras llega. | Calificación y la siguiente sugerencia cruzada. |
+| Delivery o retiro, propina y desglose (envío gratis con Pro). El medio de pago es un texto de ejemplo. | Simulado: los pasos avanzan solos y Mochi recorre la ruta en el mapa. | Calificación y la siguiente sugerencia cruzada. |
 
 También:
 
@@ -189,8 +172,8 @@ Las pantallas de catálogo leen la API (`/catalog`, `src/api/catalog.js`) y la a
 - **Real:** las tiendas, productos, precios, menús y ofertas que muestran las pantallas (vienen de la API, que lee la base que descarga el scraper), el carrito, los pedidos y el historial del navegador.
   - **De la API** vienen también la búsqueda y los productos y precios que muestra Mochi.
 - **De las capturas:** el diseño (títulos, filas de categorías, banners, íconos). No son catálogo: no apuntan a ninguna tienda ni producto.
-- **Simulado:** el pago y el seguimiento (el pedido «llega» a los 20 s), y el progreso del juego (de demo, sin cuenta: vive en el servidor bajo el id seudónimo).
-- **Privacidad:** el id de usuario es seudónimo (`proto-…`, guardado en este navegador). La API lo entrega firmado (`POST /session`). **Al servidor** (con ese id y su token) van las búsquedas y lo que le preguntas a Mochi (el texto que escribes), los eventos de uso (carro con su `cart_id`, sugerencias vistas y aceptadas, tarjetas y rondas del juego: `POST /events`), los pedidos (`POST /orders`: líneas, tienda y vertical, sin la dirección) y el progreso del juego (`PUT /game/state/{id}`). **Solo en este navegador** quedan las líneas del carro y sus notas, los favoritos, la dirección elegida, Loyalty, y una copia de cada pedido (con la dirección) para su seguimiento. La primera visita muestra un aviso de qué se guarda; **Cuenta → Borrar mis datos** (y **Olvidar** en el buscador con Mochi, que aparece siempre y pide la misma confirmación) borra en la API el perfil, los eventos, los pedidos y el progreso del juego, vacía las claves `rappi-proto-*` del navegador, genera un id nuevo y recarga la app en la Home. En modo "Rappi hoy" no se aprende.
+- **Simulado:** el pago y el seguimiento (el pedido «llega» a los 20 s).
+- **Privacidad:** el id de usuario es seudónimo (`proto-…`, guardado en este navegador). La API lo entrega firmado (`POST /session`). **Al servidor** (con ese id y su token) van las búsquedas y lo que le preguntas a Mochi (el texto que escribes), los eventos de uso (carro con su `cart_id`, sugerencias vistas y aceptadas: `POST /events`), y los pedidos (`POST /orders`: líneas, tienda y vertical, sin la dirección). **Solo en este navegador** quedan las líneas del carro y sus notas, los favoritos, la dirección elegida, Loyalty, y una copia de cada pedido (con la dirección) para su seguimiento. La primera visita muestra un aviso de qué se guarda; **Cuenta → Borrar mis datos** (y **Olvidar** en el buscador con Mochi, que aparece siempre y pide la misma confirmación) borra en la API el perfil, los eventos y los pedidos, vacía las claves `rappi-proto-*` del navegador, genera un id nuevo y recarga la app en la Home. En modo "Rappi hoy" no se aprende.
 - **Supuestos:** textos cortados en el borde de las capturas, marcados como "supuesto" en los archivos `data.js`. Lo que la API no sabe (tiempo de entrega de un producto, nota, costo de envío: un $0 es un dato que falta, no «envío gratis») no se muestra.
 
 ## Estructura
@@ -201,14 +184,14 @@ src/
 ├── agent/          El nombre visible del agente (`name.js`: `AGENT_NAME`, hoy «Mochi»)
 ├── assistant/      El texto con que se le pregunta a Mochi por un producto (`¿Con qué acompaño…?`)
 ├── assets/         Recortes de las capturas
-├── game/           Lógica del juego de verticales: tarjetas de conocimiento, desafíos, XP, niveles, pasaporte (lógica pura, con tests)
 ├── components/     Piezas compartidas; assistant/ tiene la mascota, la barra de la Home, el buscador con Mochi y Descubre
 ├── data/           Accesos y verticales de la Home
 ├── hooks/          Navegación con historial, scroll
-├── screens/        Una carpeta por pantalla (home, deals, vertical, checkout, tracking, game…)
+├── screens/        Una carpeta por pantalla (home, deals, vertical, checkout, tracking…)
 ├── state/          Carrito, perfil, pedidos, hoja de producto, modo demo, dirección… (varios persisten en localStorage)
-└── styles/         Tokens de diseño y estilos globales
+├── styles/         Tokens de diseño y estilos globales
+└── utils/          Utilidades sueltas (`today`: la fecha local)
 docs/screenshots/   Capturas de este README
 public/             Íconos y manifiesto para "Agregar a pantalla de inicio"
-scripts/            Íconos, capturas y el recorrido de `make mvp-check` (Home, compra, kit de Mochi, juego, dato del agente, panel y API caída)
+scripts/            Íconos, capturas y el recorrido de `make mvp-check` (Home, compra, kit de Mochi, panel y API caída)
 ```

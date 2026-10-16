@@ -77,7 +77,7 @@ Estado al 11-10-2026:
 | Fase | Qué es | Estado |
 |---|---|---|
 | **1. Datos** | Scraper → Postgres: catálogo, menús, precios e historial por vertical (`rappi-scraper/`) | **Hecha.** Primera descarga completa del 24 al 27-09-2026, recuperación de fallidos el 28-09 y primera descarga semanal automática el 29 y 30-09 (`make schedule`). Cifras en [README → Resultados](../README.md#resultados) |
-| **Prototipo** | App navegable: Mochi en la Home, buscador con Mochi, pasaporte y juego de verticales (`prototipo-app/`) | **Listo para demo.** Necesita la API (`make mvp`) y usa el catálogo real; sin ella muestra «Sin conexión con Mochi». Ver [decisiones.md](decisiones.md#agente-mochi) |
+| **Prototipo** | App navegable: Mochi en la Home, buscador con Mochi y ofertas entre verticales (`prototipo-app/`) | **Listo para demo.** Necesita la API (`make mvp`) y usa el catálogo real; sin ella muestra «Sin conexión con Mochi». Ver [decisiones.md](decisiones.md#agente-mochi) |
 | **2. RAG** | Conceptos (capa 2), embeddings de texto, búsqueda híbrida por vertical y evaluación (`rappi-ia/`) | **Construido.** Todos los documentos de búsqueda con embedding de texto. Evaluación en [README → Resultados](../README.md#resultados) |
 | **3. Agente** | Mochi en el backend y API: herramientas de búsqueda, reglas de conducta; LLM opcional | **Construido.** Responde solo por texto (`POST /agent/ask`) y hace ofertas (`/agent/offer`, `/agent/plans`) |
 | **4. Panel empresa** | Tendencias, demanda no satisfecha, frecuencia y abandono | **Construido** (`dashboard-empresa/`) y conectado a la API como parte del MVP: usuarios simulados, salvo la pestaña Catálogo (real) y la vista «Uso del MVP» (lo hecho en la app, pocas personas: no es evidencia) |

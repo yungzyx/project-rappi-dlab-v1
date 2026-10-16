@@ -74,7 +74,6 @@ def test_long_user_id_is_422(client):
     assert client.get("/search", params={"q": "vino", "vertical": long}).status_code == 422
     assert client.get("/search", params={"q": "vino", "current": long}).status_code == 422
     assert client.get("/catalog/restaurants", params={"cuisine": long}).status_code == 422
-    assert client.get("/game/cards", params={"vertical": long}).status_code == 422
     assert client.post("/agent/ask", json={"message": "vino", "vertical": long}).status_code == 422
     line = {"entity_type": "catalog_item", "entity_id": "1", "concept_id": long}
     order = {"user_id": "u1", "session_id": "s", "cart_id": "c", "vertical": "licores", "lines": [line]}

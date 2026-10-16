@@ -5,7 +5,7 @@
 #     VITE_API_URL); si aparecen, la app quedó apuntando al Mac de quien la construyó.
 #  2. Salvo con VITE_DEMO=1: los textos de desarrollador y los controles de la demo. La app los deja detrás de
 #     `import.meta.env.DEV || VITE_DEMO === '1'`, que Vite pliega al construir, así que en un build normal el código y
-#     sus textos desaparecen del bundle: «make mvp», «make knowledge», «Levanta el MVP», «No pude conectar» (aviso de
+#     sus textos desaparecen del bundle: «make mvp», «Levanta el MVP», «No pude conectar» (aviso de
 #     ConnectionGate), «Tecla D» y «Modo de la demo» (interruptor). No se revisan «Modo demo» ni «Rappi hoy»: siguen en
 #     el bundle porque la fila de Cuenta y las etiquetas se filtran en tiempo de ejecución.
 #  Con VITE_DEMO=1 el grupo 2 se omite: ese build deja esos textos a propósito (la demo desplegada, ver docs/despliegue.md).
@@ -15,7 +15,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 always=(':8000' 'localhost')
-dev_only=('make mvp' 'make knowledge' 'Levanta el MVP' 'No pude conectar' 'Tecla D' 'Modo de la demo')
+dev_only=('make mvp' 'Levanta el MVP' 'No pude conectar' 'Tecla D' 'Modo de la demo')
 
 patterns=("${always[@]}")
 if [ "${VITE_DEMO:-}" = 1 ]; then

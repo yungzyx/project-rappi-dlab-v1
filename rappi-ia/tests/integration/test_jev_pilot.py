@@ -1,7 +1,5 @@
-"""Piloto de Jev (roles A y B contra las planillas juzgadas) y propuestas de tarjetas, siempre con `FakeJev`."""
+"""Piloto de Jev (roles A y B contra las planillas juzgadas), siempre con `FakeJev`."""
 
-import csv
-import hashlib
 import json
 from argparse import Namespace
 from datetime import date
@@ -14,7 +12,6 @@ from rappi_ia.concepts.jev_map import build_questions
 from rappi_ia.concepts.taxonomy import load_taxonomy
 from rappi_ia.eval import jev_pilot, sheets
 from rappi_ia.eval.sheets import pair_id
-from rappi_ia.game import cards
 from rappi_ia.jev import JevAnswer
 
 TAXONOMY = load_taxonomy()
@@ -537,93 +534,3 @@ def test_cli_runs_the_pilot_with_key_and_sheets(db, dirs, monkeypatch, capsys):
     assert dirs.proposal.exists()
     db.rollback()  # el comando confirmó los juicios en caché
     assert db.execute("SELECT count(*) FROM eval_judgments WHERE judge = 'jev'").fetchone()[0] == 6
-
-
-# --- propuestas de tarjetas ------------------------------------------------------------------------------------------
-
-CARDS = [
-    {"id": "supermercado-01", "vertical": "supermercado", "kind": "dato", "title": "Las manzanas", "text": "Flotan."},
-    {
-        "id": "licores-01",
-        "vertical": "licores",
-        "kind": "pregunta",
-        "question": "¿De dónde es el pisco?",
-        "options": ["Chile", "Perú", "Ambos"],
-        "answer": 2,
-        "explanation": "Los dos países lo producen.",
-    },
-]
-LINKS = {
-    "supermercado-01": cards.CardLinks(("frutas",), ()),
-    "licores-01": cards.CardLinks(("pisco",), ()),
-}
-
-
-def test_card_questions_offer_leaves_and_none_but_no_sensitive_concept():
-    question = cards.jev_card_question(TAXONOMY)["concepto"]
-    options = set(question["criteria"])
-    assert "ninguno" in options and "frutas" in options
-    assert not options & {c.id for c in TAXONOMY.concepts.values() if c.sensitive}
-
-
-def test_card_proposals_use_the_card_text_and_never_the_options():
-    fake = FakeJev(answers={"concepto": JevAnswer(choice="frutas", confidence=0.8, probabilities={"frutas": 0.8})})
-
-    rows = cards.propose_card_concepts(fake, CARDS, LINKS, TAXONOMY)
-
-    states = [state for state, _ in fake.calls]
-    assert states[0] == {"vertical": "supermercado", "titulo": "Las manzanas", "texto": "Flotan."}
-    assert states[1] == {
-        "vertical": "licores",
-        "pregunta": "¿De dónde es el pisco?",
-        "explicacion": "Los dos países lo producen.",
-    }
-    assert rows[0] == {
-        "tarjeta": "supermercado-01",
-        "concepto_propuesto": "frutas",
-        "confianza": "0.80",
-        "ligas_revisadas": "frutas",
-    }
-
-
-def test_a_sensitive_proposal_is_never_written():
-    fake = FakeJev(answers={"concepto": JevAnswer(choice="medicamentos", confidence=0.9)})
-    rows = cards.propose_card_concepts(fake, CARDS[:1], LINKS, TAXONOMY)
-    assert rows[0]["concepto_propuesto"] == ""
-
-
-def test_a_card_jev_did_not_answer_stays_in_the_list_without_proposal():
-    rows = cards.propose_card_concepts(FakeJev(fail_when=lambda s: True), CARDS, LINKS, TAXONOMY)
-    assert [r["concepto_propuesto"] for r in rows] == ["", ""] and [r["confianza"] for r in rows] == ["", ""]
-
-
-def _digest(path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
-def test_cli_card_proposals_write_a_csv_and_never_links(db, tmp_path, monkeypatch, capsys):
-    monkeypatch.setattr(config, "DATA_DIR", tmp_path / "data")
-    fake = FakeJev(answers={"concepto": JevAnswer(choice="frutas", confidence=0.7)})
-    monkeypatch.setattr(jev, "client_or_none", lambda: fake)
-    before = _digest(cards.LINKS_FILE)
-
-    cli.cmd_knowledge(db, Namespace(jev_propuestas=True))
-
-    out_file = tmp_path / "data" / "eval" / "tarjetas-jev.csv"
-    with out_file.open(encoding="utf-8", newline="") as f:
-        rows = list(csv.DictReader(f))
-    assert len(rows) == len(cards.read_cards()) and len(fake.calls) == len(rows)
-    assert list(rows[0]) == ["tarjeta", "concepto_propuesto", "confianza", "ligas_revisadas"]
-    assert _digest(cards.LINKS_FILE) == before
-    assert db.execute("SELECT count(*) FROM knowledge_card_concepts").fetchone()[0] == 0
-    assert "tarjetas-jev.csv" in capsys.readouterr().out
-
-
-def test_cli_card_proposals_without_key_do_nothing(db, tmp_path, monkeypatch, capsys):
-    monkeypatch.setattr(config, "DATA_DIR", tmp_path / "data")
-    monkeypatch.setattr(jev, "client_or_none", lambda: None)
-
-    cli.cmd_knowledge(db, Namespace(jev_propuestas=True))
-
-    assert "TYPESAFE_API_KEY" in capsys.readouterr().out
-    assert not (tmp_path / "data" / "eval" / "tarjetas-jev.csv").exists()

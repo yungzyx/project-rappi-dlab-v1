@@ -25,12 +25,6 @@ vi.mock('../../state/EventsContext', async (importOriginal) => ({
   ...(await importOriginal()),
   useEvents: () => events,
 }))
-// El juego, con su acción «forget»: que vuelva a cero sin subir nada se prueba en state/GameContext.test.jsx.
-const game = vi.hoisted(() => ({ forget: vi.fn(), settle: vi.fn(), resume: vi.fn() }))
-vi.mock('../../state/GameContext', async (importOriginal) => ({
-  ...(await importOriginal()),
-  useGame: () => game,
-}))
 
 function deferred() {
   let resolve
@@ -112,7 +106,7 @@ function OpenButton() {
         onClick={() =>
           assistant.open({
             query: 'Muéstrame algo nuevo para probar',
-            offer: { moment: 'vertical_por_probar', context: { stamped: ['restaurantes', 'supermercado'] } },
+            offer: { moment: 'vertical_por_probar', context: {} },
           })
         }
       >
@@ -158,7 +152,6 @@ beforeEach(() => {
   api.profile.mockResolvedValue({ interests: [] })
   api.forget.mockResolvedValue({})
   events.settled.mockResolvedValue(undefined)
-  game.settle.mockResolvedValue(undefined)
 })
 afterEach(() => {
   cleanup()
@@ -519,43 +512,19 @@ describe('lo aprendido y Olvidar', () => {
     await runUntilIdle()
     expect(events.clear).toHaveBeenCalled() // lo que dejó en cola la respuesta no se envía
     expect(api.forget).not.toHaveBeenCalled() // falta que termine el lote en camino
-    expect(game.settle).not.toHaveBeenCalled() // el juego se pausa al final, pegado al DELETE
 
     pendingFlush.resolve()
     await advance(0)
     expect(api.forget).toHaveBeenCalledTimes(1)
-    expect(events.settled.mock.invocationCallOrder[0]).toBeLessThan(game.settle.mock.invocationCallOrder[0])
-    expect(game.settle.mock.invocationCallOrder[0]).toBeLessThan(api.forget.mock.invocationCallOrder[0])
+    expect(events.settled.mock.invocationCallOrder[0]).toBeLessThan(api.forget.mock.invocationCallOrder[0])
   })
 
-  test('Olvidar waits for game.settle() before the DELETE (the game is a mock here; the real pause is in AssistantPanel.forget.test.jsx)', async () => {
-    api.profile.mockResolvedValue({ interests: [VINO] })
-    const saving = deferred()
-    game.settle.mockReturnValueOnce(saving.promise)
-    const puts = []
-    stubCatalog({ 'PUT /game/state/*': (req) => puts.push(req.body) && {} })
-    await renderPanel()
-    clickForget()
-    await advance(100)
-    expect(game.settle).toHaveBeenCalledTimes(1)
-    expect(api.forget).not.toHaveBeenCalled() // el guardado en vuelo todavía no termina
-
-    saving.resolve()
-    await runUntilIdle()
-    expect(api.forget).toHaveBeenCalledTimes(1)
-    expect(game.settle.mock.invocationCallOrder[0]).toBeLessThan(api.forget.mock.invocationCallOrder[0])
-    expect(puts).toEqual([]) // olvidar el juego en memoria no sube nada
-    expect(game.resume).not.toHaveBeenCalled()
-  })
-
-  test('si el DELETE falla, Olvidar le devuelve el guardado al juego', async () => {
+  test('si el DELETE falla, Olvidar no recarga la app: no se borró nada', async () => {
     api.profile.mockResolvedValue({ interests: [VINO] })
     api.forget.mockRejectedValueOnce(new Error('API caída'))
     await renderPanel()
     clickForget()
     await runUntilIdle()
-    expect(game.resume).toHaveBeenCalledTimes(1)
-    expect(game.forget).not.toHaveBeenCalled()
     expect(reloadToHome).not.toHaveBeenCalled() // no se borró nada: la app sigue como estaba
   })
 
@@ -573,23 +542,13 @@ describe('lo aprendido y Olvidar', () => {
     expect(api.forget).toHaveBeenCalledTimes(1)
   })
 
-  test('Olvidar también deja el juego en cero (su progreso se borró con el perfil), solo si el servidor borró', async () => {
+  test('Olvidar recarga la app en la Home solo si el servidor borró', async () => {
     api.profile.mockResolvedValue({ interests: [VINO] })
     await renderPanel()
     clickForget()
     await runUntilIdle()
     expect(api.forget).toHaveBeenCalledTimes(1)
-    expect(game.forget).toHaveBeenCalledTimes(1)
-    expect(api.forget.mock.invocationCallOrder[0]).toBeLessThan(game.forget.mock.invocationCallOrder[0])
     expect(reloadToHome).toHaveBeenCalledTimes(1) // borrado todo, la app arranca de cero en la Home
-
-    cleanup()
-    game.forget.mockClear()
-    api.forget.mockRejectedValueOnce(new Error('API caída'))
-    await renderPanel()
-    clickForget()
-    await runUntilIdle()
-    expect(game.forget).not.toHaveBeenCalled() // el progreso sigue en el servidor: el juego no cambia
   })
 
   test('un perfil remoto que llega después de Olvidar no revive lo olvidado', async () => {
@@ -841,14 +800,12 @@ describe('«¿Qué puedo probar?» (una oferta pedida desde fuera)', () => {
 
     expect(api.ask).not.toHaveBeenCalled()
     const call = fetchMock.mock.calls.find(([url]) => url.includes('/agent/offer'))
-    expect(JSON.parse(call[1].body)).toMatchObject({
-      moment: 'vertical_por_probar',
-      context: { stamped: ['restaurantes', 'supermercado'] },
-    })
+    expect(JSON.parse(call[1].body)).toMatchObject({ moment: 'vertical_por_probar', context: {} })
     expect(screen.getByText('Elegiste «Muéstrame algo nuevo para probar»')).toBeTruthy()
-    expect(bubbles()).toContain('Aún no pruebas Express: mira estas ofertas.')
-    fireEvent.click(screen.getByRole('button', { name: /^Abrir Express/ }))
-    expect(push).toHaveBeenCalledWith(...routeForScreen('express'))
+    const made = fixture('agent-offer-vertical-por-probar')
+    expect(bubbles()).toContain(made.text)
+    fireEvent.click(screen.getByRole('button', { name: new RegExp('^' + made.actions[0].label) }))
+    expect(push).toHaveBeenCalledWith(...routeForScreen(made.actions[0].route[0]))
   })
 
   test('sin una oferta (204) lo dice, y si la API no contesta, Sin conexión y Reintentar', async () => {

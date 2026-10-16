@@ -8,14 +8,14 @@
 REVOKE INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM {api_role};
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 
--- Leer: todo el catálogo, los conceptos, el juego y las vistas estables de la capa de datos.
+-- Leer: todo el catálogo, los conceptos y las vistas estables de la capa de datos.
 GRANT USAGE ON SCHEMA public, capa TO {api_role};
 GRANT SELECT ON ALL TABLES IN SCHEMA public, capa TO {api_role};
 
--- Escribir: solo los datos de las personas del prototipo (sesión, eventos, pedidos, juego y segmentos) y las
+-- Escribir: solo los datos de las personas del prototipo (sesión, eventos, pedidos y segmentos) y las
 -- definiciones de segmentos, que el recálculo después de un pedido vuelve a sembrar si cambiaron las reglas.
 GRANT INSERT, UPDATE, DELETE ON
-    app_users, app_events, app_orders, app_order_lines, game_state, user_segments, user_segment_history, segment_defs
+    app_users, app_events, app_orders, app_order_lines, user_segments, user_segment_history, segment_defs
     TO {api_role};
 
 -- Las secuencias de esas tablas (p. ej. app_events.event_id), para poder insertar.
@@ -25,7 +25,7 @@ BEGIN
     FOR seq IN
         SELECT d.objid::regclass FROM pg_depend d JOIN pg_class s ON s.oid = d.objid AND s.relkind = 'S'
         WHERE d.classid = 'pg_class'::regclass AND d.refclassid = 'pg_class'::regclass
-          AND d.refobjid = ANY (ARRAY['app_users', 'app_events', 'app_orders', 'app_order_lines', 'game_state',
+          AND d.refobjid = ANY (ARRAY['app_users', 'app_events', 'app_orders', 'app_order_lines',
                                       'user_segments', 'user_segment_history', 'segment_defs']::regclass[])
     LOOP
         EXECUTE format('GRANT USAGE ON SEQUENCE %s TO {api_role}', seq);

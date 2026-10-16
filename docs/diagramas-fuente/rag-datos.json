@@ -208,7 +208,7 @@
       "id": "api",
       "type": "cloud",
       "label": "API :8000",
-      "sublabel": "agent · game · analytics",
+      "sublabel": "agent · analytics",
       "stage": 4,
       "row": 0,
       "tag": "make serve"
@@ -420,7 +420,7 @@
       "title": "Offline, cada domingo",
       "items": [
         "refresh-semanal.sh: rappi refresh y make post-refresh",
-        "Jev (opcional), conceptos, tarjetas, embeddings, evaluación, capas y purga",
+        "Jev (opcional), conceptos, embeddings, evaluación, capas y purga",
         "Candado propio: nunca corren dos descargas a la vez"
       ]
     },
@@ -430,7 +430,7 @@
       "items": [
         "Siempre dentro de un vertical: léxico por IDF y vectorial e5",
         "RRF, refuerzo por concepto y sin resultado bajo τ",
-        "Respuesta con plantillas o con Claude; /game y /analytics en la API"
+        "Respuesta con plantillas o con Claude; /analytics en la API"
       ]
     },
     {

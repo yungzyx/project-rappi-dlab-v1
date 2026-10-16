@@ -3,14 +3,12 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { fixture, stubApi } from '../../api/testing'
 import { ToastProvider } from '../../components/Toast'
-import { today } from '../../game/progress.js'
-import { gameReady } from '../../game/testSeed.js'
 import { AssistantProvider, useAssistant } from '../../state/AssistantContext'
 import { DemoProvider } from '../../state/DemoContext'
-import { GameProvider } from '../../state/GameContext'
 import { QUIET_KEY, noteDismissed, resetQuiet } from '../../state/agentQuiet'
 import { OrdersProvider, useOrders } from '../../state/OrdersContext'
 import { ProfileProvider } from '../../state/ProfileContext'
+import { today } from '../../utils/today'
 import TrackingScreen from './TrackingScreen'
 
 const events = vi.hoisted(() => ({ track: vi.fn(), flush: async () => {}, clear: () => {}, settled: async () => {} }))
@@ -23,7 +21,7 @@ const ORDER = {
   total: 7990,
 }
 
-function Harness({ reset, push }) {
+function Harness({ reset }) {
   const orders = useOrders()
   const order = orders.orders[0]
   if (!order)
@@ -32,7 +30,7 @@ function Harness({ reset, push }) {
         pedir
       </button>
     )
-  return <TrackingScreen back={() => {}} reset={reset} push={push} params={{ orderId: order.id }} />
+  return <TrackingScreen back={() => {}} reset={reset} params={{ orderId: order.id }} />
 }
 
 let api
@@ -58,24 +56,21 @@ function Probe() {
   return null
 }
 
-const renderTracking = async (reset = vi.fn(), push = vi.fn()) => {
+const renderTracking = (reset = vi.fn()) => {
   render(
     <DemoProvider>
       <ProfileProvider>
         <AssistantProvider>
           <OrdersProvider>
-            <GameProvider>
-              <ToastProvider>
-                <Probe />
-                <Harness reset={reset} push={push} />
-              </ToastProvider>
-            </GameProvider>
+            <ToastProvider>
+              <Probe />
+              <Harness reset={reset} />
+            </ToastProvider>
           </OrdersProvider>
         </AssistantProvider>
       </ProfileProvider>
     </DemoProvider>,
   )
-  await gameReady() // el juego carga sus tarjetas y su progreso del servidor simulado antes de pintar
 }
 
 // Hace el pedido y deja pasar el reloj hasta la entrega, con la respuesta de la API ya recibida.
@@ -90,7 +85,7 @@ const NEXT_CARD = /¿Y ahora/
 describe('TrackingScreen', () => {
   // Primero: lo mostrado se recuerda lo que dura la pestaña (este archivo).
   test('al entregar, la tarjeta ¿Y ahora…? sale de la API', async () => {
-    await renderTracking()
+    renderTracking()
     await deliver()
     expect(offerRequests()).toEqual([
       {
@@ -117,7 +112,7 @@ describe('TrackingScreen', () => {
   })
 
   test('the offer has ¿Por qué?', async () => {
-    await renderTracking()
+    renderTracking()
     await deliver()
     fireEvent.click(screen.getByRole('button', { name: '¿Por qué?' }))
     expect(screen.getByText(fixture('agent-offer-proximo-pedido').reason.text)).toBeTruthy()
@@ -125,7 +120,7 @@ describe('TrackingScreen', () => {
 
   test('al entregar aparece «Volver al inicio», que reinicia la pila', async () => {
     const reset = vi.fn()
-    await renderTracking(reset)
+    renderTracking(reset)
     fireEvent.click(screen.getByText('pedir'))
     expect(screen.queryByText('Volver al inicio')).toBeNull()
     await act(() => vi.advanceTimersByTimeAsync(21_000))
@@ -134,7 +129,7 @@ describe('TrackingScreen', () => {
   })
 
   test('antes de la entrega no pide nada, y sin oferta (204) o sin respuesta la tarjeta no aparece', async () => {
-    await renderTracking()
+    renderTracking()
     fireEvent.click(screen.getByText('pedir'))
     await act(() => vi.advanceTimersByTimeAsync(5_000))
     expect(offerRequests()).toEqual([])
@@ -142,7 +137,7 @@ describe('TrackingScreen', () => {
     cleanup()
     localStorage.clear()
     api = stubApi({ 'POST /agent/offer': 204 })
-    await renderTracking()
+    renderTracking()
     await deliver()
     expect(offerRequests()).toHaveLength(1)
     expect(screen.queryByRole('button', { name: NEXT_CARD })).toBeNull()
@@ -150,7 +145,7 @@ describe('TrackingScreen', () => {
     cleanup()
     localStorage.clear()
     api = stubApi({ 'POST /agent/offer': 'offline' })
-    await renderTracking()
+    renderTracking()
     await deliver()
     expect(screen.queryByRole('button', { name: NEXT_CARD })).toBeNull()
     expect(screen.getByText('Volver al inicio')).toBeTruthy()
@@ -158,7 +153,7 @@ describe('TrackingScreen', () => {
 
   test('Mochi en silencio no pide el próximo pedido', async () => {
     localStorage.setItem(QUIET_KEY, today())
-    await renderTracking()
+    renderTracking()
     await deliver()
     expect(offerRequests()).toEqual([])
     expect(screen.queryByRole('button', { name: NEXT_CARD })).toBeNull()
@@ -167,14 +162,14 @@ describe('TrackingScreen', () => {
     localStorage.clear()
     noteDismissed()
     noteDismissed() // lo ignoraron dos veces seguidas
-    await renderTracking()
+    renderTracking()
     await deliver()
     expect(offerRequests()).toEqual([])
   })
 
   test('en «Rappi hoy», al entregar no hay oferta de Mochi (ni se pide)', async () => {
     localStorage.setItem('rappi-proto-demo-mode', 'actual')
-    await renderTracking()
+    renderTracking()
     await deliver()
     expect(offerRequests()).toEqual([])
     expect(screen.queryByRole('button', { name: NEXT_CARD })).toBeNull()
@@ -182,7 +177,7 @@ describe('TrackingScreen', () => {
 
   test('en «Rappi hoy» el mapa queda como antes: Mochi de frente y sin «¡Ya casi!»', async () => {
     localStorage.setItem('rappi-proto-demo-mode', 'actual')
-    await renderTracking()
+    renderTracking()
     fireEvent.click(screen.getByText('pedir'))
     const image = () => document.querySelector('.tracking-rider image')
     act(() => vi.advanceTimersByTime(1_000)) // preparando
@@ -193,34 +188,16 @@ describe('TrackingScreen', () => {
   })
 
   test('en el prototipo final, preparando, Mochi está tímido', async () => {
-    await renderTracking()
+    renderTracking()
     fireEvent.click(screen.getByText('pedir'))
     act(() => vi.advanceTimersByTime(1_000))
     expect(document.querySelector('.tracking-rider image').getAttribute('y')).toBe('-1')
   })
 
-  describe('jugar mientras llega el pedido', () => {
-    test('ofrece una ronda de la primera vertical sin sello (Express) y la abre con el pedido', async () => {
-      const push = vi.fn()
-      await renderTracking(vi.fn(), push)
-      fireEvent.click(screen.getByText('pedir'))
-      const card = screen.getByRole('button', { name: /Juega mientras llega tu pedido/ })
-      expect(card.textContent).toMatch(/gana el sello de Express/)
-      fireEvent.click(card)
-      expect(push).toHaveBeenCalledWith('game', { round: 'conveniencia', orderId: expect.stringMatching(/^order-/) })
-    })
-
-    test('al entregar, la tarjeta ya no está', async () => {
-      await renderTracking()
-      await deliver()
-      expect(screen.queryByRole('button', { name: /Juega mientras llega tu pedido/ })).toBeNull()
-    })
-
-    test('en «Rappi hoy» no se ofrece', async () => {
-      localStorage.setItem('rappi-proto-demo-mode', 'actual')
-      await renderTracking()
-      fireEvent.click(screen.getByText('pedir'))
-      expect(screen.queryByRole('button', { name: /Juega mientras llega tu pedido/ })).toBeNull()
-    })
+  test('mientras llega el pedido no se ofrece ningún juego', async () => {
+    renderTracking()
+    fireEvent.click(screen.getByText('pedir'))
+    expect(screen.queryByText(/Juega mientras llega tu pedido/)).toBeNull()
+    expect(screen.queryByRole('button', { name: /Juega/ })).toBeNull()
   })
 })

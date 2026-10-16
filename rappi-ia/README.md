@@ -16,7 +16,6 @@ Versión interactiva: [rag-datos.html](../docs/diagramas/rag-datos.html). Vista 
 | Búsqueda híbrida | Léxico (sin tildes ni ñ, IDF) + vectorial → RRF → refuerzo por concepto, con filtros dentro de cada lista y regla de "sin resultado" | `retrieval/hybrid.py` |
 | Mochi | Entender → buscar → sugerir un complemento de otro vertical → redactar (plantillas o Claude) → verificar | `agent/` |
 | Eventos y analítica | Usuarios y eventos (**simulados** o del prototipo, nunca mezclados), métricas de frecuencia, abandono, oportunidades y afinidad | `events/`, `analytics/` |
-| Juego | 108 tarjetas con fuente, ligadas a conceptos; desafío por ronda y progreso por persona | `game/` |
 | Capa de datos | Atributos, medidas, marcas, grafo y segmentos en el esquema `capa` ([docs/capa-de-datos.md](../docs/capa-de-datos.md)) | `layers/` |
 
 ## Instalar
@@ -38,7 +37,7 @@ Las versiones de las librerías están fijadas en `requirements.lock.txt` (las d
 Después de cada `rappi refresh` del scraper:
 
 ```bash
-make post-refresh                 # migrate + purge + jev-categorias + concepts + knowledge + embed + eval + synth + layers + purge
+make post-refresh                 # migrate + purge + jev-categorias + concepts + embed + eval + synth + layers + purge
 ./scripts/despues-del-refresh.sh  # lo mismo, pero espera a que termine un `rappi refresh` lanzado a mano
 ```
 
@@ -52,10 +51,9 @@ La tarea semanal del scraper (`make schedule` en `rappi-scraper/`) ya lo hace so
 | `make eval` | Evalúa la búsqueda (léxico, vectorial, híbrido y ablación sin refuerzo), guarda τ en `src/rappi_ia/eval/thresholds.json` (solo en verticales con negativas que dependen de τ; los demás conservan el suyo; `make eval EVAL_ARGS=` no guarda) y deja el reporte en `data/eval/busqueda.md`. Con `--jev-auto` (lo que usa `make eval`) suma a Jev como tercer juez solo si hay clave y adopción |
 | `make synth` | Usuarios y eventos **simulados** para métricas y segmentos (1.500 usuarios × 26 semanas, semilla 7; reemplaza los anteriores) |
 | `make purge` | Borra el texto de las consultas con más de 90 días y a las personas del prototipo sin actividad en 180 (`PROTOTYPE_USER_RETENTION_DAYS`) |
-| `make knowledge` | Carga las 108 tarjetas del juego y sus ligas a conceptos (idempotente; también al levantar la API con make) |
 | `make layers` / `make layer-report` | Capa de datos (medidas, marcas, canónicos, atributos, grafo y segmentos) / su reporte de calidad |
 | `make migrate` / `make db-test` | Aplica las migraciones pendientes / crea la base de tests `rappi_ia_test` |
-| `make deploy-migrate` | El paso de migrar de un despliegue: respalda si hay pendientes (`pre-migracion_<fecha>.dump`), migra, carga las tarjetas y, con `DB_API_ROLE`, aplica los permisos de la API ([docs/despliegue.md](../docs/despliegue.md)) |
+| `make deploy-migrate` | El paso de migrar de un despliegue: respalda si hay pendientes (`pre-migracion_<fecha>.dump`), migra y, con `DB_API_ROLE`, aplica los permisos de la API ([docs/despliegue.md](../docs/despliegue.md)) |
 | `make analytics` | Resumen de las métricas de negocio en la terminal |
 | `make contract` | Reescribe las respuestas de ejemplo de la API para la app y el panel (el CI falla si quedan desactualizadas) |
 | `make warm` | Calienta la API antes de una demo |
@@ -73,7 +71,6 @@ La tarea semanal del scraper (`make schedule` en `rappi-scraper/`) ya lo hace so
 - `rappi-ia jev-piloto`: con `TYPESAFE_API_KEY` y las planillas juzgadas, mide a Jev como etiquetador de categorías y como juez, escribe `data/eval/jev-piloto.md` y, si pasa, la propuesta `eval/jev-adopcion.propuesta.json` (se adopta renombrándola a `jev-adopcion.json` y subiéndola a git).
 - `rappi-ia map-categories --jev [--solo-nuevas] [--exportar]`: Jev propone el concepto de las categorías sin mapeo revisado (solo con clave y adopción); `--exportar` lista sus mapeos y su cola de revisión en un CSV para pasarlos a `category_map.csv`.
 - `rappi-ia eval-search --juez-jev`: suma a Jev como juez (exige la clave). `--jev-auto` lo suma solo si hay clave y adopción, y si no sigue sin él.
-- `rappi-ia knowledge --jev-propuestas`: Jev propone un concepto por tarjeta del juego en `data/eval/tarjetas-jev.csv`, para revisar; no liga nada.
 - `rappi-ia eval-human`: con esos juicios, cuánto acierta el juez automático (precisión, recall, acuerdo) y si los ítems que solo trae el refuerzo son relevantes más o menos seguido que los que solo trae sin él.
 - `rappi-ia multivertical`: regenera el mapa multivertical (`docs/mapas/mapa-multivertical.html`): productos compartidos entre verticales, conceptos junto a la vertical donde son más típicos (la regla de Mochi) y los productos y cadenas en más verticales. Página autocontenida, sin internet. La imagen `mapa-conceptos.jpg` se captura de esa página con `#figura` al final de la URL.
 
@@ -84,9 +81,8 @@ La tarea semanal del scraper (`make schedule` en `rappi-scraper/`) ya lo hace so
 | `GET /live` · `GET /health` | El proceso responde (sin mirar la base) · lista para atender: 200 con capacidades y documentos, o 503 con `motivos` (`base`, `saturada`, `sin_documentos`, `migraciones_pendientes`, `busqueda_semantica`) |
 | `POST /session` | Sesión anónima: `{legacy_user_id?}` → `{user_id, token}`. El token va en la cabecera `X-User-Token` de toda ruta con datos de una persona (401 sin él, 403 con el de otra) |
 | `POST /agent/ask` | El agente (Mochi): `{message, vertical?, user_id?, session_id?, profile?, shown_topics?, mode}`. Acepta los ids de vertical del prototipo (`liquor`, `grocery`…) |
-| `POST /agent/offer` · `GET /agent/plans` | Lo que el agente propone en cada momento de la app (`plan`, `carrito`, `checkout`, `proximo_pedido`, `sin_resultado`, `vertical_por_probar` y `perfil`: la escalera de un perfil de gusto; 204 si no hay una buena oferta, 422 con un perfil desconocido) · las ocasiones de la Home con su kit |
+| `POST /agent/offer` · `GET /agent/plans` | Lo que el agente propone en cada momento de la app (`plan`, `carrito`, `checkout`, `proximo_pedido`, `sin_resultado`, `vertical_por_probar` (la vertical donde la persona aún no pide, según sus pedidos) y `perfil`: la escalera de un perfil de gusto; 204 si no hay una buena oferta, 422 con un perfil desconocido) · las ocasiones de la Home con su kit |
 | `GET /catalog/home` · `/catalog/verticals/{vertical}/stores` · `/catalog/stores/{store_id}` · `/catalog/products/{entity_type}/{entity_id}` · `/catalog/restaurants` · `/catalog/restaurants/{store_id}/menu` · `/catalog/deals` | Las pantallas de catálogo del prototipo (Home, verticales, tienda, producto, restaurantes, menú, ofertas), con el precio vigente |
-| `GET /game/cards` · `GET /game/challenge` · `GET`/`PUT /game/state/{user_id}` | Tarjetas del juego, desafío de cada ronda y progreso por persona |
 | `GET /search` | Búsqueda híbrida en un vertical, con precios vigentes |
 | `GET /recommendations` | "Para ti, de otras tiendas": intereses → complementos → otro vertical |
 | `GET /profile/{id}` · `DELETE /profile/{id}` | Lo aprendido (sin sensibles) · "Olvidar" (todo o un concepto) |
@@ -125,8 +121,8 @@ La tarea semanal del scraper (`make schedule` en `rappi-scraper/`) ya lo hace so
 
 **Privacidad:**
 - **Datos personales en consultas:** se redactan antes de guardarlas (RUT con dígito verificador, teléfonos, correos, direcciones y tarjetas) y el texto se borra a los 90 días (`make purge`).
-- **«Olvidar» / «Borrar mis datos»** (`DELETE /profile/{id}`): borra a la persona entera, con su perfil, sus eventos, sus pedidos y el progreso del juego (en cascada).
-- **Personas inactivas:** las del prototipo sin eventos, pedidos ni juego en 180 días se borran (`make purge`, `PROTOTYPE_USER_RETENTION_DAYS`).
+- **«Olvidar» / «Borrar mis datos»** (`DELETE /profile/{id}`): borra a la persona entera, con su perfil, sus eventos y sus pedidos (en cascada).
+- **Personas inactivas:** las del prototipo sin eventos ni pedidos en 180 días se borran (`make purge`, `PROTOTYPE_USER_RETENTION_DAYS`).
 - **Sensibles:** los conceptos sensibles no entran al perfil ni a las métricas de negocio.
 - **Claude:** si hay clave, recibe solo hechos estructurados, nunca la consulta del usuario.
 
@@ -186,7 +182,6 @@ rappi-ia/
 │   ├── agent/         el agente (`RappiAgent`): entender, herramientas, redactar
 │   ├── catalog/       pantallas de catálogo para la API (/catalog)
 │   ├── offers/        ofertas del agente por momento (/agent/offer, /agent/plans) y perfiles de gusto (perfiles.toml, destinos.toml)
-│   ├── game/          tarjetas (knowledge.json, card_concepts.toml), desafíos y progreso (/game)
 │   ├── layers/        capa de datos: medidas, marcas, atributos, grafo y segmentos (esquema capa)
 │   ├── demo/          catálogo inventado de `seed-demo` (solo bases _test)
 │   ├── jev.py         cliente de Jev (opcional, fuera de línea)
@@ -213,10 +208,11 @@ rappi-ia/
 | `020_service_events.sql` | Eventos de servicios sin catálogo (`service_shown`, `service_opened`) |
 | `022`–`026` | Capa de datos: medidas, atributos, marcas, canónicos, grafo, segmentos y vistas `capa` |
 | `027_ask_events.sql` | Evento `ask` (antes `chat`, que se sigue aceptando) |
-| `028_game.sql` · `029_game_events.sql` | Tarjetas del juego y su progreso; eventos `game_round_finished` y `game_card_discovered` |
+| `028_game.sql` · `029_game_events.sql` | Historia: tarjetas del juego y su progreso, y dos tipos de evento; la 035 los borra |
 | `030_jev.sql` | Caché de juicios de Jev (`eval_judgments`) y método `jev` en el mapa de categorías |
 | `031_order_mode.sql` | El modo de la app en que se hizo cada pedido (los de «Rappi hoy» no entran al perfil) |
 | `033_user_tokens.sql` | `app_users.token_issued_at`: cuándo recibió la persona su token firmado (un id ya firmado no se puede reclamar con `legacy_user_id`) |
 | `034_prewarm.sql` | Extensión `pg_prewarm`: al arrancar, la API lee en segundo plano los índices HNSW y de texto de la búsqueda (`API_PREWARM`). Si el rol no puede crearla (en producción la crea `init-roles.sh`), solo avisa |
+| `035_sin_juego.sql` | El pasaporte y el juego salen del proyecto: borra `knowledge_cards`, `knowledge_card_concepts`, `game_state` y los eventos del juego |
 
 `014`–`015` (limpieza del HTML de los documentos de búsqueda), `017`–`019` y `021` (formatos de tienda, Turbo, vigencia y platos por local) y `032` (`latest_prices` y `latest_menu_prices`, el último precio mantenido por triggers, y la vista `v_latest_offers`, la definición única de oferta vigente, que esta capa también lee) son del scraper.

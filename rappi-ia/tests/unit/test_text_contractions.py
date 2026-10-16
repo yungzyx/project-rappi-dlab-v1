@@ -4,7 +4,7 @@ from rappi_ia.text import contract_articles
 
 
 def test_de_el_becomes_del():
-    assert contract_articles("Porque aún no tienes el sello de el súper.") == "Porque aún no tienes el sello del súper."
+    assert contract_articles("Aún no pruebas lo de el súper.") == "Aún no pruebas lo del súper."
     assert contract_articles("Tu kit «Once»: pan, de el súper y Express.") == "Tu kit «Once»: pan, del súper y Express."
 
 

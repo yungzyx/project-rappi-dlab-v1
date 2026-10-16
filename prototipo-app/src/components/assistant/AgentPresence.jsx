@@ -5,15 +5,14 @@ import { useAddToCart } from '../../hooks/useAddToCart'
 import { useAssistant } from '../../state/AssistantContext'
 import { formatPrice, useCart } from '../../state/CartContext'
 import { useDemo } from '../../state/DemoContext'
-import { useGame } from '../../state/GameContext'
 import { AGENT_CART_EVENT, REPLAY_EVENT } from '../../state/liveMemory'
 import { isHushed, isQuiet, noteDismissed, noteEngaged, quietToday, wake } from '../../state/agentQuiet'
-import { stampedVerticals, today } from '../../game/progress.js'
+import { today } from '../../utils/today'
 import Mascot from './Mascot'
 import './agent-presence.css'
 
-// Donde el agente no flota: ya está en la pantalla (la Home, el juego, el mapa del seguimiento) o estorba (el checkout).
-export const AGENT_HIDDEN_SCREENS = new Set(['checkout', 'tracking', 'game'])
+// Donde el agente no flota: ya está en la pantalla (la Home, el mapa del seguimiento) o estorba (el checkout).
+export const AGENT_HIDDEN_SCREENS = new Set(['checkout', 'tracking'])
 export const SIDE_KEY = 'rappi-proto-mochi-lado'
 
 const SIZE = 68
@@ -38,7 +37,6 @@ export default function AgentPresence({ screen, homeTab, raised }) {
   const demo = useDemo()
   const assistant = useAssistant()
   const cart = useCart()
-  const game = useGame()
   const { remove } = useAddToCart()
   const [added, setAdded] = useState(null) // lo último agregado, mientras dura su globo
   const [menu, setMenu] = useState(false)
@@ -149,20 +147,19 @@ export default function AgentPresence({ screen, homeTab, raised }) {
     { id: 'search', label: `Buscar con ${AGENT_NAME}` },
     cart.count > 0
       ? { id: 'cart', label: `Revisar mi carrito · ${formatPrice(cart.total)}` }
-      : // Sin el progreso del juego cargado no se sabe qué sellos tiene la persona: no se ofrece lo que depende de ellos.
-        game.status === 'ready' && { id: 'try', label: '¿Qué puedo probar?' },
+      : { id: 'try', label: '¿Qué puedo probar?' },
     { id: 'move', label: side === 'right' ? 'Mover a la izquierda' : 'Mover a la derecha' },
     { id: 'quiet', label: 'Silenciar por hoy' },
-  ].filter(Boolean)
+  ]
   const run = (id) => {
     setMenu(false)
     noteEngaged()
     if (id === 'search') assistant.open()
-    // La vertical por probar la elige el servidor; la app le dice cuáles ya tienen sello.
+    // La vertical por probar la elige el servidor, según los pedidos de la persona.
     if (id === 'try')
       assistant.open({
         query: 'Muéstrame algo nuevo para probar',
-        offer: { moment: 'vertical_por_probar', context: { stamped: stampedVerticals(game.state) } },
+        offer: { moment: 'vertical_por_probar', context: {} },
       })
     if (id === 'cart') host.current?.closest('.phone')?.querySelector('.cart-bar')?.click()
     if (id === 'move') moveTo(side === 'right' ? 'left' : 'right')
