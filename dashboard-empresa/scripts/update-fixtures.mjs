@@ -1,7 +1,7 @@
 // Guarda una foto de cada respuesta de la API en src/fixtures (npm run fixtures).
 // Sirven para los tests y para el modo sin conexión. Volver a correrlo después de `make synth` o de un refresh.
 // Cada respuesta de /analytics lleva su `guardado` ({ origen, fecha }): el panel lo muestra en el aviso de «sin conexión».
-// offers y unmet no se guardan aquí: las escribe `make contract` en rappi-ia.
+// offers, unmet, combos, motor y home no se guardan aquí: las escribe `make contract` en rappi-ia.
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 

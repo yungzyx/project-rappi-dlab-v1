@@ -1,6 +1,7 @@
 import { Async } from '../../components/Async.jsx'
 import { ProvenanceBadge } from '../../components/ProvenanceBadge.jsx'
 import { useAnalyticsWithOrigin } from '../../lib/useAnalytics.js'
+import { HomeTaps } from './HomeTaps.jsx'
 import { OffersByMoment } from './OffersByMoment.jsx'
 import { SavedNote, SourceNote } from './SourceNote.jsx'
 import { UnmetSearches } from './UnmetSearches.jsx'
@@ -22,6 +23,16 @@ function Unmet({ source }) {
     <>
       <SavedNote saved={saved} />
       <UnmetSearches data={data} />
+    </>
+  )
+}
+
+function Home({ source }) {
+  const { data, saved } = useAnalyticsWithOrigin('home', source)
+  return (
+    <>
+      <SavedNote saved={saved} />
+      <HomeTaps data={data} source={source} />
     </>
   )
 }
@@ -60,6 +71,23 @@ export function MvpUsageView({ source }) {
           <SourceNote source={source} />
           <Async>
             <Unmet source={source} />
+          </Async>
+        </div>
+      </section>
+
+      <section className="section" aria-labelledby="accesos-home">
+        <div className="section-head">
+          <h2 id="accesos-home">Accesos de la Home</h2>
+          <p>
+            Cuántas personas tocaron cada vertical en la Home y cuántos toques hubo. Con ellos la Home aprende el orden
+            de los accesos de cada persona; en «Rappi hoy» no se cuenta ni se aprende nada.
+          </p>
+          <ProvenanceBadge kind={source} />
+        </div>
+        <div className="block enter">
+          <SourceNote source={source} />
+          <Async>
+            <Home source={source} />
           </Async>
         </div>
       </section>

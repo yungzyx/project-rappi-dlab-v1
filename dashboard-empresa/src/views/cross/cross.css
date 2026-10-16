@@ -142,3 +142,48 @@
     justify-self: start;
   }
 }
+
+/* ---------- Combinaciones de verticales y motor ---------- */
+.combos {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-6) var(--space-7);
+  align-items: start;
+}
+
+.combos-side {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.combos-side h3,
+.motor-title {
+  font-size: var(--text-md);
+  font-weight: 700;
+}
+
+/* Siete columnas por lado: más compactas para que quepan lado a lado en una pantalla ancha. */
+.combos .data-table {
+  font-size: var(--text-sm);
+}
+
+.combos .data-table th,
+.combos .data-table td {
+  padding-inline: var(--space-2);
+}
+
+.combos .data-table th {
+  white-space: normal;
+}
+
+.combos-label {
+  padding-top: 0;
+  border-top: 0;
+}
+
+@media (max-width: 1279px) {
+  .combos {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

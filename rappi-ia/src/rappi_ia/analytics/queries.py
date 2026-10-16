@@ -4,11 +4,14 @@
 `as_of` = último evento de esa fuente (los datos simulados terminan en la fecha con que se generaron).
 """
 
+from datetime import UTC
+
 from psycopg import Connection
 from psycopg.rows import dict_row
 
 from ..agent.verticals import _SHARES, MIN_ITEMS_ELSEWHERE
 from ..concepts.taxonomy import load_taxonomy
+from ..motor.combos import load_combos
 
 SOURCES = ("synthetic", "prototype")
 ACTIVE_DAYS = 30
@@ -16,6 +19,12 @@ MULTI_VERTICAL_DAYS = 60
 RETENTION_FROM, RETENTION_TO = 61, 120  # "retención" = pidió entre los días 61 y 120 desde su primer pedido
 MIN_SUPPORT = 30  # usuarios mínimos para aprender una arista por co-ocurrencia
 MIN_GROUP_USERS = 20  # agregados con menos usuarios no se muestran (privacidad)
+# Meses con el siguiente completo que pide la retención de una combinación propia para mostrarse.
+MIN_COMBO_RETENTION_N = 30
+COMBO_NOTES = {
+    "synthetic": "Simulado: no es evidencia",
+    "prototype": "uso del MVP, pocas personas: no es evidencia",
+}
 
 
 def _rows(conn: Connection, sql: str, params: dict) -> list[dict]:
@@ -534,6 +543,86 @@ def unmet(conn: Connection, source: str = "synthetic") -> dict:
         params,
     )
     return row
+
+
+def _rappi_row(row) -> dict:
+    return {
+        "combo": row.combo,
+        "usuarios": row.users,
+        "pct_usuarios": row.pct_users,
+        "pct_pedidos": row.pct_orders,
+        "pedidos_por_usuario": row.orders_per_user,
+        "retencion_m1": row.retention_m1,
+        "gasto_por_usuario": row.spend_per_user,
+    }
+
+
+def combos(conn: Connection, source: str = "synthetic") -> dict:
+    """La tabla de Rappi («verticales usados juntos», `motor/combos.toml`) junto a la misma tabla medida con los datos
+    de la fuente (`combo_stats`, de la última corrida del motor). La de Rappi es un dato compartido por su equipo y no
+    depende de la fuente; la propia sí, y lleva su rótulo en `nota`. La retención propia solo se entrega con
+    `MIN_COMBO_RETENTION_N` meses que tengan el siguiente completo. Es una correlación, no un efecto."""
+    _check(source)
+    table = load_combos()
+    own = _rows(
+        conn,
+        """SELECT combo, user_months AS meses_usuario, pct_users AS pct_usuarios, pct_orders AS pct_pedidos,
+                  orders_per_user AS pedidos_por_usuario,
+                  CASE WHEN retention_n >= %(min_n)s THEN retention_m1 END AS retencion_m1,
+                  retention_n AS retencion_n, spend_per_user AS gasto_por_usuario
+           FROM combo_stats WHERE data_source = %(source)s
+           ORDER BY user_months DESC, combo COLLATE "C" """,
+        {"source": source, "min_n": MIN_COMBO_RETENTION_N},
+    )
+    return {
+        "rappi": {
+            "filas": [_rappi_row(row) for row in table.rappi.values()],
+            "total": _rappi_row(table.rappi_total),
+            "nota": table.source_note,
+        },
+        "propio": own,
+        "nota": COMBO_NOTES[source],
+    }
+
+
+def motor(conn: Connection, source: str = "synthetic") -> dict | None:
+    """Los pesos, el λ y la evaluación de la última corrida terminada del motor de esa fuente, con su fecha; `None`
+    si todavía no corrió. La evaluación va como la guardó `motor.evaluate` (`None` si no hubo 84 días de datos)."""
+    _check(source)
+    [row] = _rows(
+        conn,
+        """SELECT counts -> 'pesos' AS pesos, counts -> 'lambda_cruzada' AS lambda_cruzada,
+                  counts -> 'evaluacion' AS evaluacion, finished_at
+           FROM layer_runs
+           WHERE layer = 'motor' AND status = 'done' AND counts ->> 'fuente' = %(source)s
+           ORDER BY run_id DESC LIMIT 1""",
+        {"source": source},
+    ) or [None]
+    if row is None:
+        return None
+    return {
+        "pesos": row["pesos"],
+        "lambda_cruzada": row["lambda_cruzada"],
+        "evaluacion": row["evaluacion"],
+        "fecha": row["finished_at"].astimezone(UTC).isoformat(),
+    }
+
+
+def home(conn: Connection, source: str = "synthetic") -> dict:
+    """Toques de los accesos de la Home (`vertical_open`) por vertical: personas y toques. «Rappi hoy»
+    (`payload.mode = 'actual'`) no cuenta, como en todo lo que aprende el motor, ni los servicios sin catálogo."""
+    _check(source)
+    taps = """FROM app_events
+              WHERE source = %(source)s AND type = 'vertical_open' AND vertical IS NOT NULL
+                AND NOT payload ? 'servicio' AND payload ->> 'mode' IS DISTINCT FROM 'actual'"""
+    rows = _rows(
+        conn,
+        f"""SELECT vertical, count(DISTINCT user_id) AS personas, count(*) AS toques {taps}
+            GROUP BY vertical ORDER BY 3 DESC, vertical COLLATE "C" """,
+        {"source": source},
+    )
+    [totals] = _rows(conn, f"SELECT count(DISTINCT user_id) AS personas, count(*) AS toques {taps}", {"source": source})
+    return {**totals, "verticales": rows}
 
 
 def multi_vertical_retention(conn: Connection, source: str = "synthetic") -> list[dict]:

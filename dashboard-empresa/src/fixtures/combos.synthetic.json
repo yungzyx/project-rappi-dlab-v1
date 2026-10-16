@@ -1,0 +1,168 @@
+{
+  "data": {
+    "nota": "Simulado: no es evidencia",
+    "propio": [
+      {
+        "combo": "rest",
+        "gasto_por_usuario": 22130.76923076923,
+        "meses_usuario": 13,
+        "pct_pedidos": 29.787233,
+        "pct_usuarios": 52.0,
+        "pedidos_por_usuario": 1.0769231,
+        "retencion_m1": null,
+        "retencion_n": 0
+      },
+      {
+        "combo": "rest+retail",
+        "gasto_por_usuario": 37410.0,
+        "meses_usuario": 3,
+        "pct_pedidos": 19.148935,
+        "pct_usuarios": 12.0,
+        "pedidos_por_usuario": 3.0,
+        "retencion_m1": null,
+        "retencion_n": 0
+      },
+      {
+        "combo": "retail",
+        "gasto_por_usuario": 2750.0,
+        "meses_usuario": 3,
+        "pct_pedidos": 6.382979,
+        "pct_usuarios": 12.0,
+        "pedidos_por_usuario": 1.0,
+        "retencion_m1": null,
+        "retencion_n": 0
+      },
+      {
+        "combo": "rest+turbo",
+        "gasto_por_usuario": 85315.0,
+        "meses_usuario": 2,
+        "pct_pedidos": 27.659575,
+        "pct_usuarios": 8.0,
+        "pedidos_por_usuario": 6.5,
+        "retencion_m1": null,
+        "retencion_n": 1
+      },
+      {
+        "combo": "turbo",
+        "gasto_por_usuario": 4030.0,
+        "meses_usuario": 2,
+        "pct_pedidos": 6.382979,
+        "pct_usuarios": 8.0,
+        "pedidos_por_usuario": 1.5,
+        "retencion_m1": null,
+        "retencion_n": 0
+      },
+      {
+        "combo": "rest+turbo+retail",
+        "gasto_por_usuario": 21950.0,
+        "meses_usuario": 1,
+        "pct_pedidos": 6.382979,
+        "pct_usuarios": 4.0,
+        "pedidos_por_usuario": 3.0,
+        "retencion_m1": null,
+        "retencion_n": 0
+      },
+      {
+        "combo": "turbo+retail",
+        "gasto_por_usuario": 10380.0,
+        "meses_usuario": 1,
+        "pct_pedidos": 4.255319,
+        "pct_usuarios": 4.0,
+        "pedidos_por_usuario": 2.0,
+        "retencion_m1": null,
+        "retencion_n": 1
+      }
+    ],
+    "rappi": {
+      "filas": [
+        {
+          "combo": "rest",
+          "gasto_por_usuario": 42.0,
+          "pct_pedidos": 39.8,
+          "pct_usuarios": 62.6,
+          "pedidos_por_usuario": 1.9,
+          "retencion_m1": 0.47,
+          "usuarios": 739000
+        },
+        {
+          "combo": "turbo",
+          "gasto_por_usuario": 35.0,
+          "pct_pedidos": 3.9,
+          "pct_usuarios": 6.8,
+          "pedidos_por_usuario": 1.7,
+          "retencion_m1": 0.5,
+          "usuarios": 80000
+        },
+        {
+          "combo": "rest+turbo",
+          "gasto_por_usuario": 123.0,
+          "pct_pedidos": 12.2,
+          "pct_usuarios": 6.6,
+          "pedidos_por_usuario": 5.5,
+          "retencion_m1": 0.82,
+          "usuarios": 78000
+        },
+        {
+          "combo": "retail",
+          "gasto_por_usuario": 34.0,
+          "pct_pedidos": 2.5,
+          "pct_usuarios": 5.6,
+          "pedidos_por_usuario": 1.4,
+          "retencion_m1": 0.41,
+          "usuarios": 66000
+        },
+        {
+          "combo": "rest+retail",
+          "gasto_por_usuario": 116.0,
+          "pct_pedidos": 8.4,
+          "pct_usuarios": 5.4,
+          "pedidos_por_usuario": 4.7,
+          "retencion_m1": 0.76,
+          "usuarios": 64000
+        },
+        {
+          "combo": "rest+turbo+retail",
+          "gasto_por_usuario": 257.0,
+          "pct_pedidos": 16.4,
+          "pct_usuarios": 4.7,
+          "pedidos_por_usuario": 10.5,
+          "retencion_m1": 0.93,
+          "usuarios": 56000
+        },
+        {
+          "combo": "turbo+retail",
+          "gasto_por_usuario": 108.0,
+          "pct_pedidos": 2.6,
+          "pct_usuarios": 1.7,
+          "pedidos_por_usuario": 4.6,
+          "retencion_m1": 0.8,
+          "usuarios": 20000
+        },
+        {
+          "combo": "favor",
+          "gasto_por_usuario": 11.0,
+          "pct_pedidos": 1.0,
+          "pct_usuarios": 1.5,
+          "pedidos_por_usuario": 2.0,
+          "retencion_m1": 0.44,
+          "usuarios": 18000
+        }
+      ],
+      "nota": "Dato compartido por el equipo de Rappi: cohortes de enero a junio de 2026, Chile, agrupación gruesa (MX crosswalk). Es una correlación, no un efecto.",
+      "total": {
+        "combo": "total",
+        "gasto_por_usuario": 68.0,
+        "pct_pedidos": 100.0,
+        "pct_usuarios": 100.0,
+        "pedidos_por_usuario": 3.0,
+        "retencion_m1": 0.55,
+        "usuarios": 1180000
+      }
+    }
+  },
+  "guardado": {
+    "fecha": "2026-10-16",
+    "origen": "make contract · simulación chica con semilla fija (40 personas, 8 semanas)"
+  },
+  "source": "synthetic"
+}

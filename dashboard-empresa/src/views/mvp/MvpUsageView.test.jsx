@@ -36,12 +36,13 @@ describe('MvpUsageView', () => {
     expect(screen.queryByRole('table', { name: 'Juego por vertical' })).toBeNull()
   })
 
-  test('the MVP view shows the two sections', async () => {
+  test('the MVP view shows the three sections', async () => {
     serveFixtures()
     await renderWithData(<MvpUsageView source="prototype" />)
 
     expect(screen.getByRole('heading', { name: 'Ofertas del agente por momento' })).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'Búsquedas sin resultado' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Accesos de la Home' })).toBeTruthy()
 
     const offers = await screen.findByRole('table', { name: 'Ofertas del agente por momento' })
     expect(within(offers).getByText('Plan')).toBeTruthy()
@@ -56,9 +57,58 @@ describe('MvpUsageView', () => {
     serveFixtures()
     await renderWithData(<MvpUsageView source="prototype" />)
 
-    expect(screen.getAllByText(NOT_EVIDENCE)).toHaveLength(2)
-    expect((await screen.findAllByText('1 persona')).length).toBe(2)
+    expect(screen.getAllByText(NOT_EVIDENCE)).toHaveLength(3)
+    expect((await screen.findAllByText('1 persona')).length).toBe(3)
     expect(screen.queryByText(/datos simulados/i)).toBeNull()
+  })
+
+  test('the Home section counts people and taps per vertical', async () => {
+    serveFixtures()
+    await renderWithData(<MvpUsageView source="prototype" />)
+
+    const taps = await screen.findByRole('table', { name: 'Accesos de la Home por vertical' })
+    const [row] = within(taps).getAllByRole('row').slice(1)
+    expect(within(row).getAllByRole('cell').map((cell) => cell.textContent)).toEqual(['Farmacia', '1', '1'])
+    expect(screen.getByText('1 toque')).toBeTruthy()
+    expect(screen.queryByText('Los datos simulados no incluyen toques de accesos')).toBeNull()
+  })
+
+  test('the Home section pluralizes and orders what the backend sends', async () => {
+    serveWith({
+      home: {
+        source: 'prototype',
+        data: {
+          personas: 3,
+          toques: 7,
+          verticales: [
+            { vertical: 'mall', personas: 3, toques: 5 },
+            { vertical: 'licores', personas: 1, toques: 2 },
+          ],
+        },
+      },
+    })
+    await renderWithData(<MvpUsageView source="prototype" />)
+
+    const taps = await screen.findByRole('table', { name: 'Accesos de la Home por vertical' })
+    const rows = within(taps).getAllByRole('row').slice(1)
+    expect(rows.map((row) => within(row).getAllByRole('cell').map((cell) => cell.textContent))).toEqual([
+      ['Rappi Mall', '3', '5'],
+      ['Licores', '1', '2'],
+    ])
+    expect(screen.getByText('7 toques')).toBeTruthy()
+  })
+
+  test('the Home section without taps says so, and synthetic says the simulator has none', async () => {
+    serveWith({ home: { source: 'prototype', data: { personas: 0, toques: 0, verticales: [] } } })
+    await renderWithData(<MvpUsageView source="prototype" />)
+    expect(await screen.findByText('Todavía no hay toques de accesos')).toBeTruthy()
+    expect(screen.queryByRole('table', { name: 'Accesos de la Home por vertical' })).toBeNull()
+    resetApi()
+
+    serveFixtures()
+    await renderWithData(<MvpUsageView source="synthetic" />)
+    expect(await screen.findByText('Los datos simulados no incluyen toques de accesos')).toBeTruthy()
+    expect(screen.queryByRole('table', { name: 'Accesos de la Home por vertical' })).toBeNull()
   })
 
   test('rates show a dash under the minimum', async () => {
@@ -147,7 +197,7 @@ describe('MvpUsageView', () => {
     const unmet = await screen.findByRole('table', { name: 'Búsquedas sin resultado por vertical y concepto' })
     expect(within(unmet).getByText('🥗 Ensaladas y bowls')).toBeTruthy()
     expect(screen.getByText('25 de 82 búsquedas sin resultado')).toBeTruthy()
-    expect(screen.getAllByText(/Datos simulados/)).toHaveLength(2)
+    expect(screen.getAllByText(/Datos simulados/)).toHaveLength(3)
     expect(screen.queryByText(NOT_EVIDENCE)).toBeNull()
   })
 
@@ -170,7 +220,7 @@ describe('MvpUsageView', () => {
     await renderWithData(<App />)
 
     const errors = await screen.findAllByText('La API no responde: el uso del MVP solo se ve con la base viva.')
-    expect(errors).toHaveLength(3) // un ErrorState por bloque y otro en la fecha de corte de la cabecera
+    expect(errors).toHaveLength(4) // un ErrorState por bloque y otro en la fecha de corte de la cabecera
     expect(screen.queryByRole('table', { name: 'Ofertas del agente por momento' })).toBeNull()
     expect(screen.queryByText('1 persona')).toBeNull()
     expect(screen.queryByText('Modo sin conexión (datos guardados):')).toBeNull() // no hay nada guardado que avisar
@@ -183,7 +233,7 @@ describe('MvpUsageView', () => {
     await screen.findByRole('table', { name: 'Búsquedas sin resultado por vertical y concepto' })
     const origin = (await import('../../fixtures/unmet.synthetic.json')).default.guardado
     expect(screen.getAllByText(`Guardado sin conexión: ${origin.origen} (${origin.fecha}).`).length).toBeGreaterThan(0)
-    expect(screen.getAllByText(/Guardado sin conexión:/)).toHaveLength(2) // uno por bloque
+    expect(screen.getAllByText(/Guardado sin conexión:/)).toHaveLength(3) // uno por bloque
   })
 
   test('con la API viva no hay rótulo de guardado', async () => {

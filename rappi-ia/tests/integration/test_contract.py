@@ -32,12 +32,12 @@ from rappi_ia.demo.seed import seed_demo
 from rappi_ia.embeddings.base import HashEmbedder
 from rappi_ia.events import store as events
 from rappi_ia.events.synth import generate
-from rappi_ia.motor.build import refresh_user_conn
+from rappi_ia.motor.build import build_motor, refresh_user_conn
 from rappi_ia.motor.model import TZ
 
 FIXTURES = Path(__file__).resolve().parents[3] / "prototipo-app" / "src" / "api" / "fixtures"
 PANEL_FIXTURES = Path(__file__).resolve().parents[3] / "dashboard-empresa" / "src" / "fixtures"
-PANEL_METRICS = ("offers", "unmet")
+PANEL_METRICS = ("offers", "unmet", "combos", "motor", "home")
 # Las métricas de /analytics que guarda `npm run fixtures` (dashboard-empresa/scripts/update-fixtures.mjs).
 PANEL_SHAPE = (
     "kpis",
@@ -353,6 +353,7 @@ def prototype_journey(client) -> None:
             "results": 0,
             "unmet": search["unmet"],
         },
+        {"type": "vertical_open", "session_id": "s-panel", "vertical": "farmacia"},
     ]
     assert client.post("/events", json={"user_id": "u-panel", "events": sent}).json() == {"guardados": len(sent)}
 
@@ -364,6 +365,12 @@ def test_panel_examples_are_up_to_date(client, db, name, source):
         prototype_journey(client)
     else:
         generate(db, users=40, weeks=8, seed=11, until=date(2026, 10, 4))
+    # Lo que muestran `motor` y `combos` sale de la corrida del motor. Las combinaciones del prototipo salen de pedidos
+    # fechados desde hoy (cambian con el mes): su ejemplo es el de «sin pedidos propios».
+    if name == "motor" or (name == "combos" and source == "synthetic"):
+        build_motor(db, source)
+        db.execute("UPDATE layer_runs SET finished_at = '2026-10-04 12:00+00' WHERE layer = 'motor'")  # la fecha varía
+        db.commit()
     example = Example(f"{name}.{source}", "GET", f"/analytics/{name}?source={source}")
     reply = client.request(example.method, example.path)
     write = os.environ.get("RAPPI_CONTRACT_WRITE") == "1"

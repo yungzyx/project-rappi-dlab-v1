@@ -646,6 +646,9 @@ ANALYTICS = {
     "multi-vertical": queries.multi_vertical_retention,
     "affinity": queries.affinity,
     "assortment": queries.assortment_vs_demand,
+    "combos": queries.combos,
+    "motor": queries.motor,
+    "home": queries.home,
 }
 
 

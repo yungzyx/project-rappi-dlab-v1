@@ -43,9 +43,9 @@ function describeRequest(name, source) {
 
 class HttpError extends Error {}
 
-/** Nunca mezclar fuentes: una respuesta que no trae la fuente pedida se descarta. */
+/** Nunca mezclar fuentes: una respuesta que no trae la fuente pedida se descarta. `data: null` es válido (`motor` sin corrida). */
 function dataFrom(body, expected) {
-  if (body?.source !== expected || body.data == null) {
+  if (body?.source !== expected || body.data === undefined) {
     throw new Error(`Se esperaba la fuente ${expected} y llegó ${body?.source ?? 'otra cosa'}`)
   }
   return body.data
