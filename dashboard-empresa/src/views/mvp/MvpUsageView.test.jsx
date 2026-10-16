@@ -28,19 +28,24 @@ describe('MvpUsageView', () => {
 
   afterEach(resetApi)
 
-  test('the MVP view shows the three sections', async () => {
+  test('the MVP view has no «Juego» section', async () => {
+    serveFixtures()
+    await renderWithData(<MvpUsageView source="prototype" />)
+
+    expect(screen.queryByRole('heading', { name: /juego/i })).toBeNull()
+    expect(screen.queryByRole('table', { name: 'Juego por vertical' })).toBeNull()
+  })
+
+  test('the MVP view shows the two sections', async () => {
     serveFixtures()
     await renderWithData(<MvpUsageView source="prototype" />)
 
     expect(screen.getByRole('heading', { name: 'Ofertas del agente por momento' })).toBeTruthy()
-    expect(screen.getByRole('heading', { name: 'Juego' })).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'Búsquedas sin resultado' })).toBeTruthy()
 
     const offers = await screen.findByRole('table', { name: 'Ofertas del agente por momento' })
     expect(within(offers).getByText('Plan')).toBeTruthy()
     expect(within(offers).getByText('Carro')).toBeTruthy()
-    const game = await screen.findByRole('table', { name: 'Juego por vertical' })
-    expect(within(game).getByText('Supermercado')).toBeTruthy()
     const unmet = await screen.findByRole('table', { name: 'Búsquedas sin resultado por vertical y concepto' })
     expect(within(unmet).getByText('Supermercado')).toBeTruthy()
     expect(within(unmet).getByText('Sin concepto reconocido')).toBeTruthy()
@@ -51,8 +56,8 @@ describe('MvpUsageView', () => {
     serveFixtures()
     await renderWithData(<MvpUsageView source="prototype" />)
 
-    expect(screen.getAllByText(NOT_EVIDENCE)).toHaveLength(3)
-    expect((await screen.findAllByText('1 persona')).length).toBe(3)
+    expect(screen.getAllByText(NOT_EVIDENCE)).toHaveLength(2)
+    expect((await screen.findAllByText('1 persona')).length).toBe(2)
     expect(screen.queryByText(/datos simulados/i)).toBeNull()
   })
 
@@ -63,8 +68,6 @@ describe('MvpUsageView', () => {
     const offers = await screen.findByRole('table', { name: 'Ofertas del agente por momento' })
     const [, plan] = within(offers).getAllByRole('row')
     expect(within(plan).getAllByRole('cell').map((cell) => cell.textContent)).toEqual(['Plan', '1', '1', '—'])
-    const stars = screen.getByText('Estrellas promedio (de 0 a 3)').closest('div')
-    expect(within(stars).getByText('—')).toBeTruthy()
   })
 
   test('a rate and an average that the backend does compute are shown', async () => {
@@ -73,18 +76,12 @@ describe('MvpUsageView', () => {
         source: 'prototype',
         data: { personas: 4, momentos: [{ momento: 'checkout', mostradas: 12, aceptadas: 3, aceptacion_pct: 25 }] },
       },
-      game: {
-        source: 'prototype',
-        data: { personas: 3, rondas: 6, estrellas_promedio: 2.5, tarjetas: 9, por_vertical: [{ vertical_juego: 'viajes', rondas: 6, tarjetas: 9 }] },
-      },
     })
     await renderWithData(<MvpUsageView source="prototype" />)
 
     const offers = await screen.findByRole('table', { name: 'Ofertas del agente por momento' })
     expect(within(offers).getByText('Antes de pagar')).toBeTruthy()
     expect(within(offers).getByText('25,0%')).toBeTruthy()
-    expect(await screen.findByText('2,5')).toBeTruthy()
-    expect(within(await screen.findByRole('table', { name: 'Juego por vertical' })).getByText('Viajes')).toBeTruthy()
   })
 
   test('the taste-profile moment has its own label and is not counted as «sin momento»', async () => {
@@ -111,7 +108,7 @@ describe('MvpUsageView', () => {
     expect(within(offers).queryByText('perfil')).toBeNull()
   })
 
-  test('a search without vertical says so, the stars label gives the scale and the offers note names the tab', async () => {
+  test('a search without vertical says so and the offers note names the tab', async () => {
     serveWith({
       unmet: {
         source: 'prototype',
@@ -122,7 +119,6 @@ describe('MvpUsageView', () => {
 
     const unmet = await screen.findByRole('table', { name: 'Búsquedas sin resultado por vertical y concepto' })
     expect(within(unmet).getByText('Sin vertical')).toBeTruthy()
-    expect(await screen.findByText('Estrellas promedio (de 0 a 3)')).toBeTruthy()
     expect(screen.getByText(/en «Entre verticales»/)).toBeTruthy()
   })
 
@@ -130,15 +126,14 @@ describe('MvpUsageView', () => {
     serveFixtures()
     await renderWithData(<MvpUsageView source="synthetic" />)
 
-    // offers: only «sin momento» → the simulator does not record the moment; game: all zeros.
+    // offers: only «sin momento» → the simulator does not record the moment.
     expect(await screen.findByText('Los datos simulados no registran el momento de la oferta')).toBeTruthy()
-    expect(await screen.findByText('Los datos simulados no incluyen el juego')).toBeTruthy()
     expect(screen.queryByRole('table', { name: 'Ofertas del agente por momento' })).toBeNull()
     // unmet has data and is labelled as simulated, never as MVP use.
     const unmet = await screen.findByRole('table', { name: 'Búsquedas sin resultado por vertical y concepto' })
     expect(within(unmet).getByText('🥛 Leche y yogur')).toBeTruthy()
     expect(screen.getByText('118 de 219 búsquedas sin resultado')).toBeTruthy()
-    expect(screen.getAllByText(/Datos simulados/)).toHaveLength(3)
+    expect(screen.getAllByText(/Datos simulados/)).toHaveLength(2)
     expect(screen.queryByText(NOT_EVIDENCE)).toBeNull()
   })
 
@@ -161,9 +156,8 @@ describe('MvpUsageView', () => {
     await renderWithData(<App />)
 
     const errors = await screen.findAllByText('La API no responde: el uso del MVP solo se ve con la base viva.')
-    expect(errors).toHaveLength(4) // un ErrorState por bloque y otro en la fecha de corte de la cabecera
+    expect(errors).toHaveLength(3) // un ErrorState por bloque y otro en la fecha de corte de la cabecera
     expect(screen.queryByRole('table', { name: 'Ofertas del agente por momento' })).toBeNull()
-    expect(screen.queryByRole('table', { name: 'Juego por vertical' })).toBeNull()
     expect(screen.queryByText('1 persona')).toBeNull()
     expect(screen.queryByText('Modo sin conexión (datos guardados):')).toBeNull() // no hay nada guardado que avisar
   })
@@ -175,7 +169,7 @@ describe('MvpUsageView', () => {
     await screen.findByRole('table', { name: 'Búsquedas sin resultado por vertical y concepto' })
     const origin = (await import('../../fixtures/unmet.synthetic.json')).default.guardado
     expect(screen.getAllByText(`Guardado sin conexión: ${origin.origen} (${origin.fecha}).`).length).toBeGreaterThan(0)
-    expect(screen.getAllByText(/Guardado sin conexión:/)).toHaveLength(3) // uno por bloque
+    expect(screen.getAllByText(/Guardado sin conexión:/)).toHaveLength(2) // uno por bloque
   })
 
   test('con la API viva no hay rótulo de guardado', async () => {

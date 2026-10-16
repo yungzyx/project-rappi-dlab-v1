@@ -1,7 +1,6 @@
 import { Async } from '../../components/Async.jsx'
 import { ProvenanceBadge } from '../../components/ProvenanceBadge.jsx'
 import { useAnalyticsWithOrigin } from '../../lib/useAnalytics.js'
-import { GameUsage } from './GameUsage.jsx'
 import { OffersByMoment } from './OffersByMoment.jsx'
 import { SavedNote, SourceNote } from './SourceNote.jsx'
 import { UnmetSearches } from './UnmetSearches.jsx'
@@ -13,16 +12,6 @@ function Offers({ source }) {
     <>
       <SavedNote saved={saved} />
       <OffersByMoment data={data} source={source} />
-    </>
-  )
-}
-
-function Game({ source }) {
-  const { data, saved } = useAnalyticsWithOrigin('game', source)
-  return (
-    <>
-      <SavedNote saved={saved} />
-      <GameUsage data={data} source={source} />
     </>
   )
 }
@@ -54,23 +43,6 @@ export function MvpUsageView({ source }) {
           <SourceNote source={source} />
           <Async>
             <Offers source={source} />
-          </Async>
-        </div>
-      </section>
-
-      <section className="section" aria-labelledby="juego">
-        <div className="section-head">
-          <h2 id="juego">Juego</h2>
-          <p>
-            El juego de verticales de la app: rondas terminadas, tarjetas descubiertas y estrellas promedio, en total y
-            por vertical del juego.
-          </p>
-          <ProvenanceBadge kind={source} />
-        </div>
-        <div className="block enter">
-          <SourceNote source={source} />
-          <Async>
-            <Game source={source} />
           </Async>
         </div>
       </section>

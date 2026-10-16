@@ -1,4 +1,3 @@
-import { StrictMode } from 'react'
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
 import { fixture, stubApi } from '../../../api/testing'
@@ -33,8 +32,8 @@ beforeEach(async () => {
   memory = await import('../../../state/liveMemory')
   useAssistant = assistant.useAssistant
   HomeScreen = (await import('../HomeScreen')).default
-  Providers = function Providers({ children, strict }) {
-    const tree = (
+  Providers = function Providers({ children }) {
+    return (
       <demo.DemoProvider>
         <profile.ProfileProvider>
           <assistant.AssistantProvider>
@@ -49,7 +48,6 @@ beforeEach(async () => {
         </profile.ProfileProvider>
       </demo.DemoProvider>
     )
-    return strict ? <StrictMode>{tree}</StrictMode> : tree
   }
   vi.useFakeTimers()
   // La Home pide su catálogo a la API (sin respuestas, esas secciones no se ven) y a Mochi sus ocasiones y ofertas.
@@ -85,8 +83,8 @@ afterEach(() => {
   localStorage.clear()
 })
 
-const homeTree = ({ strict = false, tab = 'home', push = vi.fn(), active = true } = {}) => (
-  <Providers strict={strict}>
+const homeTree = ({ tab = 'home', push = vi.fn(), active = true } = {}) => (
+  <Providers>
     <div className="phone">
       <div className="screen-wrap">
         <HomeScreen push={push} tab={tab} setTab={vi.fn()} active={active} />

@@ -1,6 +1,6 @@
 # Panel de negocio (demo)
 
-> **Parte del MVP.** `make mvp` lo levanta junto a la API y la app, y lee la API (`/analytics`). Con la fuente **Simulados** muestra la mecánica del panel; con la fuente **Prototipo**, la vista **Uso del MVP** muestra lo que la gente hizo en la app (ofertas del agente por momento, juego y búsquedas sin resultado), siempre rotulado «uso del MVP, pocas personas: no es evidencia».
+> **Parte del MVP.** `make mvp` lo levanta junto a la API y la app, y lee la API (`/analytics`). Con la fuente **Simulados** muestra la mecánica del panel; con la fuente **Prototipo**, la vista **Uso del MVP** muestra lo que la gente hizo en la app (ofertas del agente por momento y búsquedas sin resultado), siempre rotulado «uso del MVP, pocas personas: no es evidencia».
 
 > Proyecto independiente: no está afiliado a Rappi ni cuenta con su respaldo. Las marcas pertenecen a sus dueños. La etiqueta «Rappi Chile · propuesta» del encabezado es parte de la maqueta.
 
@@ -56,7 +56,7 @@ La URL de la API se cambia con `VITE_API_URL`, por ejemplo `VITE_API_URL=http://
 | `npm test` | Tests (Vitest + Testing Library, sin red: usan `src/fixtures/`) |
 | `npm run lint` | ESLint (reglas de React Hooks 7) |
 | `npm run build` | Build de producción en `dist/` |
-| `npm run fixtures` | Vuelve a guardar las respuestas de la API en `src/fixtures/` (correr tras `make synth` o una actualización del catálogo). Las de «Uso del MVP» (ofertas, juego y búsquedas sin resultado) no pasan por aquí: las escribe `make contract` en `rappi-ia/` y el CI falla si quedan desactualizadas |
+| `npm run fixtures` | Vuelve a guardar las respuestas de la API en `src/fixtures/` (correr tras `make synth` o una actualización del catálogo). Las de «Uso del MVP» (ofertas y búsquedas sin resultado) no pasan por aquí: las escribe `make contract` en `rappi-ia/` y el CI falla si quedan desactualizadas |
 | `npm run screenshots` | Regenera `docs/screenshots/` con el Chrome instalado y un Vite propio en el 5198 |
 
 Tests: las cifras vigentes están en [README.md#resultados](../README.md#resultados) (fila «Calidad»). CI en GitHub Actions: lint, tests y build.
@@ -137,13 +137,12 @@ Aparte va **surtido vs demanda**, marcado «demanda simulada»: cruza el surtido
 
 ### 6. Uso del MVP
 
-Lo que la gente hizo en la app del MVP, en tres secciones. Con la fuente **Prototipo** cada una lleva el rótulo «uso del MVP, pocas personas: no es evidencia» y cuántas personas hay detrás; con **Simulados** dice «Datos simulados» y muestra la mecánica (el simulador no guarda el momento de la oferta ni el juego, y el panel lo avisa en vez de inventar una tabla).
+Lo que la gente hizo en la app del MVP, en dos secciones. Con la fuente **Prototipo** cada una lleva el rótulo «uso del MVP, pocas personas: no es evidencia» y cuántas personas hay detrás; con **Simulados** dice «Datos simulados» y muestra la mecánica (el simulador no guarda el momento de la oferta, y el panel lo avisa en vez de inventar una tabla).
 
 - **Ofertas del agente por momento.** Mostradas y aceptadas según dónde se hizo la oferta: en un plan, con el carro armado, antes de pagar, para el próximo pedido, cuando una búsqueda no encontró nada, para probar otro vertical, al preguntarle al agente o en «Para ti». Aceptada: la oferta se agregó al carro. Los servicios sin catálogo van aparte, en «Entre verticales». La tasa de aceptación aparece desde 10 mostradas; antes, solo las cuentas.
-- **Juego.** Rondas terminadas, tarjetas descubiertas y estrellas promedio (de 0 a 3), en total y por vertical del juego. El promedio aparece desde 5 rondas.
 - **Búsquedas sin resultado.** Por vertical y concepto reconocido: es demanda que el catálogo no cubre. No muestra lo que escribió cada persona ni conceptos sensibles; una búsqueda sin vertical se rotula «Sin vertical».
 
-Las definiciones están en [docs/diseno-ia.md §5](../docs/diseno-ia.md#5-panel-para-la-empresa-vale-la-pena). `make mvp-check` abre esta vista con la fuente del prototipo (puerto 5185) y comprueba que muestra el kit y la tarjeta del juego que dejaron las revisiones anteriores (qué revisa, en [docs/instalacion.md](../docs/instalacion.md#5-el-mvp)).
+Las definiciones están en [docs/diseno-ia.md §5](../docs/diseno-ia.md#5-panel-para-la-empresa-vale-la-pena). `make mvp-check` abre esta vista con la fuente del prototipo (puerto 5185) y comprueba que muestra lo que dejaron las revisiones anteriores (qué revisa, en [docs/instalacion.md](../docs/instalacion.md#5-el-mvp)).
 
 Todas las vistas tienen versión móvil (sin scroll horizontal; las tablas pasan a tarjetas) y tema claro y oscuro: sigue al sistema y se puede fijar con el botón.
 

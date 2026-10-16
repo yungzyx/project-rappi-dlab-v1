@@ -10,7 +10,6 @@ STARTED="" # "etiqueta:pid" de lo lanzado con start, separado por espacios
 LAST_PID=""
 DEAD=""
 MISSING=0
-TEMP_FILE="" # archivo temporal que stop_all borra al salir
 
 fail() {
   echo "$*" >&2
@@ -103,7 +102,6 @@ stop_one() { # stop_one <etiqueta>: detiene un solo proceso (el resto sigue)
 stop_all() { # va en el trap de EXIT: seguro de llamar varias veces y con Ctrl-C repetido
   trap '' INT TERM HUP
   local entry pids=""
-  if [ -n "$TEMP_FILE" ]; then rm -f "$TEMP_FILE"; fi
   for entry in $STARTED; do pids="$pids ${entry#*:}"; done
   STARTED=""
   if [ -z "$pids" ]; then return 0; fi

@@ -58,7 +58,7 @@ describe('App', () => {
     serveFixtures()
     await renderWithData(<App />)
 
-    const empty = (await screen.findByText('Los datos simulados no incluyen el juego')).closest('.state')
+    const empty = (await screen.findByText('Los datos simulados no registran el momento de la oferta')).closest('.state')
     expect(empty.getAttribute('role')).toBeNull()
   })
 
