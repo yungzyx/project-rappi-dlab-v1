@@ -6,9 +6,11 @@ import './styles/global.css'
 import App from './App.jsx'
 import ConnectionGate from './components/ConnectionGate.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
+import { removeLegacyKeys } from './legacyStorage.js'
 import { reloadOnPreloadError } from './preloadError.js'
 
 reloadOnPreloadError()
+removeLegacyKeys()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

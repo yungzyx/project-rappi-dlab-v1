@@ -6,7 +6,7 @@ import DemoDisclaimer from '../../../components/DemoDisclaimer'
 import SmartBar from '../../../components/assistant/SmartBar'
 import { useToast } from '../../../components/Toast'
 import { ChevronDown } from '../../../components/Icons'
-import { routeForScreen } from '../../../data/verticals'
+import { VERTICAL_NAMES, routeForScreen, screenForBackend } from '../../../data/verticals'
 import { useReducedMotion } from '../../../hooks/useReducedMotion'
 import { useScrollState } from '../../../hooks/useScrollState'
 import { useAddress } from '../../../state/AddressContext'
@@ -379,9 +379,11 @@ export default function LiveHomeFeed({ push, active = true }) {
     if (mine !== run.current || !made) return
     noteShown(events.track, made.products, { origin: `agent-${made.moment}`, generation: profile.resets })
     const open = made.actions.find((action) => action.route)
+    // La burbuja no lleva productos: no promete «mira estas ofertas» (eso lo dice el texto de la API, que sí los muestra).
+    const name = VERTICAL_NAMES[screenForBackend(made.backendVertical)]
     speak(
       {
-        text: made.text,
+        text: name ? `¿Y si pruebas algo de ${name}?` : made.text,
         why: made.reason,
         mood: 'wave',
         gesture: 'hop',

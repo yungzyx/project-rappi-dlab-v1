@@ -81,8 +81,7 @@ FOOD_GROUPS = ("bebidas", "snacks", "dulces", "despensa", "frescos", "comida")
 # El orden de la Home: lo que ya muestra hoy (la app tiene «Película» para panorama); después, el resto de la taxonomía.
 HOME_OCCASIONS = ("once", "carrete", "asado", "panorama", "regalo")
 
-# El orden en que se propone una vertical por probar cuando nada le gusta más a la persona (Viajes no tiene catálogo y
-# aquí no cuenta).
+# El orden en que se propone una vertical por probar cuando nada le gusta más a la persona (Viajes no tiene catálogo).
 TO_TRY_ORDER = (
     "supermercado",
     "conveniencia",
@@ -103,7 +102,7 @@ CART_TEXT_ANONYMOUS = "Para completar tu pedido: {destino}, en {vertical}."
 CHECKOUT_TEXT = "Antes de pagar: {destino}, en {vertical}. Combina con lo que llevas."
 NEXT_ORDER_TEXT = "Para tu próximo pedido: {destino}, en {vertical}. Combina con lo que pediste."
 NO_RESULT_TEXT = "No encontré «{query}», pero {destino} sí hay en {vertical}."
-TO_TRY_TEXT = "Aún no pruebas {vertical}: mira {what}."
+TO_TRY_TEXT = "Aún no pides en {vertical}: mira {what}."
 TO_TRY_DEALS = "estas ofertas"
 TO_TRY_DISHES = "lo que más piden"
 # Por qué se ofrece (`reason.text`). {emoji} {name} es el concepto de lo que ya hay en el carrito o en el pedido.

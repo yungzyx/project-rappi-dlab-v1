@@ -220,7 +220,7 @@ def test_vertical_to_try_without_orders_starts_with_the_supermarket(client):
     body = first.json()
     assert body["moment"] == "vertical_por_probar" and body["vertical"] == "supermercado"
     assert body["prototype_vertical"] == "grocery" and 1 <= len(body["products"]) <= 3
-    assert body["text"] == "Aún no pruebas el súper: mira estas ofertas."
+    assert body["text"] == "Aún no pides en el súper: mira estas ofertas."
     assert_offerable(body)  # la farmacia que Rappi lista entre los súper tiene ofertas y no sale
 
 
@@ -229,7 +229,7 @@ def test_vertical_to_try_skips_verticals_with_orders_and_pharmacy(client, db):
     for vertical in ("supermercado", "conveniencia", "turbo"):
         order(db, "u1", vertical)
     after_three = offer(client, "vertical_por_probar", {}, "u1").json()
-    assert after_three["vertical"] == "chocolateria" and after_three["text"].startswith("Aún no pruebas chocolaterías")
+    assert after_three["vertical"] == "chocolateria" and after_three["text"].startswith("Aún no pides en chocolaterías")
 
     order(db, "u1", "chocolateria")
     order(db, "u1", "restaurantes")

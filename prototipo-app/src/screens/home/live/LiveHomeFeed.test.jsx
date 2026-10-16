@@ -56,6 +56,8 @@ beforeEach(async () => {
 
 // Una oferta por momento, con los ejemplos del contrato; los momentos sin ejemplo responden 204.
 const OFFER_FIXTURES = { plan: 'agent-offer-plan', carrito: 'agent-offer-carrito', vertical_por_probar: 'agent-offer-vertical-por-probar' }
+// Lo que dice Mochi al tocarlo: la burbuja no lleva productos, así que no promete «mira estas ofertas» como el texto de la API.
+const POKE_LINE = '¿Y si pruebas algo de Súper?'
 const stubAgent = (routes = {}) =>
   stubApi({
     '/agent/plans': fixture('agent-plans'),
@@ -357,7 +359,7 @@ describe('Home del prototipo final', () => {
       fireEvent.click(screen.getByRole('button', { name: /^Mochi:/ }))
       await advance(3000)
       expect(offerRequests()).toEqual([{ moment: 'vertical_por_probar', user_id: expect.any(String), context: {} }])
-      expect(container.querySelector('.live-bubble p').textContent).toBe(made.text)
+      expect(container.querySelector('.live-bubble p').textContent).toBe(POKE_LINE)
       expect(tracked('suggestion_shown', 'agent-vertical_por_probar').length).toBeLessThanOrEqual(1)
       expect(screen.queryByRole('button', { name: /Jugar/ })).toBeNull()
       fireEvent.click(screen.getByRole('button', { name: made.actions[0].label }))
@@ -437,7 +439,7 @@ describe('Home del prototipo final', () => {
       expect(status(container)).toBe('')
       fireEvent.click(screen.getByRole('button', { name: /^Mochi:/ }))
       await advance(3000)
-      expect(status(container)).toBe(fixture('agent-offer-vertical-por-probar').text)
+      expect(status(container)).toBe(POKE_LINE)
     })
   })
 
@@ -509,7 +511,7 @@ describe('Home del prototipo final', () => {
       await advance(AFTER_GREETING)
       fireEvent.click(screen.getByRole('button', { name: /^Mochi:/ }))
       await advance(3000)
-      expect(status(container)).toBe(fixture('agent-offer-vertical-por-probar').text)
+      expect(status(container)).toBe(POKE_LINE)
       expect(localStorage.getItem(memory.TOUR_KEY)).toBeTruthy()
       rerender(homeTree({ active: false }))
       memory.session.lastAdded = LOOSE_CART
@@ -523,7 +525,7 @@ describe('Home del prototipo final', () => {
       await advance(900 + 3400 + 700)
       fireEvent.click(screen.getByRole('button', { name: /^Mochi:/ }))
       await advance(5000)
-      expect(status(container)).toBe(fixture('agent-offer-vertical-por-probar').text)
+      expect(status(container)).toBe(POKE_LINE)
     })
 
     test('el plan del día no interrumpe la guía', async () => {
@@ -578,7 +580,7 @@ describe('Home del prototipo final', () => {
     await advance(900 + 3400)
     fireEvent.click(screen.getByRole('button', { name: /^Mochi:/ }))
     await advance(3000) // termina de escribir
-    expect(container.querySelector('.live-bubble p').textContent).toBe(fixture('agent-offer-vertical-por-probar').text)
+    expect(container.querySelector('.live-bubble p').textContent).toBe(POKE_LINE)
   })
 
   test('«Repetir escena» vuelve a saludar', async () => {
