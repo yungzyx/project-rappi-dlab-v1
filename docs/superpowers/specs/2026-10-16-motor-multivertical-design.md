@@ -91,9 +91,9 @@ Código nuevo en `rappi-ia/src/rappi_ia/motor/`; reglas en `motor/combos.toml`; 
 
 Al implementarlo (16-10) se dejaron fuera el 5 % «otras» y el «perfil vecino»: quedan los 7 arquetipos de la tabla renormalizados y, para un grupo sin verticales en el perfil, `GENERIC_INTERESTS` (Turbo copia antes lo ofrecible del súper y Express de la persona).
 
-**Evaluación** (`rappi-ia motor-eval`): separación por fecha en tres tramos (entrenar, validar y probar, 28 días cada uno de los dos últimos). Métricas: próximo vertical (acierto@1, acierto@3, MRR, nDCG@8) contra el orden fijo de hoy, la popularidad, solo afinidad y solo transiciones; compra cruzada (precisión@3 contra lo más pedido del vertical); recompra (error absoluto mediano en días y cobertura). Informe en `rappi-ia/data/eval/motor.md` y resumen en `docs/resultados/`. **Sobre datos simulados la evaluación prueba la mecánica, no el efecto.**
+**Evaluación** (dentro de `rappi-ia motor`; `--sin-evaluar` la salta): separación por fecha en tres tramos (entrenar, validar y probar, 28 días cada uno de los dos últimos). Métricas: próximo vertical (acierto@1, acierto@3, MRR, nDCG@8) contra el orden fijo de hoy, la popularidad, solo afinidad y solo transiciones; compra cruzada (precisión@3 contra lo más pedido del vertical, con su cobertura); recompra (`compraron`: la parte que volvió a comprar el concepto en la prueba; `error_mediano_dias`, solo sobre esas; `acierto_7_dias`, error de hasta 7 días sobre todas las predicciones que vencen). Los pesos del próximo vertical se eligen solos en validación y no se guardan pesos nuevos si no hay a quién validar. Informe por fuente en `rappi-ia/data/eval/motor-{fuente}.md` y resumen con fecha en `docs/resultados/`. El generador de datos simulados crea 3.000 personas por defecto (`DEFAULT_USERS`), con altas repartidas en todo el período para que la ventana de prueba tenga gente. **Sobre datos simulados la evaluación prueba la mecánica, no el efecto.**
 
-**Comandos:** `rappi-ia motor [--source]` (calcula todo y guarda la corrida), `rappi-ia motor-eval`. `make layers` y `post-refresh` corren `motor` después de `synth` y `segments`. Un pedido (`POST /orders`) recalcula la afinidad y la recompra de esa persona en segundo plano, como los segmentos.
+**Comandos:** `rappi-ia motor [--source] [--sin-evaluar]` (calcula todo, evalúa y guarda la corrida; no hay un `motor-eval` aparte). `make layers` y `post-refresh` corren `motor` después de `synth` y `segments`. Un pedido (`POST /orders`) recalcula la afinidad y la recompra de esa persona en segundo plano, como los segmentos.
 
 **Evento nuevo:** `vertical_open` (tocar un acceso de la Home), en `EVENT_TYPES` y en el `CHECK` (migración 036).
 
@@ -115,7 +115,7 @@ Al implementarlo (16-10) se dejaron fuera el 5 % «otras» y el «perfil vecino�
 ### Etapa 5: QA y mejora continua
 
 - Revisar el motor sobre la base real (casos sensibles, Farmacia, Licores, bebé, rendimiento de las consultas nuevas) y en `mvp-check`.
-- Ciclo propio: medir con `motor-eval`, encontrar el punto más débil, ajustar y volver a medir, hasta que las mejoras dejen de ser claras. Cada ajuste queda con su cifra antes y después.
+- Ciclo propio: medir con `rappi-ia motor`, encontrar el punto más débil, ajustar y volver a medir, hasta que las mejoras dejen de ser claras. Cada ajuste queda con su cifra antes y después.
 - La mejora sigue sola: la tarea semanal recalcula el motor y vuelve a elegir los pesos.
 
 ### Etapa 6: pulido final

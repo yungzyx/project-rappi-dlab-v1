@@ -98,6 +98,18 @@ Cada cifra dice qué tipo de dato es: real, evaluación automática, estimación
 
 Documentos al 04-10-2026 (segunda descarga semanal automática); «Con concepto», del 06-10. En tiendas es una muestra: la página pública muestra hasta 24 productos por sub-pasillo. Turbo quedó con los precios del 27-09 (ver [Límites](#límites)).
 
+### Motor multivertical (datos simulados: prueban la mecánica, no el efecto)
+
+Corrida del 16-10-2026 (`rappi-ia motor`) sobre una copia del catálogo real y **3.000 personas simuladas**, con tramos por fecha: entrenar, validar y probar (28 días cada uno de los dos últimos; 357 personas en la prueba). Informe completo y lectura en [docs/resultados/motor-2026-10-16.md](docs/resultados/motor-2026-10-16.md).
+
+| Qué | Métrica | Valor | Tipo de dato |
+|---|---|---|---|
+| Próximo vertical | nDCG@8 | combinado 0,961 · solo afinidad 0,958 · popularidad 0,891 · orden fijo 0,883 | Simulado |
+| Compra cruzada | precisión@3 | reglas aprendidas 0,076 (66 de 357 personas con alguna regla) · lo más pedido 0,124. **Las reglas aún no superan a lo más pedido** | Simulado |
+| Recompra | acierto ±7 días | 0,158 sobre 76 predicciones (volvieron a comprar el 34 %; error mediano de 9 días) | Simulado |
+
+El generador de datos simulados se calibró con la tabla de combinaciones de verticales y retención que **compartió el equipo de Rappi** (dato compartido por Rappi, cohortes de enero a junio de 2026): es una correlación, no un efecto, y el simulador la trata como efecto, así que sus cifras no prueban que sumar verticales retenga. La agrupación de verticales en `rest`, `turbo` y `retail` es un supuesto propio. Detalle: [docs/capa-de-datos.md](docs/capa-de-datos.md#motor-multivertical).
+
 ### Búsqueda
 
 124 consultas positivas en las 8 verticales y 41 negativas, con relevancia juzgada automáticamente por concepto ([`queries.json`](rappi-ia/src/rappi_ia/eval/queries.json)). Por tipo de consulta, el híbrido logra 0,988 en las exactas, 0,973 sin tildes y 0,712 en necesidades en lenguaje natural («algo para el carrete»), frente a 0,563 del léxico. Detalle, por vertical y con la historia de cada reevaluación: [docs/resultados/](docs/resultados/).

@@ -240,7 +240,7 @@ def test_latest_weights_default_without_runs(db): ...
 
 **Files:**
 - Create: `rappi-ia/src/rappi_ia/motor/evaluate.py`
-- Modify: `rappi-ia/src/rappi_ia/motor/build.py` (llama a `tune` y guarda pesos y métricas en la corrida), `rappi-ia/src/rappi_ia/cli.py` (`motor --sin-evaluar` para saltarla; el informe va a `config.DATA_DIR / "eval" / "motor.md"`)
+- Modify: `rappi-ia/src/rappi_ia/motor/build.py` (llama a `tune` y guarda pesos y métricas en la corrida), `rappi-ia/src/rappi_ia/cli.py` (`motor --sin-evaluar` para saltarla; el informe va a `config.DATA_DIR / "eval" / f"motor-{fuente}.md"` (uno por fuente))
 - Test: `rappi-ia/tests/unit/test_motor_evaluate.py`
 
 **Interfaces:**
@@ -250,11 +250,11 @@ def test_latest_weights_default_without_runs(db): ...
   - `rank_metrics(ranking: list[str], relevant: set[str]) -> dict` con `hit1`, `hit3`, `mrr`, `ndcg` (binario, sobre los 8).
   - `evaluate_next_vertical(orders, signals, cut: datetime, end: datetime, weights) -> dict[str, dict]` para los métodos `orden_fijo`, `popularidad`, `afinidad`, `transicion`, `combinado`; personas con pedidos antes de `cut` y en `[cut, end)`.
   - `GRID_B = (0, 0.1, 0.3, 0.5, 1, 2)`, `GRID_C = (0, 0.05, 0.1, 0.3, 0.5, 1)`; `tune(orders, signals, split) -> dict[str, float]`: elige (b, c) con a = 1 por nDCG en validación; empata a favor de pesos más chicos.
-  - `evaluate_cross_sell(orders, sensitive, cut, end) -> dict` (`precision3`, `cobertura`, y la línea base `lo_mas_pedido`), `evaluate_replenishment(orders, sensitive, cut, end) -> dict` (`error_mediano_dias`, `acierto_7_dias`, `n`).
+  - `evaluate_cross_sell(orders, sensitive, cut, end) -> dict` (`precision3`, `cobertura`, y la línea base `lo_mas_pedido`), `evaluate_replenishment(orders, sensitive, cut, end) -> dict` (`n`, `compraron`, `error_mediano_dias`, `acierto_7_dias`).
   - `report(results: dict, source: str) -> str`: markdown en español con la advertencia «Datos simulados: esto prueba la mecánica del motor, no su efecto» cuando `source == "synthetic"`.
 
 - [ ] **Step 1: Write the failing tests** (unitarios con datos armados): `test_rank_metrics_values` (ranking `["a","b","c"]`, relevantes `{"b"}` → hit1 0, hit3 1, mrr 0.5), `test_split_needs_84_days`, `test_tune_picks_transitions_when_people_alternate` (personas que siempre alternan A→B: el ajuste elige b > 0 y `combinado` supera a `afinidad` en prueba), `test_report_warns_on_synthetic`.
-- [ ] **Step 2: Run** → FAIL. - [ ] **Step 3: Implement.** - [ ] **Step 4: Run** `make lint && make test` → verde; `rappi-ia synth` + `rappi-ia motor --source synthetic` sobre `rappi_ia_test` sembrada (o `rappi_staging` si existe) y leer `data/eval/motor.md`.
+- [ ] **Step 2: Run** → FAIL. - [ ] **Step 3: Implement.** - [ ] **Step 4: Run** `make lint && make test` → verde; `rappi-ia synth` + `rappi-ia motor --source synthetic` sobre `rappi_ia_test` sembrada (o `rappi_staging` si existe) y leer `data/eval/motor-synthetic.md`.
 - [ ] **Step 5: Commit** `feat(motor): evaluación por fechas contra líneas base y pesos elegidos solos`.
 
 ### Task 6: Documentos y cifras

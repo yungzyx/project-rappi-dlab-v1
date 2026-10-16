@@ -19,7 +19,7 @@
 | Ver el sistema de un vistazo | [Diagramas y mapas](#diagramas-y-mapas) | 2 min |
 | Entender el diseño del RAG y del agente Mochi | [diseno-ia.md](diseno-ia.md) | 20 min |
 | Conocer el modelo de datos (capas 1 a 3) | [ecosistema-rappi.md §3](ecosistema-rappi.md#3-modelo-de-datos-del-ecosistema-propuesta) | 5 min |
-| Usar desde otra herramienta lo que la base le suma al catálogo (atributos, marcas, grafo, segmentos) | [capa-de-datos.md](capa-de-datos.md) | 8 min |
+| Usar desde otra herramienta lo que la base le suma al catálogo (atributos, marcas, grafo, segmentos y el motor multivertical) | [capa-de-datos.md](capa-de-datos.md) | 8 min |
 | Activar a Jev (etiqueta categorías y juzga la búsqueda, opcional): clave, planillas, piloto y adopción | [jev.md](jev.md) | 5 min |
 | Conocer la capa de IA, su API y cómo se evalúa | [rappi-ia/README.md](../rappi-ia/README.md) | 10 min |
 | Usar o modificar el scraper | [rappi-scraper/README.md](../rappi-scraper/README.md) | 10 min |
@@ -48,6 +48,7 @@ Las fuentes JSON de los diagramas están en [diagramas-fuente/](diagramas-fuente
 |---|---|
 | Las cifras vigentes, con qué tipo de dato es cada una | [README.md#resultados](../README.md#resultados) |
 | Los reportes de evaluación de la búsqueda, uno por fecha | [resultados/](resultados/) (`busqueda-*.md`) |
+| La evaluación del motor multivertical sobre datos simulados (16-10-2026) | [resultados/motor-2026-10-16.md](resultados/motor-2026-10-16.md) |
 | La precisión medida de conceptos, atributos y marcas | [resultados/capas-precision-2026-10-06.md](resultados/capas-precision-2026-10-06.md) y [la muestra nueva](resultados/capas-precision-2026-10-06-nueva-muestra.md) |
 | Historia: cómo se verificaron los datos del juego de verticales (salió del proyecto el 16-10; fuente de cada tarjeta) | [resultados/juego-verificacion-2026-10-09.md](resultados/juego-verificacion-2026-10-09.md) |
 
@@ -67,6 +68,7 @@ Las fuentes JSON de los diagramas están en [diagramas-fuente/](diagramas-fuente
 
 | Reporte | Dónde | Cómo se genera |
 |---|---|---|
+| Evaluación del motor multivertical (uno por fuente) | `rappi-ia/data/eval/motor-{fuente}.md` | `make motor` en `rappi-ia/`. La copia versionada está en [resultados/](resultados/) |
 | Evaluación de la búsqueda | `rappi-ia/data/eval/busqueda.md` | `make eval` en `rappi-ia/` (también guarda τ; solo el reporte: `make eval EVAL_ARGS=`). La copia versionada está en [resultados/](resultados/) |
 | Piloto de Jev (si se corrió) | `rappi-ia/data/eval/jev-piloto.md` | `rappi-ia jev-piloto`, con la clave y las planillas juzgadas (ver [jev.md](jev.md)) |
 | Calidad de cada corrida del scraper | `rappi-scraper/data/reports/` | Al terminar cada corrida, o con `rappi report` |

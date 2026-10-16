@@ -435,7 +435,7 @@ def test_the_multi_vertical_retention_compares_both_groups_with_the_default_hist
     catálogo chico de arriba solo tiene Súper, Licores y Express."""
     seed_demo(db)
     monkeypatch.setattr(queries, "MIN_GROUP_USERS", 5)  # catálogo de prueba chico: grupos chicos
-    generate(db, seed=3, until=date(2026, 9, 27))  # usuarios y semanas por defecto
+    generate(db, seed=3, users=1500, until=date(2026, 9, 27))  # 1.500 personas, como cuando era el valor por defecto
     rows = queries.multi_vertical_retention(db, "synthetic")
     groups = {}
     for row in rows:

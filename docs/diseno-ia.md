@@ -226,15 +226,16 @@ Quien pide seguido lo mismo recibe un perfil («🥢 Amante de lo asiático») y
 - No cuentan co-ocurrencias en que B se agregó desde una sugerencia de Mochi, para no retroalimentarse.
 - Las aprendidas de datos `synthetic` quedan marcadas y **el agente no las usa**: solo se ven en el panel.
 - Nunca se aprenden aristas hacia conceptos sensibles.
+- **Desde el 16-10-2026, el motor multivertical sí usa patrones de la población** (`rappi_ia/motor/`): transiciones entre verticales, tendencias y compra cruzada ordenan qué vertical ofrecer. Eso no cambia las aristas de arriba (`capa.knowledge_edges` sigue sin lo aprendido de `synthetic`), pero sí que, mientras `MOTOR_POBLACION` sea `synthetic`, parte de lo que se recomienda sale de patrones simulados. Se declara así, cada tabla del motor lleva su `data_source` y las dos fuentes no se mezclan. Ver [capa-de-datos.md](capa-de-datos.md#motor-multivertical) y la decisión del 16-10-2026 en [decisiones.md](decisiones.md#datos-simulados-y-panel).
 
 **Palancas que salen de estos datos:**
 
 | Palanca | Señal | Acción | Métrica que mueve |
 |---|---|---|---|
-| Recompra por ciclo | Días entre compras del mismo concepto (pañales, café, alimento de mascota) | "¿Repetimos?" en el momento justo | Frecuencia |
+| Recompra por ciclo | Días entre compras del mismo concepto (pañales, café, alimento de mascota) | "¿Repetimos?" en el momento justo. **Pieza del motor lista** (tabla `replenishment`: intervalo y fecha del próximo); la oferta que la usa llega en la etapa 4 | Frecuencia |
 | Rescate de carrito | Carro abandonado | Recordatorio con el carro y un complemento. Sin descuento automático | Abandono de carrito |
 | Reactivación por ritmo | Usuario en riesgo según su propio ritmo | Mensaje con su concepto top y una novedad del vertical (con consentimiento) | Abandono (churn) |
-| Segunda vertical | Usuario de un solo vertical | Sugerencia cruzada de mayor confianza | % multi-vertical y retención |
+| Segunda vertical | Usuario de un solo vertical | Sugerencia cruzada de mayor confianza. **Pieza del motor lista** (la escalera de combinaciones: el grupo que más sube la retención esperada, `combo_stats`/`combo_steps` y la tabla de Rappi); la oferta que la usa llega en la etapa 4 | % multi-vertical y retención |
 | Ocasiones | Picos por día u hora (viernes: carrete; domingo: asado) | Campañas con horario | Frecuencia |
 | Demanda no satisfecha | Consultas sin resultado | Captar comercios o categorías; avisar a quien lo pidió (con consentimiento) | Conversión y oportunidades |
 | Búsquedas fallidas | Reformulaciones sin clic | Sinónimos y mapeo de conceptos | Abandono de búsqueda |
@@ -273,6 +274,7 @@ Notas del modelo:
 - **Líneas de pedido:** `APP_ORDER_LINE` puede apuntar a un producto o a un plato.
 - **Precio vigente:** `latest_prices` y `latest_menu_prices` guardan el último precio de cada oferta y de cada plato (migración 032), y `v_latest_offers` es la única definición de oferta vigente.
 - **Jev:** `eval_judgments` guarda los juicios de Jev (migración 030), y el mapa de categorías suma el método `jev`.
+- **Motor multivertical:** siete tablas (migración 036): `user_vertical_affinity` y `replenishment` por persona (se van con «Olvidar»), y `vertical_transitions`, `combo_stats`, `combo_steps`, `cross_sell_rules` y `trends` por población, con `data_source` (`synthetic` o `prototype`). No están en el diagrama: dependen de `app_users`, `app_orders` y `concepts`. Cada una tiene su vista en `capa` ([capa-de-datos.md](capa-de-datos.md#motor-multivertical)).
 - **Capa de datos:** las vistas estables para otras herramientas están en el esquema `capa` ([capa-de-datos.md](capa-de-datos.md)).
 - **Tabla sin uso:** `image_embeddings` (de una versión anterior) sigue en la base, sin que nada la escriba ni la lea; una migración para borrarla se dejó fuera para no tocar el historial.
 - **Procedencia:** todo dato inferido guarda `method` (`curado`, `llm`, `regla`, `embedding`, `coocurrencia`), `confidence`, `model_version` y fecha. Los datos de usuario guardan `source`.
