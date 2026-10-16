@@ -180,7 +180,11 @@ def test_checkout_offer_skips_items_already_in_cart(client):
 
     assert both.status_code == 200, both.text
     body = both.json()
-    assert body["moment"] == "checkout" and without_why(body["reason"]) == {"concept": "hielo", "from_concept": "pisco"}
+    # Las gaseosas ya van en el carro: no se ofrecen. Gana la arista más fuerte que queda (gaseosas → snacks salados).
+    assert body["moment"] == "checkout" and without_why(body["reason"]) == {
+        "concept": "snacks-salados",
+        "from_concept": "gaseosas",
+    }
     assert {p["entity_id"] for p in body["products"]}.isdisjoint({PISCO, COLA})
     assert body["text"].startswith("Para completar lo que llevas") and "pisco" not in body["text"].lower()
     assert_offerable(body)

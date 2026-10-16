@@ -82,7 +82,7 @@ describe('«¿Me falta algo?» en el checkout (solo si se pide)', () => {
     renderCheckout()
     await ask()
     expect(tracked('suggestion_shown')).toHaveLength(1)
-    expect(tracked('suggestion_shown')[0][1]).toMatchObject({ concept_id: 'hielo', vertical: 'turbo' })
+    expect(tracked('suggestion_shown')[0][1]).toMatchObject({ concept_id: 'snacks-salados', vertical: 'express' })
     cleanup()
     renderCheckout()
     await ask()
@@ -121,7 +121,7 @@ describe('«¿Me falta algo?» en el checkout (solo si se pide)', () => {
     const card = document.querySelector('.checkout-suggestion')
     expect(card.querySelector('.checkout-suggestion-reason').textContent).toBe(fixture('agent-offer-checkout').text)
     expect(card.querySelector('.checkout-suggestion-product').textContent).toMatch(
-      /^Hielo en cubos 2 kg \(prueba\) · \$1\.490 · Turbo/,
+      /^Papas fritas clásicas 180 g \(prueba\) · \$2\.290 · Express/,
     )
     expect(card.querySelector('.mascot')).toBeTruthy()
     expect(screen.queryByLabelText('Solo mayores de 18')).toBeNull()
@@ -139,7 +139,7 @@ describe('«¿Me falta algo?» en el checkout (solo si se pide)', () => {
     await ask()
     fireEvent.click(screen.getByRole('button', { name: 'Agregar' }))
     expect(probe.cart.count).toBe(2)
-    const added = probe.cart.items.find(({ product }) => product.entityId === '93002')
+    const added = probe.cart.items.find(({ product }) => product.entityId === '91001')
     expect(added.product).toMatchObject({ fromSuggestion: true, suggestionOrigin: 'agent-checkout' })
     expect(tracked('suggestion_accepted')).toHaveLength(1)
     fireEvent.click(screen.getByRole('button', { name: 'Deshacer' }))
