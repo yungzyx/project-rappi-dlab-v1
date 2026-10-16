@@ -39,7 +39,11 @@ async function run(page) {
     await target.screenshot({ path: `${OUT}/${name}.jpg`, type: 'jpeg', quality: 82 })
     console.log(`  ✓ ${name}`)
   }
-  const tap = (selector, text) => page.locator(selector, text ? { hasText: text } : {}).first().click()
+  const tap = (selector, text) =>
+    page
+      .locator(selector, text ? { hasText: text } : {})
+      .first()
+      .click()
   const back = () => tap('[aria-label="Volver"]')
   const tab = (label) => tap('.bottom-nav-item', label)
   // Lo que viene del catálogo llega después de abrir la pantalla: se espera a que esté (y a que carguen sus fotos).

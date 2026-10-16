@@ -16,7 +16,9 @@ export default function ProductRow({ product, showStore = false, showDescription
         <span className="product-row-text">
           <strong>{product.name}</strong>
           {showStore && <span className="product-row-store">{product.store}</span>}
-          {showDescription && product.description && <span className="product-row-description">{product.description}</span>}
+          {showDescription && product.description && (
+            <span className="product-row-description">{product.description}</span>
+          )}
           <span className="product-row-prices">
             <b>{product.price}</b>
             {product.before && <s>{product.before}</s>}

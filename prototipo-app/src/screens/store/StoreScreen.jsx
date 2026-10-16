@@ -64,7 +64,8 @@ export default function StoreScreen({ back, params }) {
       vertical: loaded.vertical,
       entity_type: 'store',
       entity_id: String(loaded.id),
-      payload: { name: loaded.name } })
+      payload: { name: loaded.name },
+    })
     // Llegar tocando un producto es verlo (el prototipo no tiene página de producto): mismos campos que el carro.
     if (item) events.track('view_item', { ...cartEventFields(item), vertical: item.vertical ?? loaded.vertical })
   }, [loaded, item, events])

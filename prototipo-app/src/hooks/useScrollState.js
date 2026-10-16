@@ -23,7 +23,9 @@ export function useScrollState({ collapseAt = 0, backToTopFrom = Infinity } = {}
       lastTop.current = top
       const next = { collapsed: top > collapseAt, showBackToTop: goingUp && top > backToTopFrom, scrolled: top > 0 }
       setState((prev) =>
-        prev.collapsed === next.collapsed && prev.showBackToTop === next.showBackToTop && prev.scrolled === next.scrolled
+        prev.collapsed === next.collapsed &&
+        prev.showBackToTop === next.showBackToTop &&
+        prev.scrolled === next.scrolled
           ? prev
           : next,
       )

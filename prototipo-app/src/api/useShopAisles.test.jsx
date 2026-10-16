@@ -32,7 +32,14 @@ describe('useShopAisles', () => {
     const { result } = hook(null)
     await act(async () => {})
     expect(fetchMock).not.toHaveBeenCalled()
-    expect(result.current).toMatchObject({ data: null, error: null, aisles: [], aisle: null, products: [], hasMore: false })
+    expect(result.current).toMatchObject({
+      data: null,
+      error: null,
+      aisles: [],
+      aisle: null,
+      products: [],
+      hasMore: false,
+    })
   })
 
   test('trae los pasillos y la primera página del primero', async () => {
@@ -92,7 +99,9 @@ describe('useShopAisles', () => {
     expect(result.current.aisle).toBe(300)
     expect(result.current.data).toBeNull() // cargando: nada de lo del pasillo anterior
     expect(result.current.aisles).toHaveLength(5)
-    await waitFor(() => expect(result.current.products.map((product) => product.name)).toEqual(['Gaseosa cola 1,5 L (prueba)']))
+    await waitFor(() =>
+      expect(result.current.products.map((product) => product.name)).toEqual(['Gaseosa cola 1,5 L (prueba)']),
+    )
     expect(result.current.hasMore).toBe(false)
     expect(requests(fetchMock).at(-1)).toEqual(['/catalog/stores/9101', { aisle: '300' }])
   })

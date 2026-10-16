@@ -17,7 +17,12 @@ function SeriesCard({ rows, series, asOf }) {
           <strong>{latest ? series.format(latest.value) : '—'}</strong>
           <span>{series.unit}</span>
         </span>
-        <Delta value={change} format={formatChange} goodWhen={series.goodWhen} suffix={`vs hace ${COMPARE_WEEKS} semanas`} />
+        <Delta
+          value={change}
+          format={formatChange}
+          goodWhen={series.goodWhen}
+          suffix={`vs hace ${COMPARE_WEEKS} semanas`}
+        />
       </figcaption>
       <LineChart
         points={points}

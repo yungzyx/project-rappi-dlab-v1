@@ -27,7 +27,9 @@ function FunnelHeadline({ source }) {
     <Headline
       value={formatPct(conversion)}
       unit="de las sesiones que buscan terminan en pedido"
-      context={worst ? `la conversión más baja: ${verticalLabel(worst.vertical)}, ${formatPct(worst.overallPct)}` : undefined}
+      context={
+        worst ? `la conversión más baja: ${verticalLabel(worst.vertical)}, ${formatPct(worst.overallPct)}` : undefined
+      }
       size="minor"
     />
   )
@@ -90,7 +92,9 @@ export function FrequencyView({ source }) {
       <section className="section" aria-labelledby="retencion">
         <div className="section-head">
           <h2 id="retencion">Cuánto vuelven</h2>
-          <p>Frecuencia es volver a tiempo: cada usuario tiene su propio ritmo, y el riesgo se mide contra ese ritmo.</p>
+          <p>
+            Frecuencia es volver a tiempo: cada usuario tiene su propio ritmo, y el riesgo se mide contra ese ritmo.
+          </p>
         </div>
         <div className="retention-grid">
           <Card

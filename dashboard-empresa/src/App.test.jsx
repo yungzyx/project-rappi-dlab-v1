@@ -58,7 +58,9 @@ describe('App', () => {
     serveFixtures()
     await renderWithData(<App />)
 
-    const empty = (await screen.findByText('Los datos simulados no registran el momento de la oferta')).closest('.state')
+    const empty = (await screen.findByText('Los datos simulados no registran el momento de la oferta')).closest(
+      '.state',
+    )
     expect(empty.getAttribute('role')).toBeNull()
   })
 
@@ -81,7 +83,17 @@ describe('App', () => {
 
     // Mientras tanto se hace la demo en el prototipo: la API ya cuenta la sugerencia mostrada.
     const fixtures = globalThis.fetch
-    const demo = [{ concepto: '🥤 Bebidas gaseosas', vertical: 'licores', mostradas: 2, aceptadas: 1, ignoradas: 0, convertidas: 1, aceptacion_pct: null }]
+    const demo = [
+      {
+        concepto: '🥤 Bebidas gaseosas',
+        vertical: 'licores',
+        mostradas: 2,
+        aceptadas: 1,
+        ignoradas: 0,
+        convertidas: 1,
+        aceptacion_pct: null,
+      },
+    ]
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url) =>

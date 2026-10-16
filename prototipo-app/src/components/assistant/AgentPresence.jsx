@@ -262,12 +262,7 @@ export default function AgentPresence({ screen, homeTab, raised }) {
           <p>¿Qué hacemos juntos?</p>
           <div className="agent-actions">
             {actions.map((action) => (
-              <button
-                key={action.id}
-                type="button"
-                className="agent-action tap"
-                onClick={() => run(action.id)}
-              >
+              <button key={action.id} type="button" className="agent-action tap" onClick={() => run(action.id)}>
                 {action.label}
               </button>
             ))}

@@ -56,10 +56,7 @@ export function DemoProvider({ children }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [toggle])
 
-  const value = useMemo(
-    () => ({ mode, isFinal: mode === 'final', setMode, toggle }),
-    [mode, setMode, toggle],
-  )
+  const value = useMemo(() => ({ mode, isFinal: mode === 'final', setMode, toggle }), [mode, setMode, toggle])
 
   return <DemoContext.Provider value={value}>{children}</DemoContext.Provider>
 }

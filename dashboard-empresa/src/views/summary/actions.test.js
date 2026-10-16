@@ -31,7 +31,9 @@ describe('pickActions', () => {
     // La simulación cambia con cada `make synth`: lo esperado se lee del fixture, no se fija a mano.
     const top = [...opportunities.data].sort((a, b) => b.usuarios - a.usuarios)[0]
     const unmet = new Set(opportunities.data.map((row) => row.concept_id).filter(Boolean))
-    const rising = trends.data.filter((row) => row.crecimiento_pct > 0).sort((a, b) => b.crecimiento_pct - a.crecimiento_pct)
+    const rising = trends.data
+      .filter((row) => row.crecimiento_pct > 0)
+      .sort((a, b) => b.crecimiento_pct - a.crecimiento_pct)
     const actionable = rising.find((row) => !unmet.has(row.concept_id))
 
     expect(actions.map((action) => action.id)).toEqual(['oportunidad', 'tendencia', 'riesgo'])
@@ -49,7 +51,10 @@ describe('pickActions', () => {
   })
 
   test('la oportunidad top es la de más usuarios aunque la API la entregue en otro orden', () => {
-    const rows = [opportunity({ concept_id: 'a', que: 'A', usuarios: 3 }), opportunity({ concept_id: 'b', que: 'B', usuarios: 9 })]
+    const rows = [
+      opportunity({ concept_id: 'a', que: 'A', usuarios: 3 }),
+      opportunity({ concept_id: 'b', que: 'B', usuarios: 9 }),
+    ]
 
     const [top] = pickActions({ opportunities: rows })
 
@@ -58,7 +63,13 @@ describe('pickActions', () => {
 
   test('una consulta sin concepto va entre comillas y el crecimiento nulo se lee como demanda nueva', () => {
     const rows = [
-      opportunity({ concept_id: null, que: 'kombucha', vertical: 'supermercado', anteriores: 0, crecimiento_pct: null }),
+      opportunity({
+        concept_id: null,
+        que: 'kombucha',
+        vertical: 'supermercado',
+        anteriores: 0,
+        crecimiento_pct: null,
+      }),
     ]
 
     const [top] = pickActions({ opportunities: rows })

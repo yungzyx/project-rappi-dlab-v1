@@ -5,7 +5,12 @@ import { plural, verticalLabel } from '../../lib/labels.js'
 import { Stats } from './Stats.jsx'
 
 const COLUMNS = [
-  { key: 'vertical', header: 'Vertical', primary: true, render: (row) => (row.vertical ? verticalLabel(row.vertical) : 'Sin vertical') },
+  {
+    key: 'vertical',
+    header: 'Vertical',
+    primary: true,
+    render: (row) => (row.vertical ? verticalLabel(row.vertical) : 'Sin vertical'),
+  },
   { key: 'concepto', header: 'Concepto', render: (row) => row.concepto ?? 'Sin concepto reconocido' },
   { key: 'sin_resultado', header: 'Sin resultado', numeric: true, render: (row) => formatNumber(row.sin_resultado) },
 ]
@@ -21,7 +26,10 @@ export function UnmetSearches({ data }) {
       <Stats
         items={[
           { label: 'Personas', value: `${formatNumber(personas)} ${plural(personas, 'persona')}` },
-          { label: 'Búsquedas', value: `${formatNumber(unmet)} de ${formatNumber(busquedas)} ${plural(busquedas, 'búsqueda')} sin resultado` },
+          {
+            label: 'Búsquedas',
+            value: `${formatNumber(unmet)} de ${formatNumber(busquedas)} ${plural(busquedas, 'búsqueda')} sin resultado`,
+          },
         ]}
       />
       {rows.length > 0 && (

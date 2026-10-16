@@ -21,7 +21,14 @@ describe('chunk que no carga tras un despliegue', () => {
 
   test('sin sessionStorage tampoco entra en bucle', () => {
     const reload = vi.fn()
-    const broken = { getItem: () => { throw new Error('bloqueado') }, setItem: () => { throw new Error('bloqueado') } }
+    const broken = {
+      getItem: () => {
+        throw new Error('bloqueado')
+      },
+      setItem: () => {
+        throw new Error('bloqueado')
+      },
+    }
     const stop = reloadOnPreloadError({ reload, storage: broken })
     window.dispatchEvent(new Event('vite:preloadError', { cancelable: true }))
     window.dispatchEvent(new Event('vite:preloadError', { cancelable: true }))

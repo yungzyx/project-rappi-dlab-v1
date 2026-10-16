@@ -90,7 +90,14 @@ export default function TrackingMap({ progress, delivered, step }) {
           <stop offset="0" stopColor="#fff7ee" />
           <stop offset="1" stopColor="#ffe2ce" />
         </radialGradient>
-        <circle cx={MARKER / 2} cy={MARKER / 2} r={MARKER / 2 - 1} fill={`url(#${badgeFill})`} stroke="#fff4eb" strokeWidth="2" />
+        <circle
+          cx={MARKER / 2}
+          cy={MARKER / 2}
+          r={MARKER / 2 - 1}
+          fill={`url(#${badgeFill})`}
+          stroke="#fff4eb"
+          strokeWidth="2"
+        />
         <svg
           x={-POSE_OVERFLOW}
           y={-POSE_OVERFLOW}

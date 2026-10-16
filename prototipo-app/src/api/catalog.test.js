@@ -1,6 +1,16 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { PLACEHOLDER_IMG } from '../components/Img'
-import { deals, home, menu, product, restaurants, store, storeOfProduct, toPrototypeStore, verticalStores } from './catalog'
+import {
+  deals,
+  home,
+  menu,
+  product,
+  restaurants,
+  store,
+  storeOfProduct,
+  toPrototypeStore,
+  verticalStores,
+} from './catalog'
 import { ApiError, toPrototypeProduct } from './client'
 import { fixture, stubApi } from './testing'
 

@@ -11,13 +11,7 @@ import { useToast } from '../../components/Toast'
 import { useOpenSearch } from '../../hooks/useOpenSearch'
 import { formatPrice, useCart } from '../../state/CartContext'
 import FavoritesScreen from '../favorites/FavoritesScreen'
-import {
-  BadgePercentIcon,
-  GridIcon,
-  HeartIcon,
-  MoreIcon,
-  SearchIcon,
-  SpeedBoltIcon } from '../../components/Icons'
+import { BadgePercentIcon, GridIcon, HeartIcon, MoreIcon, SearchIcon, SpeedBoltIcon } from '../../components/Icons'
 import turboLogo from '../../assets/turbo-logo.webp'
 import turboHero from '../../assets/turbo-hero.webp'
 import turboCrown from '../../assets/turbo-crown.webp'
@@ -58,13 +52,7 @@ export default function TurboScreen({ back, push }) {
   return (
     <>
       {tab === 'turbo' && (
-        <TurboFeed
-          back={back}
-          toast={toast}
-          shop={shop}
-          onOpenStore={openStore}
-          onSearch={() => openSearch('turbo')}
-        />
+        <TurboFeed back={back} toast={toast} shop={shop} onOpenStore={openStore} onSearch={() => openSearch('turbo')} />
       )}
       {tab === 'favorites' && <FavoritesScreen push={push} />}
       {tab === 'offers' && <TurboOffers onOpenStore={openStore} />}
@@ -202,7 +190,13 @@ function TurboFeed({ back, toast, shop, onOpenStore, onSearch }) {
 
       <HScroll className="turbo-promos">
         {PROMOS.map((promo) => (
-          <button key={promo.id} type="button" className="turbo-promo tap" aria-label={promo.label} onClick={() => toast()}>
+          <button
+            key={promo.id}
+            type="button"
+            className="turbo-promo tap"
+            aria-label={promo.label}
+            onClick={() => toast()}
+          >
             <img src={promo.img} alt="" draggable="false" loading="lazy" />
           </button>
         ))}

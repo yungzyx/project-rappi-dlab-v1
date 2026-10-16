@@ -37,7 +37,14 @@ function CohortTable({ matrix }) {
       render: (row) => formatPct(row.cells[week]),
     })),
   ]
-  return <DataTable caption="Retención por cohorte semanal" columns={columns} rows={matrix.cohorts} rowKey={(row) => row.cohort} />
+  return (
+    <DataTable
+      caption="Retención por cohorte semanal"
+      columns={columns}
+      rows={matrix.cohorts}
+      rowKey={(row) => row.cohort}
+    />
+  )
 }
 
 export function CohortHeatmap({ data }) {

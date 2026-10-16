@@ -76,7 +76,9 @@ describe('ConnectionGate', () => {
     expect(screen.getByText(`No pude conectar con la API del MVP (${API_URL}).`)).toBeTruthy()
     const [help, wait] = screen.getAllByText('make mvp')
     expect(help.tagName).toBe('CODE')
-    expect(help.parentElement.textContent).toBe('Levanta el MVP con make mvp en la carpeta del proyecto y vuelve a intentar.')
+    expect(help.parentElement.textContent).toBe(
+      'Levanta el MVP con make mvp en la carpeta del proyecto y vuelve a intentar.',
+    )
     expect(wait.parentElement.textContent).toBe('Si acabas de correr make mvp, espera «MVP listo».')
     expect(screen.getByRole('button', { name: 'Reintentar' })).toBeTruthy()
     expect(screen.queryByText('La app')).toBeNull()

@@ -15,11 +15,19 @@ describe('claves viejas del pasaporte y del juego', () => {
   })
 
   test('con el almacenamiento bloqueado no lanza', () => {
-    const broken = { removeItem: () => { throw new Error('bloqueado') } }
+    const broken = {
+      removeItem: () => {
+        throw new Error('bloqueado')
+      },
+    }
     expect(() => removeLegacyKeys(() => broken)).not.toThrow()
   })
 
   test('no falla si acceder al almacenamiento lanza un error', () => {
-    expect(() => removeLegacyKeys(() => { throw new Error('SecurityError') })).not.toThrow()
+    expect(() =>
+      removeLegacyKeys(() => {
+        throw new Error('SecurityError')
+      }),
+    ).not.toThrow()
   })
 })

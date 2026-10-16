@@ -15,7 +15,10 @@ const api = vi.hoisted(() => ({
 }))
 vi.mock('../../api/client', async (importOriginal) => ({ ...(await importOriginal()), ...api }))
 const events = vi.hoisted(() => ({ track: vi.fn(), flush: vi.fn(), clear: vi.fn(), settled: vi.fn() }))
-vi.mock('../../state/EventsContext', async (importOriginal) => ({ ...(await importOriginal()), useEvents: () => events }))
+vi.mock('../../state/EventsContext', async (importOriginal) => ({
+  ...(await importOriginal()),
+  useEvents: () => events,
+}))
 
 const advance = (ms) => act(() => vi.advanceTimersByTimeAsync(ms))
 async function runUntilIdle() {

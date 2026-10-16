@@ -47,7 +47,14 @@
   top: 50%;
   width: 130%;
   aspect-ratio: 1;
-  background: conic-gradient(#ffd9cb 0deg 150deg, #ffc2a6 190deg, #ff9a3d 250deg, #ff5a36 300deg, #ff3d7f 335deg, #ffd9cb);
+  background: conic-gradient(
+    #ffd9cb 0deg 150deg,
+    #ffc2a6 190deg,
+    #ff9a3d 250deg,
+    #ff5a36 300deg,
+    #ff3d7f 335deg,
+    #ffd9cb
+  );
   transform: translate(-50%, -50%) rotate(0deg);
 }
 
@@ -117,8 +124,7 @@
   border-radius: 0 0 28px 28px;
   background:
     radial-gradient(120% 90% at 85% 0%, rgba(255, 122, 74, 0.2), transparent 60%),
-    radial-gradient(90% 70% at 10% 10%, rgba(255, 61, 127, 0.1), transparent 60%),
-    linear-gradient(#fff6f1, #fffaf7);
+    radial-gradient(90% 70% at 10% 10%, rgba(255, 61, 127, 0.1), transparent 60%), linear-gradient(#fff6f1, #fffaf7);
 }
 
 .agent-card-head {
@@ -247,7 +253,6 @@
   animation: bubble-in 360ms var(--ease-out) both;
 }
 
-
 .agent-msg-bot {
   width: 100%;
 }
@@ -263,7 +268,6 @@
   line-height: 21px;
   transform-origin: bottom left;
 }
-
 
 .agent-msg-typing {
   display: flex;
@@ -473,7 +477,9 @@
   font-weight: 500;
   white-space: nowrap;
   animation: chip-in 420ms var(--ease-out) both;
-  transition: transform var(--duration-fast), background var(--duration-fast);
+  transition:
+    transform var(--duration-fast),
+    background var(--duration-fast);
 }
 
 .assistant-chip:active {

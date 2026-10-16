@@ -84,7 +84,8 @@ function CoverageTable({ rows }) {
 
 export function CoverageChart({ data }) {
   const rows = coverageRows(data)
-  if (!rows.length) return <EmptyState title="Sin tiendas en la muestra">El catálogo todavía no tiene pasillos.</EmptyState>
+  if (!rows.length)
+    return <EmptyState title="Sin tiendas en la muestra">El catálogo todavía no tiene pasillos.</EmptyState>
   const flagged = rows.filter((row) => row.overCount)
   return (
     <>
@@ -92,8 +93,8 @@ export function CoverageChart({ data }) {
       {flagged.length > 0 && (
         <p className="card-note">
           <strong>No calza:</strong> en {flagged.map((row) => verticalLabel(row.vertical)).join(' y ')} se obtuvieron
-          más productos que los declarados. Probablemente tiendas con doble etiqueta de vertical que suman productos a un
-          vertical y declarados a otro: hay que revisar el conteo antes de leerlo como cobertura.
+          más productos que los declarados. Probablemente tiendas con doble etiqueta de vertical que suman productos a
+          un vertical y declarados a otro: hay que revisar el conteo antes de leerlo como cobertura.
         </p>
       )}
     </>

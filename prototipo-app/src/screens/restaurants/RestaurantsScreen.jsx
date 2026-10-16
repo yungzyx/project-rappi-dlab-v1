@@ -6,13 +6,7 @@ import Carousel, { Dots } from '../../components/Carousel'
 import HScroll from '../../components/HScroll'
 import OfflineNotice from '../../components/OfflineNotice'
 import { useToast } from '../../components/Toast'
-import {
-  BoltIcon,
-  ChevronDown,
-  SearchIcon,
-  SlidersIcon,
-  StarIcon,
-  TrophyIcon } from '../../components/Icons'
+import { BoltIcon, ChevronDown, SearchIcon, SlidersIcon, StarIcon, TrophyIcon } from '../../components/Icons'
 import { useOpenSearch } from '../../hooks/useOpenSearch'
 import { useAddress } from '../../state/AddressContext'
 import { RestaurantCard } from '../home/StoreCards'
@@ -22,7 +16,8 @@ import './restaurants.css'
 const FILTER_ICONS = {
   trophy: () => <TrophyIcon size={17} />,
   bolt: () => <BoltIcon size={17} />,
-  star: (active) => <StarIcon size={17} filled={active} /> }
+  star: (active) => <StarIcon size={17} filled={active} />,
+}
 
 export default function RestaurantsScreen({ back, push }) {
   const toast = useToast()
@@ -141,14 +136,20 @@ export default function RestaurantsScreen({ back, push }) {
       {!list.data && !list.error && <div className="rest-skeleton" aria-hidden="true" />}
       {list.data?.length === 0 && (
         <p className="rest-empty">
-          {cuisine ? 'Todavía no hay restaurantes de esta cocina en el catálogo.' : 'Todavía no hay restaurantes en el catálogo.'}
+          {cuisine
+            ? 'Todavía no hay restaurantes de esta cocina en el catálogo.'
+            : 'Todavía no hay restaurantes en el catálogo.'}
         </p>
       )}
       {list.data?.length > 0 && (
         <div className="rest-list">
           {list.data.map((restaurant) => (
             // Abre su menú: el id dice cuál sucursal es (dos pueden llamarse igual).
-            <RestaurantCard key={restaurant.id} store={restaurant} onClick={() => push('store', { store: restaurant })} />
+            <RestaurantCard
+              key={restaurant.id}
+              store={restaurant}
+              onClick={() => push('store', { store: restaurant })}
+            />
           ))}
         </div>
       )}

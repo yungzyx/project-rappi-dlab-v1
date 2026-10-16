@@ -70,23 +70,23 @@ export function ProductCard({ product, onOpenStore }) {
         onClick={openSheet}
         {...askProps}
       >
-      <span className={product.partial ? 'product-media is-partial' : 'product-media'}>
-        <Img src={product.img} draggable="false" />
-        {product.ageRestricted && (
-          <span className="product-age" aria-label="Solo mayores de 18">
-            +18
-          </span>
-        )}
-      </span>
-      <span className="product-price-row">
-        <span className={product.discount ? 'product-price' : 'product-price is-plain'}>{product.price}</span>
-        {product.before && <s>{product.before}</s>}
-      </span>
-      {product.discount && <span className="product-pct">{product.discount}</span>}
-      <span className="product-name">{product.name}</span>
-      <span className="product-size">{product.size}</span>
-      <span className="product-unit">{product.unit}</span>
-      <StoreLine item={product} />
+        <span className={product.partial ? 'product-media is-partial' : 'product-media'}>
+          <Img src={product.img} draggable="false" />
+          {product.ageRestricted && (
+            <span className="product-age" aria-label="Solo mayores de 18">
+              +18
+            </span>
+          )}
+        </span>
+        <span className="product-price-row">
+          <span className={product.discount ? 'product-price' : 'product-price is-plain'}>{product.price}</span>
+          {product.before && <s>{product.before}</s>}
+        </span>
+        {product.discount && <span className="product-pct">{product.discount}</span>}
+        <span className="product-name">{product.name}</span>
+        <span className="product-size">{product.size}</span>
+        <span className="product-unit">{product.unit}</span>
+        <StoreLine item={product} />
       </button>
       <AddButton product={product} className="add-button--grocery" />
     </div>

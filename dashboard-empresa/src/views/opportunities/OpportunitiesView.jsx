@@ -115,9 +115,9 @@ export function OpportunitiesView({ source }) {
         <div className="section-head">
           <h2 id="tendencias">Conceptos que suben y bajan</h2>
           <p>
-            Señales de interés (búsquedas, preguntas al agente y agregados al carro): últimas 4 semanas contra las 4 anteriores, sin
-            conceptos sensibles. Mismo largo de barra = mismo cambio en ambas listas; «sin oferta» = además es demanda
-            no satisfecha.
+            Señales de interés (búsquedas, preguntas al agente y agregados al carro): últimas 4 semanas contra las 4
+            anteriores, sin conceptos sensibles. Mismo largo de barra = mismo cambio en ambas listas; «sin oferta» =
+            además es demanda no satisfecha.
           </p>
           <Async fallback={null}>
             <TrendHeadline source={source} />

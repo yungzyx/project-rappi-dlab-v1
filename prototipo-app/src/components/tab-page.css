@@ -32,7 +32,9 @@
   opacity: 0;
   transform: translateY(-12px);
   pointer-events: none;
-  transition: opacity 200ms, transform var(--duration-normal) var(--ease-out);
+  transition:
+    opacity 200ms,
+    transform var(--duration-normal) var(--ease-out);
 }
 
 .tab-compact.is-visible {

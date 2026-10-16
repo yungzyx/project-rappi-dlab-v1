@@ -59,7 +59,10 @@ describe('eventos', () => {
     })
 
   test('se envían en lote con el id del usuario y la sesión', async () => {
-    const fetchMock = vi.fn(async (url) => ({ ok: true, json: async () => (String(url).endsWith('/health') ? { capacidades: {} } : { guardados: 2 }) }))
+    const fetchMock = vi.fn(async (url) => ({
+      ok: true,
+      json: async () => (String(url).endsWith('/health') ? { capacidades: {} } : { guardados: 2 }),
+    }))
     vi.stubGlobal('fetch', fetchMock)
     const { result } = setup()
     act(() => result.current.track('search', { query: 'chelas', concept_id: 'cerveza' }))
@@ -74,7 +77,10 @@ describe('eventos', () => {
 
   test('en modo "Rappi hoy" los eventos van sin concepto y marcados `mode: actual`: ni Mochi ni el motor aprenden', async () => {
     localStorage.setItem('rappi-proto-demo-mode', 'actual')
-    const fetchMock = vi.fn(async (url) => ({ ok: true, json: async () => (String(url).endsWith('/health') ? { capacidades: {} } : {}) }))
+    const fetchMock = vi.fn(async (url) => ({
+      ok: true,
+      json: async () => (String(url).endsWith('/health') ? { capacidades: {} } : {}),
+    }))
     vi.stubGlobal('fetch', fetchMock)
     const { result } = setup()
     act(() => result.current.track('cart_add', { concept_id: 'cerveza' }))
@@ -91,7 +97,10 @@ describe('eventos', () => {
 })
 
 test('clear descarta lo pendiente (Olvidar no se deshace con eventos en cola)', async () => {
-  const fetchMock = vi.fn(async (url) => ({ ok: true, json: async () => (String(url).endsWith('/health') ? { capacidades: {} } : {}) }))
+  const fetchMock = vi.fn(async (url) => ({
+    ok: true,
+    json: async () => (String(url).endsWith('/health') ? { capacidades: {} } : {}),
+  }))
   vi.stubGlobal('fetch', fetchMock)
   const { result } = renderHook(() => useEvents(), {
     wrapper: ({ children }) => (
@@ -115,10 +124,14 @@ describe('regresiones', () => {
         </DemoProvider>
       ),
     })
-  const eventsBody = (fetchMock) => JSON.parse(fetchMock.mock.calls.find(([url]) => String(url).endsWith('/events'))[1].body)
+  const eventsBody = (fetchMock) =>
+    JSON.parse(fetchMock.mock.calls.find(([url]) => String(url).endsWith('/events'))[1].body)
 
   test('un texto más largo que el límite del servidor se recorta: no hace fallar el lote completo', async () => {
-    const fetchMock = vi.fn(async (url) => ({ ok: true, json: async () => (String(url).endsWith('/health') ? { capacidades: {} } : {}) }))
+    const fetchMock = vi.fn(async (url) => ({
+      ok: true,
+      json: async () => (String(url).endsWith('/health') ? { capacidades: {} } : {}),
+    }))
     vi.stubGlobal('fetch', fetchMock)
     const { result } = setup()
     act(() => result.current.track('search', { query: 'a'.repeat(600), entity_id: 'x'.repeat(80) }))
@@ -153,7 +166,10 @@ describe('regresiones', () => {
   })
 
   test('al ocultar la página, la cola solo se vacía si el navegador aceptó el beacon', async () => {
-    const fetchMock = vi.fn(async (url) => ({ ok: true, json: async () => (String(url).endsWith('/health') ? { capacidades: {} } : {}) }))
+    const fetchMock = vi.fn(async (url) => ({
+      ok: true,
+      json: async () => (String(url).endsWith('/health') ? { capacidades: {} } : {}),
+    }))
     vi.stubGlobal('fetch', fetchMock)
     Object.defineProperty(navigator, 'sendBeacon', { value: vi.fn(() => false), configurable: true })
     try {

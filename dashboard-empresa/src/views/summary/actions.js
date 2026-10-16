@@ -9,7 +9,9 @@ const RISK_ACTION =
 function growthText(row) {
   if (row.recientes === 0) return 'sin búsquedas en las últimas 4 semanas'
   const pct = row.crecimiento_pct
-  return pct === null || pct === undefined ? 'nueva: no aparecía en las 4 semanas anteriores' : `${formatSignedPct(pct)} vs las 4 semanas anteriores`
+  return pct === null || pct === undefined
+    ? 'nueva: no aparecía en las 4 semanas anteriores'
+    : `${formatSignedPct(pct)} vs las 4 semanas anteriores`
 }
 
 function topOpportunity(opportunities) {

@@ -73,10 +73,12 @@ export default function CheckoutScreen({ back, push }) {
         qty,
         // Con ellos el agente arma el próximo pedido al entregar (oferta `proximo_pedido`).
         entityType: product.entityType,
-        entityId: product.entityId })),
+        entityId: product.entityId,
+      })),
       total: price.total,
       pickup,
-      address: address.selected.line })
+      address: address.selected.line,
+    })
     cart.clear()
     // El seguimiento reemplaza al checkout en el historial: "volver" desde ahí no regresa a un carrito vacío.
     push('tracking', { orderId: id }, { swap: true })

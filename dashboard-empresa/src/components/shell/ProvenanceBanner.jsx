@@ -5,8 +5,8 @@ import { Icon } from '../Icon.jsx'
 const MESSAGES = {
   synthetic: (
     <>
-      <strong>Usuarios y eventos SIMULADOS:</strong> muestran la mecánica del panel, no evidencia. El catálogo sí es real
-      (muestra pública de rappi.cl).
+      <strong>Usuarios y eventos SIMULADOS:</strong> muestran la mecánica del panel, no evidencia. El catálogo sí es
+      real (muestra pública de rappi.cl).
     </>
   ),
   prototype: (

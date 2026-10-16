@@ -22,7 +22,12 @@ export default function ConnectionGate({ children }) {
     let timer
     const check = async () => {
       const result = await checkConnection()
-      const ready = result.ok && (await ensureSession().then(() => true, () => false))
+      const ready =
+        result.ok &&
+        (await ensureSession().then(
+          () => true,
+          () => false,
+        ))
       if (!current) return
       if (ready) {
         setStatus('online')

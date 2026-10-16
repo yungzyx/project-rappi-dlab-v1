@@ -28,8 +28,7 @@ export function MultiVerticalRetention({ rows }) {
   if (!rows.length) {
     return (
       <EmptyState title="Sin usuarios elegibles">
-        La comparación usa usuarios cuyo primer pedido fue hace 120 días o más, en grupos de al menos{' '}
-        {MIN_GROUP_USERS}.
+        La comparación usa usuarios cuyo primer pedido fue hace 120 días o más, en grupos de al menos {MIN_GROUP_USERS}.
       </EmptyState>
     )
   }
@@ -48,7 +47,9 @@ export function MultiVerticalRetention({ rows }) {
           <section key={row.stratum} className="strata-row" aria-label={row.stratum}>
             <h3>
               {row.stratum}
-              {row.gap !== null && <Delta value={row.gap} format={formatPoints} goodWhen={null} suffix="multi − un vertical" />}
+              {row.gap !== null && (
+                <Delta value={row.gap} format={formatPoints} goodWhen={null} suffix="multi − un vertical" />
+              )}
             </h3>
             {GROUPS.map((group, index) => (
               <GroupBar key={group.key} group={group} value={row.groups[index]} />

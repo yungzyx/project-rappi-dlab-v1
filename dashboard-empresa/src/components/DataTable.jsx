@@ -24,11 +24,7 @@ export function DataTable({ caption, columns, rows, rowKey, rowClassName }) {
           {rows.map((row, index) => (
             <tr key={rowKey(row, index)} className={rowClassName?.(row, index)}>
               {columns.map((column) => (
-                <td
-                  key={column.key}
-                  data-label={column.header}
-                  className={cellClass(column)}
-                >
+                <td key={column.key} data-label={column.header} className={cellClass(column)}>
                   {column.render ? column.render(row, index) : row[column.key]}
                 </td>
               ))}

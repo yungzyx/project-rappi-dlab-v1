@@ -68,7 +68,11 @@ describe('MvpUsageView', () => {
 
     const taps = await screen.findByRole('table', { name: 'Accesos de la Home por vertical' })
     const [row] = within(taps).getAllByRole('row').slice(1)
-    expect(within(row).getAllByRole('cell').map((cell) => cell.textContent)).toEqual(['Farmacia', '1', '1'])
+    expect(
+      within(row)
+        .getAllByRole('cell')
+        .map((cell) => cell.textContent),
+    ).toEqual(['Farmacia', '1', '1'])
     expect(screen.getByText('1 toque')).toBeTruthy()
     expect(screen.queryByText('Los datos simulados no incluyen toques de accesos')).toBeNull()
   })
@@ -91,7 +95,13 @@ describe('MvpUsageView', () => {
 
     const taps = await screen.findByRole('table', { name: 'Accesos de la Home por vertical' })
     const rows = within(taps).getAllByRole('row').slice(1)
-    expect(rows.map((row) => within(row).getAllByRole('cell').map((cell) => cell.textContent))).toEqual([
+    expect(
+      rows.map((row) =>
+        within(row)
+          .getAllByRole('cell')
+          .map((cell) => cell.textContent),
+      ),
+    ).toEqual([
       ['Rappi Mall', '3', '5'],
       ['Licores', '1', '2'],
     ])
@@ -117,7 +127,11 @@ describe('MvpUsageView', () => {
 
     const offers = await screen.findByRole('table', { name: 'Ofertas del agente por momento' })
     const [, plan] = within(offers).getAllByRole('row')
-    expect(within(plan).getAllByRole('cell').map((cell) => cell.textContent)).toEqual(['Plan', '1', '1', '—'])
+    expect(
+      within(plan)
+        .getAllByRole('cell')
+        .map((cell) => cell.textContent),
+    ).toEqual(['Plan', '1', '1', '—'])
   })
 
   test('a rate and an average that the backend does compute are shown', async () => {
@@ -151,7 +165,13 @@ describe('MvpUsageView', () => {
 
     const offers = await screen.findByRole('table', { name: 'Ofertas del agente por momento' })
     const rows = within(offers).getAllByRole('row').slice(1)
-    expect(rows.map((row) => within(row).getAllByRole('cell').map((cell) => cell.textContent))).toEqual([
+    expect(
+      rows.map((row) =>
+        within(row)
+          .getAllByRole('cell')
+          .map((cell) => cell.textContent),
+      ),
+    ).toEqual([
       ['Perfil de gusto', '3', '1', '—'],
       ['Sin momento', '1', '0', '—'],
     ])
@@ -169,14 +189,23 @@ describe('MvpUsageView', () => {
 
     const offers = await screen.findByRole('table', { name: 'Ofertas del agente por momento' })
     const [row] = within(offers).getAllByRole('row').slice(1)
-    expect(within(row).getAllByRole('cell').map((cell) => cell.textContent)).toEqual(['Recompra', '2', '1', '—'])
+    expect(
+      within(row)
+        .getAllByRole('cell')
+        .map((cell) => cell.textContent),
+    ).toEqual(['Recompra', '2', '1', '—'])
   })
 
   test('a search without vertical says so and the offers note names the tab', async () => {
     serveWith({
       unmet: {
         source: 'prototype',
-        data: { personas: 1, busquedas: 2, sin_resultado: 2, por_vertical: [{ vertical: null, concepto: null, sin_resultado: 2 }] },
+        data: {
+          personas: 1,
+          busquedas: 2,
+          sin_resultado: 2,
+          por_vertical: [{ vertical: null, concepto: null, sin_resultado: 2 }],
+        },
       },
     })
     await renderWithData(<MvpUsageView source="prototype" />)
@@ -249,11 +278,17 @@ describe('MvpUsageView', () => {
     serveFixtures()
     await renderWithData(<App />)
     expect(await screen.findByText('🥗 Ensaladas y bowls')).toBeTruthy()
-    expect(globalThis.fetch).toHaveBeenCalledWith(expect.stringContaining('/analytics/unmet?source=synthetic'), expect.anything())
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/analytics/unmet?source=synthetic'),
+      expect.anything(),
+    )
 
     await act(async () => fireEvent.click(screen.getByRole('radio', { name: 'Prototipo' })))
 
-    expect(globalThis.fetch).toHaveBeenCalledWith(expect.stringContaining('/analytics/unmet?source=prototype'), expect.anything())
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/analytics/unmet?source=prototype'),
+      expect.anything(),
+    )
     expect(await screen.findByText('1 de 1 búsqueda sin resultado')).toBeTruthy()
     expect(screen.queryByText('🥗 Ensaladas y bowls')).toBeNull()
     expect(screen.queryByText('92 de 156 búsquedas sin resultado')).toBeNull()

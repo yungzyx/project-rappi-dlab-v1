@@ -14,9 +14,19 @@ const RAPPI_COLUMNS = [
   { key: 'usuarios', header: 'Usuarios', numeric: true, render: (row) => formatNumber(row.usuarios) },
   { key: 'pct_usuarios', header: '% usuarios', numeric: true, render: (row) => formatPct(row.pct_usuarios) },
   { key: 'pct_pedidos', header: '% pedidos', numeric: true, render: (row) => formatPct(row.pct_pedidos) },
-  { key: 'pedidos', header: 'Pedidos/usuario', numeric: true, render: (row) => formatNumber(row.pedidos_por_usuario, 1) },
+  {
+    key: 'pedidos',
+    header: 'Pedidos/usuario',
+    numeric: true,
+    render: (row) => formatNumber(row.pedidos_por_usuario, 1),
+  },
   { key: 'retencion', header: 'Retención M+1', numeric: true, render: retention },
-  { key: 'gasto', header: 'Gasto/usuario (moneda de la fuente)', numeric: true, render: (row) => formatNumber(row.gasto_por_usuario) },
+  {
+    key: 'gasto',
+    header: 'Gasto/usuario (moneda de la fuente)',
+    numeric: true,
+    render: (row) => formatNumber(row.gasto_por_usuario),
+  },
 ]
 
 const OWN_COLUMNS = [
@@ -24,7 +34,12 @@ const OWN_COLUMNS = [
   { key: 'meses', header: 'Personas-mes', numeric: true, render: (row) => formatNumber(row.meses_usuario) },
   { key: 'pct_usuarios', header: '% personas', numeric: true, render: (row) => formatPct(row.pct_usuarios) },
   { key: 'pct_pedidos', header: '% pedidos', numeric: true, render: (row) => formatPct(row.pct_pedidos) },
-  { key: 'pedidos', header: 'Pedidos/persona', numeric: true, render: (row) => formatNumber(row.pedidos_por_usuario, 1) },
+  {
+    key: 'pedidos',
+    header: 'Pedidos/persona',
+    numeric: true,
+    render: (row) => formatNumber(row.pedidos_por_usuario, 1),
+  },
   { key: 'retencion', header: 'Retención M+1', numeric: true, render: retention },
   { key: 'gasto', header: 'Gasto/persona', numeric: true, render: (row) => formatCLP(row.gasto_por_usuario) },
 ]

@@ -51,7 +51,9 @@ function stubCatalog(routes = {}) {
   return stubApi({
     '/catalog/home': fixture('catalog-home'),
     '/search': (req) =>
-      ['xyzzy', 'pizza hawaiana'].includes(req.query.get('q')) ? fixture('search-grouped-unmet') : fixture('search-grouped'),
+      ['xyzzy', 'pizza hawaiana'].includes(req.query.get('q'))
+        ? fixture('search-grouped-unmet')
+        : fixture('search-grouped'),
     ...routes,
   })
 }
@@ -280,9 +282,12 @@ describe('sugerencia cruzada', () => {
     fireEvent.click(screen.getByText('Hamburguesa clásica'))
     fireEvent.click(screen.getByRole('button', { name: /Ver tienda/ }))
     await runUntilIdle()
-    expect(push).toHaveBeenCalledWith('store', expect.objectContaining({
-      store: { id: 9803, name: 'Hamburguesería de prueba', vertical: 'restaurants' },
-    }))
+    expect(push).toHaveBeenCalledWith(
+      'store',
+      expect.objectContaining({
+        store: { id: 9803, name: 'Hamburguesería de prueba', vertical: 'restaurants' },
+      }),
+    )
   })
 })
 
@@ -591,7 +596,11 @@ describe('sin escribir una pregunta', () => {
     fireEvent.keyDown(field, { key: 'Enter' })
 
     expect(api.ask).not.toHaveBeenCalled()
-    expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual(['Licores', 'Express', 'Súper'])
+    expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual([
+      'Licores',
+      'Express',
+      'Súper',
+    ])
     expect(screen.queryByText('Descubre con Mochi')).toBeNull()
     expect(events.track).toHaveBeenCalledWith(
       'search',
@@ -725,7 +734,13 @@ describe('Para ti y Descubre con Mochi', () => {
     const [row] = data.rows
     data.rows = [
       row,
-      { ...row, concept: 'helados', prototype_vertical: 'grocery', vertical: 'supermercado', reason: 'Por tu interés en 🍫 chocolate' },
+      {
+        ...row,
+        concept: 'helados',
+        prototype_vertical: 'grocery',
+        vertical: 'supermercado',
+        reason: 'Por tu interés en 🍫 chocolate',
+      },
       { ...row, concept: 'snacks-salados', prototype_vertical: 'liquor', vertical: 'licores' },
       { ...row, concept: 'jugos', prototype_vertical: 'restaurants', vertical: 'restaurantes' },
     ]
@@ -879,7 +894,9 @@ describe('sugerencias mostradas', () => {
     await runUntilIdle()
     say('otra cerveza')
     await runUntilIdle()
-    const shown = events.track.mock.calls.filter(([name, f]) => name === 'suggestion_shown' && f.concept_id === 'helados')
+    const shown = events.track.mock.calls.filter(
+      ([name, f]) => name === 'suggestion_shown' && f.concept_id === 'helados',
+    )
     expect(shown).toHaveLength(1)
   })
 })

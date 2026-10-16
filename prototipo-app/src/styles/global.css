@@ -155,7 +155,9 @@ img {
 }
 
 .tap {
-  transition: transform var(--duration-fast) var(--ease-out), opacity var(--duration-fast);
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    opacity var(--duration-fast);
 }
 
 .tap:active {

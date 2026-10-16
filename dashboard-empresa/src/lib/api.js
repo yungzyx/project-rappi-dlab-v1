@@ -14,9 +14,7 @@ export function apiUrl(env, location) {
 }
 
 // Solo existe en desarrollo: el build de producción la descarta, y `dist/` no lleva rastros de «localhost» ni del puerto.
-const devApiUrl = import.meta.env.DEV
-  ? (location) => `http://${location?.hostname || 'localhost'}:8000`
-  : undefined
+const devApiUrl = import.meta.env.DEV ? (location) => `http://${location?.hostname || 'localhost'}:8000` : undefined
 
 export const API_URL = apiUrl(import.meta.env, typeof window !== 'undefined' ? window.location : undefined)
 // /analytics/weekly tardó entre 7 y 28 s en las pruebas (según la carga de la máquina); el resto, menos de 1 s.

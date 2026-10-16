@@ -49,7 +49,8 @@ async function respond(route, req, signal) {
   const value = typeof route === 'function' ? route(req) : route
   if (value === undefined) return json(404, { detail: 'Not Found' })
   if (value === 'offline') throw new TypeError('Failed to fetch')
-  if (typeof value === 'number') return value === 204 ? new Response(null, { status: 204 }) : json(value, { detail: `HTTP ${value}` })
+  if (typeof value === 'number')
+    return value === 204 ? new Response(null, { status: 204 }) : json(value, { detail: `HTTP ${value}` })
   if (typeof value === 'string' && value.startsWith('slow:')) {
     await wait(Number(value.slice('slow:'.length)), signal)
     return json(200, slowBody(req.path))
@@ -66,7 +67,8 @@ const KEY = /^(?:(GET|POST|PUT|DELETE) )?(\/[^?#\s]*)$/
 /** 'GET /ruta' o '/ruta' → 'GET /ruta'. Una clave que no calza falla aquí: si no, la ruta se vería como un 404. */
 function normalizeKey(key) {
   const match = KEY.exec(key)
-  if (!match) throw new Error(`stubApi: clave inválida «${key}» (usa 'GET /ruta', 'POST /ruta' o '/ruta', sin query string)`)
+  if (!match)
+    throw new Error(`stubApi: clave inválida «${key}» (usa 'GET /ruta', 'POST /ruta' o '/ruta', sin query string)`)
   const [, method = 'GET', path] = match
   return `${method} ${path}`
 }

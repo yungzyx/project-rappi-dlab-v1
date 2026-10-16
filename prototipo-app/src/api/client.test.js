@@ -45,7 +45,13 @@ afterEach(() => {
 describe('de la API al prototipo', () => {
   test('un producto conserva los ids del catálogo real para eventos y pedidos', () => {
     const product = toPrototypeProduct(API_PRODUCT)
-    expect(product).toMatchObject({ id: 'cat-200', price: '$1.290', discount: '-19%', entityId: '200', concept: 'cerveza' })
+    expect(product).toMatchObject({
+      id: 'cat-200',
+      price: '$1.290',
+      discount: '-19%',
+      entityId: '200',
+      concept: 'cerveza',
+    })
     expect(product.ageRestricted).toBe(true)
   })
 
@@ -60,7 +66,10 @@ describe('de la API al prototipo', () => {
     // La API no sabe el tiempo de entrega de un producto: no se inventa uno.
     expect(toPrototypeProduct(fixture('catalog-product')).eta).toBeUndefined()
     // Una vertical que el prototipo no conoce queda con su código.
-    expect(toPrototypeProduct({ ...API_PRODUCT, vertical: 'otra' })).toMatchObject({ vertical: 'otra', backendVertical: 'otra' })
+    expect(toPrototypeProduct({ ...API_PRODUCT, vertical: 'otra' })).toMatchObject({
+      vertical: 'otra',
+      backendVertical: 'otra',
+    })
     // Un plato no trae presentación ni siempre foto: no queda «undefined» ni «null» a la vista.
     const dish = toPrototypeProduct(fixture('catalog-menu').sections[2].items[0])
     expect(dish.size).toBeUndefined()
@@ -82,7 +91,13 @@ describe('de la API al prototipo', () => {
       text: 'Mira estas opciones',
       products: [API_PRODUCT],
       reason: 'Porque llevas 🍺 cerveza',
-      suggestion: { reason: 'Porque llevas 🍺 cerveza', concept: 'snacks-salados', vertical: 'supermercado', prototype_vertical: 'grocery', products: [API_PRODUCT] },
+      suggestion: {
+        reason: 'Porque llevas 🍺 cerveza',
+        concept: 'snacks-salados',
+        vertical: 'supermercado',
+        prototype_vertical: 'grocery',
+        products: [API_PRODUCT],
+      },
       actions: [{ label: 'Pedir de un restaurante', query: 'pizza', vertical: 'restaurantes' }],
       intent: { concepts: ['cerveza'] },
       unmet: false,
@@ -91,16 +106,25 @@ describe('de la API al prototipo', () => {
     expect(message.reason).toBeNull() // la razón se muestra con la sugerencia, no dos veces
     expect(message.suggestion).toMatchObject({ vertical: 'supermercado', concept: 'snacks-salados' })
     expect(message.suggestion.products[0].fromSuggestion).toBe(true)
-    expect(message.actions[0]).toEqual({ label: 'Pedir de un restaurante', ask: { text: 'pizza', vertical: 'restaurantes' } })
+    expect(message.actions[0]).toEqual({
+      label: 'Pedir de un restaurante',
+      ask: { text: 'pizza', vertical: 'restaurantes' },
+    })
   })
 
   test('la sugerencia dice de qué vertical viene y a qué pantalla lleva', () => {
     const from = (vertical, prototypeVertical) =>
-      toMessage({ text: 'Mira', suggestion: { concept: 'x', vertical, prototype_vertical: prototypeVertical, products: [] } }).suggestion
+      toMessage({
+        text: 'Mira',
+        suggestion: { concept: 'x', vertical, prototype_vertical: prototypeVertical, products: [] },
+      }).suggestion
     expect(from('licores', 'liquor')).toMatchObject({ verticalLabel: 'Licores', route: ['vertical', { id: 'liquor' }] })
     expect(from('turbo', 'express')).toMatchObject({ verticalLabel: 'Turbo', route: ['turbo'] })
     expect(from('restaurantes', 'restaurants')).toMatchObject({ verticalLabel: 'Restaurantes', route: ['restaurants'] })
-    expect(from('chocolateria', 'chocolates')).toMatchObject({ verticalLabel: 'Chocolatería', route: ['vertical', { id: 'chocolates' }] })
+    expect(from('chocolateria', 'chocolates')).toMatchObject({
+      verticalLabel: 'Chocolatería',
+      route: ['vertical', { id: 'chocolates' }],
+    })
   })
 
   test('"también en": otras verticales con su nombre, su pantalla y sus tiendas', () => {
@@ -110,21 +134,39 @@ describe('de la API al prototipo', () => {
         concept: 'cerveza',
         label: '🍺 Cerveza',
         verticals: [
-          { vertical: 'supermercado', prototype_vertical: 'grocery', items: 262, stores: [{ name: 'Unimarc', logo: 'https://x/u.png' }] },
-          { vertical: 'turbo', prototype_vertical: 'express', items: 50, stores: [{ name: 'Rappi Drinks', logo: null }] },
+          {
+            vertical: 'supermercado',
+            prototype_vertical: 'grocery',
+            items: 262,
+            stores: [{ name: 'Unimarc', logo: 'https://x/u.png' }],
+          },
+          {
+            vertical: 'turbo',
+            prototype_vertical: 'express',
+            items: 50,
+            stores: [{ name: 'Rappi Drinks', logo: null }],
+          },
         ],
       },
     })
     expect(message.alsoIn.label).toBe('🍺 Cerveza')
     expect(message.alsoIn.verticals).toEqual([
-      { label: 'Súper', route: ['vertical', { id: 'grocery' }], items: 262, stores: [{ name: 'Unimarc', logo: 'https://x/u.png' }] },
+      {
+        label: 'Súper',
+        route: ['vertical', { id: 'grocery' }],
+        items: 262,
+        stores: [{ name: 'Unimarc', logo: 'https://x/u.png' }],
+      },
       { label: 'Turbo', route: ['turbo'], items: 50, stores: [{ name: 'Rappi Drinks', logo: null }] },
     ])
     expect(toMessage({ text: 'Mira' }).alsoIn).toBeNull()
   })
 
   test('la sugerencia se registra con el código del backend: Turbo no se confunde con conveniencia', () => {
-    const message = toMessage({ text: 'Mira', suggestion: { concept: 'snacks-salados', vertical: 'turbo', prototype_vertical: 'express', products: [] } })
+    const message = toMessage({
+      text: 'Mira',
+      suggestion: { concept: 'snacks-salados', vertical: 'turbo', prototype_vertical: 'express', products: [] },
+    })
     expect(message.suggestion.vertical).toBe('turbo')
   })
 
@@ -145,7 +187,12 @@ describe('health', () => {
   })
 
   test('con API devuelve sus capacidades', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true, capacidades: { voz: true, fotos: false } }) }))
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue({ ok: true, json: async () => ({ ok: true, capacidades: { voz: true, fotos: false } }) }),
+    )
     expect(await health({ force: true })).toEqual({ voz: true, fotos: false })
   })
 
@@ -183,7 +230,10 @@ describe('ask', () => {
     try {
       vi.stubGlobal(
         'fetch',
-        vi.fn((_url, { signal }) => new Promise((_resolve, reject) => signal.addEventListener('abort', () => reject(new Error('abortado'))))),
+        vi.fn(
+          (_url, { signal }) =>
+            new Promise((_resolve, reject) => signal.addEventListener('abort', () => reject(new Error('abortado')))),
+        ),
       )
       const pending = ask({ message: 'cerveza' })
       const outcome = expect(pending).rejects.toMatchObject({ kind: 'timeout' })
@@ -196,7 +246,11 @@ describe('ask', () => {
   })
 })
 
-const failure = (promise) => promise.then(() => null, (error) => error)
+const failure = (promise) =>
+  promise.then(
+    () => null,
+    (error) => error,
+  )
 
 describe('errores de la API', () => {
   test('una respuesta 500 es ApiError http con su estado', async () => {
@@ -322,7 +376,11 @@ describe('stubApi', () => {
     stubApi({ '/recommendations': fixture('recommendations') })
     const response = await recommendations('u-contrato')
     expect(response.interests).toEqual(['pizza'])
-    expect(response.rows[0]).toMatchObject({ concept: 'gaseosas', vertical: 'conveniencia', prototype_vertical: 'express' })
+    expect(response.rows[0]).toMatchObject({
+      concept: 'gaseosas',
+      vertical: 'conveniencia',
+      prototype_vertical: 'express',
+    })
     expect(response.rows[0].products[0]).toMatchObject({ vertical: 'express', backendVertical: 'conveniencia' })
     expect(response.rows[0].products[0].entityId).toBeTruthy()
   })
@@ -354,7 +412,9 @@ describe('stubApi', () => {
     for (const key of ['health', 'FETCH /health', 'get /health', 'PATCH /health', 'GET health', '/health?x=1', '']) {
       expect(() => stubApi({ [key]: {} })).toThrow(/^stubApi: clave inválida/)
     }
-    expect(() => stubApi({ '/health': {}, 'GET /health2': {}, 'POST /agent/ask': {}, 'PUT /a': {}, 'DELETE /a/b': {} })).not.toThrow()
+    expect(() =>
+      stubApi({ '/health': {}, 'GET /health2': {}, 'POST /agent/ask': {}, 'PUT /a': {}, 'DELETE /a/b': {} }),
+    ).not.toThrow()
   })
 
   test('un 204 es null, no un error', async () => {
@@ -369,7 +429,10 @@ describe('stubApi', () => {
   test('un valor {slow, body} responde ese cuerpo pasado el tiempo', async () => {
     vi.useFakeTimers()
     try {
-      stubApi({ '/health': { slow: 3000, body: fixture('health') }, 'DELETE /profile/proto-1': { slow: 100, body: 500 } })
+      stubApi({
+        '/health': { slow: 3000, body: fixture('health') },
+        'DELETE /profile/proto-1': { slow: 100, body: 500 },
+      })
       let settled = false
       const connection = checkConnection().then((result) => {
         settled = true
@@ -506,7 +569,6 @@ describe('envíos', () => {
       delete navigator.sendBeacon
     }
   })
-
 })
 
 describe('apiUrl', () => {

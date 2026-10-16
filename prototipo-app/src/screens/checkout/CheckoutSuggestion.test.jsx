@@ -8,7 +8,10 @@ import { ProfileProvider } from '../../state/ProfileContext'
 import CheckoutSuggestion from './CheckoutSuggestion'
 
 const events = vi.hoisted(() => ({ track: vi.fn(), flush: async () => {}, clear: () => {}, settled: async () => {} }))
-vi.mock('../../state/EventsContext', async (importOriginal) => ({ ...(await importOriginal()), useEvents: () => events }))
+vi.mock('../../state/EventsContext', async (importOriginal) => ({
+  ...(await importOriginal()),
+  useEvents: () => events,
+}))
 
 // Productos de la API, como llegan al carro: con su tipo e id reales.
 const PISCO = {
@@ -20,7 +23,14 @@ const PISCO = {
   entityId: '94005',
   concept: 'pisco',
 }
-const PIZZA = { id: 'menu-95001', name: 'Pizza (prueba)', price: '$7.990', vertical: 'restaurants', entityType: 'menu_item', entityId: '95001' }
+const PIZZA = {
+  id: 'menu-95001',
+  name: 'Pizza (prueba)',
+  price: '$7.990',
+  vertical: 'restaurants',
+  entityType: 'menu_item',
+  entityId: '95001',
+}
 
 const probe = {}
 function Probe() {
@@ -110,7 +120,9 @@ describe('«¿Me falta algo?» en el checkout (solo si se pide)', () => {
     await ask()
     const card = document.querySelector('.checkout-suggestion')
     expect(card.querySelector('.checkout-suggestion-reason').textContent).toBe(fixture('agent-offer-checkout').text)
-    expect(card.querySelector('.checkout-suggestion-product').textContent).toMatch(/^Hielo en cubos 2 kg \(prueba\) · \$1\.490 · Turbo/)
+    expect(card.querySelector('.checkout-suggestion-product').textContent).toMatch(
+      /^Hielo en cubos 2 kg \(prueba\) · \$1\.490 · Turbo/,
+    )
     expect(card.querySelector('.mascot')).toBeTruthy()
     expect(screen.queryByLabelText('Solo mayores de 18')).toBeNull()
   })

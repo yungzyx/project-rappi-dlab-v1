@@ -25,9 +25,7 @@ function Providers({ children }) {
           <AssistantProvider>
             <CartProvider>
               <FavoritesProvider>
-                <ToastProvider>
-                  {children}
-                </ToastProvider>
+                <ToastProvider>{children}</ToastProvider>
               </FavoritesProvider>
             </CartProvider>
           </AssistantProvider>
@@ -43,7 +41,9 @@ function branchMenu(id, dish) {
   const [first] = menu.sections[1].items
   return {
     restaurant: { ...menu.restaurant, id, name: 'Pizzería de prueba' },
-    sections: [{ name: 'Pizzas', items: [{ ...first, id: `menu-${id}`, entity_id: String(id), name: dish, store_id: id }] }],
+    sections: [
+      { name: 'Pizzas', items: [{ ...first, id: `menu-${id}`, entity_id: String(id), name: dish, store_id: id }] },
+    ],
   }
 }
 

@@ -65,12 +65,28 @@ export default function TravelScreen({ back }) {
     <div className="screen travel">
       <div className="travel-hero" onPointerDown={onPointerDown} onPointerUp={onPointerUp}>
         {HEROES.map((item, i) => (
-          <img key={item.id} src={item.img} alt="" draggable="false" className={i === index ? 'is-active' : undefined} />
+          <img
+            key={item.id}
+            src={item.img}
+            alt=""
+            draggable="false"
+            className={i === index ? 'is-active' : undefined}
+          />
         ))}
         <BackButton className="travel-hit travel-hit--back" icon={false} onClick={back} />
-        <button type="button" className="travel-hit travel-hit--bell" aria-label="Notificaciones" onClick={() => toast('No tienes notificaciones')} />
+        <button
+          type="button"
+          className="travel-hit travel-hit--bell"
+          aria-label="Notificaciones"
+          onClick={() => toast('No tienes notificaciones')}
+        />
         <button type="button" className="travel-hit travel-hit--help" aria-label="Ayuda" onClick={() => toast()} />
-        <button type="button" className="travel-hit travel-hit--trips" aria-label="Mis Viajes" onClick={() => toast('Aún no tienes viajes')} />
+        <button
+          type="button"
+          className="travel-hit travel-hit--trips"
+          aria-label="Mis Viajes"
+          onClick={() => toast('Aún no tienes viajes')}
+        />
         <button
           type="button"
           className="travel-hit"
@@ -89,7 +105,15 @@ export default function TravelScreen({ back }) {
             onChange={(e) => setQuery(e.target.value)}
           />
           <button type="submit" aria-label="Buscar">
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
+            <svg
+              width="26"
+              height="26"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.7"
+              aria-hidden="true"
+            >
               <circle cx="10" cy="10" r="6.5" />
               <path d="M15 15l5.5 5.5M7.2 8.3a3.3 3.3 0 0 1 3-2" />
             </svg>
@@ -98,7 +122,12 @@ export default function TravelScreen({ back }) {
 
         <div className="travel-tiles">
           {TILES.map((tile) => (
-            <button key={tile.id} type="button" className="travel-tile tap" onClick={() => toast(`${tile.label}: las reservas no están en el prototipo`)}>
+            <button
+              key={tile.id}
+              type="button"
+              className="travel-tile tap"
+              onClick={() => toast(`${tile.label}: las reservas no están en el prototipo`)}
+            >
               <img src={tile.img} alt="" loading="lazy" />
               <span>{tile.label}</span>
             </button>

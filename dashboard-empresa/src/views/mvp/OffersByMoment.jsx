@@ -25,7 +25,12 @@ const COLUMNS = [
   { key: 'momento', header: 'Momento', primary: true, render: (row) => MOMENTS[row.momento] ?? row.momento },
   { key: 'mostradas', header: 'Mostradas', numeric: true, render: (row) => formatNumber(row.mostradas) },
   { key: 'aceptadas', header: 'Aceptadas', numeric: true, render: (row) => formatNumber(row.aceptadas) },
-  { key: 'aceptacion_pct', header: 'Tasa de aceptación', numeric: true, render: (row) => formatPct(row.aceptacion_pct) },
+  {
+    key: 'aceptacion_pct',
+    header: 'Tasa de aceptación',
+    numeric: true,
+    render: (row) => formatPct(row.aceptacion_pct),
+  },
 ]
 
 /** Ofertas del agente por momento. La tasa llega vacía (—) con menos mostradas que el mínimo: ahí solo valen las cuentas. */

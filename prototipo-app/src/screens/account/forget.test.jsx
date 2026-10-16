@@ -44,7 +44,8 @@ function renderAccount() {
   )
 }
 
-const deletes = (api) => api.mock.calls.filter(([, init]) => init?.method === 'DELETE').map(([url]) => new URL(url).pathname)
+const deletes = (api) =>
+  api.mock.calls.filter(([, init]) => init?.method === 'DELETE').map(([url]) => new URL(url).pathname)
 
 describe('Borrar mis datos (Cuenta)', () => {
   test('llama a forget, deja solo el id nuevo en el navegador y userId cambia', async () => {

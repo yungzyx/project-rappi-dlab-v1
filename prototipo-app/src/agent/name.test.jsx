@@ -70,7 +70,11 @@ describe('el nombre del agente sale de AGENT_NAME', () => {
 
   test('el saludo y el nombre del buscador', async () => {
     vi.useFakeTimers()
-    stubApi({ '/catalog/home': fixture('catalog-home'), '/search': fixture('search-grouped'), '/recommendations': { rows: [] } })
+    stubApi({
+      '/catalog/home': fixture('catalog-home'),
+      '/search': fixture('search-grouped'),
+      '/recommendations': { rows: [] },
+    })
     render(
       <DemoProvider>
         <ProfileProvider>

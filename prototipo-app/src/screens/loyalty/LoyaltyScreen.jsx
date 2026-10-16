@@ -43,8 +43,8 @@ export default function LoyaltyScreen({ back }) {
 
       <h2 className="loyalty-title">Elige un programa</h2>
       <p className="loyalty-text">
-        Acumula puntos/millas en un (1) programa siendo PRO. Selecciona &quot;cambiar&quot; cuando desees acumular en otro
-        programa.
+        Acumula puntos/millas en un (1) programa siendo PRO. Selecciona &quot;cambiar&quot; cuando desees acumular en
+        otro programa.
         <br />
         ¡Canjea a créditos en cuantos programas quieras!
       </p>

@@ -209,18 +209,42 @@
   fill: var(--ink-3);
 }
 
-.heat-cell--1 rect { fill: var(--seq-1); }
-.heat-cell--2 rect { fill: var(--seq-2); }
-.heat-cell--3 rect { fill: var(--seq-3); }
-.heat-cell--4 rect { fill: var(--seq-4); }
-.heat-cell--5 rect { fill: var(--seq-5); }
-.heat-cell--6 rect { fill: var(--seq-6); }
-.heat-cell--1 text { fill: var(--seq-ink-1); }
-.heat-cell--2 text { fill: var(--seq-ink-2); }
-.heat-cell--3 text { fill: var(--seq-ink-3); }
-.heat-cell--4 text { fill: var(--seq-ink-4); }
-.heat-cell--5 text { fill: var(--seq-ink-5); }
-.heat-cell--6 text { fill: var(--seq-ink-6); }
+.heat-cell--1 rect {
+  fill: var(--seq-1);
+}
+.heat-cell--2 rect {
+  fill: var(--seq-2);
+}
+.heat-cell--3 rect {
+  fill: var(--seq-3);
+}
+.heat-cell--4 rect {
+  fill: var(--seq-4);
+}
+.heat-cell--5 rect {
+  fill: var(--seq-5);
+}
+.heat-cell--6 rect {
+  fill: var(--seq-6);
+}
+.heat-cell--1 text {
+  fill: var(--seq-ink-1);
+}
+.heat-cell--2 text {
+  fill: var(--seq-ink-2);
+}
+.heat-cell--3 text {
+  fill: var(--seq-ink-3);
+}
+.heat-cell--4 text {
+  fill: var(--seq-ink-4);
+}
+.heat-cell--5 text {
+  fill: var(--seq-ink-5);
+}
+.heat-cell--6 text {
+  fill: var(--seq-ink-6);
+}
 
 .scale-legend {
   display: flex;

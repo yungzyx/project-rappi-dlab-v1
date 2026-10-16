@@ -13,7 +13,9 @@
   pointer-events: none;
   opacity: 0;
   transform: translate(-50%, 8px);
-  transition: opacity var(--duration-fast), transform var(--duration-normal) var(--ease-out);
+  transition:
+    opacity var(--duration-fast),
+    transform var(--duration-normal) var(--ease-out);
 }
 
 .toast.is-visible {

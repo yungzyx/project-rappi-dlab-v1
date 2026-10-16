@@ -17,9 +17,7 @@ function Providers({ children }) {
     <DemoProvider>
       <ProfileProvider>
         <AssistantProvider>
-          <CartProvider>
-            {children}
-          </CartProvider>
+          <CartProvider>{children}</CartProvider>
         </AssistantProvider>
       </ProfileProvider>
     </DemoProvider>

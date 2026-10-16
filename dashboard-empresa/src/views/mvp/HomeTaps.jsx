@@ -22,7 +22,9 @@ export function HomeTaps({ data, source }) {
       )
     }
     return (
-      <EmptyState title="Todavía no hay toques de accesos">Aparecen cuando alguien toca un vertical en la Home.</EmptyState>
+      <EmptyState title="Todavía no hay toques de accesos">
+        Aparecen cuando alguien toca un vertical en la Home.
+      </EmptyState>
     )
   }
   return (

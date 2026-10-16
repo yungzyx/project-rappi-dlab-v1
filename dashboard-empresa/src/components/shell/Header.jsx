@@ -37,8 +37,8 @@ export function Header({ source, onSourceChange, onRefresh }) {
           <ThemeToggle />
         </div>
         <p className="masthead-lede">
-          La conducta de compra y lo que la gente pide en búsquedas y preguntas al agente, convertidos en decisiones para{' '}
-          <strong>subir la frecuencia</strong> y <strong>bajar el abandono</strong>.
+          La conducta de compra y lo que la gente pide en búsquedas y preguntas al agente, convertidos en decisiones
+          para <strong>subir la frecuencia</strong> y <strong>bajar el abandono</strong>.
         </p>
         <div className="masthead-meta">
           <Async fallback={<span>Cargando fecha de corte…</span>}>
