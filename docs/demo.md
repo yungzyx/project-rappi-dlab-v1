@@ -46,7 +46,18 @@ Es lo primero que se ve en el prototipo final. Para partir de cero: **↺ Repeti
 1. Mochi entra caminando a la Home y saluda. No sugiere productos ni mueve la Home: la Home es la de siempre. **Qué decir:** Mochi es parte de la Home, no un canal aparte.
 1b. La primera vez, después del saludo, Mochi hace una guía de 2 pasos: el buscador y qué pasa al tocarla (**Siguiente** / **Saltar**). No vuelve a aparecer; «↺ Repetir escena» la muestra de nuevo.
 2. Baja hasta «¿Qué plan tienes hoy?» (cinco ocasiones) y elige **Carrete**: un kit de varias verticales con un solo botón. Como la persona eligió la ocasión, el kit puede traer alcohol, con la marca **+18**; en lo que Mochi ofrece por su cuenta nunca hay alcohol, farmacia, bebé ni salud.
-3. Toca a Mochi: propone una vertical que la persona aún no pide, según sus pedidos («Porque aún no pides en …»), con sus ofertas. Con «Abrir» entra a esa vertical. Si no tiene nada que ofrecer, Mochi calla.
+3. Toca a Mochi: propone una vertical que la persona aún no pide, según sus pedidos («Porque aún no pides en …») y la escalera de combinaciones (ver abajo), con sus ofertas. Con «Abrir» entra a esa vertical. Si no tiene nada que ofrecer, Mochi calla.
+
+### La escalera de combinaciones y la recompra (2 minutos, opcional)
+
+Mochi propone la siguiente vertical según lo que la persona ya usa, siguiendo una escalera: Restaurantes → Turbo → Retail. El punto de partida es la tabla de combinaciones que compartió el equipo de Rappi (retención al mes siguiente de cada combinación); el motor la mezcla con lo que aprende de la población, que hoy es simulada.
+
+1. Con **Olvidar** recién hecho, pide algo en **Restaurants** hasta pagar. Vuelve a la Home y toca a Mochi: propone **Turbo**, con productos que suelen sumar quienes piden lo mismo, o «Lo más pedido en Turbo» si no hay una compra cruzada que mostrar. «¿Por qué?» dice la razón («Porque pides … y quienes lo piden suelen sumar … en …»). **Qué decir:** la sugerencia sigue un camino (primero Turbo, después Retail) y siempre dice por qué; si la persona ya pidió en esa vertical hace más de un mes, Mochi dice «Vuelve a …».
+2. Pide más veces en Turbo y toca de nuevo a Mochi: el paso siguiente es Retail (Rappi Mall). Con la combinación completa, Mochi vuelve a lo de antes.
+3. La recompra: una persona que pide el mismo concepto con ritmo (por ejemplo, café cada 14 días) ve, cuando le toca, el bloque «¿Repetimos …? Lo pides cada N días.» en la Home, después de los accesos, con **Ver producto**. Solo aparece con tres compras del concepto y un ritmo regular; con una cuenta nueva no sale. Se cuenta como aceptada cuando agrega el producto al carro, no al tocar el botón.
+4. En el panel, «Entre verticales» muestra la tabla de Rappi junto a la medida con datos simulados («Combinaciones de verticales»), el «Motor» (evaluación y pesos) y, en «Uso del MVP», «Recompra» entre las ofertas por momento.
+
+**Qué decir:** es una propuesta con una correlación de punto de partida, no un efecto probado: quien pide mucho usa más verticales y además vuelve más. El efecto real se mide con un grupo de control.
 
 ### La Home que aprende el orden (1 minuto, opcional)
 

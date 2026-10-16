@@ -1,5 +1,5 @@
 // Revisa en un Chrome real que la app del MVP responda como debe (lo corre scripts/mvp-check.sh con `make mvp-check`).
-// Uso: node scripts/mvp-check.mjs --app http://localhost:5184 [--api http://localhost:8010] [--shop | --kit | --home | --expect-offline | --panel http://localhost:5185]
+// Uso: node scripts/mvp-check.mjs --app http://localhost:5184 [--api http://localhost:8010] [--shop | --kit | --home | --combo | --expect-offline | --panel http://localhost:5185]
 //   sin banderas: la app abre en la Home conectada, con la barra «Busca o pídele ideas a <agente>» y el aviso de privacidad
 //     de la primera visita (que se cierra con «Entendido»);
 //   con --shop: Home → vertical Grocery → primera tienda → agregar un producto → carrito → pagar, y la API recibe el
@@ -11,6 +11,10 @@
 //     sin el texto «Ordenadas según lo que más usas»; toca «Retail» (Rappi Mall) tres veces, volviendo a la Home cada
 //     vez, espera a que la API acepte los toques (`vertical_open`; al volver a la Home la app los manda y vuelve a pedir
 //     el orden) y, sin recargar, Retail queda primero y el texto aparece;
+//   con --combo: combinación de verticales. Una persona nueva pide en Restaurantes (Home → Restaurants → primer
+//     restaurante → agregar un plato → pagar), vuelve a la Home y toca a Mochi: la oferta es de Turbo (el siguiente peldaño
+//     de la escalera desde Restaurantes, según la tabla de Rappi) y su «¿Por qué?» muestra la razón. Solo se mira la
+//     vertical y que haya una razón: el texto exacto depende de lo que haya aprendido el motor;
 //   con --expect-offline: la API está detenida y la app muestra «Sin conexión con <agente>»;
 //   con --panel <url del panel> (sin --app): corre después de las demás, con la API en marcha. Espera a que la API ya
 //     cuente lo que dejó el kit (una oferta aceptada en «Plan»), abre el panel en «Uso del MVP» con la fuente del
@@ -171,6 +175,82 @@ async function checkKit(page) {
   return `buscó «cerveza» (${found} grupos), pidió el kit «Carrete», lo agregó y la API aceptó el pedido`
 }
 
+/** Cuánto se espera a que Mochi termine de saludar y responda a un toque. */
+const COMBO_WAIT_MS = 25_000
+
+/**
+ * Combinación de verticales: pide en Restaurantes y, al volver a la Home, Mochi propone Turbo con su «¿Por qué?».
+ * Los textos son los de la app (Restaurants, View cart, Place order, «¿Por qué?»). Tras pagar se recarga la app y se
+ * vuelve al inicio: la Home se monta de nuevo con la misma persona (su identificador queda en el navegador) y Mochi
+ * saluda; tocarlo antes de que termine no hace nada, así que se vuelve a tocar hasta que responda.
+ */
+async function checkCombo(page) {
+  await checkOnline(page)
+  await step(page, 'abrir Restaurants desde la Home', () =>
+    page.getByRole('button', { name: 'Restaurants', exact: true }).click(),
+  )
+  const list = page.locator('.rest-list')
+  await step(page, 'ver la lista de restaurantes', () => list.waitFor())
+  await step(page, 'abrir el primer restaurante', () => list.locator('.featured-card').first().click())
+  const restaurant = await step(page, 'ver el nombre del restaurante', async () => {
+    const heading = page.getByRole('heading', { level: 1 })
+    await heading.waitFor()
+    return heading.innerText()
+  })
+  const dish = page
+    .getByRole('listitem')
+    .getByRole('button', { name: /^Agregar / })
+    .first()
+  await step(page, 'ver platos en el menú', () => dish.waitFor())
+  await step(page, 'agregar un plato', () => dish.click())
+  await step(page, 'abrir el carrito', () => page.getByRole('button', { name: /View cart/ }).click())
+  await step(page, 'ir al checkout', () => page.getByRole('button', { name: 'Go to checkout' }).click())
+  const place = page.getByRole('button', { name: /^Place order/ })
+  await step(page, 'ver el botón de pagar', () => place.waitFor())
+  const posted = page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/orders')
+  await place.click()
+  const response = await posted.catch(() => {
+    throw new Error('la app no mandó el pedido a la API (POST /orders)')
+  })
+  if (!response.ok()) throw new Error(`la API rechazó el pedido (POST /orders → ${response.status()})`)
+
+  await page.reload({ timeout: TIMEOUT_MS })
+  // La app vuelve a donde estaba (el seguimiento del pedido): «Volver al inicio» o la flecha de atrás, las veces que haga falta, llevan a la Home.
+  const home = page.locator('.home-shortcut').first()
+  await step(page, 'volver a la Home desde el seguimiento', async () => {
+    const leave = page.getByRole('button', { name: 'Volver al inicio' }).or(page.locator('[aria-label="Volver"]'))
+    // `force`: el botón queda al borde del teléfono y Playwright no lo da por visible del todo.
+    for (let tries = 0; tries < 10 && !(await home.isVisible()); tries++) {
+      await leave
+        .first()
+        .click({ timeout: 3000, force: true })
+        .catch(() => {})
+      await page.waitForTimeout(500)
+    }
+    await home.waitFor()
+  })
+  const why = page.getByRole('button', { name: '¿Por qué?' })
+  const mochi = page.getByRole('button', { name: `${AGENT_NAME}: muéstrame algo nuevo para probar` })
+  const deadline = Date.now() + COMBO_WAIT_MS
+  while ((await why.count()) === 0 && Date.now() < deadline) {
+    await mochi.click({ timeout: 2000 }).catch(() => {}) // aún entra a escena o saluda
+    await page.waitForTimeout(1000)
+  }
+  await step(page, 'ver la oferta de Mochi con su «¿Por qué?»', () => why.first().waitFor({ timeout: 2000 }))
+  const proposal = await step(page, 'leer la oferta de Mochi', () =>
+    page.locator('.live-bubble p[aria-hidden="true"]').first().innerText(),
+  )
+  if (!/Turbo/.test(proposal)) throw new Error(`pidió en Restaurantes y Mochi propuso «${proposal}», no Turbo`)
+  await step(page, 'abrir el «¿Por qué?»', () => why.first().click())
+  const reason = await step(page, 'leer la razón', async () => {
+    const text = page.locator('.offer-why-text').first()
+    await text.waitFor()
+    return (await text.innerText()).trim()
+  })
+  if (!reason) throw new Error('el «¿Por qué?» no muestra ninguna razón')
+  return `pidió en «${restaurant}» (Restaurantes) y Mochi propuso Turbo: «${proposal}»; razón: «${reason}»`
+}
+
 const ORDER_CAPTION = 'Ordenadas según lo que más usas'
 const FIXED_LABELS = ['Grocery', 'Pharmacy', 'Retail', 'Liquor', 'Express', 'Chocolates']
 const TAIL_LABELS = ['Loyalty', 'Benefits Pro']
@@ -301,6 +381,7 @@ const { values } = parseArgs({
     shop: { type: 'boolean', default: false },
     kit: { type: 'boolean', default: false },
     home: { type: 'boolean', default: false },
+    combo: { type: 'boolean', default: false },
     api: { type: 'string', default: API_DEFAULT },
     'expect-offline': { type: 'boolean', default: false },
     panel: { type: 'string' },
@@ -315,9 +396,11 @@ const label = values.panel
       ? 'kit de Mochi'
       : values.home
         ? 'home'
-        : values.shop
-          ? 'compra'
-          : 'en línea'
+        : values.combo
+          ? 'combinación'
+          : values.shop
+            ? 'compra'
+            : 'en línea'
 
 /** Con MVP_CHECK_ARTIFACTS=<carpeta> (lo usa el CI), una revisión que falla deja la captura de lo que se veía. */
 async function saveFailureScreenshot(page) {
@@ -346,6 +429,7 @@ async function main() {
     if (!values.panel) await page.goto(values.app, { timeout: TIMEOUT_MS })
     const checks = {
       home: checkHome,
+      combo: checkCombo,
       kit: checkKit,
       shop: checkShop,
     }

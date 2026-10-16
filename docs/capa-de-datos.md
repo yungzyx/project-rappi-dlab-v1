@@ -119,6 +119,10 @@ Responde dos preguntas por persona: **qué vertical conviene sumarle** y **qué 
 
 La tabla viene con una agrupación gruesa de Rappi (`rest`, `turbo`, `retail`). La asignación de los verticales del proyecto a esos grupos es un **supuesto propio**: `retail` junta supermercado, conveniencia, farmacia, licores, mall y chocolatería; RappiFavor, que no tiene catálogo, queda fuera.
 
+### Cómo se usa en las ofertas
+
+`motor/recommend.py` arma las recomendaciones conectadas con tres tablas de población: `trends` (lo más pedido por vertical y concepto) y `cross_sell_rules` (las reglas «quien pide A en X pide B en Y»), mezcladas en `cross_picks`: `popularidad × (1 + λ·max(0, lift − 1))`. El λ se elige en validación (`rappi-ia motor`) y queda en la corrida; con λ = 0 la mezcla es solo lo más pedido, y sin corrida vale 1. `combo_stats` y `combo_steps` junto a la tabla de Rappi deciden qué grupo sumarle a la persona (`motor/predict.py:target_step`); la oferta `vertical_por_probar` y el complemento del carro los leen. Todo se limita a la población que diga `MOTOR_POBLACION`, y ningún concepto sensible entra.
+
 ### Qué esperar de las cifras
 
 `rappi-ia motor` mide el modelo por fechas (entrenar, validar y probar) contra líneas base y escribe un informe por fuente en `rappi-ia/data/eval/motor-{fuente}.md`; la última corrida sobre datos simulados está en [resultados/motor-2026-10-16.md](resultados/motor-2026-10-16.md). Sobre `synthetic` mide la mecánica, no el efecto, porque el generador ya supone que sumar verticales retiene (ver [decisiones.md](decisiones.md#datos-simulados-y-panel)).

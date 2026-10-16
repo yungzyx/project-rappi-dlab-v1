@@ -225,7 +225,9 @@ def suggest_complement(
     vertical del grupo que completa su combinación (sin contar la actual) y el primero no: ese va primero y busca antes
     en esas verticales. La marca de la persona gana a ese desempate: si el primero trae un producto de una marca que
     compra (`prefer_brands`), queda el orden de siempre. La `basis` de la sugerencia dice `combinacion` si el desempate
-    la eligió y `compra_cruzada` («<A>→<B>@<vertical>» de la regla) si la trajo una compra cruzada.
+    la eligió y `compra_cruzada` («<A>→<B>@<vertical>» de la regla) si la trajo una compra cruzada. Una compra cruzada
+    se busca solo en la vertical de su regla; si ahí no hay productos, el mismo concepto se prueba por su arista curada
+    (o aprendida) en las verticales de siempre, y la sugerencia sale sin esa `basis`.
 
     Con `prefer_brands` (brand_key → pedidos de la persona), se miran más candidatos del concepto y el de la marca
     comprada con más pedidos va primero. Si ninguno es de sus marcas, el resultado es el de siempre."""
