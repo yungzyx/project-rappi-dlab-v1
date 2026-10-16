@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { offer, plans as fetchPlans } from '../../../api/agent'
-import { noteAccepted, noteShown } from '../../../api/suggestions'
+import { noteShown } from '../../../api/suggestions'
 import { userId } from '../../../api/user'
 import DemoDisclaimer from '../../../components/DemoDisclaimer'
 import SmartBar from '../../../components/assistant/SmartBar'
@@ -290,11 +290,6 @@ export default function LiveHomeFeed({ push, active = true }) {
     }
   }, [active, events.track, profile.resets])
 
-  // «Agregar» cuenta la aceptación y lleva a la tienda del producto, donde se ve destacado.
-  const addRepeat = () => {
-    noteAccepted(events.track, repeat.products, { origin: REPEAT_ORIGIN, generation: profile.resets })
-    openItem(repeat.products[0], push)
-  }
   const repeatLater = () => {
     noteDismissed()
     session.repeatLater = true
@@ -454,7 +449,7 @@ export default function LiveHomeFeed({ push, active = true }) {
       </>
     ),
     recompra: repeat && (
-      <RepeatBlock offer={repeat} onAdd={addRepeat} onLater={repeatLater} onOpen={openFromBlock} />
+      <RepeatBlock offer={repeat} onLater={repeatLater} onOpen={openFromBlock} />
     ),
     promos: <Promos push={push} />,
     turbo: <FastRestaurants stores={catalog.fastRestaurants} push={push} />,

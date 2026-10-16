@@ -137,10 +137,11 @@ REASON_TO_TRY_TOP = "Porque aún no pides en {vertical}: esto es lo que más se 
 BACK_TEXT = "Vuelve a {vertical}: mira {what}."
 BACK_TOP = "lo más pedido"
 REASON_BACK = "Porque hace más de un mes que no pides en {vertical}."
-# La recompra: {destino} es el concepto, {dias} cada cuántos días lo pide y {hace} «hoy», «ayer» o «hace N días».
-REPEAT_TEXT = "¿Repetimos {destino}? Lo pides cada {dias} días."
-REASON_REPEAT = "Porque lo pides cada {dias} días y tu último pedido fue {hace}."
-REPEAT_ACTION = "Agregar"
+# La recompra: {destino} es el concepto, {cada} cada cuánto lo pide («cada día» o «cada N días», `_every`) y {hace}
+# «hoy», «ayer» o «hace N días».
+REPEAT_TEXT = "¿Repetimos {destino}? Lo pides {cada}."
+REASON_REPEAT = "Porque lo pides {cada} y tu último pedido fue {hace}."
+REPEAT_ACTION = "Ver producto"  # abre su tienda con el producto destacado; la aceptación cuenta al agregarlo al carro
 REPEAT_AHEAD_DAYS = 2  # se ofrece desde 2 días antes del día en que le toca
 SEE_ACTION = "Ver {destino}"
 OPEN_ACTION = "Abrir {vertical}"
@@ -729,8 +730,8 @@ def repeat_offer(
         if not offerable_vertical(vertical) or vertical not in SCREEN_VERTICALS:
             continue
         if product := _repeat_product(conn, embedder, user_id, concept, vertical):
-            text = REPEAT_TEXT.format(destino=concept.name.lower(), dias=days)
-            why = REASON_REPEAT.format(dias=days, hace=_days_ago(today, last_ts))
+            text = REPEAT_TEXT.format(destino=concept.name.lower(), cada=_every(days))
+            why = REASON_REPEAT.format(cada=_every(days), hace=_days_ago(today, last_ts))
             reason = _reason(why, [{"kind": "recompra", "id": concept.id, "source": "pedidos"}], concept=concept.id)
             action = {"label": REPEAT_ACTION, "route": [SCREEN_VERTICALS[vertical]], "store_id": product["store_id"]}
             return Offer("recompra", text, [product], vertical, reason, [action])
@@ -756,6 +757,11 @@ def _repeat_product(
     outcome = search_products(conn, vertical, concept.name, [concept.id], embedder, k=4, offer=True)
     found = [p.to_dict() for p in outcome.products if p.concept == concept.id]
     return next(iter(_offerable_products(conn, found)), None)
+
+
+def _every(days: int) -> str:
+    """«cada día» o «cada N días»."""
+    return "cada día" if days == 1 else f"cada {days} días"
 
 
 def _days_ago(today: date, ts: datetime) -> str:

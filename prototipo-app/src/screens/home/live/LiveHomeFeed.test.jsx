@@ -451,21 +451,24 @@ describe('Home del prototipo final', () => {
       expect(tracked('suggestion_shown', 'agent-recompra')).toHaveLength(1)
     })
 
-    test('«Agregar» cuenta la aceptación y lleva a la tienda del producto', async () => {
+    test('«Ver producto» lleva a su tienda con el producto destacado y no cuenta una aceptación', async () => {
       api = stubRepeat()
       const push = vi.fn()
       const made = fixture('agent-offer-recompra')
       const { container } = await renderHome({ push })
       await advance(100)
-      fireEvent.click(within(repeatBlock(container)).getByRole('button', { name: made.actions[0].label }))
-      expect(tracked('suggestion_accepted', 'agent-recompra')).toEqual([
-        ['suggestion_accepted', { concept_id: 'cafe', vertical: 'grocery', payload: { origen: 'agent-recompra' } }],
-      ])
+      fireEvent.click(within(repeatBlock(container)).getByRole('button', { name: 'Ver producto' }))
+      // La aceptación cuenta al agregarlo al carro en la tienda (lleva su origen: StoreScreen.test.jsx).
+      expect(tracked('suggestion_accepted', 'agent-recompra')).toEqual([])
       expect(push).toHaveBeenLastCalledWith(
         'store',
         expect.objectContaining({
           store: expect.objectContaining({ id: made.products[0].store_id }),
-          item: expect.objectContaining({ entityId: made.products[0].entity_id, suggestionOrigin: 'agent-recompra' }),
+          item: expect.objectContaining({
+            entityId: made.products[0].entity_id,
+            fromSuggestion: true,
+            suggestionOrigin: 'agent-recompra',
+          }),
         }),
       )
     })

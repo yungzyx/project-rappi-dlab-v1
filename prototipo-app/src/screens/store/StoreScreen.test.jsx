@@ -347,6 +347,24 @@ describe('producto que llegó tocándolo', () => {
     expect(screen.queryByText('Lo que elegiste')).toBeNull()
   })
 
+  test('una sugerencia del agente que está en el pasillo cuenta su aceptación al agregarla, una vez', async () => {
+    // Como llega desde «¿Repetimos?» en la Home (api/agent.js): el café de la 9101, con su origen.
+    const offered = fixture('agent-offer-recompra').products[0]
+    const item = { ...toPrototypeProduct(offered), fromSuggestion: true, suggestionOrigin: 'agent-recompra' }
+    stubCatalog()
+    openStore({ store: GROCERY, item })
+    await waitFor(() => expect(rows()).toHaveLength(24))
+    expect(tracked('suggestion_accepted')).toEqual([])
+
+    const row = [...document.querySelectorAll('.product-row')].find((node) => node.textContent.includes(offered.name))
+    fireEvent.click(within(row).getByLabelText(`Agregar ${offered.name}`))
+    fireEvent.click(within(row).getByLabelText(/^Agregar uno de/)) // otra unidad: no es otra aceptación
+    const accepted = tracked('suggestion_accepted')
+    expect(accepted).toEqual([
+      expect.objectContaining({ concept_id: 'cafe', payload: { origen: 'agent-recompra' } }),
+    ])
+  })
+
   test('también se destaca en un restaurante si el plato no está en su menú', async () => {
     stubCatalog()
     openStore({ store: PIZZERIA, item: elsewhere() })

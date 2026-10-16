@@ -1,7 +1,7 @@
 {
   "actions": [
     {
-      "label": "Agregar",
+      "label": "Ver producto",
       "route": [
         "grocery"
       ],

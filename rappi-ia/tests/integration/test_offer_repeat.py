@@ -16,7 +16,7 @@ from rappi_ia.embeddings.text_store import embed_search_documents
 from rappi_ia.events import store as events
 from rappi_ia.motor.build import refresh_user_conn
 from rappi_ia.motor.model import TZ
-from rappi_ia.offers.engine import _days_ago
+from rappi_ia.offers.engine import _days_ago, _every
 
 TODAY = datetime.now(TZ).date()
 COFFEE = ("catalog_item", "91004")  # café molido, solo en el súper
@@ -83,7 +83,7 @@ def test_what_is_due_today_comes_with_the_last_product_and_says_why(client, db):
     [product] = body["products"]
     assert (product["entity_type"], product["entity_id"]) == COFFEE
     assert product["vertical"] == "supermercado" and product["price_value"]
-    assert body["actions"] == [{"label": "Agregar", "route": ["grocery"], "store_id": product["store_id"]}]
+    assert body["actions"] == [{"label": "Ver producto", "route": ["grocery"], "store_id": product["store_id"]}]
 
 
 @pytest.mark.parametrize(
@@ -157,6 +157,21 @@ def test_a_forgotten_concept_does_not_come_back(client, db):
 
 def test_the_context_is_empty_and_strict(client):
     assert repeat(client, context={"concept": "cafe"}).status_code == 422
+
+
+def test_a_daily_rhythm_reads_every_day(client, db):
+    rhythm(db, "u-ritmo", "supermercado", "cafe", COFFEE, last_days_ago=1, every=1)
+
+    body = repeat(client).json()
+
+    assert body["text"] == "¿Repetimos café? Lo pides cada día."
+    assert body["reason"]["text"] == "Porque lo pides cada día y tu último pedido fue ayer."
+
+
+def test_every_reads_in_spanish():
+    assert _every(1) == "cada día"
+    assert _every(2) == "cada 2 días"
+    assert _every(14) == "cada 14 días"
 
 
 def test_days_ago_reads_in_spanish():
