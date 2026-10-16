@@ -42,8 +42,8 @@ Es una **correlación, no un efecto**: quien ya pide mucho usa más verticales y
 | Pieza | Qué hace |
 |---|---|
 | **Motor multivertical** | En la base de datos, siete tablas con vistas estables en el esquema `capa`. Guarda la afinidad de cada persona por cada vertical, las transiciones entre verticales y las combinaciones con su retención (la tabla de Rappi medida con los datos propios). Suma la compra cruzada entre verticales, lo más pedido y lo que sube, y la recompra (qué concepto pide cada persona con ritmo y cuándo le toca). Se evalúa por fechas (entrenar, validar, probar) y elige sus pesos en validación. Lo personal sale de los datos de cada persona; lo de la población, de una fuente declarada en cada oferta (hoy, personas simuladas). |
-| **Home que aprende el orden** | Los seis accesos pequeños de la Home (Grocery, Pharmacy, Retail, Liquor, Express, Chocolates) se ordenan según lo que cada persona pide y abre, con la leyenda «Ordenadas según lo que más usas». Quien no tiene historial ve el orden fijo. Restaurantes y Turbo no se mueven, Loyalty y Benefits Pro quedan siempre al final y «Rappi hoy» no aprende. Es un pedido del equipo de Rappi. |
-| **Mochi en la Home, con recomendaciones conectadas** | Mochi de cuerpo entero vive en la Home, sin un canal aparte para escribirle. Saluda, acompaña el plan del día («¿Qué plan tienes hoy?», un kit de varias verticales) y, al tocarlo, propone la siguiente vertical de la escalera con su porqué. Dentro de esa vertical ofrece lo que suelen sumar quienes piden lo mismo o, si no hay un patrón, lo más pedido ahí. Cuando a la persona le toca, propone repetir («¿Repetimos …? Pides cada N días.»). |
+| **Home que aprende el orden** | Los seis accesos pequeños de la Home (Grocery, Pharmacy, Retail, Liquor, Express, Chocolates) se ordenan según lo que cada persona pide y abre, con la leyenda «Ordenadas según lo que más usas». Quien no tiene historial ve el orden fijo. Restaurantes y Turbo no se mueven, Loyalty y Benefits Pro quedan siempre al final y «Rappi hoy» no aprende. Nace de una conversación con el equipo de Rappi. |
+| **Mochi en la Home, con recomendaciones conectadas** | Mochi de cuerpo entero vive en la Home, sin un canal aparte para escribirle. Saluda, acompaña el plan del día («¿Qué plan tienes hoy?», un kit de varias verticales) y, al tocarlo, propone la siguiente vertical de la escalera con su porqué. Dentro de esa vertical ofrece lo más pedido ahí; cuando una regla aprendida lo justifica (hoy no, λ = 0), lo que suelen sumar quienes piden lo mismo. Cuando a la persona le toca, propone repetir («¿Repetimos …? Pides cada N días.»). |
 | **Buscador con Mochi** | La barra de la Home abre el buscador de siempre con lo que Mochi sabe de la persona: lo aprendido (con «Olvidar»), ideas para tocar («Arma un carrete»), búsqueda de tiendas y productos, y «Descubre con Mochi». Se toca; no se escribe. |
 
 | La Home que aprende | Mochi propone una vertical | «¿Repetimos?» | El buscador con Mochi |
@@ -53,14 +53,15 @@ Es una **correlación, no un efecto**: quien ya pide mucho usa más verticales y
 
 ### Cómo cruza las verticales
 
-La app busca en las verticales que corresponden a la consulta (las de su concepto o su ocasión, como «carrete»; sin ninguno, en todas, y quedan solo las que calzan las palabras o se parecen mucho) y muestra un grupo por vertical, con la de la pantalla primero. Una recomendación cruzada sigue tres pasos: concepto → complemento → búsqueda en la otra vertical.
+Una recomendación cruzada sigue tres pasos: concepto → complemento → búsqueda en la otra vertical. Algunos ejemplos:
 
 | Lo que hace la persona | Concepto | Complemento | Dónde se busca | Qué ve |
 |---|---|---|---|---|
-| Pide cerveza bajo $3.000 en Licores | cerveza | snacks salados | la vertical donde el concepto es más típico entre las que tienen oferta suficiente (Express) | «De Express · ¿Te tinca sumar snacks salados? Porque llevas cerveza», con «Ver más en Express» |
-| Compra pañales en el supermercado | pañales | alimentación de bebé | la vertical donde ese concepto es más típico (farmacia), no la de más ítems | «De Farmacia · ¿Te tinca sumar alimentación de bebé? Porque llevas pañales» |
+| Pide cerveza bajo $3.000 en Licores | cerveza | snacks salados | la vertical donde el concepto es más típico entre las que tienen oferta suficiente, sin contar la actual (Express) | «De Express ¿Te tinca sumar 🥨 snacks salados? Porque llevas 🍺 cerveza», con «Ver más en Express →» |
+| Pide pizza en Restaurantes | pizza | bebidas gaseosas (su primer complemento, la cerveza, Mochi no lo ofrece) | Express (Licores no se ofrece) | «De Express ¿Te tinca sumar 🥤 bebidas gaseosas? Porque llevas 🍕 pizza» |
+| Busca pañales | pañales | — | — | Ninguna sugerencia: sus complementos son de bebé y salud, que Mochi nunca ofrece por su cuenta |
 
-**La escalera.** Para elegir qué vertical sumarle a cada persona, el motor parte de la tabla de Rappi y la mezcla con la retención aprendida de la población. Dentro de la vertical elegida, la compra cruzada mezcla lo más pedido con las reglas aprendidas («quien pide A en una vertical pide B en otra»), con un peso λ que se elige en validación. Si la persona compra una marca, esa marca gana a la combinación en un empate. Cada oferta dice en su `basis` de qué fuente salió, y el texto no afirma lo que hace la población («Porque pides …. Para acompañar: …, en ….»).
+**La escalera.** Para elegir qué vertical sumarle a cada persona, el motor parte de la tabla de Rappi y la mezcla con la retención aprendida de la población. Dentro de la vertical elegida, la compra cruzada mezcla lo más pedido con las reglas aprendidas («quien pide A en una vertical pide B en otra»), con un peso λ que se elige en validación (hoy quedó en 0, así que se ofrece lo más pedido). Si la persona compra una marca, esa marca gana a la combinación en un empate. Cada oferta dice en su `basis` de qué fuente salió, y el texto no afirma lo que hace la población («Porque pides …. Para acompañar: …, en ….»).
 
 Las sugerencias siguen reglas para no perder la confianza del cliente: como máximo una sugerencia cruzada por respuesta, con su razón visible; nunca productos sensibles por iniciativa propia (medicamentos, salud sexual, tabaco y vapeo). Farmacia y Licores solo suben en la Home por señales de la propia persona y nunca se proponen por iniciativa propia. Mochi nunca ofrece alcohol por su cuenta: solo aparece en el kit de una ocasión que la persona eligió, siempre con el aviso +18. Lo aprendido se ve y se borra («Olvidar»).
 
@@ -68,7 +69,7 @@ Las sugerencias siguen reglas para no perder la confianza del cliente: como máx
 
 ![Motor multivertical: señales y pedidos de la persona, y la tabla de Rappi, pasan por afinidad, recompra, paso de combinación y compra cruzada hasta la Home dinámica y las ofertas de Mochi](docs/diagramas/motor-flujo.png)
 
-*El motor: lo de la persona (verde) ordena la Home y decide la recompra; la tabla de Rappi y lo aprendido de la población (gris) eligen la vertical por probar y sus productos. [Versión interactiva](docs/diagramas/motor-flujo.html).*
+*El motor: lo de la persona (verde) ordena la Home y decide la recompra; la tabla de Rappi (punteada) y lo aprendido de la población (gris) eligen la vertical por probar y sus productos. [Versión interactiva](docs/diagramas/motor-flujo.html).*
 
 1. **Descarga (semanal).** `rappi refresh` lee las páginas públicas de rappi.cl y guarda catálogo, menús y precios con historial.
 2. **Postgres + pgvector.** El catálogo (capa 1) y `search_documents`, una partición por vertical.
@@ -98,18 +99,18 @@ Cada cifra dice qué tipo de dato es: real, evaluación automática, estimación
 
 ### Motor multivertical (datos simulados: prueban la mecánica, no el efecto)
 
-Corrida del 16-10-2026 (`rappi-ia motor`) sobre una copia del catálogo real y **3.000 personas simuladas**, con tramos por fecha: entrenar, validar y probar (28 días cada uno de los dos últimos). Son las cifras vigentes, después de la mejora continua de la etapa 5. Informe completo, intentos descartados y ruido entre semillas: [docs/resultados/motor-2026-10-16.md](docs/resultados/motor-2026-10-16.md#resultado-final-código-de-esta-etapa-semilla-7-rappi-ia-motor).
+Corrida del 16-10-2026 (`rappi-ia motor`) sobre una copia del catálogo real y **3.000 personas simuladas**, con tramos por fecha: entrenar, validar y probar (28 días cada uno de los dos últimos). Son las cifras vigentes, después de los ajustes del 16-10. Informe completo, intentos descartados y ruido entre semillas: [docs/resultados/motor-2026-10-16.md](docs/resultados/motor-2026-10-16.md#resultado-final-código-de-esta-etapa-semilla-7-rappi-ia-motor).
 
 | Qué | Métrica (tramo de prueba) | Valor | Tipo de dato |
 |---|---|---|---|
-| Próximo vertical | nDCG@8 | combinado 0,958 · solo afinidad 0,957 · popularidad 0,898 · orden fijo 0,892 | Simulado |
+| Próxima vertical | nDCG@8 | combinado 0,958 · solo afinidad 0,957 · popularidad 0,898 · orden fijo 0,892 | Simulado |
 | Compra cruzada | precisión@3 | mezcla 0,128 · lo más pedido 0,128. En validación λ quedó en 0, así que hoy las reglas no cambian lo que se ofrece. Entre las 47 personas con alguna regla: reglas 0,128 frente a 0,106 de lo más pedido (pocas personas) | Simulado |
 | Recompra | acierto ±7 días | 0,114 (9 de 79 predicciones), error mediano de 9 días | Simulado |
 | Generador simulado | distancia a la tabla de Rappi | 23,3 → 18,2 (se acercó al sumar Turbo a las sugerencias simuladas) | Simulado, comparado con el dato compartido por Rappi |
 
 Cómo leerlo: la ventaja del combinado viene casi entera de la afinidad de cada persona, y el generador hace que cada persona repita sus verticales, así que en parte acierta por construcción. El generador se calibró con la tabla de Rappi y la trata como efecto, así que sus cifras no prueban que sumar verticales retenga. La agrupación de verticales en `rest`, `turbo` y `retail` es un supuesto propio. Detalle: [docs/capa-de-datos.md](docs/capa-de-datos.md#motor-multivertical).
 
-**Revisión sobre el catálogo real** ([QA del 16-10-2026](docs/resultados/qa-motor-2026-10-16.md), en solo lectura, con 200 personas simuladas y las 44 del prototipo): las guardias (Farmacia, Licores, bebé, salud, conceptos sensibles, alcohol) dieron **0 casos en 2.851 productos ofrecidos**, y la ruta más lenta (`/recommendations`) respondió con p95 de 222 ms con el modelo de texto.
+**Revisión sobre el catálogo real** ([QA del 16-10-2026](docs/resultados/qa-motor-2026-10-16.md), en solo lectura, con 200 personas simuladas y las 44 del prototipo, medida antes de los ajustes de la etapa 5, con λ > 0): las guardias (Farmacia, Licores, bebé, salud, conceptos sensibles, alcohol) dieron **0 casos en 2.851 productos ofrecidos**, y la ruta más lenta (`/recommendations`) respondió con p95 de 222 ms con el modelo de texto.
 
 ### Catálogo, conceptos y búsqueda
 
@@ -191,7 +192,7 @@ Una demo cerrada en un servidor Linux con Docker Compose: Caddy con TLS y una pu
 
 ## Límites
 
-- **El motor aprende de una población simulada:** sin pedidos reales, las transiciones, las combinaciones, la compra cruzada y lo más pedido salen de personas simuladas (`MOTOR_POBLACION`; con datos de Rappi se cambia la fuente, no el mecanismo). Como en validación λ quedó en 0, la variante «Para tu pedido de …» no aparece en la demo y sale «Lo más pedido en …». Ver [docs/decisiones.md](docs/decisiones.md).
+- **El motor aprende de una población simulada:** sin pedidos reales, las transiciones, las combinaciones, la compra cruzada y lo más pedido salen de personas simuladas (`MOTOR_POBLACION`; con datos de Rappi se cambia la fuente, no el mecanismo). Como en validación λ quedó en 0, la razón «Porque pides …. Para acompañar: …» no aparece en la demo: Mochi ofrece lo más pedido («Porque aún no pides en …: esto es lo que más se pide.»). Ver [docs/decisiones.md](docs/decisiones.md).
 - **La escalera parte de una correlación:** la tabla de Rappi no prueba que sumar una vertical retenga, y la agrupación en `rest`, `turbo` y `retail` es un supuesto propio. El efecto (frecuencia, retención, verticales por persona) solo se mide con datos de Rappi y un grupo de control.
 - **Cobertura parcial en tiendas:** hasta 24 productos por sub-pasillo y una sucursal por marca o formato. No se listan las tiendas sin ofertas vigentes en un pasillo de primer nivel, ni Mascotas (la base no tiene esa vertical).
 - **Mochi no ofrece por su cuenta alcohol, farmacia, bebé ni salud:** solo el kit de una ocasión que la persona elige puede traer alcohol, con +18. Consecuencia aceptada: hay menos complementos (por ejemplo, «playa» ya no sugiere protector solar). Ver [docs/decisiones.md](docs/decisiones.md).
