@@ -36,8 +36,7 @@
           "agente",
           "conceptos",
           "busqueda",
-          "eventos",
-          "tarjetas"
+          "eventos"
         ],
         "note": "El puente es el concepto: interés del usuario → complemento → búsqueda en el índice de otro vertical."
       },
@@ -148,7 +147,7 @@
       "col": 0,
       "type": "frontend",
       "label": "prototipo-app",
-      "sublabel": "buscador · juego",
+      "sublabel": "buscador · Home",
       "width": 150
     },
     {
@@ -214,15 +213,6 @@
       "type": "frontend",
       "label": "Panel :5175",
       "sublabel": "Uso del MVP · /analytics",
-      "width": 170
-    },
-    {
-      "id": "tarjetas",
-      "lane": "cruce_lane",
-      "col": 3,
-      "type": "database",
-      "label": "Tarjetas del juego",
-      "sublabel": "knowledge_cards · game_state",
       "width": 170
     }
   ],
@@ -321,14 +311,6 @@
       "to": "panel",
       "label": "métricas",
       "role": "branch"
-    },
-    {
-      "id": "conceptos-tarjetas",
-      "from": "conceptos",
-      "to": "tarjetas",
-      "label": "knowledge",
-      "variant": "dashed",
-      "role": "async"
     }
   ]
 }

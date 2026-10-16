@@ -1,6 +1,6 @@
 # Guion de demo del MVP
 
-Unos 10 minutos para mostrar el prototipo final a una persona del negocio: qué ve el usuario en la app, cómo Mochi cruza verticales y cómo invita a descubrir las que no usa (pasaporte y juego). Se hace con el MVP corriendo (`make mvp`): la app no abre sin la API.
+Unos 10 minutos para mostrar el prototipo final a una persona del negocio: qué ve el usuario en la app, cómo Mochi cruza verticales y cómo invita a descubrir las que no usa. Se hace con el MVP corriendo (`make mvp`): la app no abre sin la API.
 
 ## Antes de empezar
 
@@ -15,7 +15,7 @@ Si la app muestra **«Sin conexión con Mochi»**, la API todavía no terminó d
 
 1. Abre el prototipo (http://localhost:5174) y deja el modo **Prototipo final** (arriba a la izquierda; la tecla **D** alterna con «Rappi hoy», la app como es hoy).
 2. Justo antes de presentar, con la API arriba: `cd rappi-ia && make warm`. Pasa por los botones del guion sin registrarlos: en frío la primera respuesta tarda de 2 a 5 s; después, menos de medio segundo. Repetirlo si la API pasó un rato sin uso.
-3. Para empezar sin rastros de pruebas anteriores, toca la barra de la Home («¿Qué se te antoja hoy?») para abrir el buscador con Mochi y, arriba, en «Aprendiendo de ti», toca **Olvidar** (o, en Cuenta, **Borrar mis datos**) y confirma con **Sí, borrar**: borra en la API el perfil, los eventos, los pedidos y el progreso del juego, vacía lo que la app guardó en este navegador y la recarga en la Home, como la primera vez (vuelve el aviso de privacidad: «Entendido»). El botón aparece siempre, aunque Mochi todavía no haya aprendido nada.
+3. Para empezar sin rastros de pruebas anteriores, toca la barra de la Home («¿Qué se te antoja hoy?») para abrir el buscador con Mochi y, arriba, en «Aprendiendo de ti», toca **Olvidar** (o, en Cuenta, **Borrar mis datos**) y confirma con **Sí, borrar**: borra en la API el perfil, los eventos y los pedidos, vacía lo que la app guardó en este navegador y la recarga en la Home, como la primera vez (vuelve el aviso de privacidad: «Entendido»). El botón aparece siempre, aunque Mochi todavía no haya aprendido nada.
 
 ## Recorrido
 
@@ -43,27 +43,17 @@ Los productos y precios salen del catálogo real y la sugerencia de otra vertica
 
 Es lo primero que se ve en el prototipo final. Para partir de cero: **↺ Repetir escena** (junto al interruptor, arriba a la izquierda).
 
-1. Mochi entra caminando a la Home y saluda. No sugiere productos ni mueve la Home: la Home es la de siempre, con el pasaporte de verticales justo bajo los accesos. **Qué decir:** Mochi es parte de la Home, no un canal aparte.
-1b. La primera vez, después del saludo, Mochi hace una guía de 3 pasos: el buscador, el pasaporte y «Jugar» (**Siguiente** / **Saltar**). No vuelve a aparecer; «↺ Repetir escena» la muestra de nuevo.
+1. Mochi entra caminando a la Home y saluda. No sugiere productos ni mueve la Home: la Home es la de siempre. **Qué decir:** Mochi es parte de la Home, no un canal aparte.
+1b. La primera vez, después del saludo, Mochi hace una guía de 2 pasos: el buscador y qué pasa al tocarla (**Siguiente** / **Saltar**). No vuelve a aparecer; «↺ Repetir escena» la muestra de nuevo.
 2. Baja hasta «¿Qué plan tienes hoy?» (cinco ocasiones) y elige **Carrete**: un kit de varias verticales con un solo botón. Como la persona eligió la ocasión, el kit puede traer alcohol, con la marca **+18**; en lo que Mochi ofrece por su cuenta nunca hay alcohol, farmacia, bebé ni salud.
-3. Toca a Mochi: propone jugar una vertical que falta en el pasaporte. Con «Abrir» la sellas al entrar y, al volver, lo celebra.
-
-El pasaporte y su envío gratis son una idea para probar con usuarios, no una promoción real.
-
-### Juego de verticales (2 minutos, opcional)
-
-1. En el pasaporte de la Home, toca **Jugar**: el camino de las 9 verticales con la misión del día. Juega una ronda de Chocolatería (5 pasos: datos «¿Sabías que…?» que se dan vuelta, preguntas curiosas y un desafío que la API arma con el catálogo) y abre el **Álbum**: cada dato trae su fuente. Si recargas la página, el progreso sigue: vive en el servidor. **Qué decir:** cada vertical enseña su mundo con datos verificados, para que la persona conozca verticales que no usa, jugando y sin que se le pida comprar.
-2. Haz un pedido y, en el seguimiento, toca **«Juega mientras llega tu pedido»**: la ronda muestra arriba cuánto falta y avisa cuando llega (en la demo, a los 20 s). **Qué decir:** la espera se aprovecha para descubrir otra vertical y suma un sello.
-3. Vuelve a la Home: el sello nuevo está en el pasaporte.
-4. Abre el buscador con Mochi y toca **Algo dulce**: la respuesta trae un **«¿Sabías que…?»** con su fuente, ligado a lo que se buscó, y lo suma al álbum. **Qué decir:** el juego y el buscador comparten una sola base de conocimiento; Mochi nunca trae un dato de alcohol o salud por su cuenta.
+3. Toca a Mochi: propone una vertical que la persona aún no pide, según sus pedidos («Porque aún no pides en …»), con sus ofertas. Con «Abrir» entra a esa vertical. Si no tiene nada que ofrecer, Mochi calla.
 
 ### El panel con lo que acaba de pasar (2 minutos, opcional)
 
 Con `make mvp` el panel ya está arriba. Después de la demo de la app, ábrelo en [http://localhost:5175/?vista=mvp&fuente=prototipo](http://localhost:5175/?vista=mvp&fuente=prototipo) (o elige **Prototipo** arriba y la pestaña **Uso del MVP**; **Actualizar** vuelve a pedir lo nuevo sin recargar).
 
 1. **Ofertas del agente por momento:** el kit de «Carrete» aparece en **Plan** y, si usaste el carro o el checkout, en **Carro** y **Antes de pagar**, con lo mostrado y lo aceptado. **Qué decir:** así se ve en qué momento la oferta de Mochi funciona; el porcentaje aparece recién con 10 mostradas, antes solo las cuentas.
-2. **Juego:** las rondas terminadas y las tarjetas descubiertas, por vertical del juego. Las estrellas promedio aparecen desde 5 rondas.
-3. **Búsquedas sin resultado:** una búsqueda sin resultado en la app (por ejemplo, algo que el catálogo no tiene) suma a su vertical; el concepto solo se suma si la pregunta pasó por el agente (las búsquedas de la app no llevan concepto). Nunca se ve lo que se escribió.
+2. **Búsquedas sin resultado:** una búsqueda sin resultado en la app (por ejemplo, algo que el catálogo no tiene) suma a su vertical; el concepto solo se suma si la pregunta pasó por el agente (las búsquedas de la app no llevan concepto). Nunca se ve lo que se escribió.
 
 **Qué decir:** cada bloque lleva el rótulo «uso del MVP, pocas personas: no es evidencia». Son las pruebas de unas pocas personas, no una medición, y nunca se mezclan con los datos simulados del resto del panel. «Olvidar» en la app borra también los eventos de esa persona.
 

@@ -208,7 +208,6 @@ Quien pide seguido lo mismo recibe un perfil («🥢 Amante de lo asiático») y
 | Sugerencia aceptada / convertida | Aceptada: el producto sugerido (al preguntarle al agente o en "Para ti") se agregó al carro; cuenta una vez por sugerencia (concepto, vertical y origen) en la pestaña, igual que la mostrada, así las aceptadas nunca superan a las mostradas: quitarlo y volver a agregarlo, o agregarlo otra vez en el carro siguiente, no es otra aceptación. Convertida: llegó a un pedido. El aviso sobre el carro se mide aparte: ahí aceptar es abrir al agente |
 | Servicios sin catálogo | Por servicio (RappiTravel, RappiFavor): veces que Mochi lo ofreció (`service_shown`), que se abrió (`service_opened`) y ganchos del catálogo mostrados y aceptados (sugerencias con `origen` = el servicio). Vista «Entre verticales» |
 | Ofertas del agente por momento | Sugerencias mostradas (`suggestion_shown`) y aceptadas (`suggestion_accepted`) agrupadas por el momento que dice su `origen`: `agent-plan`, `agent-carrito`, `agent-checkout`, `agent-proximo_pedido`, `agent-sin_resultado`, `agent-vertical_por_probar`, `agent-perfil`, la pregunta al agente (`agent-ask`) y «Para ti». Los nombres históricos (`mochi-<momento>`, `chat`, `para-ti-local`, `vertical-para-ti`) siguen contando; un origen sin momento o desconocido va a «sin momento» y no se pierde. Quedan fuera los servicios sin catálogo (tienen su sección) y el aviso sobre el carro. La tasa de aceptación necesita 10 mostradas, como en las sugerencias cruzadas. Solo cuentas y personas distintas |
-| Juego | Del juego de verticales, personas distintas, rondas terminadas (`game_round_finished`, una vez por ronda aunque se vuelva a pintar), tarjetas descubiertas (`game_card_discovered`, una vez por tarjeta y persona) y estrellas promedio de las rondas (de 0 a 3; solo desde 5 rondas), en total y por vertical del juego (`payload.vertical_juego`). Quien solo jugó cuenta como persona activa del MVP. Los eventos no llevan texto: solo el id de la tarjeta y números |
 | Búsquedas sin resultado | De las búsquedas (`search`) y preguntas al agente (`ask`, antes `chat`) que saben si encontraron algo, cuántas no y, por vertical y concepto reconocido, cuántas sin resultado (hasta 20 filas). **Nunca el texto buscado**; sin concepto reconocido se rotula «Sin concepto reconocido» y los conceptos sensibles no se muestran. Una fila sin umbral de personas puede reflejar la búsqueda de una sola persona: por eso se lee como demanda que el catálogo no cubre, no como una tendencia |
 | Embudo por vertical | Sesiones que buscan (llegan a la vertical) → agregan al carro → inician pago → piden. La entrada (buscar, preguntarle al agente, navegar, aceptar una sugerencia o agregar al carro desde una lista, que solo manda el agregado) se mira en toda la sesión, porque la sugerencia cruzada lleva el pedido a otra vertical. Una sesión cuenta en una vertical si tuvo ahí algún evento que no sea ver o descartar una sugerencia: ver una sugerencia sin aceptarla no la mete en esa vertical. Por eso una sesión puede contar en dos verticales: la conversión global (el titular) cuenta cada sesión una vez |
 
@@ -265,9 +264,6 @@ erDiagram
     APP_ORDER ||--o{ APP_ORDER_LINE : contiene
     APP_ORDER_LINE }o--o| CATALOG_ITEM : "producto"
     APP_ORDER_LINE }o--o| MENU_ITEM : "plato"
-    KNOWLEDGE_CARD ||--o{ KNOWLEDGE_CARD_CONCEPT : liga
-    CONCEPT ||--o{ KNOWLEDGE_CARD_CONCEPT : tema
-    APP_USER ||--o| GAME_STATE : progreso
 ```
 
 Notas del modelo:
@@ -275,7 +271,6 @@ Notas del modelo:
 - **Platos y productos:** no hay una tabla de platos estándar. Un plato y un producto del súper se conectan al compartir concepto en `item_concepts`.
 - **Eventos:** `APP_EVENT` lleva `session_id` (una sesión termina tras 30 minutos sin actividad) y `cart_id` en los eventos de carro (`cart_add`, `cart_remove`, `checkout_start`, `order_placed`).
 - **Líneas de pedido:** `APP_ORDER_LINE` puede apuntar a un producto o a un plato.
-- **Juego:** `knowledge_cards` (108 tarjetas, las carga `rappi-ia knowledge`), `knowledge_card_concepts` (ligas revisadas) y `game_state` (progreso por persona, `source` del prototipo): migración 028.
 - **Precio vigente:** `latest_prices` y `latest_menu_prices` guardan el último precio de cada oferta y de cada plato (migración 032), y `v_latest_offers` es la única definición de oferta vigente.
 - **Jev:** `eval_judgments` guarda los juicios de Jev (migración 030), y el mapa de categorías suma el método `jev`.
 - **Capa de datos:** las vistas estables para otras herramientas están en el esquema `capa` ([capa-de-datos.md](capa-de-datos.md)).
@@ -308,7 +303,7 @@ El MVP integrado se armó encima de las etapas de diseño en 7 etapas, cada una 
 | 1. Base | `make mvp` levanta API, app y panel; `make mvp-check` los recorre con Chrome | [etapa 1](superpowers/plans/2026-10-10-mvp-etapa-1-base.md) |
 | 2. Catálogo real | Las pantallas de catálogo leen la base (`/catalog`) | [etapa 2](superpowers/plans/2026-10-10-mvp-etapa-2-catalogo.md) |
 | 3. Buscador y agente sobre el RAG | El buscador con Mochi y sus ofertas salen de la API (`/agent`) | [etapa 3](superpowers/plans/2026-10-10-mvp-etapa-3-mochi.md) |
-| 4. Juego en el RAG | Tarjetas, desafíos y progreso en la base (`knowledge`, `/game`) | [etapa 4](superpowers/plans/2026-10-10-mvp-etapa-4-juego.md) |
+| 4. Juego en el RAG (historia) | Tarjetas, desafíos y progreso en la base; salió del proyecto el 16-10-2026 (migración 035, ver [decisiones.md](decisiones.md)) | [etapa 4](superpowers/plans/2026-10-10-mvp-etapa-4-juego.md) |
 | 5. Personalización | Lo aprendido, «Para ti» y eventos del prototipo | [etapa 5](superpowers/plans/2026-10-10-mvp-etapa-5-personalizacion.md) |
 | 6. Panel conectado | «Uso del MVP» con lo que la gente hace en la app | [etapa 6](superpowers/plans/2026-10-11-mvp-etapa-6-panel.md) |
 | 7. Jev | Etiquetas de categorías y juez de la búsqueda, listo y apagado hasta el piloto | [etapa 7](superpowers/plans/2026-10-11-mvp-etapa-7-jev.md) |

@@ -17,7 +17,7 @@ Requiere Node 22.22+ o 24.15+ (ver `.nvmrc` en la raíz). Como la app no abre si
 ```bash
 make mvp              # API :8000, app http://localhost:5174 y panel :5175; Ctrl-C detiene los tres
 make mvp LAN=1        # abre la API y la app a la red local, para el iPhone (misma red wifi o su hotspot)
-make mvp-check        # recorre el MVP con Chrome contra un catálogo inventado, sin tocar la base real (7 revisiones)
+make mvp-check        # recorre el MVP con Chrome contra un catálogo inventado, sin tocar la base real (5 revisiones)
 ```
 
 Requisitos, qué revisa `make mvp-check` y qué hacer si falla algo: [docs/instalacion.md](../docs/instalacion.md#5-el-mvp). Para correr solo la app, con la API ya levantada por su cuenta (`cd rappi-ia && make serve`):

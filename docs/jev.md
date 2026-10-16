@@ -11,15 +11,12 @@ Jev es **opcional y fuera de línea**. Solo trabaja dentro de `make post-refresh
 | **Etiquetar categorías** | Propone el concepto de las categorías nuevas del catálogo (las que ningún mapeo revisado cubre). Si está muy seguro lo aplica (`category_map` con método `jev`); si duda, la deja en una cola de revisión; si dice «ninguno» o la categoría mezcla cosas, no hace nada. Un concepto sensible o +18 nunca se asigna solo a una categoría cuyo resto dice lo contrario: va a revisión. | `make jev-categorias`, antes de `make concepts`; cola en `data/concepts/revision-jev.csv` |
 | **Juzgar la búsqueda** | Suma un tercer juez (junto al juez por concepto y las personas) en el reporte `make eval`: dice si cada resultado sirve para la consulta. Sus juicios se guardan en `eval_judgments` con la versión del modelo: la segunda corrida no vuelve a preguntar lo mismo. | `data/eval/busqueda.md` |
 
-Además puede proponer un concepto por tarjeta del juego (`rappi-ia knowledge --jev-propuestas`), pero solo escribe `data/eval/tarjetas-jev.csv` para que una persona lo revise: **nunca liga nada**.
-
 ## Qué datos salen
 
 Solo datos públicos del catálogo y el set de evaluación:
 
 - nombres de categorías y 8 nombres de producto de ejemplo por categoría;
-- las consultas de `src/rappi_ia/eval/queries.json` y los nombres de lo que la búsqueda devolvió;
-- el texto de las tarjetas del juego (solo con `--jev-propuestas`).
+- las consultas de `src/rappi_ia/eval/queries.json` y los nombres de lo que la búsqueda devolvió.
 
 **Nunca** salen búsquedas, eventos, pedidos ni perfiles de personas. Sin `TYPESAFE_API_KEY` no se llama a nadie.
 

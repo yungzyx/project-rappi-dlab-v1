@@ -109,7 +109,6 @@ Todas van en `/etc/rappi/rappi.env`, salvo las que fija `docker-compose.yml` o l
 | `AGENT_LLM_MODEL` | api | `claude-sonnet-5` | — | no |
 | `LLM_DAILY_CALL_CAP` | api (por proceso; `0` = nunca Claude) | `300` | `300` | no |
 | `AGENT_NAME` | api | `Mochi` | — | no |
-| `GAME_MIN_ITEMS` | api | `20` | — | no |
 | `MVP_HOME_LAT` / `MVP_HOME_LNG` | api («Cerca de ti») | `-33.4263` / `-70.6106` | — | no |
 | `PROFILE_CITY` | api (la ciudad de los restaurantes de un perfil de gusto si la persona no tiene) | `Santiago de Chile` | `Viña del Mar` | no |
 | `TEXT_EMBEDDING_MODEL` | api, jobs | `intfloat/multilingual-e5-base` | — | no |
@@ -206,7 +205,7 @@ $COMPOSE exec -T db rm /tmp/catalogo.dump /tmp/catalogo.list
 $COMPOSE run --rm migrate
 ```
 
-`rappi-ia deploy-migrate`, como `rappi_owner`: si hay migraciones pendientes, **primero respalda** en el volumen `backups` (`pre-migracion_<fecha>.dump`; si el respaldo falla, no migra), después migra, carga las tarjetas del juego y aplica los permisos de `rappi_api` ([`deploy/db/grants.sql`](../deploy/db/grants.sql)). Dice qué hizo en cada paso. Sale con un mensaje claro si una tabla está ocupada («Intenta de nuevo en unos minutos») o si una migración falla.
+`rappi-ia deploy-migrate`, como `rappi_owner`: si hay migraciones pendientes, **primero respalda** en el volumen `backups` (`pre-migracion_<fecha>.dump`; si el respaldo falla, no migra), después migra y aplica los permisos de `rappi_api` ([`deploy/db/grants.sql`](../deploy/db/grants.sql)). Dice qué hizo en cada paso. Sale con un mensaje claro si una tabla está ocupada («Intenta de nuevo en unos minutos») o si una migración falla.
 
 ### 3.7 Levantar el stack
 
@@ -215,7 +214,7 @@ $COMPOSE up -d --wait
 $COMPOSE ps
 ```
 
-`up` vuelve a correr `migrate` (ya no hay nada pendiente: solo tarjetas y permisos) y después levanta `api` y `web`. La API tarda en quedar sana porque carga el modelo (hasta 2 min de gracia). `ps` debe mostrar `api`, `db` y `web` como `(healthy)`.
+`up` vuelve a correr `migrate` (ya no hay nada pendiente: solo los permisos) y después levanta `api` y `web`. La API tarda en quedar sana porque carga el modelo (hasta 2 min de gracia). `ps` debe mostrar `api`, `db` y `web` como `(healthy)`.
 
 ### 3.8 Prueba de humo
 
@@ -391,7 +390,7 @@ Caché: `/assets/*` (con huella en el nombre) `private, max-age=31536000, immuta
 ### Identidad firmada
 
 - La app pide una sesión con `POST /session` y recibe un id seudónimo (`proto-…`) y su token, firmado con `API_SECRET` (HMAC-SHA256). Lo manda en la cabecera `X-User-Token`.
-- Toda ruta con datos de una persona (`/profile/{user_id}`, `/game/state/{user_id}`, un `user_id` en la query o el cuerpo) exige el token de ese id: sin token, 401 (la app pide una sesión nueva); con el de otro, 403. Sin `user_id`, la ruta sigue anónima.
+- Toda ruta con datos de una persona (`/profile/{user_id}`, un `user_id` en la query o el cuerpo) exige el token de ese id: sin token, 401 (la app pide una sesión nueva); con el de otro, 403. Sin `user_id`, la ruta sigue anónima.
 - **Ids anteriores:** un navegador que ya tenía un id `proto-…` lo manda como `legacy_user_id` y lo recibe firmado. Cada id se reclama **una sola vez y el primero gana**: quien vio un id en un registro antiguo podría reclamarlo antes que su dueño. Solo afecta a bases con personas `prototype` de antes del despliegue (por ejemplo, las del Mac mini que trae el dump).
 - **Cambiar `API_SECRET`** invalida todos los tokens: cada persona recibe un id nuevo y su historial anterior queda huérfano hasta que la purga de 180 días lo borra.
 - **Personas nuevas por IP:** `POST /session` crea a lo más 20 personas nuevas por IP al día (429 después). En una demo con muchos teléfonos en el mismo wifi o detrás de un NAT, todos comparten la IP pública y el 21.º ve «Sin conexión»: para un evento, subir `API_NEW_USERS_PER_IP_DAY` (o `0`, sin tope) y `$COMPOSE up -d api`. Lo mismo vale para `API_RATE_PER_MIN` y `API_RATE_WRITE_PER_MIN`.
@@ -403,7 +402,7 @@ uvicorn toma la IP de `X-Forwarded-For` (`--proxy-headers --forwarded-allow-ips=
 
 ### Roles de la base
 
-- **`rappi_api`** (la API): solo `CONNECT` en la base; lee todo (`public` y `capa`) y escribe solo los datos de las personas: `app_users`, `app_events`, `app_orders`, `app_order_lines`, `game_state`, `user_segments`, `user_segment_history`, y `segment_defs` (el recálculo de segmentos tras un pedido la vuelve a sembrar si cambiaron las reglas). No es dueña de ninguna tabla ni puede crear objetos. Los permisos los aplica `migrate` en cada despliegue ([`grants.sql`](../deploy/db/grants.sql), idempotente).
+- **`rappi_api`** (la API): solo `CONNECT` en la base; lee todo (`public` y `capa`) y escribe solo los datos de las personas: `app_users`, `app_events`, `app_orders`, `app_order_lines`, `user_segments`, `user_segment_history`, y `segment_defs` (el recálculo de segmentos tras un pedido la vuelve a sembrar si cambiaron las reglas). No es dueña de ninguna tabla ni puede crear objetos. Los permisos los aplica `migrate` en cada despliegue ([`grants.sql`](../deploy/db/grants.sql), idempotente).
 - **`rappi_owner`** (migrate y jobs): dueño de la base y de las tablas; migra, restaura y corre los trabajos. No es superusuario.
 - **`postgres`** (superusuario): solo el contenedor `db` (roles, extensiones, crear y borrar bases).
 
@@ -427,7 +426,7 @@ Una clave nueva en el archivo va también en la lista `x-sin-claves-…` que cor
 |---|---|---|
 | La persona del prototipo: id seudónimo, fecha de alta y de su sesión | `app_users` | hasta «Borrar mis datos» o 180 días sin actividad (`PROTOTYPE_USER_RETENTION_DAYS`) |
 | Eventos de uso, con el texto de búsquedas y preguntas (datos personales redactados antes de guardar: RUT, teléfonos, correos, direcciones, tarjetas) | `app_events` | el texto, 90 días; el evento, lo que dure la persona |
-| Pedidos (líneas, tienda, vertical; sin dirección), progreso del juego, segmentos | `app_orders`, `app_order_lines`, `game_state`, `user_segments` | lo que dure la persona (se borran en cascada) |
+| Pedidos (líneas, tienda, vertical; sin dirección), segmentos | `app_orders`, `app_order_lines`, `user_segments` | lo que dure la persona (se borran en cascada) |
 | Registros de la API (sin ids, sin IP, sin query) | Docker | 5 × 10 MB por contenedor |
 | Respaldos (traen todo lo anterior) | volumen `backups`: 3 `nocturno_*`, 4 `pre-migracion_*` y 4 `rappi_*` (si la descarga corre en el servidor); restic | en restic, hasta unas 3 semanas (7 diarios y 4 semanales, que se solapan); en el volumen, 3 días los nocturnos, unas 4 semanas los `rappi_*` y los `pre-migracion_*` hasta 4 despliegues con migración, sin plazo. Lo borrado sigue en ellos hasta que rotan |
 

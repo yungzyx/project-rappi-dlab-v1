@@ -1,13 +1,13 @@
 # rappi-dlab · Que Rappi se conozca más allá de una vertical
 
-Propuesta para Rappi Chile: un **prototipo navegable de la app** en el que Mochi, la mochila de Rappi con bigote, vive en la Home, busca contigo y te invita a descubrir verticales que no usas, con un pasaporte de sellos y un juego que también se ofrece mientras llega tu pedido. Detrás hay datos reales: el catálogo público de rappi.cl en Postgres + pgvector, una búsqueda híbrida evaluada y una capa de datos que entiende qué es cada producto.
+Propuesta para Rappi Chile: un **prototipo navegable de la app** en el que Mochi, la mochila de Rappi con bigote, vive en la Home, busca contigo y te invita a descubrir verticales que no usas. Detrás hay datos reales: el catálogo público de rappi.cl en Postgres + pgvector, una búsqueda híbrida evaluada y una capa de datos que entiende qué es cada producto.
 
 > [!NOTE]
 > Proyecto independiente: no está afiliado a Rappi ni cuenta con su respaldo. Rappi y las demás marcas mencionadas pertenecen a sus respectivos dueños.
 
 [![CI](https://github.com/yungzyx/rappi-dlab/actions/workflows/ci.yml/badge.svg)](https://github.com/yungzyx/rappi-dlab/actions/workflows/ci.yml)
 
-<img src="prototipo-app/docs/screenshots/00-modo-demo.jpg" width="320" alt="Prototipo final: Mochi en la Home, el buscador con Mochi y el pasaporte">
+<img src="prototipo-app/docs/screenshots/00-modo-demo.jpg" width="320" alt="Prototipo final: Mochi en la Home y el buscador con Mochi">
 
 *El prototipo final. El interruptor de arriba (tecla **D**) alterna con la app como es hoy.*
 
@@ -19,18 +19,16 @@ La señal existe: cada búsqueda y cada pedido dice algo de quien lo hace. Pero 
 
 ## La propuesta
 
-**Buscar dentro de la vertical, entender a través de las verticales, e invitar a descubrir las que la persona no usa.** El prototipo final lo muestra en cuatro piezas:
+**Buscar dentro de la vertical, entender a través de las verticales, e invitar a descubrir las que la persona no usa.** El prototipo final lo muestra en dos piezas:
 
 | Pieza | Qué hace |
 |---|---|
-| **Mochi en la Home** | Mochi de cuerpo entero vive en la Home, sin canal aparte para escribirle. Saluda, acompaña el pasaporte y el plan del día («¿Qué plan tienes hoy?», un kit de varias verticales) y, al tocarlo, propone una vertical por probar. |
+| **Mochi en la Home** | Mochi de cuerpo entero vive en la Home, sin canal aparte para escribirle. Saluda, acompaña el plan del día («¿Qué plan tienes hoy?», un kit de varias verticales) y, al tocarlo, propone una vertical por probar. |
 | **Buscador con Mochi** | La barra de la Home abre el buscador de siempre con lo que Mochi sabe de ti: lo aprendido (con «Olvidar»), ideas para tocar («Arma un carrete»), búsqueda de tiendas y productos y «Descubre con Mochi». Se toca; no se escribe. |
-| **Pasaporte Rappi y juego de verticales** | Un sello por vertical: las 8 del catálogo y Viajes (9). Se gana abriendo la vertical o jugando: rondas cortas de 5 pasos con datos «¿Sabías que…?» verificados (con su fuente) y un desafío armado por la API con el catálogo real, niveles, misión del día y álbum. Mochi también suma al álbum el dato ligado a lo que buscas. Con 4 sellos, envío gratis (idea para probar, no una promoción). |
-| **Mientras llega el pedido** | El seguimiento ofrece «Juega mientras llega tu pedido»: una ronda de una vertical sin sello, con el tiempo que falta arriba. La espera se aprovecha para descubrir otra vertical. |
 
-| La Home | El buscador con Mochi | El juego | Mientras llega el pedido |
-|:---:|:---:|:---:|:---:|
-| <img src="prototipo-app/docs/screenshots/01-home-final.jpg" width="190" alt="Home con Mochi y el pasaporte"> | <img src="prototipo-app/docs/screenshots/20-asistente.jpg" width="190" alt="Buscador con Mochi"> | <img src="prototipo-app/docs/screenshots/31-juego-camino.jpg" width="190" alt="Camino del juego de verticales"> | <img src="prototipo-app/docs/screenshots/32-juego-espera.jpg" width="190" alt="Ronda con la franja del pedido"> |
+| La Home | El buscador con Mochi |
+|:---:|:---:|
+| <img src="prototipo-app/docs/screenshots/01-home-final.jpg" width="190" alt="Home con Mochi"> | <img src="prototipo-app/docs/screenshots/20-asistente.jpg" width="190" alt="Buscador con Mochi"> |
 
 ### Cómo cruza las verticales
 
@@ -53,7 +51,7 @@ El efecto real (frecuencia, venta cruzada, verticales nuevas por persona) solo s
 2. **Postgres + pgvector.** El catálogo (capa 1) y `search_documents`, una partición por vertical.
 3. **IA offline.** Cada producto y plato recibe un concepto (capa 2), y los conceptos se enlazan con sus complementos. Una capa de datos suma atributos, medidas, marcas, un grafo de conocimiento y segmentos, y los expone en el esquema `capa` ([docs/capa-de-datos.md](docs/capa-de-datos.md)). Cada documento recibe un embedding de un modelo local multilingüe (e5), con un índice vectorial por vertical. Opcionalmente, y solo en este proceso semanal, Jev (el modelo «System One» de TypeSafe) etiqueta las categorías nuevas y suma un juez a la evaluación; viene apagado hasta que se ponga una clave y un piloto lo apruebe ([docs/jev.md](docs/jev.md)).
 4. **Consulta.** Búsqueda híbrida por vertical (la app consulta las verticales de la consulta, las de su concepto o su ocasión, o todas si no detecta ninguno, y muestra un grupo por vertical): por palabras y por significado, combinadas por posición (RRF) y reforzadas por el concepto pedido. Mochi arma la respuesta y la sugerencia cruzada.
-5. **Prototipo.** La API (FastAPI, puerto 8000) atiende al prototipo (5174). El prototipo no abre sin la API: muestra «Sin conexión con Mochi» (se levantan juntos con `make mvp`). Las verticales, las tiendas con sus pasillos, los restaurantes con su menú, Turbo, Ofertas, Favoritos y la Home leen el catálogo real de la API (`/catalog`); el buscador y Mochi (preguntas, kits, comentarios, «Para ti» y lo aprendido) también salen de la API, sin datos ni respuestas locales. Lo mismo el juego: las tarjetas (`rappi-ia knowledge`, parte de `make post-refresh`), los desafíos y el progreso de cada persona (`/game`) viven en la base y en la API, no en la app.
+5. **Prototipo.** La API (FastAPI, puerto 8000) atiende al prototipo (5174). El prototipo no abre sin la API: muestra «Sin conexión con Mochi» (se levantan juntos con `make mvp`). Las verticales, las tiendas con sus pasillos, los restaurantes con su menú, Turbo, Ofertas, Favoritos y la Home leen el catálogo real de la API (`/catalog`); el buscador y Mochi (preguntas, kits, comentarios, «Para ti» y lo aprendido) también salen de la API, sin datos ni respuestas locales.
 
 **Mochi** en la API responde solo por texto (`POST /agent/ask`); el prototipo lo usa como buscador. Su nombre visible sale de `AGENT_NAME` (rappi-ia) y de `prototipo-app/src/agent/name.js`. Reconoce servicios sin catálogo (un viaje lleva a **RappiTravel**, un envío o trámite a **RappiFavor**). Arma perfiles de gusto (el sushi abre «Amante de lo asiático») y ofrece lo de ese gusto en otras verticales, de a un peldaño; la API los sirve y la app todavía no los usa. Sin clave de API responde con plantillas; con clave, Claude solo redacta sobre lo que el código ya recuperó y verificó. Diseño completo: [docs/diseno-ia.md](docs/diseno-ia.md).
 
@@ -110,7 +108,7 @@ Documentos al 04-10-2026 (segunda descarga semanal automática); «Con concepto�
 > - **Usuarios y eventos simulados.** Los segmentos y las métricas de negocio usan personas simuladas (`source = 'synthetic'`): muestran la mecánica, no un resultado.
 > - **La ventaja del híbrido.** La relevancia se juzga por concepto y el híbrido recibe un refuerzo por ese mismo concepto; sin él, no se distingue del vectorial (0,860 frente a 0,849). Falta un juicio humano.
 > - **Las precisiones de la capa 2 y de la capa de datos** son estimaciones con jueces LLM.
-> - **El progreso del juego y el pasaporte** son de demo: se guardan en el servidor bajo un id seudónimo del navegador, sin cuenta; la persona los borra con «Borrar mis datos» (Cuenta).
+> - **Lo que Mochi aprende de la persona y sus pedidos** es de demo: se guardan en el servidor bajo un id seudónimo del navegador, sin cuenta; la persona los borra con «Borrar mis datos» (Cuenta).
 > - **«No está en el catálogo»** no significa «Rappi no lo vende»: en tiendas el catálogo es una muestra.
 
 ## Probarlo
@@ -128,7 +126,7 @@ Requisitos (el detalle, en [docs/instalacion.md](docs/instalacion.md)):
 ```bash
 make mvp          # desde la raíz del repositorio; Ctrl-C detiene los tres
 make mvp LAN=1    # abre la API y la app a la red local, para el iPhone (solo en una red de confianza)
-make mvp-check    # recorre el MVP con Chrome contra un catálogo inventado, sin tocar la base real (7 revisiones)
+make mvp-check    # recorre el MVP con Chrome contra un catálogo inventado, sin tocar la base real (5 revisiones)
 ```
 
 `make mvp` revisa las dependencias, los puertos y la base (`rappi-ia doctor`, solo lectura), aplica las migraciones pendientes (no las de una rama sin fusionar: `MIGRATE=1` lo fuerza, ver [docs/instalacion.md](docs/instalacion.md#5-el-mvp)), arranca los tres con sus registros prefijados y avisa cuando responden. La API tarda en estar lista porque carga los modelos. No descarga nada de rappi.cl. Qué revisa `make mvp-check`, en [docs/instalacion.md](docs/instalacion.md#5-el-mvp).
@@ -146,7 +144,7 @@ Una demo cerrada en un servidor Linux con Docker Compose: Caddy con TLS y una pu
 ## Qué es real y qué es simulado
 
 - **Real:** el catálogo, los precios y los menús (de rappi.cl), los conceptos, la capa de datos, la búsqueda y las respuestas de Mochi con la API. Las tiendas, productos, precios, menús y ofertas que muestran las pantallas del prototipo salen de la API; su diseño (títulos, categorías, banners) sigue siendo de recortes de capturas de la app. Lo que la API no sabe (tiempo de entrega, nota, costo de envío) no se muestra.
-- **Simulado:** el pago, el seguimiento del pedido (llega a los 20 s), los usuarios y eventos para segmentos y métricas, y el progreso del juego.
+- **Simulado:** el pago, el seguimiento del pedido (llega a los 20 s), y los usuarios y eventos para segmentos y métricas.
 - **Uso responsable:** solo páginas públicas sin barreras técnicas, sin APIs internas ni inicio de sesión, una descarga a la vez con pausas de 1,5 a 3 s y una actualización por semana. Sin datos personales: los usuarios son simulados o del prototipo (id seudónimo). Los datos descargados no se publican ni están en el repositorio. Fines de investigación y demostración; un uso comercial requeriría autorización de Rappi.
 
 ## Límites
@@ -163,7 +161,7 @@ Una demo cerrada en un servidor Linux con Docker Compose: Caddy con TLS y una pu
 
 ```text
 .
-├── prototipo-app/          el prototipo final (Vite + React): Mochi, buscador, pasaporte y juego de verticales
+├── prototipo-app/          el prototipo final (Vite + React): Mochi y buscador con Mochi
 ├── rappi-ia/               conceptos, embeddings, búsqueda, capa de datos, Mochi y API (comando `rappi-ia`)
 ├── rappi-scraper/          descarga del catálogo público → Postgres + pgvector (comando `rappi`; migraciones de toda la base)
 ├── dashboard-empresa/      panel de negocio, parte del MVP (Vite + React; lee la API)
@@ -184,7 +182,7 @@ Una demo cerrada en un servidor Linux con Docker Compose: Caddy con TLS y una pu
 [`dashboard-empresa/`](dashboard-empresa/) es el panel para la empresa y forma parte del MVP: lee las métricas de la API (`/analytics`) y `make mvp` lo levanta junto a la app. Convierte la conducta de compra y lo que la gente pide en decisiones (tendencias por concepto, demanda no satisfecha, usuarios en riesgo, rendimiento de las sugerencias cruzadas y salud del catálogo). Se elige la fuente de los datos y nunca se mezclan:
 
 - **Simulados** (por defecto): usuarios, eventos y pedidos de un generador con semilla. Muestran la mecánica del panel, no un resultado. La pestaña Catálogo es real (muestra pública de rappi.cl).
-- **Prototipo**: lo que la gente hizo en la app del MVP, con la vista **Uso del MVP**: las ofertas del agente por momento (plan, carro, antes de pagar, próximo pedido, sin resultado, vertical por probar, pregunta y «Para ti»), el juego (rondas, tarjetas descubiertas y estrellas) y las búsquedas sin resultado por vertical y concepto. Es uso de pocas personas y el panel lo rotula «uso del MVP, pocas personas: no es evidencia». Sin nombres ni textos: personas contadas, nunca nombradas.
+- **Prototipo**: lo que la gente hizo en la app del MVP, con la vista **Uso del MVP**: las ofertas del agente por momento (plan, carro, antes de pagar, próximo pedido, sin resultado, vertical por probar, pregunta y «Para ti») y las búsquedas sin resultado por vertical y concepto. Es uso de pocas personas y el panel lo rotula «uso del MVP, pocas personas: no es evidencia». Sin nombres ni textos: personas contadas, nunca nombradas.
 
 ```bash
 make mvp   # panel en http://localhost:5175/?vista=mvp&fuente=prototipo (sin la API, «Uso del MVP» no muestra cifras: dice «La API no responde»)
@@ -192,7 +190,7 @@ make mvp   # panel en http://localhost:5175/?vista=mvp&fuente=prototipo (sin la 
 
 ## Historial del proyecto
 
-Este repo cuenta la propuesta vigente. Todas las etapas anteriores (la presentación al gerente, las versiones con Bigotes, los modos «Propuesta» y «Bigotes vivo») y el juego de verticales con su historial están en [**rappi-evolucion-proyecto**](https://github.com/yungzyx/rappi-evolucion-proyecto), con una etiqueta por etapa y su [línea de tiempo](https://github.com/yungzyx/rappi-evolucion-proyecto/blob/main/EVOLUCION.md).
+Este repo cuenta la propuesta vigente. Todas las etapas anteriores (la presentación al gerente, las versiones con Bigotes, los modos «Propuesta» y «Bigotes vivo») y el pasaporte con el juego de verticales (código, tarjetas y planes) están en [**rappi-evolucion-proyecto**](https://github.com/yungzyx/rappi-evolucion-proyecto), con una etiqueta por etapa y su [línea de tiempo](https://github.com/yungzyx/rappi-evolucion-proyecto/blob/main/EVOLUCION.md).
 
 ## Documentación
 

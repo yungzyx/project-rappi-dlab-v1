@@ -7,7 +7,7 @@
 | Si quieres… | Lee | Tiempo |
 |---|---|---|
 | Entender el problema y por qué existe el proyecto | [contexto-y-problema.md](contexto-y-problema.md) | 5 min |
-| Ver el prototipo final: Mochi, buscador, pasaporte y juego | [prototipo-app/README.md](../prototipo-app/README.md) | 5 min |
+| Ver el prototipo final: Mochi en la Home y el buscador con Mochi | [prototipo-app/README.md](../prototipo-app/README.md) | 5 min |
 | Mostrarlo a alguien del negocio (guion de 10 minutos) | [demo.md](demo.md) | 3 min |
 | Saber qué se decidió y por qué | [decisiones.md](decisiones.md) | 5 min |
 | Ver cómo llegó a ser lo que es (todas las etapas) | [rappi-evolucion-proyecto](https://github.com/yungzyx/rappi-evolucion-proyecto) | 5 min |
@@ -25,7 +25,8 @@
 | Usar o modificar el scraper | [rappi-scraper/README.md](../rappi-scraper/README.md) | 10 min |
 | Qué es el MVP integrado y cómo se armó (7 etapas) | [especificación del MVP](superpowers/specs/2026-10-10-mvp-integrado-design.md) | 10 min |
 | Saber cómo se arman los perfiles de gusto (el sushi como narrativa, escaleras de verticales) y qué falta para la app | [especificación](superpowers/specs/2026-10-14-perfiles-de-gusto-design.md) | 5 min |
-| Diseño original del juego de verticales (09-10, antes de pasar a la API) | [especificación](superpowers/specs/2026-10-09-juego-en-prototipo-design.md) | 5 min |
+| Saber hacia dónde va el proyecto: la Home dinámica y el motor de recomendaciones entre verticales | [especificación](superpowers/specs/2026-10-16-motor-multivertical-design.md) y [plan de la etapa 1](superpowers/plans/2026-10-16-etapa-1-sin-pasaporte-ni-juego.md) | 10 min |
+| Historia: diseño del juego de verticales (09-10; salió del proyecto el 16-10, ver [decisiones.md](decisiones.md)) | [especificación](superpowers/specs/2026-10-09-juego-en-prototipo-design.md) | 5 min |
 
 ### Diagramas y mapas
 
@@ -48,7 +49,7 @@ Las fuentes JSON de los diagramas están en [diagramas-fuente/](diagramas-fuente
 | Las cifras vigentes, con qué tipo de dato es cada una | [README.md#resultados](../README.md#resultados) |
 | Los reportes de evaluación de la búsqueda, uno por fecha | [resultados/](resultados/) (`busqueda-*.md`) |
 | La precisión medida de conceptos, atributos y marcas | [resultados/capas-precision-2026-10-06.md](resultados/capas-precision-2026-10-06.md) y [la muestra nueva](resultados/capas-precision-2026-10-06-nueva-muestra.md) |
-| Cómo se verificaron los datos del juego de verticales (fuente de cada tarjeta) | [resultados/juego-verificacion-2026-10-09.md](resultados/juego-verificacion-2026-10-09.md) |
+| Historia: cómo se verificaron los datos del juego de verticales (salió del proyecto el 16-10; fuente de cada tarjeta) | [resultados/juego-verificacion-2026-10-09.md](resultados/juego-verificacion-2026-10-09.md) |
 
 ## 4. Operación
 
