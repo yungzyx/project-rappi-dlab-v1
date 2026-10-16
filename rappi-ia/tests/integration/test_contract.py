@@ -147,6 +147,13 @@ CONTRACT: tuple[Example, ...] = (
         "/agent/offer",
         {"moment": "vertical_por_probar", "user_id": "u-afin", "context": {}},
     ),
+    # Solo pide sushi en restaurantes (u-gustos): la combinación que más retiene le suma Turbo.
+    Example(
+        "agent-offer-vertical-por-probar-combinacion",
+        "POST",
+        "/agent/offer",
+        {"moment": "vertical_por_probar", "user_id": "u-gustos", "context": {}},
+    ),
     # La escalera de un perfil elegido, sin persona: lo que usa la demo.
     Example("agent-offer-perfil", "POST", "/agent/offer", {"moment": "perfil", "context": {"perfil": "asiatico"}}),
     Example("profile-gustos", "GET", "/profile/u-gustos/gustos"),

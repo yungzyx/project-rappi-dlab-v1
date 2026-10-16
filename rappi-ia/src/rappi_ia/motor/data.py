@@ -40,8 +40,10 @@ class Signal:
     vertical: str
 
 
-def _filters(source: str, user_id: str | None, before: datetime | None, table: str) -> tuple[str, list]:
-    """Las condiciones comunes: fuente de la persona y del registro, persona y corte de tiempo opcionales."""
+def _filters(
+    source: str, user_id: str | None, before: datetime | None, table: str, since: datetime | None = None
+) -> tuple[str, list]:
+    """Las condiciones comunes: fuente de la persona y del registro, persona y cortes de tiempo opcionales."""
     sql = f"u.source = %s AND {table}.source = %s"
     params: list = [source, source]
     if user_id is not None:
@@ -50,14 +52,22 @@ def _filters(source: str, user_id: str | None, before: datetime | None, table: s
     if before is not None:
         sql += f" AND {table}.ts < %s"
         params.append(before)
+    if since is not None:
+        sql += f" AND {table}.ts > %s"
+        params.append(since)
     return sql, params
 
 
 def load_orders(
-    conn: Connection, source: str, user_id: str | None = None, before: datetime | None = None
+    conn: Connection,
+    source: str,
+    user_id: str | None = None,
+    before: datetime | None = None,
+    since: datetime | None = None,
 ) -> list[Order]:
-    """Los pedidos `propuesta` de la fuente (de una persona y anteriores a `before`, si se piden), en orden de `ts`."""
-    where, params = _filters(source, user_id, before, "o")
+    """Los pedidos `propuesta` de la fuente (de una persona, anteriores a `before` y posteriores a `since`, si se
+    piden), en orden de `ts`."""
+    where, params = _filters(source, user_id, before, "o", since)
     rows = conn.execute(
         f"""SELECT o.order_id, o.user_id, o.cart_id, o.ts, o.vertical, o.total,
                    l.concept_id, l.entity_type, l.entity_id, l.from_suggestion

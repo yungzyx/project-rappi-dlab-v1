@@ -69,11 +69,8 @@ def cross_picks(
     population = population or config.MOTOR_POBLACION
     now = datetime.now(UTC)
     source = _source_of(conn, user_id)
-    recent = [
-        o
-        for o in (load_orders(conn, source, user_id) if source else [])
-        if now - timedelta(days=RECENT_DAYS) < o.ts <= now
-    ]
+    since = now - timedelta(days=RECENT_DAYS)
+    recent = [o for o in (load_orders(conn, source, user_id, since=since) if source else []) if o.ts <= now]
     had = {(line.concept_id, o.vertical) for o in recent for line in o.lines if line.concept_id is not None}
     concepts = sorted({c for c, _vertical in had})
 

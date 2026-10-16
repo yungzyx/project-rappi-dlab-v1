@@ -106,7 +106,7 @@ def test_vertical_to_try_without_history_keeps_the_default_order(client, db):
 
 def test_vertical_to_try_skips_verticals_with_orders_even_with_affinity(client, db):
     _like(db, "u1", "chocolates")
-    _order(db, "u1", "chocolateria")
+    _order(db, "u1", "chocolateria", "restaurantes", "turbo")  # la combinación completa: la vertical de siempre
 
     body = to_try(client, "u1")
 
@@ -135,7 +135,7 @@ def test_vertical_to_try_basis_has_the_three_concepts_that_contribute_most(clien
     _like(db, "u1", "chocolates", "helados", "golosinas", "galletas", "pasteleria")
     _like(db, "u1", "chocolates")  # otra vez: chocolate pesa más
 
-    _order(db, "u1", "supermercado", "conveniencia", "turbo")
+    _order(db, "u1", "supermercado", "conveniencia", "turbo", "restaurantes")  # la combinación completa
 
     body = to_try(client, "u1")
 
@@ -155,7 +155,7 @@ def test_vertical_to_try_reason_names_the_concept_of_the_offered_vertical_not_th
         db, [events.Event("u1", "s1", "search", ts=NOW, concept_id="cafe", query="cafe")], source="prototype"
     )  # café pesa menos que pastas
 
-    _order(db, "u1", "chocolateria")
+    _order(db, "u1", "chocolateria", "restaurantes", "turbo")  # la combinación completa: la vertical de siempre
 
     body = to_try(client, "u1")
 

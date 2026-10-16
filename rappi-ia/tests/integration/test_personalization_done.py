@@ -70,15 +70,16 @@ def test_two_users_with_different_histories_get_different_offers(people, db):
     to_try_offers = {user: to_try(client, user) for user in histories}
     first_plans = {user: plans(client, user)[0] for user in histories}
 
-    assert to_try_offers[SWEET]["vertical"] != to_try_offers[GRILL]["vertical"]
-    # Cada una ya pidió en la vertical que le gusta (chocolatería y súper): la vertical por probar es otra y se
-    # explica con sus pedidos, no con sus gustos.
-    assert (to_try_offers[SWEET]["vertical"], to_try_offers[GRILL]["vertical"]) == ("supermercado", "conveniencia")
+    # Cada una ya pidió en la vertical que le gusta (chocolatería y súper), las dos de retail: la vertical por probar
+    # es la que más retiene sumarles (Turbo) y se explica con sus pedidos, no con sus gustos.
     for user in histories:
         offered = to_try_offers[user]
         ordered = {v for (v,) in db.execute("SELECT vertical FROM app_orders WHERE user_id = %s", (user,))}
-        assert offered["vertical"] not in ordered
-        assert offered["reason"]["basis"] == [{"kind": "sin_pedidos", "id": offered["vertical"], "source": "contexto"}]
+        assert offered["vertical"] == "turbo" and offered["vertical"] not in ordered
+        assert offered["reason"]["basis"] == [
+            {"kind": "combinacion", "id": "retail→turbo+retail", "source": "rappi"},
+            {"kind": "sin_pedidos", "id": "turbo", "source": "contexto"},
+        ]
     assert first_plans[SWEET]["id"] != first_plans[GRILL]["id"]
     assert (first_plans[SWEET]["id"], first_plans[GRILL]["id"]) == ("antojo", "asado")
     for user, history in histories.items():

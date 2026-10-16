@@ -229,12 +229,13 @@ def test_vertical_to_try_skips_verticals_with_orders_and_pharmacy(client, db):
     for vertical in ("supermercado", "conveniencia", "turbo"):
         order(db, "u1", vertical)
     after_three = offer(client, "vertical_por_probar", {}, "u1").json()
-    assert after_three["vertical"] == "chocolateria" and after_three["text"].startswith("Aún no pides en chocolaterías")
+    # Turbo y retail: a su combinación le faltan los restaurantes (test_offer_combo.py)
+    assert after_three["vertical"] == "restaurantes" and after_three["text"].endswith("lo que más piden.")
 
     order(db, "u1", "chocolateria")
     order(db, "u1", "restaurantes")
     mall = offer(client, "vertical_por_probar", {}, "u1").json()
-    assert mall["vertical"] == "mall"  # salta Licores y Farmacia
+    assert mall["vertical"] == "mall"  # con la combinación completa, la de siempre: salta Licores y Farmacia
     assert_offerable(mall)  # el sex shop y el smoking shop del mall tienen ofertas y no salen
 
     order(db, "u2", "supermercado")
@@ -272,9 +273,12 @@ def test_vertical_to_try_reason_says_no_orders(client, db):
 
     body = offer(client, "vertical_por_probar", {}, "u1").json()
 
-    assert body["vertical"] == "conveniencia"
-    assert body["reason"]["text"] == "Porque aún no pides en Express."
-    assert body["reason"]["basis"] == [{"kind": "sin_pedidos", "id": "conveniencia", "source": "contexto"}]
+    assert body["vertical"] == "turbo"  # lo que más retiene sumarle al súper (sin población: sus ofertas de siempre)
+    assert body["reason"]["text"] == "Porque aún no pides en Turbo."
+    assert body["reason"]["basis"] == [
+        {"kind": "combinacion", "id": "retail→turbo+retail", "source": "rappi"},
+        {"kind": "sin_pedidos", "id": "turbo", "source": "contexto"},
+    ]
 
 
 def test_vertical_to_try_reason_keeps_the_article_of_the_label(client):

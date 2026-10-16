@@ -3,7 +3,8 @@ con su precio vigente) y pasando por las guardias de `offers/guards.py`.
 
 Momentos (`POST /agent/offer`): `plan` (el kit de una ocasión que la persona eligió), `carrito` (un complemento de
 otra tienda), `checkout`, `proximo_pedido`, `sin_resultado` (dónde sí está lo que buscó), `vertical_por_probar` (la
-vertical donde la persona aún no ha pedido y más le gusta; sin historia, la primera) y `perfil` (la escalera de
+vertical del grupo que completa la combinación de verticales que más retiene, según el motor; sin ese paso, la vertical
+donde la persona aún no ha pedido y más le gusta, y sin historia, la primera) y `perfil` (la escalera de
 un perfil de gusto, `offers/profiles.py`, con su forma propia: `ProfileOffer`). Si no hay una buena oferta, no hay
 oferta (`None`: 204): el agente no dice nada.
 
@@ -15,9 +16,13 @@ Cada oferta dice por qué (`Offer.reason`): las claves de siempre (`occasion`, `
 sin_pedidos o perfil, este último en el momento `perfil` sin persona; e `id`; `source` «contexto» y sin `score`, que es
 de las señales de una persona en `offers/personal.py`). Lo que el agente no propone no entra a la base. Cuando la oferta
 se ordena por lo que le gusta a la persona (`vertical_por_probar` y las ocasiones de la Home), la `basis` son sus
-señales (`kind` concepto, con `score` y `source`) de los conceptos que más aportan. Un complemento cuyo primer producto
-es de una marca que la persona compra lo dice en el `text` y suma esa señal (`marca`, con los pedidos como `score`). En
-el momento `perfil` de una persona, el porqué es el «por qué» de su perfil y la `basis`, la suya (`offers/profiles.py`):
+señales (`kind` concepto, con `score` y `source`) de los conceptos que más aportan. Cuando `vertical_por_probar` sigue
+el paso del motor, la `basis` parte con `combinacion` («<actual>→<objetivo>», `source` «rappi»: la tabla de Rappi) y
+suma de dónde salen los productos: `compra_cruzada` («<A>→<B>@<vertical>») o `lo_mas_pedido` («<vertical>»), con
+`source` «poblacion:<fuente>»; el texto habla de la persona, nunca de cifras de retención. Un complemento cuyo primer
+producto es de una marca que la persona compra lo dice en el `text` y suma esa señal (`marca`, con los pedidos como
+`score`). En el momento `perfil` de una persona, el porqué es el «por qué» de su perfil y la `basis`, la suya
+(`offers/profiles.py`):
 la evidencia de sus segmentos (`source` «segmento:<id>», el peso de su nivel como `score`) y lo que pidió y buscó
 (`source` «pedidos» o «busquedas», cuántas veces como `score`).
 """
@@ -34,6 +39,9 @@ from ..catalog.deals import deals
 from ..catalog.stores import product_detail
 from ..concepts.taxonomy import Concept, Service, load_taxonomy
 from ..embeddings.base import MemoizedQueryEmbedder, TextEmbedder
+from ..motor.combos import combo_key, load_combos
+from ..motor.predict import next_verticals, target_step
+from ..motor.recommend import CrossPick, cross_picks, latest_lambda
 from ..retrieval.hybrid import _concepts_of, detect_concepts
 from ..text import contract_articles, normalize, tokens
 from .guards import (
@@ -113,6 +121,12 @@ REASON_NEXT = "Porque pediste {emoji} {name}."
 REASON_NEXT_ANONYMOUS = "Porque combina con lo que pediste."
 REASON_NO_RESULT = "Porque buscaste «{query}» y aquí sí hay."
 REASON_TO_TRY = "Porque aún no pides en {vertical}."
+# La vertical por probar del paso del motor: con compra cruzada, {origen} es el concepto de la persona que dispara la
+# regla y {destino} el que se ofrece; con lo más pedido de la población, la vertical.
+TO_TRY_CROSS_TEXT = "Para acompañar tu {origen}: {destino} en {vertical}."
+REASON_TO_TRY_CROSS = "Porque pides {emoji} {name} y quienes lo piden suelen sumar {destino} en {vertical}."
+TO_TRY_TOP_TEXT = "Lo más pedido en {vertical}."
+REASON_TO_TRY_TOP = "Porque aún no pides en {vertical}: esto es lo que más se pide."
 SEE_ACTION = "Ver {destino}"
 OPEN_ACTION = "Abrir {vertical}"
 REASON_LIKES_VERTICAL = "Porque te gusta {emoji} {name}, y en {vertical} hay más."
@@ -221,7 +235,7 @@ def make_offer(
     if moment == "sin_resultado":
         return where_is_it(conn, embedder, context["query"])
     if moment == "vertical_por_probar":
-        return vertical_to_try(conn, tried_verticals(conn, user_id), user_interests(conn, user_id))
+        return vertical_to_try(conn, embedder, tried_verticals(conn, user_id), user_interests(conn, user_id), user_id)
     if moment == "perfil":
         return profile_offer(conn, embedder, context.get("perfil"), user_id)
     raise OfferError(f"Momento desconocido: {moment}")
@@ -426,27 +440,164 @@ def tried_verticals(conn: Connection, user_id: str | None) -> set[str]:
     return {vertical for (vertical,) in rows}
 
 
-def vertical_to_try(conn: Connection, tried: set[str], interests: Interests) -> Offer | None:
+def vertical_to_try(
+    conn: Connection,
+    embedder: TextEmbedder | None,
+    tried: set[str],
+    interests: Interests,
+    user_id: str | None = None,
+) -> Offer | None:
+    """La vertical por probar. Si el motor tiene un paso para la persona (`motor.predict.target_step`: el grupo que
+    más retención suma a su combinación de los últimos 30 días), una vertical de ese grupo (`_combo_offer`); si no lo
+    tiene (sin pedidos, o ya usa los tres grupos) o el grupo no tiene nada que mostrar, la de siempre
+    (`_usual_to_try`). `tried`: verticales del backend con algún pedido suyo (`tried_verticals`)."""
+    step = target_step(conn, user_id) if user_id is not None else None
+    if step is not None and (offer := _combo_offer(conn, embedder, tried, interests, user_id, step)):
+        return offer
+    return _usual_to_try(conn, tried, interests)
+
+
+def _usual_to_try(conn: Connection, tried: set[str], interests: Interests) -> Offer | None:
     """La vertical donde la persona aún no pide (nunca farmacia ni Licores) que más le gusta, o la primera de
     `TO_TRY_ORDER` si no hay afinidad (ese orden desempata). Muestra hasta tres de sus ofertas o, en restaurantes (que
-    no tiene ofertas), sus platos más pedidos; una vertical sin nada que mostrar se salta. `tried`: verticales del
-    backend con algún pedido suyo (`tried_verticals`)."""
+    no tiene ofertas), sus platos más pedidos; una vertical sin nada que mostrar se salta."""
     candidates = [v for v in TO_TRY_ORDER if v not in tried and offerable_vertical(v)]
     affinity = _vertical_affinity(conn, interests) if interests.concepts else {}
     for vertical in sorted(candidates, key=lambda v: -sum(affinity.get(v, {}).values())):
-        if products := _popular_dishes(conn) if vertical == "restaurantes" else _offerable_deals(conn, vertical):
-            label = VERTICAL_LABELS.get(vertical, vertical)
-            what = TO_TRY_DISHES if vertical == "restaurantes" else TO_TRY_DEALS
-            action = {"label": OPEN_ACTION.format(vertical=label), "route": [SCREEN_VERTICALS[vertical]]}
-            text = TO_TRY_TEXT.format(vertical=label, what=what)
-            if likes := affinity.get(vertical):
-                reason = _likes_reason(REASON_LIKES_VERTICAL, likes, interests, vertical=label)
-            else:
-                reason = _reason(
-                    contract_articles(REASON_TO_TRY.format(vertical=label)), [_context_signal("sin_pedidos", vertical)]
-                )
-            return Offer("vertical_por_probar", text, products, vertical, reason, [action])
+        if products := _deals_or_dishes(conn, vertical):
+            return _usual_offer(vertical, products, interests, affinity)
     return None
+
+
+def _deals_or_dishes(conn: Connection, vertical: str) -> list[dict]:
+    return _popular_dishes(conn) if vertical == "restaurantes" else _offerable_deals(conn, vertical)
+
+
+def _usual_offer(
+    vertical: str, products: list[dict], interests: Interests, affinity: dict, basis: tuple[dict, ...] = ()
+) -> Offer:
+    """La oferta de siempre de una vertical por probar: «Aún no pides en…» y, si algo de ahí le gusta, «Porque te
+    gusta…»; `basis` va antes de sus señales."""
+    label = VERTICAL_LABELS.get(vertical, vertical)
+    what = TO_TRY_DISHES if vertical == "restaurantes" else TO_TRY_DEALS
+    text = TO_TRY_TEXT.format(vertical=label, what=what)
+    if likes := affinity.get(vertical):
+        reason = _likes_reason(REASON_LIKES_VERTICAL, likes, interests, vertical=label)
+    else:
+        reason = _reason(
+            contract_articles(REASON_TO_TRY.format(vertical=label)), [_context_signal("sin_pedidos", vertical)]
+        )
+    reason["basis"] = [*basis, *reason["basis"]]
+    return Offer("vertical_por_probar", text, products, vertical, reason, [_open_action(vertical)])
+
+
+def _combo_offer(
+    conn: Connection,
+    embedder: TextEmbedder | None,
+    tried: set[str],
+    interests: Interests,
+    user_id: str,
+    step: tuple[str, str, float],
+) -> Offer | None:
+    """Una vertical del grupo que completa la combinación: las que se pueden ofrecer, primero las que la persona no ha
+    probado y, entre ellas, en el orden de `next_verticals`. Para la primera con algo que mostrar: los productos de su
+    mejor compra cruzada (`cross_picks`), o lo más pedido ahí por la población (`trends`), o sus ofertas o platos de
+    siempre. La `basis` parte con el paso (`combinacion`)."""
+    group, target, _gain = step
+    population = config.MOTOR_POBLACION
+    current = combo_key(set(target.split("+")) - {group})
+    combo = {"kind": "combinacion", "id": f"{current}→{target}", "source": "rappi"}
+    order = [s.vertical for s in next_verticals(conn, user_id, population)]
+    candidates = [v for v in load_combos().groups[group] if offerable_vertical(v)]
+    affinity: dict | None = None
+    for vertical in sorted(candidates, key=lambda v: (v in tried, order.index(v))):
+        label = VERTICAL_LABELS.get(vertical, vertical)
+        picks = cross_picks(conn, user_id, [vertical], population, k=1)
+        if picks and (products := _pick_products(conn, embedder, picks[0])):
+            pick = picks[0]
+            concepts = load_taxonomy().concepts
+            origin = concepts.get(pick.from_concept) if pick.from_concept else None
+            # Solo si la regla empujó el par (λ > 0) y el agente puede nombrar lo que la persona pide.
+            if origin is not None and is_offerable(origin) and latest_lambda(conn, population) > 0:
+                destino = concepts[pick.concept_id].name.lower()
+                text = TO_TRY_CROSS_TEXT.format(origen=origin.name.lower(), destino=destino, vertical=label)
+                why = REASON_TO_TRY_CROSS.format(
+                    emoji=origin.emoji, name=origin.name.lower(), destino=destino, vertical=label
+                )
+                signal = {
+                    "kind": "compra_cruzada",
+                    "id": f"{origin.id}→{pick.concept_id}@{vertical}",
+                    "source": f"poblacion:{population}",
+                }
+                reason = _reason(
+                    contract_articles(why), [combo, signal], concept=pick.concept_id, from_concept=origin.id
+                )
+                return Offer(
+                    "vertical_por_probar", contract_articles(text), products, vertical, reason, [_open_action(vertical)]
+                )
+            return _top_offer(vertical, products, combo, population)
+        if products := _most_ordered(conn, vertical, population):
+            return _top_offer(vertical, products, combo, population)
+        if products := _deals_or_dishes(conn, vertical):
+            if affinity is None:
+                affinity = _vertical_affinity(conn, interests) if interests.concepts else {}
+            return _usual_offer(vertical, products, interests, affinity, (combo,))
+    return None
+
+
+def _top_offer(vertical: str, products: list[dict], combo: dict, population: str) -> Offer:
+    """«Lo más pedido en…»: lo que más pide la población en la vertical (o lo de un concepto que nadie empujó)."""
+    label = VERTICAL_LABELS.get(vertical, vertical)
+    signal = {"kind": "lo_mas_pedido", "id": vertical, "source": f"poblacion:{population}"}
+    reason = _reason(contract_articles(REASON_TO_TRY_TOP.format(vertical=label)), [combo, signal])
+    text = contract_articles(TO_TRY_TOP_TEXT.format(vertical=label))
+    return Offer("vertical_por_probar", text, products, vertical, reason, [_open_action(vertical)])
+
+
+def _pick_products(conn: Connection, embedder: TextEmbedder | None, pick: CrossPick) -> list[dict]:
+    """Hasta tres productos del concepto de una compra cruzada en su vertical, buscados como oferta."""
+    concept = load_taxonomy().concepts[pick.concept_id]
+    outcome = search_products(
+        conn, pick.vertical, concept.name, [concept.id], embedder, k=SHOWN_PRODUCTS + 1, offer=True
+    )
+    found = [p.to_dict() for p in outcome.products if p.concept == concept.id]
+    return _offerable_products(conn, found)[:SHOWN_PRODUCTS]
+
+
+def _most_ordered(conn: Connection, vertical: str, population: str) -> list[dict]:
+    """Hasta tres de los productos más pedidos por la población en la vertical (`trends`, alcance `producto`) que
+    siguen a la venta: un producto del catálogo con oferta vigente (`v_latest_offers`, por `product_detail`) en una
+    tienda de esa vertical, o un plato con precio (`latest_menu_prices`) que no es de una sección de tragos. Pasan las
+    guardias de las ofertas (`_offerable_products`)."""
+    rows = conn.execute(
+        """SELECT entity_type, entity_id FROM trends
+           WHERE data_source = %s AND scope = 'producto' AND vertical = %s AND entity_type IS NOT NULL
+           ORDER BY rank, item_key""",
+        (population, vertical),
+    ).fetchall()
+    dishes = [int(i) for t, i in rows if t == "menu_item" and i.isascii() and i.isdigit()]
+    sections = conn.execute(
+        """SELECT mi.item_id::text, ms.name FROM menu_items mi
+           JOIN menu_sections ms ON ms.store_id = mi.store_id AND ms.section_id = mi.section_id
+           WHERE mi.item_id = ANY(%s)""",
+        (dishes,),
+    ).fetchall()
+    drinks = {item_id for item_id, section in sections if alcohol_section(section)}
+    products: list[dict] = []
+    for entity_type, entity_id in rows:
+        if entity_id in drinks:
+            continue
+        product = product_detail(conn, entity_type, entity_id)
+        if product and product["vertical"] == vertical and _offerable_products(conn, [product]):
+            products.append(product)
+            if len(products) >= SHOWN_PRODUCTS:
+                break
+    return products
+
+
+def _open_action(vertical: str) -> dict:
+    label = OPEN_ACTION.format(vertical=VERTICAL_LABELS.get(vertical, vertical))
+    return {"label": label, "route": [SCREEN_VERTICALS[vertical]]}
 
 
 def _vertical_affinity(conn: Connection, interests: Interests) -> dict[str, dict[str, float]]:
@@ -536,28 +687,33 @@ def _offerable_deals(conn: Connection, vertical: str) -> list[dict]:
     nombre que dice bebé, ni de un concepto que no ofrece, ni de una tienda Farmacia, Sex shop o Smoking shop (`deals`
     ya quita lo sensible, pero con vertical no quita esas tiendas). Un producto que está dos veces con otro id (el
     catálogo repite nombres) sale una vez. Las de un concepto típico de la vertical van primero."""
+    unique: dict[str, dict] = {}
+    for deal in _offerable_products(conn, deals(conn, vertical, DEAL_POOL)):
+        unique.setdefault(" ".join(deal["name"].lower().split()), deal)
+    return _typical_first(list(unique.values()), vertical, typical_verticals(conn))[:SHOWN_PRODUCTS]
+
+
+def _offerable_products(conn: Connection, products: list[dict]) -> list[dict]:
+    """Los productos (`Product.to_dict()`) que el agente puede proponer por su cuenta: ni +18, ni un nombre que dice
+    alcohol o bebé, ni de un concepto que no ofrece, ni de una tienda Farmacia, Sex shop o Smoking shop. Sin
+    `entity_type` es del catálogo (las ofertas de `deals` lo son)."""
     concepts = load_taxonomy().concepts
-    found = deals(conn, vertical, DEAL_POOL)
     blocked = {
         store_id
         for (store_id,) in conn.execute(
             "SELECT store_id FROM store_verticals WHERE store_id = ANY(%s) AND subvertical = ANY(%s)",
-            ([d["store_id"] for d in found if d["store_id"]], unofferable_subverticals()),
+            ([p["store_id"] for p in products if p["store_id"]], unofferable_subverticals()),
         )
     }
-    offerable = [
-        d
-        for d in found
-        if not d["age_restricted"]
-        and not alcohol_in_name("catalog_item", d["name"])  # las ofertas de `deals` son del catálogo
-        and not baby_in_name("catalog_item", d["name"])
-        and d["store_id"] not in blocked
-        and (d["concept"] not in concepts or is_offerable(concepts[d["concept"]]))
+    return [
+        p
+        for p in products
+        if not p["age_restricted"]
+        and not alcohol_in_name(p.get("entity_type", "catalog_item"), p["name"], p["concept"])
+        and not baby_in_name(p.get("entity_type", "catalog_item"), p["name"])
+        and p["store_id"] not in blocked
+        and (p["concept"] not in concepts or is_offerable(concepts[p["concept"]]))
     ]
-    unique: dict[str, dict] = {}
-    for deal in offerable:
-        unique.setdefault(" ".join(deal["name"].lower().split()), deal)
-    return _typical_first(list(unique.values()), vertical, typical_verticals(conn))[:SHOWN_PRODUCTS]
 
 
 def _typical_first(found: list[dict], vertical: str, typical: dict[str, str]) -> list[dict]:

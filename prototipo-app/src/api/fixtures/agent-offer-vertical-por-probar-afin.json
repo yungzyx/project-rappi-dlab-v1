@@ -1,9 +1,9 @@
 {
   "actions": [
     {
-      "label": "Abrir chocolaterías",
+      "label": "Abrir Turbo",
       "route": [
-        "chocolates"
+        "turbo"
       ]
     }
   ],
@@ -11,34 +11,38 @@
   "products": [
     {
       "age_restricted": false,
-      "before": "$2.990",
-      "concept": "chocolates",
-      "discount": "-17%",
-      "entity_id": "97001",
+      "before": "$4.990",
+      "concept": "helados",
+      "discount": "-20%",
+      "entity_id": "93001",
       "entity_type": "catalog_item",
-      "id": "cat-97001",
-      "img": "https://imagenes.prueba.invalid/productos/97001.png",
-      "name": "Chocolate amargo 70 % 100 g (prueba)",
-      "presentation": "100 g",
-      "price": "$2.490",
-      "price_value": 2490.0,
-      "store": "Chocolatería de prueba Centro",
-      "store_id": 9701,
-      "vertical": "chocolateria"
+      "id": "cat-93001",
+      "img": "https://imagenes.prueba.invalid/productos/93001.png",
+      "name": "Helado de vainilla 1 L (prueba)",
+      "presentation": "1 L",
+      "price": "$3.990",
+      "price_value": 3990.0,
+      "store": "Tienda turbo de prueba Centro",
+      "store_id": 9301,
+      "vertical": "turbo"
     }
   ],
-  "prototype_vertical": "chocolates",
+  "prototype_vertical": "turbo",
   "reason": {
     "basis": [
       {
-        "id": "chocolates",
-        "kind": "concepto",
-        "score": 3.0,
-        "source": "eventos"
+        "id": "retail→turbo+retail",
+        "kind": "combinacion",
+        "source": "rappi"
+      },
+      {
+        "id": "turbo",
+        "kind": "sin_pedidos",
+        "source": "contexto"
       }
     ],
-    "text": "Porque te gusta 🍫 chocolates, y en chocolaterías hay más."
+    "text": "Porque aún no pides en Turbo."
   },
-  "text": "Aún no pides en chocolaterías: mira estas ofertas.",
-  "vertical": "chocolateria"
+  "text": "Aún no pides en Turbo: mira estas ofertas.",
+  "vertical": "turbo"
 }
