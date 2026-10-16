@@ -541,7 +541,7 @@ def test_odd_query_params_never_return_500(client, path):
 
 
 def test_demo_ask_suggestion_order_reaches_the_panel(client):
-    """El camino de la demo: Bigotes sugiere algo de otra vertical, se acepta, se pide y el panel lo cuenta."""
+    """El camino de la demo: Mochi sugiere algo de otra vertical, se acepta, se pide y el panel lo cuenta."""
     chat = client.post(
         "/agent/ask", json={"message": "cerveza", "vertical": "liquor", "user_id": "u1", "session_id": "s1"}
     ).json()

@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 // La vista y la fuente viven en la URL (?vista=oportunidades&fuente=prototipo) para compartir un enlace exacto.
 const SOURCE_PARAMS = { synthetic: 'simulados', prototype: 'prototipo' }
 
-export function readUrlState(search, viewIds) {
+function readUrlState(search, viewIds) {
   const params = new URLSearchParams(search)
   const view = viewIds.includes(params.get('vista')) ? params.get('vista') : viewIds[0]
   const source = params.get('fuente') === SOURCE_PARAMS.prototype ? 'prototype' : 'synthetic'

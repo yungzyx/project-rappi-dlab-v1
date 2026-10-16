@@ -52,7 +52,7 @@ export default function ConnectionGate({ children }) {
  * El aviso de «Conectando…» (`status` 'checking') o «Sin conexión» con «Reintentar» (`status` 'offline'): lo usa la puerta
  * de conexión.
  */
-export function ConnectionNotice({ status, onRetry }) {
+function ConnectionNotice({ status, onRetry }) {
   return (
     <main className="connection-gate">
       <div className="connection-card">

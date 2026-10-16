@@ -11,7 +11,7 @@ const ALMOST_AT = 0.8 // tramo final de la ruta: el agente avisa que ya casi lle
  * La pose del agente según cómo va el pedido, como posición en la imagen de 2 × 2 poses: preparándose está tímido
  * (abajo a la izquierda), en camino de frente y, en el tramo final o al llegar, feliz (arriba a la derecha).
  */
-export function poseFor({ step, progress, delivered }) {
+function poseFor({ step, progress, delivered }) {
   if (delivered) return { x: -1, y: 0, almost: false }
   if (step === undefined) return { x: 0, y: 0, almost: false } // sin etapa («Rappi hoy»): de frente, como siempre
   if (step <= 1) return { x: 0, y: -1, almost: false }

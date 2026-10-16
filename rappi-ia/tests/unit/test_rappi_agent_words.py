@@ -1,4 +1,4 @@
-"""Reglas de palabras de Bigotes que no necesitan la base (revisión de las rondas 5 a 10)."""
+"""Reglas de palabras de Mochi que no necesitan la base (revisión de las rondas 5 a 10)."""
 
 import pytest
 

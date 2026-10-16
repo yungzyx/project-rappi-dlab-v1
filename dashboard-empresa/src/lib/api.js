@@ -18,7 +18,7 @@ const devApiUrl = import.meta.env.DEV ? (location) => `http://${location?.hostna
 
 export const API_URL = apiUrl(import.meta.env, typeof window !== 'undefined' ? window.location : undefined)
 // /analytics/weekly tardó entre 7 y 28 s en las pruebas (según la carga de la máquina); el resto, menos de 1 s.
-export const TIMEOUT_MS = 30_000
+const TIMEOUT_MS = 30_000
 
 export const SOURCES = ['synthetic', 'prototype']
 export const CATALOG = 'catalog'

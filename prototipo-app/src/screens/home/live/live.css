@@ -28,40 +28,6 @@
   transition: box-shadow 520ms var(--live-glide);
 }
 
-.live-card-head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 0 18px;
-}
-
-.live-card-head h2 {
-  font-size: 20px;
-  font-weight: 700;
-  letter-spacing: -0.3px;
-  line-height: 24px;
-}
-
-.live-card-head p {
-  margin-top: 2px;
-  color: var(--ink-3);
-  font-size: 13.5px;
-  line-height: 17px;
-}
-
-.live-card-emoji {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 46px;
-  height: 46px;
-  border-radius: 14px;
-  background: var(--surface);
-  box-shadow: 0 2px 10px rgba(60, 30, 20, 0.1);
-  font-size: 26px;
-  font-style: normal;
-}
-
 .live-items {
   gap: 16px;
   padding: 22px 18px 0;

@@ -101,8 +101,8 @@ def test_another_database_error_also_falls_back_and_frees_the_turn(monkeypatch, 
 
 
 def test_spares_never_take_the_reserve_of_the_pool(monkeypatch):
-    """Con 4 conexiones y una del request, la búsqueda toma una extra (quedan 2, la reserva) y la siguiente no: /health,
-    el juego o una búsqueda nueva no esperan a que terminen las búsquedas en paralelo."""
+    """Con 4 conexiones y una del request, la búsqueda toma una extra (quedan 2, la reserva) y la siguiente no: /health
+    o una búsqueda nueva no esperan a que terminen las búsquedas en paralelo."""
     pool = FakePool()
 
     def body(gate):

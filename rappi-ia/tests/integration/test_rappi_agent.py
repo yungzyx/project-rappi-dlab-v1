@@ -271,7 +271,7 @@ def test_the_price_shown_is_from_the_current_branch_not_an_old_one(rappi_agent):
 
 def test_a_price_saved_twice_with_the_same_date_is_still_shown(rappi_agent):
     """Importar dos veces el mismo CSV legacy guarda el precio con la misma fecha en dos corridas. El último precio se
-    elegía sin desempate y, si no era el de la corrida que la vigencia toma por última (desempata por run_id), Bigotes
+    elegía sin desempate y, si no era el de la corrida que la vigencia toma por última (desempata por run_id), Mochi
     ocultaba el producto aunque estuviera en la búsqueda."""
     agent, db = rappi_agent
     add_store(db, 6, "licores", "Botillería Centro")
@@ -511,7 +511,7 @@ def test_a_symptom_without_remedies_for_it_gets_the_painkillers(remedies_rappi_a
 
 
 def test_a_trip_opens_rappitravel_and_suggests_something_for_it(rappi_agent):
-    """RappiTravel no tiene catálogo: Bigotes lleva a su pantalla y suma un gancho del catálogo para el viaje."""
+    """RappiTravel no tiene catálogo: Mochi lleva a su pantalla y suma un gancho del catálogo para el viaje."""
     agent, db = rappi_agent
     add_store(db, 11, "farmacia", "Farmacia")
     add_store(db, 12, "mall", "Tienda")
