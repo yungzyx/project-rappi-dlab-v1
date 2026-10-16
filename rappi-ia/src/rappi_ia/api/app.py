@@ -33,6 +33,7 @@ from ..demo.doctor import pending_migrations
 from ..events import store as events
 from ..layers.segments import recalculate_user_segments
 from ..motor.build import refresh_user, refresh_user_conn
+from ..motor.home import home_verticals
 from ..offers.guards import is_offerable
 from ..offers.profiles import active_profiles
 from ..retrieval.hybrid import MODES
@@ -482,6 +483,13 @@ def tastes(user_id: ShortPath, conn: Connection = Depends(get_conn)) -> dict:
     por_que, basis }] }`, el principal primero; la lista va vacía sin perfiles. «Olvidar» borra o recalcula sus
     segmentos, y el perfil se va con ellos."""
     return {"perfiles": [profile.to_dict() for profile in active_profiles(conn, user_id)]}
+
+
+@app.get("/profile/{user_id}/verticales", dependencies=[Depends(owner_in_path)])
+def home_shortcuts(user_id: ShortPath, conn: Connection = Depends(get_conn)) -> dict:
+    """El orden de los accesos de la Home (`motor/home.py`): `{ fixed, order: [{ id, score, reason }], personalized }`.
+    Restaurantes y Turbo van fijos; los otros seis se ordenan por lo que la persona más usa."""
+    return home_verticals(conn, user_id)
 
 
 @app.delete("/profile/{user_id}", dependencies=[Depends(owner_in_path)])

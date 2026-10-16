@@ -150,6 +150,9 @@ CONTRACT: tuple[Example, ...] = (
     # La escalera de un perfil elegido, sin persona: lo que usa la demo.
     Example("agent-offer-perfil", "POST", "/agent/offer", {"moment": "perfil", "context": {"perfil": "asiatico"}}),
     Example("profile-gustos", "GET", "/profile/u-gustos/gustos"),
+    # El orden de los accesos de la Home: una persona que pide en farmacia (sube primero) y una sin historial.
+    Example("profile-verticales", "GET", "/profile/u-verticales/verticales"),
+    Example("profile-verticales-nueva", "GET", "/profile/u-nueva/verticales"),
     # Se reclama el id viejo de un navegador (de antes de la sesión firmada): la respuesta no cambia en cada corrida.
     # El token sale del secreto de los tests (tests/conftest.py), que no sirve fuera de ellos.
     Example("session", "POST", "/session", {"legacy_user_id": "proto-0123456789abcdef"}),
@@ -208,6 +211,11 @@ def client(db):
         assert (
             test_client.post("/orders", json={**order, "vertical": "restaurants", "lines": [line]}).status_code == 200
         )
+    # Una persona que pide seguido en farmacia, para `profile-verticales` (la nueva, `u-nueva`, no tiene historial).
+    for n in range(3):
+        farmacia = {"user_id": "u-verticales", "session_id": f"s-verticales-{n}", "cart_id": f"c-verticales-{n}"}
+        order = {**farmacia, "vertical": "farmacia", "lines": [chips]}
+        assert test_client.post("/orders", json=order).status_code == 200
     # Una persona de antes de la identidad firmada, para el ejemplo de `/session`.
     db.execute("INSERT INTO app_users (user_id, source) VALUES ('proto-0123456789abcdef', 'prototype')")
     db.commit()
