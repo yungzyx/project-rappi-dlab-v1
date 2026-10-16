@@ -143,6 +143,18 @@ def cmd_segments(conn, args) -> None:
     print(build_segments(conn, args.source, args.user))
 
 
+def cmd_motor(conn, args) -> None:
+    from .motor.build import build_motor
+
+    for source in [args.source] if args.source else ["synthetic", "prototype"]:
+        counts = build_motor(conn, source)
+        print(
+            f"Motor ({source}): {counts['transiciones']} transiciones, {counts['combinaciones']} combinaciones "
+            f"({counts['pasos']} pasos), {counts['reglas']} reglas de compra cruzada, {counts['tendencias']} "
+            f"tendencias, {counts['afinidad']} filas de afinidad y {counts['recompra']} de recompra"
+        )
+
+
 def cmd_brands(conn, args) -> None:
     print(build_brands(conn))
 
@@ -608,6 +620,7 @@ COMMANDS = {
     "canonical": cmd_canonical,
     "relations": cmd_relations,
     "segments": cmd_segments,
+    "motor": cmd_motor,
     "layer-sample": cmd_layer_sample,
     "layer-precision": cmd_layer_precision,
     "layer-report": cmd_layer_report,
@@ -662,6 +675,11 @@ def build_parser() -> argparse.ArgumentParser:
     sg = sub.add_parser("segments", help="capa de perfiles: segmentos de usuario por comportamiento (con historia)")
     sg.add_argument("--source", choices=["synthetic", "prototype"], default="synthetic")
     sg.add_argument("--user", help="recalcula solo a esta persona")
+    mt = sub.add_parser(
+        "motor",
+        help="motor multivertical: transiciones, combinaciones, compra cruzada, tendencias, afinidad y recompra",
+    )
+    mt.add_argument("--source", choices=["synthetic", "prototype"], help="solo esta fuente (sin él, las dos)")
     sub.add_parser("measures", help="capa de perfiles: tamaño, unidad y pack normalizados de cada ítem")
     mc = sub.add_parser(
         "map-categories", help="exporta las categorías sin mapeo revisado, con concepto sugerido, a un CSV para revisar"

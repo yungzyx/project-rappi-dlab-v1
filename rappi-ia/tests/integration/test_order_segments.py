@@ -176,7 +176,8 @@ def test_recalculation_error_does_not_break_the_order(client, db, caplog):
 
     assert db.execute("SELECT count(*) FROM app_orders WHERE order_id = %s", (order_id,)).fetchone()[0] == 1
     warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
-    assert len(warnings) == 1 and "u1" not in warnings[0].getMessage()  # sin el id de la persona
+    assert [r.name for r in warnings] == [segments.__name__, "rappi_ia.motor.build"]  # segmentos y motor
+    assert all("u1" not in r.getMessage() for r in warnings)  # sin el id de la persona
 
 
 def test_segment_rules_are_cached(tmp_path):
@@ -302,10 +303,10 @@ def test_a_client_without_its_own_connector_never_opens_the_real_db(db, real_db_
     finally:
         api.app.dependency_overrides.clear()
 
-    assert real_db_guard == ["connector"]
+    assert real_db_guard == ["connector", "connector"]  # el recálculo de segmentos y el del motor
     assert db.execute("SELECT count(*) FROM app_orders WHERE order_id = %s", (order_id,)).fetchone()[0] == 1
     warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
-    assert len(warnings) == 1 and "base real" in str(warnings[0].exc_info[1])
+    assert len(warnings) == 2 and all("base real" in str(r.exc_info[1]) for r in warnings)
 
 
 def test_a_concept_forget_waits_for_the_recalculation_in_flight(db, test_url):

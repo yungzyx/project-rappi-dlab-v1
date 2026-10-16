@@ -1,4 +1,4 @@
-.PHONY: help install install-ml db-test migrate check-migrations verify-migrations deploy-migrate test lint format jev-categorias concepts embed eval synth analytics serve serve-lan warm probar-agente purge post-refresh layers layer-report contract
+.PHONY: help install install-ml db-test migrate check-migrations verify-migrations deploy-migrate test lint format jev-categorias concepts embed eval synth analytics serve serve-lan warm probar-agente purge post-refresh layers layer-report motor contract
 
 PY := .venv/bin/python
 # Python ≥ 3.12 para crear el .venv. En un Mac nuevo `python3` es el 3.9 de macOS: se prefiere python3.13
@@ -121,7 +121,7 @@ probar-agente:  ## Prueba al agente con las frases de usuarios (con la API corri
 purge:  ## Borra el texto de consultas con más de 90 días (docs/diseno-ia.md §2) y a las personas del prototipo sin actividad en 180
 	$(PY) -m rappi_ia purge
 
-layers:  ## Capa de perfiles: medidas, marcas, atributos y grafo (crece con las etapas del plan)
+layers:  ## Capa de perfiles: medidas, marcas, atributos, grafo, segmentos y motor (crece con las etapas del plan)
 	$(PY) -m rappi_ia measures
 	$(PY) -m rappi_ia brands
 	$(PY) -m rappi_ia canonical
@@ -129,6 +129,10 @@ layers:  ## Capa de perfiles: medidas, marcas, atributos y grafo (crece con las 
 	$(PY) -m rappi_ia relations
 	$(PY) -m rappi_ia segments --source synthetic
 	$(PY) -m rappi_ia segments --source prototype
+	$(PY) -m rappi_ia motor
+
+motor:  ## Motor multivertical: transiciones, combinaciones, compra cruzada, tendencias, afinidad y recompra (las dos fuentes)
+	$(PY) -m rappi_ia motor
 
 layer-report:  ## Reporte de calidad de las capas de perfiles (data/eval/capas.md)
 	$(PY) -m rappi_ia layer-report
