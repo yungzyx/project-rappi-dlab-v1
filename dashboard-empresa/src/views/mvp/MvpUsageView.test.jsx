@@ -108,6 +108,20 @@ describe('MvpUsageView', () => {
     expect(within(offers).queryByText('perfil')).toBeNull()
   })
 
+  test('the repeat moment («¿Repetimos?») has its own label', async () => {
+    serveWith({
+      offers: {
+        source: 'prototype',
+        data: { personas: 1, momentos: [{ momento: 'recompra', mostradas: 2, aceptadas: 1, aceptacion_pct: null }] },
+      },
+    })
+    await renderWithData(<MvpUsageView source="prototype" />)
+
+    const offers = await screen.findByRole('table', { name: 'Ofertas del agente por momento' })
+    const [row] = within(offers).getAllByRole('row').slice(1)
+    expect(within(row).getAllByRole('cell').map((cell) => cell.textContent)).toEqual(['Recompra', '2', '1', '—'])
+  })
+
   test('a search without vertical says so and the offers note names the tab', async () => {
     serveWith({
       unmet: {

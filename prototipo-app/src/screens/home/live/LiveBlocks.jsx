@@ -68,3 +68,29 @@ export function PlanBlock({ plans, plan, kit, kitReason, added, onPick, onOpen, 
     </section>
   )
 }
+
+/**
+ * «¿Repetimos?»: lo que la persona pide con ritmo y ya le toca (la oferta `recompra` de la API), con el último producto
+ * que compró de eso. «Agregar» lleva a su tienda; «Después» lo deja para otra vez.
+ */
+export function RepeatBlock({ offer, onAdd, onLater, onOpen }) {
+  const [product] = offer.products
+  const add = offer.actions[0]
+  return (
+    <section className="live-card live-card--repeat" aria-label="Recompra">
+      <h2 className="live-plan-title">{offer.text}</h2>
+      <OfferWhy reason={offer.reason} />
+      <div className="live-items live-repeat-item">
+        <ProductCard product={product} onOpenStore={() => onOpen(product)} />
+      </div>
+      <div className="live-repeat-actions">
+        <button type="button" className="live-kit-add tap" onClick={onAdd}>
+          {add?.label ?? 'Agregar'}
+        </button>
+        <button type="button" className="live-repeat-later tap" onClick={onLater}>
+          Después
+        </button>
+      </div>
+    </section>
+  )
+}

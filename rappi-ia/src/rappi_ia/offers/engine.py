@@ -4,7 +4,8 @@ con su precio vigente) y pasando por las guardias de `offers/guards.py`.
 Momentos (`POST /agent/offer`): `plan` (el kit de una ocasión que la persona eligió), `carrito` (un complemento de
 otra tienda), `checkout`, `proximo_pedido`, `sin_resultado` (dónde sí está lo que buscó), `vertical_por_probar` (la
 vertical del grupo que completa la combinación de verticales que más retiene, según el motor; sin ese paso, la vertical
-donde la persona aún no ha pedido y más le gusta, y sin historia, la primera) y `perfil` (la escalera de
+donde la persona aún no ha pedido y más le gusta, y sin historia, la primera), `recompra` («¿Repetimos?»: lo que la
+persona pide con ritmo y está por tocarle, según la tabla `replenishment` del motor) y `perfil` (la escalera de
 un perfil de gusto, `offers/profiles.py`, con su forma propia: `ProfileOffer`). Si no hay una buena oferta, no hay
 oferta (`None`: 204): el agente no dice nada.
 
@@ -19,7 +20,9 @@ se ordena por lo que le gusta a la persona (`vertical_por_probar` y las ocasione
 señales (`kind` concepto, con `score` y `source`) de los conceptos que más aportan. Cuando `vertical_por_probar` sigue
 el paso del motor, la `basis` parte con `combinacion` («<actual>→<objetivo>», `source` «rappi»: la tabla de Rappi) y
 suma de dónde salen los productos: `compra_cruzada` («<A>→<B>@<vertical>») o `lo_mas_pedido` («<vertical>»), con
-`source` «poblacion:<fuente>»; el texto habla de la persona, nunca de cifras de retención. Un complemento cuyo primer
+`source` «poblacion:<fuente>», y `vuelta` («<vertical>», `source` «pedidos») si la persona ya pidió ahí hace más de un
+mes; el texto habla de la persona, nunca de cifras de retención. La `recompra` lleva su señal `recompra` («<concepto>»,
+`source` «pedidos»: sale de los pedidos de la persona). Un complemento cuyo primer
 producto es de una marca que la persona compra lo dice en el `text` y suma esa señal (`marca`, con los pedidos como
 `score`). En el momento `perfil` de una persona, el porqué es el «por qué» de su perfil y la `basis`, la suya
 (`offers/profiles.py`):
@@ -28,6 +31,7 @@ la evidencia de sus segmentos (`source` «segmento:<id>», el peso de su nivel c
 """
 
 from dataclasses import dataclass, field
+from datetime import date, datetime, timedelta
 
 from psycopg import Connection
 from rappi_scraper.storage.search import MIN_PRICE
@@ -41,6 +45,7 @@ from ..catalog.stores import BIGINT_MAX, _product, product_detail
 from ..concepts.taxonomy import Concept, Service, load_taxonomy
 from ..embeddings.base import MemoizedQueryEmbedder, TextEmbedder
 from ..motor.combos import combo_key, load_combos
+from ..motor.model import TZ
 from ..motor.predict import next_verticals, target_step
 from ..motor.recommend import CrossPick, cross_picks, latest_lambda
 from ..retrieval.hybrid import _concepts_of, detect_concepts
@@ -132,6 +137,11 @@ REASON_TO_TRY_TOP = "Porque aún no pides en {vertical}: esto es lo que más se 
 BACK_TEXT = "Vuelve a {vertical}: mira {what}."
 BACK_TOP = "lo más pedido"
 REASON_BACK = "Porque hace más de un mes que no pides en {vertical}."
+# La recompra: {destino} es el concepto, {dias} cada cuántos días lo pide y {hace} «hoy», «ayer» o «hace N días».
+REPEAT_TEXT = "¿Repetimos {destino}? Lo pides cada {dias} días."
+REASON_REPEAT = "Porque lo pides cada {dias} días y tu último pedido fue {hace}."
+REPEAT_ACTION = "Agregar"
+REPEAT_AHEAD_DAYS = 2  # se ofrece desde 2 días antes del día en que le toca
 SEE_ACTION = "Ver {destino}"
 OPEN_ACTION = "Abrir {vertical}"
 REASON_LIKES_VERTICAL = "Porque te gusta {emoji} {name}, y en {vertical} hay más."
@@ -241,6 +251,8 @@ def make_offer(
         return where_is_it(conn, embedder, context["query"])
     if moment == "vertical_por_probar":
         return vertical_to_try(conn, embedder, tried_verticals(conn, user_id), user_interests(conn, user_id), user_id)
+    if moment == "recompra":
+        return repeat_offer(conn, embedder, user_id)
     if moment == "perfil":
         return profile_offer(conn, embedder, context.get("perfil"), user_id)
     raise OfferError(f"Momento desconocido: {moment}")
@@ -641,9 +653,23 @@ def _most_ordered(conn: Connection, vertical: str, population: str) -> list[dict
            ORDER BY rank, item_key""",
         (population, vertical, kind),
     ).fetchall()
-    ids = [i for (i,) in rows if i.isascii() and i.isdigit() and int(i) <= BIGINT_MAX]
+    ids = [i for (i,) in rows if _valid_id(i)]
+    found = _priced_in_vertical(conn, vertical, ids)
+    ranked = [found[i].to_dict() for i in ids if i in found]
+    return _offerable_products(conn, ranked)[:SHOWN_PRODUCTS]
+
+
+def _valid_id(entity_id: str) -> bool:
+    return entity_id.isascii() and entity_id.isdigit() and int(entity_id) <= BIGINT_MAX
+
+
+def _priced_in_vertical(conn: Connection, vertical: str, ids: list[str]) -> dict[str, Product]:
+    """id → producto de los `ids` (`_valid_id`) que siguen a la venta en la vertical, con el precio de ahí: productos
+    del catálogo (`_TOP_CATALOG`) o, en restaurantes, platos con precio que no son de una sección de tragos
+    (`_TOP_DISHES`). Una sola consulta."""
     if not ids:
-        return []
+        return {}
+    kind = "menu_item" if vertical == "restaurantes" else "catalog_item"
     params = {"ids": [int(i) for i in ids], "vertical": vertical, "min_price": MIN_PRICE}
     taxonomy = load_taxonomy()
     found: dict[str, Product] = {}
@@ -658,8 +684,7 @@ def _most_ordered(conn: Connection, vertical: str, population: str) -> list[dict
             if not alcohol_section(section):
                 row = (id_, name, price, real, image, None, False, concept)
                 found[id_] = _product(row, vertical, store, store_id, taxonomy, kind)
-    ranked = [found[i].to_dict() for i in ids if i in found and found[i].price_value is not None]
-    return _offerable_products(conn, ranked)[:SHOWN_PRODUCTS]
+    return {i: p for i, p in found.items() if p.price_value is not None}
 
 
 def _open_action(vertical: str) -> dict:
@@ -675,6 +700,68 @@ def _vertical_affinity(conn: Connection, interests: Interests) -> dict[str, dict
         if vertical := typical.get(concept_id):
             affinity.setdefault(vertical, {})[concept_id] = score
     return affinity
+
+
+# ── recompra ─────────────────────────────────────────────────────────────────
+def repeat_offer(
+    conn: Connection, embedder: TextEmbedder | None, user_id: str | None, today: date | None = None
+) -> Offer | None:
+    """«¿Repetimos?»: un concepto que la persona pide con ritmo (`replenishment`, que el motor recalcula después de
+    cada pedido suyo y de «Olvidar») y que le toca entre hace `interval_days` días y dentro de `REPEAT_AHEAD_DAYS`
+    (`today` es el día de Santiago). El más atrasado primero (empate: el concepto); solo conceptos y verticales que el
+    agente propone por su cuenta. El producto es el último que compró del concepto, si sigue a la venta en esa
+    vertical, o el primero que da la búsqueda del concepto ahí; un concepto sin producto se salta. None (204) sin
+    persona o sin nada que le toque."""
+    if user_id is None:
+        return None
+    today = today or datetime.now(TZ).date()
+    rows = conn.execute(
+        """SELECT concept_id, vertical, interval_days, last_ts, due_on FROM replenishment
+           WHERE user_id = %s AND vertical IS NOT NULL AND due_on <= %s ORDER BY due_on, concept_id""",
+        (user_id, today + timedelta(days=REPEAT_AHEAD_DAYS)),
+    ).fetchall()
+    concepts = load_taxonomy().concepts
+    for concept_id, vertical, interval, last_ts, due_on in rows:
+        days = round(interval)
+        concept = concepts.get(concept_id)
+        if due_on < today - timedelta(days=days) or concept is None or not is_offerable(concept):
+            continue
+        if not offerable_vertical(vertical) or vertical not in SCREEN_VERTICALS:
+            continue
+        if product := _repeat_product(conn, embedder, user_id, concept, vertical):
+            text = REPEAT_TEXT.format(destino=concept.name.lower(), dias=days)
+            why = REASON_REPEAT.format(dias=days, hace=_days_ago(today, last_ts))
+            reason = _reason(why, [{"kind": "recompra", "id": concept.id, "source": "pedidos"}], concept=concept.id)
+            action = {"label": REPEAT_ACTION, "route": [SCREEN_VERTICALS[vertical]], "store_id": product["store_id"]}
+            return Offer("recompra", text, [product], vertical, reason, [action])
+    return None
+
+
+def _repeat_product(
+    conn: Connection, embedder: TextEmbedder | None, user_id: str, concept: Concept, vertical: str
+) -> dict | None:
+    """El último producto (o plato, en restaurantes) del concepto que la persona compró en un pedido `propuesta`, con
+    su precio en la vertical; si ya no está ahí, el primero del concepto que da la búsqueda en la vertical. Los dos
+    pasan las guardias de las ofertas (`_offerable_products`)."""
+    kind = "menu_item" if vertical == "restaurantes" else "catalog_item"
+    row = conn.execute(
+        """SELECT l.entity_id FROM app_order_lines l JOIN app_orders o USING (order_id)
+           WHERE o.user_id = %s AND o.mode = 'propuesta' AND l.concept_id = %s AND l.entity_type = %s
+           ORDER BY o.ts DESC, o.order_id DESC, l.line_no DESC LIMIT 1""",
+        (user_id, concept.id, kind),
+    ).fetchone()
+    last = _priced_in_vertical(conn, vertical, [row[0]]).get(row[0]) if row and _valid_id(row[0]) else None
+    if last and (offerable := _offerable_products(conn, [last.to_dict()])):
+        return offerable[0]
+    outcome = search_products(conn, vertical, concept.name, [concept.id], embedder, k=4, offer=True)
+    found = [p.to_dict() for p in outcome.products if p.concept == concept.id]
+    return next(iter(_offerable_products(conn, found)), None)
+
+
+def _days_ago(today: date, ts: datetime) -> str:
+    """«hoy», «ayer» o «hace N días», contando días de Santiago."""
+    days = (today - ts.astimezone(TZ).date()).days
+    return "hoy" if days <= 0 else "ayer" if days == 1 else f"hace {days} días"
 
 
 # ── perfil ───────────────────────────────────────────────────────────────────

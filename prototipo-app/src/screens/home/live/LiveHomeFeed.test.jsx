@@ -68,8 +68,19 @@ const stubAgent = (routes = {}) =>
     'POST /agent/offer': (req) => (OFFER_FIXTURES[req.body.moment] ? fixture(OFFER_FIXTURES[req.body.moment]) : 204),
     ...routes,
   })
-const offerRequests = (mock = api) =>
+const allOfferRequests = (mock = api) =>
   mock.mock.calls.filter(([url]) => url.endsWith('/agent/offer')).map(([, init]) => JSON.parse(init.body))
+// La recompra se pide sola cada vez que la Home está arriba: sus tests la miran con `repeatRequests`.
+const offerRequests = (mock = api) => allOfferRequests(mock).filter((body) => body.moment !== 'recompra')
+const repeatRequests = (mock = api) => allOfferRequests(mock).filter((body) => body.moment === 'recompra')
+// Con una recompra que ofrecer (los demás momentos, como siempre).
+const stubRepeat = () =>
+  stubAgent({
+    'POST /agent/offer': (req) => {
+      const name = req.body.moment === 'recompra' ? 'agent-offer-recompra' : OFFER_FIXTURES[req.body.moment]
+      return name ? fixture(name) : 204
+    },
+  })
 const LOOSE_CART = {
   id: 'cat-94001',
   name: 'Cerveza rubia lata 470 cc (prueba)',
@@ -391,7 +402,7 @@ describe('Home del prototipo final', () => {
       memory.session.lastAdded = LOOSE_CART
       await renderHome()
       await advance(4000)
-      expect(offerRequests()).toEqual([])
+      expect(allOfferRequests()).toEqual([]) // tampoco la recompra
 
       // Tampoco si lo ignoraron dos veces seguidas.
       cleanup()
@@ -403,6 +414,77 @@ describe('Home del prototipo final', () => {
       await renderHome()
       await advance(4000)
       expect(offerRequests()).toEqual([])
+    })
+  })
+
+  describe('«¿Repetimos?» (la recompra)', () => {
+    const repeatBlock = (container) => container.querySelector('.live-block--recompra')
+
+    test('sin recompra (204) no hay bloque, y la Home la pidió sin contexto', async () => {
+      const { container } = await renderHome()
+      await advance(100)
+      expect(repeatRequests()).toEqual([{ moment: 'recompra', user_id: expect.any(String), context: {} }])
+      expect(repeatBlock(container)).toBeNull()
+      expect(tracked('suggestion_shown', 'agent-recompra')).toEqual([])
+    })
+
+    test('con recompra, va justo después de los accesos, dice por qué y registra la mostrada una vez', async () => {
+      api = stubRepeat()
+      const made = fixture('agent-offer-recompra')
+      const { container, rerender } = await renderHome()
+      await advance(100)
+      expect(blockOrder(container)).toEqual(['essentials', 'recompra', 'promos', 'turbo', 'plan', 'nearby', 'lower'])
+      const block = repeatBlock(container)
+      expect(within(block).getByText(made.text)).toBeTruthy()
+      expect(within(block).getByText(made.products[0].name)).toBeTruthy()
+      fireEvent.click(within(block).getByRole('button', { name: '¿Por qué?' }))
+      expect(within(block).getByText(made.reason.text)).toBeTruthy()
+      expect(tracked('suggestion_shown', 'agent-recompra')).toEqual([
+        ['suggestion_shown', { concept_id: 'cafe', vertical: 'grocery', payload: { origen: 'agent-recompra' } }],
+      ])
+
+      // Al volver a la Home se pide otra vez, pero la mostrada no se cuenta de nuevo.
+      rerender(homeTree({ active: false }))
+      rerender(homeTree({ active: true }))
+      await advance(100)
+      expect(repeatRequests()).toHaveLength(2)
+      expect(tracked('suggestion_shown', 'agent-recompra')).toHaveLength(1)
+    })
+
+    test('«Agregar» cuenta la aceptación y lleva a la tienda del producto', async () => {
+      api = stubRepeat()
+      const push = vi.fn()
+      const made = fixture('agent-offer-recompra')
+      const { container } = await renderHome({ push })
+      await advance(100)
+      fireEvent.click(within(repeatBlock(container)).getByRole('button', { name: made.actions[0].label }))
+      expect(tracked('suggestion_accepted', 'agent-recompra')).toEqual([
+        ['suggestion_accepted', { concept_id: 'cafe', vertical: 'grocery', payload: { origen: 'agent-recompra' } }],
+      ])
+      expect(push).toHaveBeenLastCalledWith(
+        'store',
+        expect.objectContaining({
+          store: expect.objectContaining({ id: made.products[0].store_id }),
+          item: expect.objectContaining({ entityId: made.products[0].entity_id, suggestionOrigin: 'agent-recompra' }),
+        }),
+      )
+    })
+
+    test('«Después» quita el bloque, cuenta como ignorar a Mochi y no se vuelve a pedir', async () => {
+      api = stubRepeat()
+      const quiet = await import('../../../state/agentQuiet')
+      const { container, rerender } = await renderHome()
+      await advance(100)
+      fireEvent.click(within(repeatBlock(container)).getByRole('button', { name: 'Después' }))
+      expect(repeatBlock(container)).toBeNull()
+      quiet.noteDismissed() // una segunda vez (desde el globo): Mochi se calla
+      expect(quiet.isHushed()).toBe(true)
+
+      rerender(homeTree({ active: false }))
+      rerender(homeTree({ active: true }))
+      await advance(100)
+      expect(repeatRequests()).toHaveLength(1)
+      expect(repeatBlock(container)).toBeNull()
     })
   })
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { offer, plans as fetchPlans } from '../../../api/agent'
-import { noteShown } from '../../../api/suggestions'
+import { noteAccepted, noteShown } from '../../../api/suggestions'
 import { userId } from '../../../api/user'
 import DemoDisclaimer from '../../../components/DemoDisclaimer'
 import SmartBar from '../../../components/assistant/SmartBar'
@@ -27,14 +27,15 @@ import { CREDITS } from '../../../data/home'
 import '../home.css'
 import { useVerticalOrder } from '../useVerticalOrder'
 import LiveAgent from './LiveAgent'
-import { PlanBlock, openItem } from './LiveBlocks'
+import { PlanBlock, RepeatBlock, openItem } from './LiveBlocks'
 import { REPLAY_EVENT, markTourSeen, session, tourSeen } from '../../../state/liveMemory'
 import { isHushed, isQuiet, noteDismissed } from '../../../state/agentQuiet'
 import { today } from '../../../utils/today'
 import './live.css'
 
-// Las secciones de la Home de hoy. El agente no sugiere productos aquí.
-const ORDER = ['essentials', 'promos', 'turbo', 'plan', 'nearby', 'lower']
+// Las secciones de la Home de hoy, más «¿Repetimos?» (la recompra), que solo aparece cuando la API la ofrece.
+const ORDER = ['essentials', 'recompra', 'promos', 'turbo', 'plan', 'nearby', 'lower']
+const REPEAT_ORIGIN = 'agent-recompra'
 const T = { enter: 900, greet: 3400, greetHold: 6000, notice: 500 }
 // Silenciado por hoy (desde el agente flotante) o callado porque lo ignoraron: no habla por su cuenta; si lo tocan, sí.
 const silent = () => isQuiet(today()) || isHushed()
@@ -77,6 +78,7 @@ export default function LiveHomeFeed({ push, active = true }) {
   const [say, setSay] = useState(null)
   const [target, setTarget] = useState(null) // id del bloque donde se para el agente
   const [present, setPresent] = useState(() => session.played) // aún no entra a escena
+  const [repeat, setRepeat] = useState(null) // «¿Repetimos?»: la oferta `recompra`, si la API tiene una
   const [entering, setEntering] = useState(false)
 
   const screenRef = useRef(null)
@@ -269,6 +271,36 @@ export default function LiveHomeFeed({ push, active = true }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active])
 
+  // «¿Repetimos?» se pide cada vez que la Home vuelve a estar arriba (un pedido nuevo cambia lo que le toca). Sin
+  // oferta (204) o sin red, no hay bloque; en silencio, o si ya dijeron «Después», no se pide.
+  useEffect(() => {
+    if (!active || silent() || session.repeatLater) return undefined
+    let current = true
+    offer('recompra', {}, { userId: userId() }).then(
+      (made) => {
+        if (!current) return
+        const shown = made?.products.length ? made : null
+        if (shown) noteShown(events.track, shown.products, { origin: REPEAT_ORIGIN, generation: profile.resets })
+        setRepeat(shown)
+      },
+      () => {},
+    )
+    return () => {
+      current = false
+    }
+  }, [active, events.track, profile.resets])
+
+  // «Agregar» cuenta la aceptación y lleva a la tienda del producto, donde se ve destacado.
+  const addRepeat = () => {
+    noteAccepted(events.track, repeat.products, { origin: REPEAT_ORIGIN, generation: profile.resets })
+    openItem(repeat.products[0], push)
+  }
+  const repeatLater = () => {
+    noteDismissed()
+    session.repeatLater = true
+    setRepeat(null)
+  }
+
   // Las ocasiones del plan del día salen de la API; sin ellas el bloque no ofrece nada (no hay kits locales).
   useEffect(() => {
     let current = true
@@ -421,6 +453,9 @@ export default function LiveHomeFeed({ push, active = true }) {
         />
       </>
     ),
+    recompra: repeat && (
+      <RepeatBlock offer={repeat} onAdd={addRepeat} onLater={repeatLater} onOpen={openFromBlock} />
+    ),
     promos: <Promos push={push} />,
     turbo: <FastRestaurants stores={catalog.fastRestaurants} push={push} />,
     plan: (
@@ -467,7 +502,7 @@ export default function LiveHomeFeed({ push, active = true }) {
         <DemoDisclaimer />
 
         <div className="live-blocks">
-          {ORDER.map((id) => (
+          {ORDER.filter((id) => blocks[id]).map((id) => (
             <div key={id} ref={setRef(id)} className={`live-block live-block--${id}`}>
               {blocks[id]}
             </div>
