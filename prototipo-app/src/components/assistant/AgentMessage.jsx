@@ -105,7 +105,8 @@ function AlsoIn({ alsoIn, onAction }) {
             <span>
               <strong>{vertical.label}</strong>
               <small>
-                {vertical.stores.map((store) => store.name).join(' · ')} · {vertical.items.toLocaleString('es-CL')} productos
+                {vertical.stores.map((store) => store.name).join(' · ')} · {vertical.items.toLocaleString('es-CL')}{' '}
+                productos
               </small>
             </span>
           </button>
@@ -193,7 +194,12 @@ export default function AgentMessage({ message, onStreamDone, onOpenProduct, onO
               </button>
             )}
             {message.actions?.map((action) => (
-              <button key={action.label} type="button" className="agent-msg-action tap" onClick={() => onAction(action)}>
+              <button
+                key={action.label}
+                type="button"
+                className="agent-msg-action tap"
+                onClick={() => onAction(action)}
+              >
                 {action.label} →
               </button>
             ))}

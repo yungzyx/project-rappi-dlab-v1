@@ -199,11 +199,7 @@ export default function AssistantPanel({ push, vertical, depth = 1 }) {
 
   /** «¿Con qué acompaño…?»: la oferta del agente para ese producto (el momento `carrito`). */
   const pairing = (product) =>
-    offered(
-      'carrito',
-      { product: { entity_type: product.entityType, entity_id: product.entityId } },
-      NOTHING_TO_PAIR,
-    )
+    offered('carrito', { product: { entity_type: product.entityType, entity_id: product.entityId } }, NOTHING_TO_PAIR)
 
   const askPairing = (product) => {
     if (forgetting) return

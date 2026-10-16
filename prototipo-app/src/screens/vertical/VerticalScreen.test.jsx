@@ -121,10 +121,18 @@ describe('catálogo real en la vertical', () => {
     const grouped = fixture('search-grouped')
     grouped.groups = [grouped.groups[1], grouped.groups[0], grouped.groups[2]]
     const fetchMock = stubApi({ '/search': grouped, '/catalog/home': fixture('catalog-home') })
-    render(<SearchScreen back={() => {}} push={() => {}} params={{ query: 'cerveza', vertical: 'express' }} />, { wrapper: Providers })
+    render(<SearchScreen back={() => {}} push={() => {}} params={{ query: 'cerveza', vertical: 'express' }} />, {
+      wrapper: Providers,
+    })
     expect(await screen.findByRole('heading', { name: 'Express' })).toBeTruthy()
-    expect(new URL(fetchMock.mock.calls.find(([u]) => u.includes('/search'))[0]).searchParams.get('current')).toBe('express')
-    expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual(['Express', 'Licores', 'Súper'])
+    expect(new URL(fetchMock.mock.calls.find(([u]) => u.includes('/search'))[0]).searchParams.get('current')).toBe(
+      'express',
+    )
+    expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual([
+      'Express',
+      'Licores',
+      'Súper',
+    ])
   })
 
   test('en la Propuesta, la categoría abre el buscador con Mochi ya con «cerveza»', async () => {

@@ -7,15 +7,16 @@ import { ProfileProvider } from '../../state/ProfileContext'
 import { SearchResults } from './SearchSections'
 
 const events = vi.hoisted(() => ({ track: vi.fn(), flush: async () => {}, clear: () => {}, settled: async () => {} }))
-vi.mock('../../state/EventsContext', async (importOriginal) => ({ ...(await importOriginal()), useEvents: () => events }))
+vi.mock('../../state/EventsContext', async (importOriginal) => ({
+  ...(await importOriginal()),
+  useEvents: () => events,
+}))
 
 function Providers({ children }) {
   return (
     <DemoProvider>
       <ProfileProvider>
-        <CartProvider>
-          {children}
-        </CartProvider>
+        <CartProvider>{children}</CartProvider>
       </ProfileProvider>
     </DemoProvider>
   )
@@ -43,9 +44,12 @@ describe('SearchResults sin resultados', () => {
   test('la oferta sin_resultado registra su mostrada y, al tocar «Ver en…», una aceptada (una sola vez)', async () => {
     events.track.mockClear()
     stubApi({ 'POST /agent/offer': fixture('agent-offer-sin-resultado') })
-    render(<SearchResults query="pizza hawaiana" data={{ ...EMPTY, query: 'pizza hawaiana' }} onOpenVertical={() => {}} />, {
-      wrapper: Providers,
-    })
+    render(
+      <SearchResults query="pizza hawaiana" data={{ ...EMPTY, query: 'pizza hawaiana' }} onOpenVertical={() => {}} />,
+      {
+        wrapper: Providers,
+      },
+    )
     await flush()
     const tracked = (type) => events.track.mock.calls.filter(([name]) => name === type).map(([, fields]) => fields)
     const fields = { concept_id: 'pizza', vertical: 'restaurantes', payload: { origen: 'agent-sin_resultado' } }
@@ -62,7 +66,9 @@ describe('SearchResults sin resultados', () => {
 
   test('the offer has ¿Por qué?', async () => {
     stubApi({ 'POST /agent/offer': fixture('agent-offer-sin-resultado') })
-    render(<SearchResults query="pizza hawaiana" data={{ ...EMPTY, query: 'pizza hawaiana' }} onOpenVertical={() => {}} />)
+    render(
+      <SearchResults query="pizza hawaiana" data={{ ...EMPTY, query: 'pizza hawaiana' }} onOpenVertical={() => {}} />,
+    )
     await flush()
     fireEvent.click(screen.getByRole('button', { name: '¿Por qué?' }))
     expect(screen.getByText(fixture('agent-offer-sin-resultado').reason.text)).toBeTruthy()
@@ -78,7 +84,13 @@ describe('SearchResults sin resultados', () => {
   test('sin resultados muestra Ver en la vertical que sí lo tiene', async () => {
     const fetchMock = stubApi({ 'POST /agent/offer': fixture('agent-offer-sin-resultado') })
     const onOpenVertical = vi.fn()
-    render(<SearchResults query="pizza hawaiana" data={{ ...EMPTY, query: 'pizza hawaiana' }} onOpenVertical={onOpenVertical} />)
+    render(
+      <SearchResults
+        query="pizza hawaiana"
+        data={{ ...EMPTY, query: 'pizza hawaiana' }}
+        onOpenVertical={onOpenVertical}
+      />,
+    )
     await flush()
 
     expect(screen.getByText('No encontré «pizza hawaiana», pero pizza sí hay en restaurantes.')).toBeTruthy()
@@ -94,7 +106,14 @@ describe('SearchResults sin resultados', () => {
   test('si Mochi no tiene nada que ofrecer (204), solo invita a probar otra búsqueda', async () => {
     stubApi({ 'POST /agent/offer': 204 })
     const onTryAnother = vi.fn()
-    render(<SearchResults query="xyzzy" data={{ ...EMPTY, query: 'xyzzy' }} onOpenVertical={() => {}} onTryAnother={onTryAnother} />)
+    render(
+      <SearchResults
+        query="xyzzy"
+        data={{ ...EMPTY, query: 'xyzzy' }}
+        onOpenVertical={() => {}}
+        onTryAnother={onTryAnother}
+      />,
+    )
     await flush()
 
     expect(screen.getByText('No encontré «xyzzy». ¿Lo buscamos con otras palabras?')).toBeTruthy()
@@ -105,7 +124,14 @@ describe('SearchResults sin resultados', () => {
 
   test('si la oferta falla, Mochi no dice nada de más: también solo «Probar otra búsqueda»', async () => {
     stubApi({ 'POST /agent/offer': 'offline' })
-    render(<SearchResults query="xyzzy" data={{ ...EMPTY, query: 'xyzzy' }} onOpenVertical={() => {}} onTryAnother={() => {}} />)
+    render(
+      <SearchResults
+        query="xyzzy"
+        data={{ ...EMPTY, query: 'xyzzy' }}
+        onOpenVertical={() => {}}
+        onTryAnother={() => {}}
+      />,
+    )
     await flush()
     expect(screen.getByRole('button', { name: 'Probar otra búsqueda' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: /^Ver en/ })).toBeNull()
@@ -113,7 +139,14 @@ describe('SearchResults sin resultados', () => {
 
   test('mientras se escribe otra consulta no se muestra la oferta de la anterior', async () => {
     stubApi({ 'POST /agent/offer': fixture('agent-offer-sin-resultado') })
-    render(<SearchResults query="pizza hawaianas" data={{ ...EMPTY, query: 'pizza hawaiana' }} loading onOpenVertical={() => {}} />)
+    render(
+      <SearchResults
+        query="pizza hawaianas"
+        data={{ ...EMPTY, query: 'pizza hawaiana' }}
+        loading
+        onOpenVertical={() => {}}
+      />,
+    )
     await flush()
     expect(screen.queryByRole('button', { name: /^Ver en/ })).toBeNull()
     expect(screen.queryByText(/No results|No encontré/)).toBeNull()
@@ -132,7 +165,13 @@ describe('SearchResults con resultados', () => {
       groups: raw.groups.map((g) => ({
         vertical: g.prototype_vertical,
         backendVertical: g.vertical,
-        products: g.products.map((p) => ({ id: p.id, name: p.name, price: p.price, store: p.store, storeId: p.store_id })),
+        products: g.products.map((p) => ({
+          id: p.id,
+          name: p.name,
+          price: p.price,
+          store: p.store,
+          storeId: p.store_id,
+        })),
       })),
     }
   }

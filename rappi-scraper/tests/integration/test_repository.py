@@ -139,7 +139,7 @@ def test_search_is_isolated_per_vertical(db, page):
 
 
 def test_search_documents_mark_products_that_need_a_prescription(db):
-    """Rappi marca `requires_medical_prescription`: Bigotes no los muestra cuando se habla de síntomas."""
+    """Rappi marca `requires_medical_prescription`: Mochi no los muestra cuando se habla de síntomas."""
     _store(db, 1, "cruzverde", "farmacia")
     run = repository.start_run(db, "stores", {})
     repository.save_products(
@@ -489,7 +489,7 @@ def test_rebuilding_search_takes_the_documents_lock(db):
 
 
 def test_search_documents_carry_no_html_from_descriptions(db):
-    """~430 descripciones traen <p> y entidades (&iacute;, &nbsp;): entraban al índice, al vector y a Bigotes."""
+    """~430 descripciones traen <p> y entidades (&iacute;, &nbsp;): entraban al índice, al vector y a Mochi."""
     _store(db, 1, "lider", "supermercado")
     run = repository.start_run(db, "stores", {})
     html = "<p>Prote&iacute;na neutra&nbsp;Nutri &amp; Co &#8211; 1&nbsp;kg</p><br/>"

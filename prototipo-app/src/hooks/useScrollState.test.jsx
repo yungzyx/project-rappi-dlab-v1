@@ -6,9 +6,7 @@ const renders = vi.fn()
 function Page() {
   const [{ collapsed, showBackToTop, scrolled }, onScroll] = useScrollState({ collapseAt: 100, backToTopFrom: 500 })
   renders()
-  return (
-    <div data-testid="scroller" onScroll={onScroll} data-state={`${collapsed} ${showBackToTop} ${scrolled}`} />
-  )
+  return <div data-testid="scroller" onScroll={onScroll} data-state={`${collapsed} ${showBackToTop} ${scrolled}`} />
 }
 
 afterEach(() => {

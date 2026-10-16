@@ -114,8 +114,8 @@ def test_purged_searches_without_concept_do_not_become_a_null_opportunity(db):
     assert queries.opportunities(db, "prototype") == []
 
 
-def test_where_it_exists_follows_the_rule_bigotes_uses(db):
-    """El panel no pide que Bigotes ofrezca algo donde Bigotes no lo haría: 3 «comidas peruanas» en farmacia (un
+def test_where_it_exists_follows_the_rule_the_agent_uses(db):
+    """El panel no pide que Mochi ofrezca algo donde Mochi no lo haría: 3 «comidas peruanas» en farmacia (un
     laxante mal etiquetado) no son oferta, y la cerveza no se busca en restaurantes porque no se pide hecha."""
     seed_taxonomy(db, load_taxonomy())
     db.execute("DROP MATERIALIZED VIEW concept_assortment")
@@ -514,9 +514,9 @@ def test_synthetic_carts_are_also_abandoned_after_starting_payment(simulated):
     assert carts["cart_add"] > carts["checkout_start"] > carts["order_placed"]
 
 
-def test_synthetic_suggestions_go_to_the_vertical_bigotes_would_choose(db):
+def test_synthetic_suggestions_go_to_the_vertical_the_agent_would_choose(db):
     """El generador sorteaba la vertical entre todas las que tienen 1 ítem del concepto: «Cerveza · Farmacia»
-    encabezaba la tabla de sugerencias. Ahora usa el orden de Bigotes (`ranked_verticals`) y sus guardias de ofertas:
+    encabezaba la tabla de sugerencias. Ahora usa el orden de Mochi (`ranked_verticals`) y sus guardias de ofertas:
     la cerveza (el primer complemento de la pizza y de las papas) nunca se sugiere."""
     for store_id, vertical in [(2, "supermercado"), (3, "conveniencia"), (4, "farmacia"), (5, "mall"), (7, "licores")]:
         add_store(db, store_id, vertical, vertical.title())

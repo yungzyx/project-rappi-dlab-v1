@@ -23,8 +23,9 @@ export function CrossProducts({ rows }) {
         ))}
       </ol>
       <p className="card-note">
-        Mismo <span className="mono">master_product_id</span>, contando solo tiendas de un único vertical: Lider, Express
-        Lider y Unimarc aparecen como conveniencia y como súper, y con ellas la cifra sube un 15% (catálogo del 30-09).
+        Mismo <span className="mono">master_product_id</span>, contando solo tiendas de un único vertical: Lider,
+        Express Lider y Unimarc aparecen como conveniencia y como súper, y con ellas la cifra sube un 15% (catálogo del
+        30-09).
       </p>
     </>
   )

@@ -197,10 +197,10 @@ def test_shown_row_judges_the_products_the_user_sees(monkeypatch):
     assert f"| {SHOWN} | 0.1 |" in report
 
 
-def test_shown_unmet_follows_the_bigotes_rule(monkeypatch):
-    """Bigotes registra «sin resultado» solo si no muestra productos: con la búsqueda marcándolo y productos a la
+def test_shown_unmet_follows_the_agent_rule(monkeypatch):
+    """Mochi registra «sin resultado» solo si no muestra productos: con la búsqueda marcándolo y productos a la
     vista (las arenas para gato de «pasaje de avión»), no cuenta. Por síntomas tampoco: los medicamentos se ocultan
-    por la regla 6d, no por falta de surtido («tengo tos» era una falsa alarma que Bigotes no anota)."""
+    por la regla 6d, no por falta de surtido («tengo tos» era una falsa alarma que Mochi no anota)."""
     outcomes = {
         "pasaje de avión": SimpleNamespace(result=_result(unmet=True), products=[_product("1", "accesorios-mascota")]),
         "neumáticos": SimpleNamespace(result=_result(unmet=True), products=[]),
@@ -223,7 +223,7 @@ def test_shown_unmet_follows_the_bigotes_rule(monkeypatch):
     }
 
 
-def test_report_measures_unmet_as_bigotes_records_it():
+def test_report_measures_unmet_as_the_agent_records_it():
     hybrid = [
         run("pasaje de avión", "negativa", 0.79),
         run("neumáticos", "negativa", 0.75),

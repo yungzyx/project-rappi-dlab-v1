@@ -95,7 +95,11 @@ describe('Home de «Rappi hoy»', () => {
 
     await screen.findByRole('region', { name: 'Cerca de ti' })
     const nearby = section('Cerca de ti')
-    for (const name of ['Botillería de prueba Oriente', 'Supermercado de prueba Norte', 'Tienda turbo de prueba Centro'])
+    for (const name of [
+      'Botillería de prueba Oriente',
+      'Supermercado de prueba Norte',
+      'Tienda turbo de prueba Centro',
+    ])
       expect(nearby.getByText(name)).toBeTruthy()
     expect(nearby.getAllByText('30 min').length).toBeGreaterThan(0)
     // Restaurantes rápidos y Mejor evaluados salen de la API; no hay «Envío más barato» (casi todos traen $0: falta el dato).
@@ -104,13 +108,17 @@ describe('Home de «Rappi hoy»', () => {
     await screen.findByRole('region', { name: 'Mejor evaluados' })
     expect(section('Mejor evaluados').getAllByRole('button')).toHaveLength(6)
     expect(screen.queryByText(/lower fees|Envío más barato|Stores near by you/)).toBeNull()
-    const asked = fetchMock.mock.calls.map(([url]) => new URL(url)).filter((url) => url.pathname === '/catalog/restaurants')
+    const asked = fetchMock.mock.calls
+      .map(([url]) => new URL(url))
+      .filter((url) => url.pathname === '/catalog/restaurants')
     expect(asked.map((url) => Object.fromEntries(url.searchParams))).toEqual([{ sort: 'rating', limit: '6' }])
   })
 
   test('si /catalog/home falla, esas secciones se ocultan y la Home sigue entera', async () => {
     const { fetchMock } = renderHome(homeRoutes({ '/catalog/home': 'offline' }))
-    await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => new URL(url).pathname === '/catalog/home')).toBe(true))
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.some(([url]) => new URL(url).pathname === '/catalog/home')).toBe(true),
+    )
     await screen.findByRole('region', { name: 'Mejor evaluados' }) // la otra llamada es independiente
     expect(screen.queryByRole('region', { name: 'Cerca de ti' })).toBeNull()
     expect(screen.queryByRole('region', { name: 'Restaurantes rápidos' })).toBeNull()
@@ -144,6 +152,9 @@ describe('Home de «Rappi hoy»', () => {
     expect(stores).toHaveLength(14)
     expect(stores.every((store) => Number.isInteger(store.id))).toBe(true)
     expect(stores.filter((store) => store.vertical === 'restaurants')).toHaveLength(8)
-    expect(stores.find((store) => store.id === 9402)).toMatchObject({ vertical: 'liquor', name: 'Botillería de prueba Oriente' })
+    expect(stores.find((store) => store.id === 9402)).toMatchObject({
+      vertical: 'liquor',
+      name: 'Botillería de prueba Oriente',
+    })
   })
 })

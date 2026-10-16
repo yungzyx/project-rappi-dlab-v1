@@ -107,7 +107,9 @@
   opacity: 0;
   transform: translateY(-12px);
   pointer-events: none;
-  transition: opacity 200ms, transform var(--duration-normal) var(--ease-out);
+  transition:
+    opacity 200ms,
+    transform var(--duration-normal) var(--ease-out);
 }
 
 .home-compact.is-visible {
@@ -188,6 +190,7 @@
 }
 
 .home-shortcuts-caption {
+  min-height: 25px; /* 8px de relleno + una línea: se reserva aunque no haya leyenda */
   padding: 8px var(--gutter) 0;
   color: var(--ink-muted);
   font-size: 13px;
@@ -412,4 +415,3 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-

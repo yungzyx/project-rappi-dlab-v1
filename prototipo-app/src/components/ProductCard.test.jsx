@@ -8,7 +8,14 @@ import { ProductSheetProvider, useProductSheet } from '../state/ProductSheetCont
 import { PLACEHOLDER_IMG } from './Img'
 import { ProductCard } from './ProductCard'
 
-const beer = { id: 'cat-1', name: 'Corona Cerveza Rubia Extra', img: '', price: '$2.200', store: 'Casanova spa', storeBadge: '#333' }
+const beer = {
+  id: 'cat-1',
+  name: 'Corona Cerveza Rubia Extra',
+  img: '',
+  price: '$2.200',
+  store: 'Casanova spa',
+  storeBadge: '#333',
+}
 
 test('un producto +18 lleva la marca en la tarjeta (la fila "Para ti" de la API puede traer alcohol)', () => {
   const { rerender } = render(

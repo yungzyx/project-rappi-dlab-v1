@@ -796,7 +796,8 @@ def configure_logging(verbose: bool) -> None:
         datefmt="%H:%M:%S",
     )
     # Las peticiones a huggingface.co al cargar un modelo (~20 por carga) tapaban los errores del log semanal.
-    logging.getLogger("httpx").setLevel(logging.DEBUG if verbose else logging.WARNING)
+    for noisy in ("httpx", "httpx2"):
+        logging.getLogger(noisy).setLevel(logging.DEBUG if verbose else logging.WARNING)
 
 
 def main(argv: list[str] | None = None) -> None:

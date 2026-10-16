@@ -53,7 +53,12 @@ export function UnmetDemand({ rows }) {
     { key: 'busquedas', header: 'Búsquedas', numeric: true, render: (row) => formatNumber(row.busquedas) },
     { key: 'crecimiento', header: 'Crecimiento', numeric: true, render: (row) => <Growth row={row} /> },
     { key: 'existe_en', header: 'Dónde existe', render: (row) => <WhereItExists value={row.existe_en} /> },
-    { key: 'accion', header: 'Acción sugerida', wide: true, render: (row) => <span className="action-cell">{row.accion}</span> },
+    {
+      key: 'accion',
+      header: 'Acción sugerida',
+      wide: true,
+      render: (row) => <span className="action-cell">{row.accion}</span>,
+    },
   ]
   return (
     <DataTable

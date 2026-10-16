@@ -12,7 +12,7 @@ import Mascot from './Mascot'
 import './agent-presence.css'
 
 // Donde el agente no flota: ya está en la pantalla (la Home, el mapa del seguimiento) o estorba (el checkout).
-export const AGENT_HIDDEN_SCREENS = new Set(['checkout', 'tracking'])
+const AGENT_HIDDEN_SCREENS = new Set(['checkout', 'tracking'])
 export const SIDE_KEY = 'rappi-proto-mochi-lado'
 
 const SIZE = 68
@@ -262,12 +262,7 @@ export default function AgentPresence({ screen, homeTab, raised }) {
           <p>¿Qué hacemos juntos?</p>
           <div className="agent-actions">
             {actions.map((action) => (
-              <button
-                key={action.id}
-                type="button"
-                className="agent-action tap"
-                onClick={() => run(action.id)}
-              >
+              <button key={action.id} type="button" className="agent-action tap" onClick={() => run(action.id)}>
                 {action.label}
               </button>
             ))}

@@ -40,7 +40,14 @@ export default function PrivacyNotice({ onOpenAccount }) {
         borrarlo en Cuenta → Borrar mis datos.
       </p>
       <div className="privacy-notice-actions">
-        <button type="button" className="privacy-notice-account tap" onClick={() => { close(); onOpenAccount() }}>
+        <button
+          type="button"
+          className="privacy-notice-account tap"
+          onClick={() => {
+            close()
+            onOpenAccount()
+          }}
+        >
           Ir a Cuenta
         </button>
         <button type="button" className="privacy-notice-ok tap" onClick={close}>

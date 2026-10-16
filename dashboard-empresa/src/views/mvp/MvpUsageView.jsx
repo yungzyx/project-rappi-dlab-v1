@@ -46,7 +46,8 @@ export function MvpUsageView({ source }) {
           <p>
             Aceptada: la oferta se agregó al carro. El momento es dónde se hizo: en un plan, con el carro armado, antes
             de pagar, para el próximo pedido, cuando una búsqueda no encontró nada, para probar otro vertical, al
-            preguntarle al agente o en «Para ti». Los servicios sin catálogo tienen su propia sección, en «Entre verticales».
+            preguntarle al agente o en «Para ti». Los servicios sin catálogo tienen su propia sección, en «Entre
+            verticales».
           </p>
           <ProvenanceBadge kind={source} />
         </div>

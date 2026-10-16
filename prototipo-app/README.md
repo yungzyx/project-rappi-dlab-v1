@@ -8,7 +8,7 @@ Hecho con Vite + React 19. **Necesita la API de [`rappi-ia`](../rappi-ia/)**: si
 
 ![Modo demo: la misma app en el prototipo final y en «Rappi hoy»](docs/screenshots/00-modo-demo.jpg)
 
-*Las capturas de las pantallas se tomaron o se revisaron el 10-10-2026 con el MVP corriendo y el catálogo real (`npm run screenshots`); solo la ficha de Mochi es anterior. `npm run screenshots` necesita el MVP corriendo y, como paga una compra, deja un pedido y sus eventos (`source = 'prototype'`) en la base.*
+*Las capturas de las pantallas se tomaron o se revisaron el 16-10-2026 con el MVP corriendo sobre una copia de la base (`rappi_staging`) y el catálogo real (`npm run screenshots`); solo la ficha de Mochi es anterior. «¿Repetimos?» sale de la respuesta de ejemplo del contrato con un café real del catálogo: es una ilustración, no un hábito medido. Como el recorrido paga una compra y deja un pedido y sus eventos (`source = 'prototype'`) en la base que use la API, `npm run screenshots` se niega a correr sin `SCREENSHOTS_ALLOW_WRITES=1`: se corre con la API sobre `rappi_staging`, nunca sobre `rappi`.*
 
 ## Cómo correrlo
 
@@ -56,7 +56,7 @@ Si la API se cae con la app ya abierta, el buscador con Mochi dice «Sin conexi�
 | `npm run lint` | ESLint (reglas de React Hooks) |
 | `npm run format` | Formato con Prettier |
 | `npm run build` | Build de producción en `dist/` |
-| `npm run screenshots` | Regenera las capturas de este README; necesita el MVP corriendo (`make mvp`) y usa el Chrome instalado |
+| `npm run screenshots` | Regenera las capturas de este README con el Chrome instalado. Necesita el MVP corriendo sobre una copia de la base (`DATABASE_URL=postgresql:///rappi_staging make mvp`) y `SCREENSHOTS_ALLOW_WRITES=1`, porque paga una compra: sin la variable se niega |
 | `./scripts/make-icons.sh` | Regenera los íconos de pantalla de inicio desde `scripts/icon.svg` |
 
 Tests: las cifras vigentes están en [README.md#resultados](../README.md#resultados) (fila «Calidad»). CI en GitHub Actions: lint, tests y build.
@@ -75,6 +75,19 @@ El interruptor junto al teléfono (tecla **D**, o Account → Modo demo en el ce
 En el **prototipo final** Mochi de cuerpo entero vive en la Home (`src/screens/home/live/`), sin canal aparte para escribirle. Al entrar saluda y, la primera vez, hace una guía de 2 pasos (el buscador y qué pasa al tocarlo, con «Siguiente» y «Saltar»; no vuelve a aparecer, salvo con «Repetir escena»); no sugiere productos. La Home suma «¿Qué plan tienes hoy?» (un kit de varias verticales) y, al tocar a Mochi, una vertical por probar. Mochi saluda al llegar, salta, apunta y gira según lo que dice, y en espera mira alrededor, baila o se estira; sin nada que decir se asoma desde el borde y al hacer scroll se esconde, para no tapar la Home. Lo que se agrega al carro fuera de la Home lo comenta al volver, si combina con algo de otra vertical. La barra de la Home y la lupa de abajo abren el buscador con Mochi (ver más abajo), y al entregar un pedido ofrece armar el próximo. En el celular, «Repetir escena de Mochi» está en Account. «↺ Repetir escena», junto al interruptor, vuelve a empezar. Respeta «reducir movimiento» del sistema.
 
 ## Lo nuevo de la propuesta
+
+### La Home que aprende
+
+La Home del prototipo final se ordena según cada persona, con el [motor multivertical](../docs/capa-de-datos.md#motor-multivertical) de la API:
+
+- **Accesos ordenados por el uso propio:** los 6 accesos pequeños siguen lo que la persona más pide y abre (`GET /profile/{id}/verticales`; cada toque a una vertical es un evento `vertical_open`) y, cuando el orden es suyo, la fila dice «Ordenadas según lo que más usas». Restaurantes y Turbo no se mueven, Loyalty y Benefits Pro van al final y, sin historial, queda el orden de siempre. En «Rappi hoy» no cambia nada.
+- **«¿Repetimos …?»:** cuando la persona pide un concepto con ritmo y ya le toca, aparece un bloque con lo último que llevó («Pides cada 7 días»), «Ver producto» y «Después» (la oferta `recompra`). Cuenta como aceptada al agregar el producto al carro.
+- **Tocar a Mochi:** propone el siguiente paso de la escalera de combinaciones (Restaurantes → Turbo → Retail), por ejemplo «¿Y si pruebas algo de Súper?», con «¿Por qué?» para ver la razón.
+
+| Home que aprende | Mochi propone una vertical | ¿Repetimos? |
+|:---:|:---:|:---:|
+| <img src="docs/screenshots/03-home-dinamica.jpg" width="240" alt="Home con los accesos reordenados: Chocolates y Retail primero, con la leyenda «Ordenadas según lo que más usas»"> | <img src="docs/screenshots/22-vertical-por-probar.jpg" width="240" alt="Mochi en la Home pregunta «¿Y si pruebas algo de Súper?» y, en «¿Por qué?», dice «Porque aún no pides en el súper»"> | <img src="docs/screenshots/21-recompra.jpg" width="240" alt="Bloque de ejemplo «¿Repetimos café? Pides cada 7 días.» con un café molido del catálogo, Ver producto y Después"> |
+| Tras abrir dos veces Chocolates y una vez Retail, esos accesos suben. | Esa persona nunca pidió: Mochi le propone el súper y dice por qué. | Ilustración con la respuesta de ejemplo del contrato y un café real del catálogo; no es un hábito medido. |
 
 ### Mochi, el buscador
 
@@ -193,5 +206,5 @@ src/
 └── utils/          Utilidades sueltas (`today`: la fecha local)
 docs/screenshots/   Capturas de este README
 public/             Íconos y manifiesto para "Agregar a pantalla de inicio"
-scripts/            Íconos, capturas y el recorrido de `make mvp-check` (Home, compra, kit de Mochi, Home dinámica, panel y API caída)
+scripts/            Íconos, capturas y el recorrido de `make mvp-check` (Home, compra, kit de Mochi, Home dinámica, combinación, panel y API caída: 7 revisiones)
 ```

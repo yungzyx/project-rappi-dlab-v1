@@ -1,7 +1,7 @@
 """Ofertas: productos con una baja de precio real o con una rebaja de la tienda, en una oferta vigente. Solo lectura,
 consultas parametrizadas.
 
-Una oferta es una oferta vigente de una tienda que se abre (la regla de `stores._CURRENT_OFFERS`) con un precio de
+Una oferta es una oferta vigente de una tienda que se abre (la regla de `stores.CURRENT_OFFERS`) con un precio de
 antes mayor que el actual:
 
 - si la tienda marca un precio de lista (`real_price`) por encima del actual (`discount_pct` > 0), ese es el de
@@ -26,7 +26,7 @@ from rappi_scraper.storage.search import MIN_PRICE
 from ..agent.tools import Product
 from ..concepts.taxonomy import load_taxonomy, sensitive_concepts
 from .cache import cached
-from .stores import _CURRENT_OFFERS, _OWN_VERTICAL, _product, downloaded_cte, not_pushed_params
+from .stores import CURRENT_OFFERS, OWN_VERTICAL, downloaded_cte, not_pushed_params, product_card
 
 MAX_DISCOUNT_PCT = 60
 
@@ -66,7 +66,7 @@ offers AS (
     FROM changed d
     CROSS JOIN LATERAL (
         SELECT sp.master_product_id, ps.price
-        {_CURRENT_OFFERS}
+        {CURRENT_OFFERS}
           AND ps.sku = d.sku
     ) o
 ),
@@ -106,7 +106,7 @@ def deals(conn: Connection, vertical: str | None = None, limit: int = 24) -> lis
 def _deals(conn: Connection, vertical: str | None, limit: int) -> list[dict]:
     sql = _DEALS.format(
         downloaded=downloaded_cte(vertical is not None, history=True),
-        vertical=_OWN_VERTICAL if vertical is None else "%(vertical)s",
+        vertical=OWN_VERTICAL if vertical is None else "%(vertical)s",
     )
     params = {
         "vertical": vertical,
@@ -123,6 +123,8 @@ def _deals(conn: Connection, vertical: str | None, limit: int) -> list[dict]:
     ):
         # `before` va como precio de lista: `Product.to_dict` calcula el descuento y lo deja si es mayor que el precio.
         products.append(
-            _product((id_, name, price, before, image, presentation, adult, concept), own, store, store_id, taxonomy)
+            product_card(
+                (id_, name, price, before, image, presentation, adult, concept), own, store, store_id, taxonomy
+            )
         )
     return [product.to_dict() for product in products]

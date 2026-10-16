@@ -40,7 +40,10 @@ export function serveFixturesWith(overrides) {
 /** La API está caída: el panel debe caer a los datos guardados. */
 export function apiDown() {
   retryConnection()
-  vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(new TypeError('Failed to fetch'))))
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => Promise.reject(new TypeError('Failed to fetch'))),
+  )
 }
 
 /**

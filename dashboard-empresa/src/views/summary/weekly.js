@@ -53,7 +53,11 @@ export function weeklySeries(rows, series, asOfIso) {
   const base = points.find((point) => !point.partial && point.value !== null && utcDay(point.date) === baseDay) ?? null
   let change = null
   if (latest && base) {
-    change = series.rate ? latest.value - base.value : base.value > 0 ? ((latest.value - base.value) / base.value) * 100 : null
+    change = series.rate
+      ? latest.value - base.value
+      : base.value > 0
+        ? ((latest.value - base.value) / base.value) * 100
+        : null
   }
   return { points, latest, change, formatChange: series.rate ? formatPoints : formatSignedPct }
 }

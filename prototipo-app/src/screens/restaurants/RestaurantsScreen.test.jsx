@@ -95,7 +95,12 @@ describe('Restaurantes con el catálogo real', () => {
 
     fireEvent.click(screen.getByText('Pizzería de prueba Centro'))
     expect(push).toHaveBeenCalledWith('store', {
-      store: expect.objectContaining({ id: 9801, name: 'Pizzería de prueba Centro', vertical: 'restaurants', logo: false }),
+      store: expect.objectContaining({
+        id: 9801,
+        name: 'Pizzería de prueba Centro',
+        vertical: 'restaurants',
+        logo: false,
+      }),
     })
   })
 

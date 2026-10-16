@@ -40,7 +40,10 @@ export function ColumnChart({ data, formatValue, describe, label }) {
               onBlur={() => setActive(null)}
             >
               <rect className="hit" x={band * index} y={0} width={band} height={HEIGHT} />
-              <path className="column-bar" d={columnPath(center(index) - barWidth / 2, barWidth, baseline, y(item.value))} />
+              <path
+                className="column-bar"
+                d={columnPath(center(index) - barWidth / 2, barWidth, baseline, y(item.value))}
+              />
               <text className="value-label num" x={center(index)} y={y(item.value) - 8} textAnchor="middle">
                 {formatValue(item.value)}
               </text>

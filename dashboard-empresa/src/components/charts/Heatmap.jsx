@@ -56,7 +56,12 @@ export function Heatmap(props) {
                   >
                     <rect x={cellX(column)} y={cellY(rowIndex)} width={cellWidth} height={ROW} rx="3" />
                     {cellWidth >= 22 && (
-                      <text x={cellX(column) + cellWidth / 2} y={cellY(rowIndex) + ROW / 2} dy="0.32em" textAnchor="middle">
+                      <text
+                        x={cellX(column) + cellWidth / 2}
+                        y={cellY(rowIndex) + ROW / 2}
+                        dy="0.32em"
+                        textAnchor="middle"
+                      >
                         {formatCell(value)}
                       </text>
                     )}

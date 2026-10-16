@@ -14,7 +14,7 @@ from collections import defaultdict
 from psycopg import Connection
 
 # Participación de cada concepto en cada vertical, con restaurantes solo para lo que se pide hecho.
-_SHARES = """
+SHARES = """
     WITH total AS (SELECT vertical, sum(items) AS items FROM concept_assortment GROUP BY vertical)
     SELECT a.concept_id, a.vertical, a.items, t.items AS vertical_items
     FROM concept_assortment a
@@ -43,7 +43,7 @@ def contending_verticals(conn: Connection, concept_ids: list[str]) -> list[str]:
 def typical_verticals(conn: Connection) -> dict[str, str]:
     """La vertical más típica de cada concepto (la primera de `ranked_verticals`), en una sola consulta."""
     offer: dict[str, list[tuple[str, int, int]]] = defaultdict(list)
-    for concept_id, vertical, items, vertical_items in conn.execute(_SHARES):
+    for concept_id, vertical, items, vertical_items in conn.execute(SHARES):
         offer[concept_id].append((vertical, items, vertical_items))
     return {concept_id: _rank(rows)[0][0] for concept_id, rows in offer.items()}
 
@@ -51,7 +51,7 @@ def typical_verticals(conn: Connection) -> dict[str, str]:
 def _offer(conn: Connection, concept_ids: list[str]) -> list[tuple[str, int, int]]:
     """(vertical, ítems de los conceptos, ítems de la vertical)."""
     return conn.execute(
-        f"""SELECT vertical, sum(items)::integer, max(vertical_items)::integer FROM ({_SHARES}) s
+        f"""SELECT vertical, sum(items)::integer, max(vertical_items)::integer FROM ({SHARES}) s
             WHERE concept_id = ANY(%s) GROUP BY vertical""",
         (concept_ids,),
     ).fetchall()

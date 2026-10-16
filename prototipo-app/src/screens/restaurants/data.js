@@ -19,7 +19,13 @@ export const CATEGORIES = [
   { id: 'turbo', label: 'Turbo Restaurantes', img: rcatTurbo, query: 'turbo' },
   { id: 'pizzas', label: 'Pizzas', img: rcatPizza, cuisine: 'Pizzas' },
   { id: 'hamburguesa', label: 'Hamburguesa', img: rcatBurger, cuisine: 'Hamburguesa' },
-  { id: 'culinaria', label: 'Experiencia Culinaria', img: rcatCulinaria, partial: true, cuisine: 'Experiencias Culinarias' },
+  {
+    id: 'culinaria',
+    label: 'Experiencia Culinaria',
+    img: rcatCulinaria,
+    partial: true,
+    cuisine: 'Experiencias Culinarias',
+  },
 ]
 
 // En la captura solo se ve el primer banner (Tung Fong). Son publicidad de la app, no tiendas del catálogo: no abren ninguna.

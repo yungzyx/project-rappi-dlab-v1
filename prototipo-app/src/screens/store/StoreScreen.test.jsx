@@ -25,9 +25,7 @@ function Providers({ children }) {
           <AssistantProvider>
             <CartProvider>
               <FavoritesProvider>
-                <ToastProvider>
-                  {children}
-                </ToastProvider>
+                <ToastProvider>{children}</ToastProvider>
               </FavoritesProvider>
             </CartProvider>
           </AssistantProvider>
@@ -281,7 +279,9 @@ describe('visita a una tienda (embudo del panel)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Ver más' }))
     await waitFor(() => expect(rows()).toHaveLength(30))
     fireEvent.click(tabs.getByRole('button', { name: 'Bebidas' }))
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Bebidas' }).getAttribute('aria-current')).toBe('true'))
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Bebidas' }).getAttribute('aria-current')).toBe('true'),
+    )
     expect(tracked('view_store')).toHaveLength(1)
   })
 
@@ -290,7 +290,11 @@ describe('visita a una tienda (embudo del panel)', () => {
     openStore({ store: PIZZERIA })
     await screen.findByRole('navigation', { name: 'Secciones del menú' })
     expect(tracked('view_store')).toEqual([
-      expect.objectContaining({ vertical: 'restaurants', entity_id: '9801', payload: { name: 'Pizzería de prueba Centro' } }),
+      expect.objectContaining({
+        vertical: 'restaurants',
+        entity_id: '9801',
+        payload: { name: 'Pizzería de prueba Centro' },
+      }),
     ])
   })
 
@@ -320,7 +324,8 @@ describe('visita a una tienda (embudo del panel)', () => {
 })
 
 describe('producto que llegó tocándolo', () => {
-  const deal = (prefix) => toPrototypeProduct(fixture('catalog-deals').find((candidate) => candidate.name.startsWith(prefix)))
+  const deal = (prefix) =>
+    toPrototypeProduct(fixture('catalog-deals').find((candidate) => candidate.name.startsWith(prefix)))
   // Galletas es de la tienda 9102 y Café, del primer pasillo de la 9101.
   const elsewhere = () => deal('Galletas')
   const listed = () => deal('Café molido')
@@ -360,9 +365,7 @@ describe('producto que llegó tocándolo', () => {
     fireEvent.click(within(row).getByLabelText(`Agregar ${offered.name}`))
     fireEvent.click(within(row).getByLabelText(/^Agregar uno de/)) // otra unidad: no es otra aceptación
     const accepted = tracked('suggestion_accepted')
-    expect(accepted).toEqual([
-      expect.objectContaining({ concept_id: 'cafe', payload: { origen: 'agent-recompra' } }),
-    ])
+    expect(accepted).toEqual([expect.objectContaining({ concept_id: 'cafe', payload: { origen: 'agent-recompra' } })])
   })
 
   test('también se destaca en un restaurante si el plato no está en su menú', async () => {

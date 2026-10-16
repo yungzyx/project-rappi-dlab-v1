@@ -7,8 +7,9 @@
 | Si quieres… | Lee | Tiempo |
 |---|---|---|
 | Entender el problema y por qué existe el proyecto | [contexto-y-problema.md](contexto-y-problema.md) | 5 min |
-| Ver el prototipo final: Mochi en la Home y el buscador con Mochi | [prototipo-app/README.md](../prototipo-app/README.md) | 5 min |
-| Mostrarlo a alguien del negocio (guion de 10 minutos) | [demo.md](demo.md) | 3 min |
+| Entender la propuesta en una página: el motor multivertical, la Home dinámica y la tabla de Rappi | [README principal](../README.md#la-propuesta) | 5 min |
+| Ver el prototipo final: la Home que aprende, Mochi en la Home y el buscador con Mochi | [prototipo-app/README.md](../prototipo-app/README.md) | 5 min |
+| Mostrarlo a alguien del negocio (guion de unos 12 minutos) | [demo.md](demo.md) | 3 min |
 | Saber qué se decidió y por qué | [decisiones.md](decisiones.md) | 5 min |
 | Ver cómo llegó a ser lo que es (todas las etapas) | [rappi-evolucion-proyecto](https://github.com/yungzyx/rappi-evolucion-proyecto) | 5 min |
 
@@ -25,7 +26,7 @@
 | Usar o modificar el scraper | [rappi-scraper/README.md](../rappi-scraper/README.md) | 10 min |
 | Qué es el MVP integrado y cómo se armó (7 etapas) | [especificación del MVP](superpowers/specs/2026-10-10-mvp-integrado-design.md) | 10 min |
 | Saber cómo se arman los perfiles de gusto (el sushi como narrativa, escaleras de verticales) y qué falta para la app | [especificación](superpowers/specs/2026-10-14-perfiles-de-gusto-design.md) | 5 min |
-| Saber hacia dónde va el proyecto: la Home dinámica y el motor de recomendaciones entre verticales | [especificación](superpowers/specs/2026-10-16-motor-multivertical-design.md) y [plan de la etapa 1](superpowers/plans/2026-10-16-etapa-1-sin-pasaporte-ni-juego.md) | 10 min |
+| Entender el motor multivertical y la Home dinámica: qué decide, con qué datos y cómo se armó (16-10, 6 etapas) | [especificación](superpowers/specs/2026-10-16-motor-multivertical-design.md) y los planes de cada etapa: [1, sin pasaporte ni juego](superpowers/plans/2026-10-16-etapa-1-sin-pasaporte-ni-juego.md) · [2, el motor](superpowers/plans/2026-10-16-etapa-2-motor.md) · [3, la Home](superpowers/plans/2026-10-16-etapa-3-home.md) · [4, recomendaciones conectadas](superpowers/plans/2026-10-16-etapa-4-conectadas.md) · [5, QA y mejora continua](superpowers/plans/2026-10-16-etapa-5-qa.md) · [6, pulido](superpowers/plans/2026-10-16-etapa-6-pulido.md) (con su [auditoría](superpowers/plans/2026-10-16-auditoria-pulido.md)). Resultados: [evaluación](resultados/motor-2026-10-16.md) y [QA](resultados/qa-motor-2026-10-16.md) | 10 min |
 | Historia: diseño del juego de verticales (09-10; salió del proyecto el 16-10, ver [decisiones.md](decisiones.md)) | [especificación](superpowers/specs/2026-10-09-juego-en-prototipo-design.md) | 5 min |
 
 ### Diagramas y mapas
@@ -34,6 +35,7 @@ GitHub muestra las imágenes; las versiones interactivas (HTML) hay que descarga
 
 | Qué | Qué muestra | Imagen | Interactivo |
 |---|---|---|---|
+| Motor multivertical | De las señales y pedidos de la persona, y de la tabla de Rappi, a la Home dinámica y las ofertas de Mochi | [motor-flujo.png](diagramas/motor-flujo.png) | [motor-flujo.html](diagramas/motor-flujo.html) |
 | Flujo de datos | Las etapas de punta a punta: descarga → Postgres → IA offline → consulta → prototipo y panel | [rag-datos.png](diagramas/rag-datos.png) | [rag-datos.html](diagramas/rag-datos.html) |
 | Arquitectura de la IA | Catálogo y agente Mochi por carriles: datos offline, consulta online y entre verticales | [arquitectura-ia.png](diagramas/arquitectura-ia.png) | [arquitectura-ia.html](diagramas/arquitectura-ia.html) |
 | Scraper | Cómo `rappi refresh` descubre, descarga y guarda el catálogo | [scraper-flujo.png](diagramas/scraper-flujo.png) | [scraper-flujo.html](diagramas/scraper-flujo.html) |

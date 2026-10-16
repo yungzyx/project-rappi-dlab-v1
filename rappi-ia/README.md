@@ -2,7 +2,7 @@
 
 Conecta el catálogo que descarga [`rappi-scraper`](../rappi-scraper/) con el asistente **Mochi** del [prototipo](../prototipo-app/). Diseño completo en [docs/diseno-ia.md](../docs/diseno-ia.md).
 
-**Regla:** *buscar dentro del vertical, entender al usuario a través de los verticales*. La búsqueda nunca mezcla verticales. El puente entre ellos son los **conceptos**: una taxonomía propia de 133 conceptos, con 103 complementos curados entre sí. Una recomendación cruzada va del concepto que le interesa al usuario a su complemento, y de ahí a una búsqueda en el otro vertical (p. ej., cerveza en licores → snacks salados de otra tienda).
+**Regla:** *buscar dentro del vertical, entender al usuario a través de los verticales*. La búsqueda nunca mezcla verticales. El puente entre ellos son los **conceptos**: una taxonomía propia de 136 conceptos (116 tipos de producto en 20 grupos), con 106 complementos curados entre sí (contados el 16-10-2026). Una recomendación cruzada va del concepto que le interesa al usuario a su complemento, y de ahí a una búsqueda en el otro vertical (p. ej., cerveza en licores → snacks salados de otra tienda).
 
 ![Flujo de datos por etapas: Descarga → Postgres → IA offline → Consulta → Prototipo y panel](../docs/diagramas/rag-datos.png)
 
@@ -17,6 +17,8 @@ Versión interactiva: [rag-datos.html](../docs/diagramas/rag-datos.html). Vista 
 | Mochi | Entender → buscar → sugerir un complemento de otro vertical → redactar (plantillas o Claude) → verificar | `agent/` |
 | Eventos y analítica | Usuarios y eventos (**simulados** o del prototipo, nunca mezclados), métricas de frecuencia, abandono, oportunidades y afinidad | `events/`, `analytics/` |
 | Capa de datos | Atributos, medidas, marcas, grafo y segmentos en el esquema `capa` ([docs/capa-de-datos.md](../docs/capa-de-datos.md)) | `layers/` |
+| Motor multivertical | Afinidad de cada persona por vertical, transiciones, combinaciones con su retención (la tabla de Rappi en `combos.toml`), compra cruzada, tendencias y recompra; el orden de la Home y la evaluación por fechas ([docs/capa-de-datos.md](../docs/capa-de-datos.md#motor-multivertical)) | `motor/` |
+| Ofertas | Lo que Mochi propone en cada momento de la app, con su razón y su fuente (`basis`), las guardias (sin alcohol, Farmacia, bebé ni salud por iniciativa propia) y los perfiles de gusto | `offers/` |
 
 ## Instalar
 
@@ -82,15 +84,16 @@ La tarea semanal del scraper (`make schedule` en `rappi-scraper/`) ya lo hace so
 | `GET /live` · `GET /health` | El proceso responde (sin mirar la base) · lista para atender: 200 con capacidades y documentos, o 503 con `motivos` (`base`, `saturada`, `sin_documentos`, `migraciones_pendientes`, `busqueda_semantica`) |
 | `POST /session` | Sesión anónima: `{legacy_user_id?}` → `{user_id, token}`. El token va en la cabecera `X-User-Token` de toda ruta con datos de una persona (401 sin él, 403 con el de otra) |
 | `POST /agent/ask` | El agente (Mochi): `{message, vertical?, user_id?, session_id?, profile?, shown_topics?, mode}`. Acepta los ids de vertical del prototipo (`liquor`, `grocery`…) |
-| `POST /agent/offer` · `GET /agent/plans` | Lo que el agente propone en cada momento de la app (`plan`, `carrito`, `checkout`, `proximo_pedido`, `sin_resultado`, `vertical_por_probar` (la vertical donde la persona aún no pide, según sus pedidos) y `perfil`: la escalera de un perfil de gusto; 204 si no hay una buena oferta, 422 con un perfil desconocido) · las ocasiones de la Home con su kit |
+| `POST /agent/offer` · `GET /agent/plans` | Lo que el agente propone en cada momento de la app (`plan`, `carrito`, `checkout`, `proximo_pedido`, `sin_resultado`, `vertical_por_probar` (el siguiente paso de la escalera de combinaciones, Restaurantes → Turbo → Retail, con su razón en `basis`), `recompra` («¿Repetimos …?», cuando le toca a un concepto que la persona pide con ritmo) y `perfil`: la escalera de un perfil de gusto; 204 si no hay una buena oferta, 422 con un perfil desconocido) · las ocasiones de la Home con su kit |
 | `GET /catalog/home` · `/catalog/verticals/{vertical}/stores` · `/catalog/stores/{store_id}` · `/catalog/products/{entity_type}/{entity_id}` · `/catalog/restaurants` · `/catalog/restaurants/{store_id}/menu` · `/catalog/deals` | Las pantallas de catálogo del prototipo (Home, verticales, tienda, producto, restaurantes, menú, ofertas), con el precio vigente |
 | `GET /search` | Búsqueda híbrida en un vertical, con precios vigentes |
 | `GET /recommendations` | "Para ti, de otras tiendas": intereses → complementos → otro vertical |
 | `GET /profile/{id}` · `DELETE /profile/{id}` | Lo aprendido (sin sensibles) · "Olvidar" (todo o un concepto) |
+| `GET /profile/{id}/verticales` | El orden de los accesos de la Home: `{fixed, order: [{id, score, reason}], personalized}`. Restaurantes y Turbo van fijos; los otros seis, por lo que la persona más usa (sin historial, el orden de siempre) |
 | `GET /profile/{id}/gustos` | Los perfiles de gusto de la persona (por ejemplo «🥢 Amante de lo asiático»): `{perfiles: [{id, nombre, emoji, nivel, principal, por_que, basis}]}`, o la lista vacía. Salen de sus segmentos y "Olvidar" los quita |
-| `POST /events` · `POST /orders` | Eventos y pedidos del prototipo (`source = prototype`). Un pedido sin vertical del catálogo es un 400 |
+| `POST /events` · `POST /orders` | Eventos y pedidos del prototipo (`source = prototype`). Un pedido sin vertical del catálogo es un 400; ya respondido, la API recalcula los segmentos, la afinidad y la recompra de esa persona |
 | `POST /events/beacon` | Lo que queda en cola al cerrar la pestaña (`sendBeacon`, text/plain: sin preflight de CORS) |
-| `GET /analytics/{kpis, weekly, opportunities, trends, funnel, cohorts, rhythm, at-risk, suggestions, multi-vertical, affinity, assortment, services, catalog, offers, game, unmet}` | Métricas de negocio (las muestra el [panel](../dashboard-empresa/), parte del MVP). `offers`, `game` y `unmet` son las de «Uso del MVP» |
+| `GET /analytics/{kpis, weekly, opportunities, trends, funnel, cohorts, rhythm, at-risk, suggestions, multi-vertical, affinity, assortment, services, catalog, offers, unmet, combos, motor, home}` | Métricas de negocio (las muestra el [panel](../dashboard-empresa/), parte del MVP). `combos` y `motor` son las de «Entre verticales»; `offers`, `unmet` y `home` (los accesos de la Home), las de «Uso del MVP» |
 | `GET /concepts` | Taxonomía de conceptos (id, nombre, emoji, grupo y si es sensible) con su versión |
 
 **Seguridad.** En local (`API_ENV=local`, por defecto) es una demo sin puerta de acceso:
@@ -162,7 +165,7 @@ La cobertura por vertical sale de `rappi-ia concepts --solo-reporte`. La precisi
 
 ## Límites
 
-- **Datos simulados:** usuarios, eventos y pedidos son **simulados** (`source = 'synthetic'`), con supuestos explícitos en `events/synth.py`. Las métricas muestran la mecánica, no evidencia.
+- **Datos simulados:** usuarios, eventos y pedidos son **simulados** (`source = 'synthetic'`), con supuestos explícitos en `events/synth.py`. Las métricas, y lo que el motor aprende de esa población (`MOTOR_POBLACION`), muestran la mecánica, no evidencia.
 - **Muestra pública:** el catálogo es la muestra pública (hasta 24 productos por sub-pasillo), así que "no está" no significa "Rappi no lo vende".
 - **Contenido de terceros:** fotos, descripciones y marcas pertenecen a Rappi y a los comercios; se usan solo con fines de investigación y demostración. Ver [README.md#qué-es-real-y-qué-es-simulado](../README.md#qué-es-real-y-qué-es-simulado).
 
@@ -184,7 +187,7 @@ rappi-ia/
 │   ├── catalog/       pantallas de catálogo para la API (/catalog)
 │   ├── offers/        ofertas del agente por momento (/agent/offer, /agent/plans) y perfiles de gusto (perfiles.toml, destinos.toml)
 │   ├── layers/        capa de datos: medidas, marcas, atributos, grafo y segmentos (esquema capa)
-│   ├── motor/         motor multivertical: modelo, tablas por fuente y predicción del próximo vertical
+│   ├── motor/         motor multivertical: modelo, tablas por fuente, predicción del próximo vertical, compra cruzada (recommend.py), orden de la Home (home.py) y evaluación
 │   ├── demo/          catálogo inventado de `seed-demo` (solo bases _test)
 │   ├── jev.py         cliente de Jev (opcional, fuera de línea)
 │   ├── events/        eventos, perfil con decaimiento, "olvidar", generador simulado
@@ -216,5 +219,6 @@ rappi-ia/
 | `033_user_tokens.sql` | `app_users.token_issued_at`: cuándo recibió la persona su token firmado (un id ya firmado no se puede reclamar con `legacy_user_id`) |
 | `034_prewarm.sql` | Extensión `pg_prewarm`: al arrancar, la API lee en segundo plano los índices HNSW y de texto de la búsqueda (`API_PREWARM`). Si el rol no puede crearla (en producción la crea `init-roles.sh`), solo avisa |
 | `035_sin_juego.sql` | El pasaporte y el juego salen del proyecto: borra `knowledge_cards`, `knowledge_card_concepts`, `game_state` y los eventos del juego |
+| `036_motor.sql` | Motor multivertical: 7 tablas (`user_vertical_affinity`, `vertical_transitions`, `combo_stats`, `combo_steps`, `cross_sell_rules`, `trends`, `replenishment`) con sus vistas en `capa`, el evento `vertical_open` y la capa `motor` en `layer_runs`. Las de población llevan `data_source`; las de cada persona se borran con ella |
 
 `014`–`015` (limpieza del HTML de los documentos de búsqueda), `017`–`019` y `021` (formatos de tienda, Turbo, vigencia y platos por local) y `032` (`latest_prices` y `latest_menu_prices`, el último precio mantenido por triggers, y la vista `v_latest_offers`, la definición única de oferta vigente, que esta capa también lee) son del scraper.

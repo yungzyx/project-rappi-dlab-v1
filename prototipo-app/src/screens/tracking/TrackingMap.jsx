@@ -11,7 +11,7 @@ const ALMOST_AT = 0.8 // tramo final de la ruta: el agente avisa que ya casi lle
  * La pose del agente según cómo va el pedido, como posición en la imagen de 2 × 2 poses: preparándose está tímido
  * (abajo a la izquierda), en camino de frente y, en el tramo final o al llegar, feliz (arriba a la derecha).
  */
-export function poseFor({ step, progress, delivered }) {
+function poseFor({ step, progress, delivered }) {
   if (delivered) return { x: -1, y: 0, almost: false }
   if (step === undefined) return { x: 0, y: 0, almost: false } // sin etapa («Rappi hoy»): de frente, como siempre
   if (step <= 1) return { x: 0, y: -1, almost: false }
@@ -90,7 +90,14 @@ export default function TrackingMap({ progress, delivered, step }) {
           <stop offset="0" stopColor="#fff7ee" />
           <stop offset="1" stopColor="#ffe2ce" />
         </radialGradient>
-        <circle cx={MARKER / 2} cy={MARKER / 2} r={MARKER / 2 - 1} fill={`url(#${badgeFill})`} stroke="#fff4eb" strokeWidth="2" />
+        <circle
+          cx={MARKER / 2}
+          cy={MARKER / 2}
+          r={MARKER / 2 - 1}
+          fill={`url(#${badgeFill})`}
+          stroke="#fff4eb"
+          strokeWidth="2"
+        />
         <svg
           x={-POSE_OVERFLOW}
           y={-POSE_OVERFLOW}

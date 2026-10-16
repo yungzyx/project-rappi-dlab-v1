@@ -34,7 +34,14 @@ describe('OpportunitiesView', () => {
   })
 
   test('«nueva» solo si hubo búsquedas recientes; sin ellas, sin actividad', () => {
-    const row = { vertical: 'mall', concept_id: 'auto', que: '🚗 Auto', busquedas: 9, usuarios: 6, crecimiento_pct: null }
+    const row = {
+      vertical: 'mall',
+      concept_id: 'auto',
+      que: '🚗 Auto',
+      busquedas: 9,
+      usuarios: 6,
+      crecimiento_pct: null,
+    }
     render(
       <UnmetDemand
         rows={[

@@ -50,12 +50,12 @@ DEFAULT_WEIGHTS = {"afinidad": 1.0, "transicion": 0.3, "popularidad": 0.1}
 OWN_SIGNALS_ONLY = frozenset({"farmacia", "licores"})  # sin transición ni popularidad: nunca los empujan otros
 
 
-def _local_day(ts: datetime) -> date:
+def local_day(ts: datetime) -> date:
     return ts.astimezone(TZ).date()
 
 
 def _month_of(ts: datetime) -> date:
-    return _local_day(ts).replace(day=1)
+    return local_day(ts).replace(day=1)
 
 
 def _next_month(month: date) -> date:
@@ -210,7 +210,7 @@ class Rule:
     lift: float
 
 
-def _concepts(order: Order, sensitive: frozenset[str], skip_suggested: bool = False) -> set[str]:
+def order_concepts(order: Order, sensitive: frozenset[str], skip_suggested: bool = False) -> set[str]:
     return {
         line.concept_id
         for line in order.lines
@@ -231,8 +231,8 @@ def cross_sell(orders: Iterable[Order], sensitive: frozenset[str]) -> list[Rule]
     users_both: Counter = Counter()
     by_user = _by_user(orders)
     for user_orders in by_user.values():
-        as_from = [_concepts(o, sensitive) for o in user_orders]
-        as_to = [_concepts(o, sensitive, skip_suggested=True) for o in user_orders]
+        as_from = [order_concepts(o, sensitive) for o in user_orders]
+        as_to = [order_concepts(o, sensitive, skip_suggested=True) for o in user_orders]
         froms, tos, both = set(), set(), set()
         for i, a in enumerate(user_orders):
             froms |= {(c, a.vertical) for c in as_from[i]}
@@ -294,7 +294,7 @@ def trends(orders: Iterable[Order], window_end: date, sensitive: frozenset[str],
     )
     meta: dict[tuple[str, str, str], tuple[str | None, str | None, str | None]] = {}
     for o in orders:
-        day = _local_day(o.ts)
+        day = local_day(o.ts)
         if now_start <= day <= window_end:
             window = "now"
         elif prev_start <= day < now_start:
@@ -356,11 +356,11 @@ def replenishment(orders: Iterable[Order], sensitive: frozenset[str]) -> list[Re
     le toca de nuevo. El vertical es donde más lo pide (empate: el más reciente)."""
     bought: dict[tuple[str, str], list[Order]] = defaultdict(list)
     for o in sorted(orders, key=lambda o: (o.ts, o.order_id)):
-        for concept in _concepts(o, sensitive):
+        for concept in order_concepts(o, sensitive):
             bought[o.user_id, concept].append(o)
     out = []
     for (user, concept), concept_orders in sorted(bought.items()):
-        days = sorted({_local_day(o.ts) for o in concept_orders})
+        days = sorted({local_day(o.ts) for o in concept_orders})
         if len(days) < REPLENISH_MIN_ORDERS:
             continue
         intervals = [(b - a).days for a, b in pairwise(days)]

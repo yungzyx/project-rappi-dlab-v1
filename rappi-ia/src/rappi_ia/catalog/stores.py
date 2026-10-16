@@ -52,7 +52,7 @@ offers AS (
 )"""
 
 # El vertical de la tienda `s`: el propio (su fila de store_verticals); los heredados de su formato, solo si no tiene.
-_OWN_VERTICAL = """(
+OWN_VERTICAL = """(
     SELECT v.vertical FROM v_store_verticals v WHERE v.store_id = s.store_id
     ORDER BY EXISTS (SELECT 1 FROM store_verticals d WHERE d.store_id = v.store_id AND d.vertical = v.vertical) DESC,
              v.vertical
@@ -89,7 +89,7 @@ page AS (
     LIMIT %(limit)s OFFSET %(offset)s
 )
 SELECT s.store_id, btrim(coalesce(b.name, s.name)), s.raw->>'image', s.raw->>'eta_value',
-       (SELECT count(*) FROM offers), {_OWN_VERTICAL},
+       (SELECT count(*) FROM offers), {OWN_VERTICAL},
        (SELECT json_agg(json_build_array(aisle_id, name, products) ORDER BY products DESC, aisle_id) FROM aisle_list),
        (SELECT aisle_id FROM chosen),
        (SELECT json_agg(json_build_array(id, name, price, real_price, image, presentation, adult, concept_id)
@@ -103,7 +103,7 @@ WHERE s.store_id = %(store_id)s"""
 # producto `sp` y su pasillo `a`. Es la regla de _STORE_OFFERS, _CATALOG_DETAIL y _with_prices dicha desde las tiendas:
 # la usan las tarjetas de una vertical, «Cerca de ti» y las ofertas (rappi_ia/catalog/). Va tras un SELECT que elige
 # columnas de `ps` y `sp`, dentro de un LATERAL o de un EXISTS.
-_CURRENT_OFFERS = """
+CURRENT_OFFERS = """
 FROM v_latest_offers ps
 JOIN store_products sp ON sp.store_id = ps.store_id AND sp.sku = ps.sku
 JOIN aisles a ON a.store_id = sp.store_id AND a.aisle_id = sp.aisle_id AND a.parent_aisle_id IS NULL
@@ -152,7 +152,7 @@ WITH downloaded AS MATERIALIZED (
 offers AS (
     SELECT d.format, d.store_id, o.master_product_id
     FROM downloaded d
-    CROSS JOIN LATERAL (SELECT sp.master_product_id {_CURRENT_OFFERS}) o
+    CROSS JOIN LATERAL (SELECT sp.master_product_id {CURRENT_OFFERS}) o
 ),
 counted AS (
     SELECT format, store_id, count(DISTINCT master_product_id) AS products FROM offers GROUP BY format, store_id
@@ -185,7 +185,7 @@ chosen AS (SELECT * FROM offers ORDER BY openable DESC, price, store_id LIMIT 1)
 SELECT ci.master_product_id::text, ci.name, c.price, c.real_price, btrim(coalesce(b.name, s.name)),
        CASE WHEN c.openable THEN c.store_id END,
        NULLIF(ci.image_url, ''), ci.presentation, ci.is_alcoholic OR ci.age_restricted, ic.concept_id,
-       {_OWN_VERTICAL}
+       {OWN_VERTICAL}
 FROM chosen c
 JOIN catalog_items ci ON ci.master_product_id = %(id)s
 JOIN stores s ON s.store_id = c.store_id
@@ -236,7 +236,7 @@ def vertical_stores(conn: Connection, vertical: str, limit: int = 30) -> list[di
 
     def compute() -> list[dict]:
         rows = conn.execute(_VERTICAL_STORES, {"vertical": vertical, "min_price": MIN_PRICE, "limit": limit})
-        return [_card(store_id, name, image, eta, count, vertical) for store_id, name, image, eta, count in rows]
+        return [store_card(store_id, name, image, eta, count, vertical) for store_id, name, image, eta, count in rows]
 
     return cached(f"vertical_stores:{vertical}:{limit}", conn, compute)
 
@@ -260,11 +260,11 @@ def store_page(
     row = conn.execute(_STORE_PAGE, params).fetchone()
     if row is None or row[4] == 0:
         return None
-    store = _card(*row[:6])
+    store = store_card(*row[:6])
     aisles = [{"id": id_, "name": name, "products": count} for id_, name, count in row[6] or []]
     chosen = next((a for a in aisles if a["id"] == row[7]), None)
     taxonomy = load_taxonomy()
-    products = [_product(p, store["vertical"], store["name"], store_id, taxonomy) for p in row[8] or []]
+    products = [product_card(p, store["vertical"], store["name"], store_id, taxonomy) for p in row[8] or []]
     return {
         "store": store,
         "aisles": aisles,
@@ -289,7 +289,7 @@ def product_detail(conn: Connection, entity_type: str, entity_id: str) -> dict |
         if row is None:
             return None
         id_, name, price, real, store, store_id, image, presentation, adult, concept, vertical = row
-        product = _product(
+        product = product_card(
             (id_, name, price, real, image, presentation, adult, concept), vertical, store, store_id, taxonomy
         )
     elif entity_type == "menu_item":
@@ -297,7 +297,7 @@ def product_detail(conn: Connection, entity_type: str, entity_id: str) -> dict |
         if row is None:
             return None
         id_, name, price, real, store, store_id, image, concept = row
-        product = _product(
+        product = product_card(
             (id_, name, price, real, image, None, False, concept),
             "restaurantes",
             store,
@@ -310,7 +310,9 @@ def product_detail(conn: Connection, entity_type: str, entity_id: str) -> dict |
     return product.to_dict() if product.price_value is not None else None
 
 
-def _card(store_id: int, name: str, image: str | None, eta: str | None, products: int, vertical: str | None) -> dict:
+def store_card(
+    store_id: int, name: str, image: str | None, eta: str | None, products: int, vertical: str | None
+) -> dict:
     return {
         "id": store_id,
         "name": name,
@@ -330,7 +332,9 @@ def _eta_text(value: str | None) -> str | None:
     return f"{minutes} min" if minutes > 0 else None
 
 
-def _product(row, vertical: str | None, store: str, store_id: int | None, taxonomy, entity_type: str = "catalog_item"):
+def product_card(
+    row, vertical: str | None, store: str, store_id: int | None, taxonomy, entity_type: str = "catalog_item"
+):
     """El `Product` de una fila (id, nombre, precio, precio antes, imagen, presentación, +18 por producto, concepto).
     Un precio de relleno ($0, $1) cuenta como desconocido, igual que en `_with_prices`."""
     entity_id, name, price, real, image, presentation, adult, concept_id = row

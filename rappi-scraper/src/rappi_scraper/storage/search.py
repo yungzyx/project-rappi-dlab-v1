@@ -106,7 +106,7 @@ item_verticals AS (
     GROUP BY o.master_product_id, vsv.vertical
 ),
 store_vertical AS (SELECT DISTINCT store_id, vertical FROM v_store_verticals),
--- Rappi marca los medicamentos con receta: Bigotes no los muestra cuando se habla de síntomas.
+-- Rappi marca los medicamentos con receta: el agente no los muestra cuando se habla de síntomas.
 prescription AS (
     SELECT master_product_id FROM store_products
     WHERE master_product_id IS NOT NULL AND raw->>'requires_medical_prescription' = 'true'

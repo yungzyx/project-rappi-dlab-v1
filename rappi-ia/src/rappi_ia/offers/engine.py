@@ -45,14 +45,14 @@ from ..agent.grouped_search import SCREEN_VERTICALS
 from ..agent.tools import VERTICAL_LABELS, Product, search_products, suggest_complement
 from ..agent.verticals import contending_verticals, ranked_verticals, typical_verticals
 from ..catalog.deals import deals
-from ..catalog.stores import BIGINT_MAX, _product, product_detail
+from ..catalog.stores import BIGINT_MAX, product_card, product_detail
 from ..concepts.taxonomy import Concept, Service, load_taxonomy
 from ..embeddings.base import MemoizedQueryEmbedder, TextEmbedder
 from ..motor.combos import load_combos
 from ..motor.model import TZ
 from ..motor.predict import next_verticals, step_signal, target_step
 from ..motor.recommend import CrossPick, cross_picks, latest_lambda
-from ..retrieval.hybrid import _concepts_of, detect_concepts
+from ..retrieval.hybrid import concepts_of, detect_concepts
 from ..text import contract_articles, normalize, tokens
 from .guards import (
     alcohol_in_name,
@@ -394,7 +394,7 @@ def complement(
     ellas, el porqué la nombra. Con `user_id`, también sus compras cruzadas son candidatas y, entre dos complementos
     parecidos, gana el de la vertical que completa su combinación (`suggest_complement`): la `basis` lo dice."""
     keys = [(e["entity_type"], e["entity_id"]) for e in entities]
-    known = _concepts_of(conn, keys)
+    known = concepts_of(conn, keys)
     sources = list(dict.fromkeys(known[key] for key in keys if key in known))
     if not sources:
         return None
@@ -651,7 +651,7 @@ def _pick_products(conn: Connection, embedder: TextEmbedder | None, pick: CrossP
 
 # Lo más pedido de una vertical, con el precio de esa vertical: la oferta vigente más barata (`v_latest_offers`, la
 # única definición de oferta vigente) de una tienda de la vertical que lo tiene en un pasillo (la regla de
-# `catalog.stores._CURRENT_OFFERS`). Una sola consulta para todos los candidatos.
+# `catalog.stores.CURRENT_OFFERS`). Una sola consulta para todos los candidatos.
 _TOP_CATALOG = """
 SELECT DISTINCT ON (sp.master_product_id)
        sp.master_product_id::text, ci.name, l.price, l.real_price, btrim(coalesce(b.name, s.name)), s.store_id,
@@ -715,12 +715,12 @@ def _priced_in_vertical(conn: Connection, vertical: str, ids: list[str]) -> dict
             _TOP_CATALOG, params
         ):
             row = (id_, name, price, real, image, presentation, adult, concept)
-            found[id_] = _product(row, vertical, store, store_id, taxonomy)
+            found[id_] = product_card(row, vertical, store, store_id, taxonomy)
     else:
         for id_, name, price, real, store, store_id, image, concept, section in conn.execute(_TOP_DISHES, params):
             if not alcohol_section(section):
                 row = (id_, name, price, real, image, None, False, concept)
-                found[id_] = _product(row, vertical, store, store_id, taxonomy, kind)
+                found[id_] = product_card(row, vertical, store, store_id, taxonomy, kind)
     return {i: p for i, p in found.items() if p.price_value is not None}
 
 

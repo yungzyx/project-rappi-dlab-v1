@@ -6,7 +6,11 @@ import { verticalLabel } from '../../lib/labels.js'
 
 export function AssortmentTable({ rows }) {
   if (!rows.length) {
-    return <EmptyState title="Sin demanda registrada">Esta fuente no tiene búsquedas ni preguntas al agente con concepto.</EmptyState>
+    return (
+      <EmptyState title="Sin demanda registrada">
+        Esta fuente no tiene búsquedas ni preguntas al agente con concepto.
+      </EmptyState>
+    )
   }
   const maxUsers = Math.max(...rows.map((row) => row.usuarios_que_buscan))
   const columns = [
@@ -28,7 +32,11 @@ export function AssortmentTable({ rows }) {
       header: 'Ítems en catálogo',
       numeric: true,
       render: (row) =>
-        row.items_en_catalogo > 0 ? formatNumber(row.items_en_catalogo) : <span className="chip chip--warn">sin oferta</span>,
+        row.items_en_catalogo > 0 ? (
+          formatNumber(row.items_en_catalogo)
+        ) : (
+          <span className="chip chip--warn">sin oferta</span>
+        ),
     },
     {
       key: 'ratio',

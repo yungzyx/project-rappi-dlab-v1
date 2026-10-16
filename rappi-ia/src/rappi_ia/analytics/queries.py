@@ -9,7 +9,7 @@ from datetime import UTC
 from psycopg import Connection
 from psycopg.rows import dict_row
 
-from ..agent.verticals import _SHARES, MIN_ITEMS_ELSEWHERE
+from ..agent.verticals import MIN_ITEMS_ELSEWHERE, SHARES
 from ..concepts.taxonomy import load_taxonomy
 from ..motor.combos import load_combos
 
@@ -228,7 +228,7 @@ def opportunities(conn: Connection, source: str = "synthetic", weeks: int = 4) -
                 FROM unmet GROUP BY 1, 2, 3
             ),
             elsewhere AS (  -- donde el agente lo ofrecería: la regla de agent.verticals.available_elsewhere
-                SELECT concept_id, vertical, items FROM ({_SHARES}) s WHERE items >= %(min_items)s
+                SELECT concept_id, vertical, items FROM ({SHARES}) s WHERE items >= %(min_items)s
             )
             SELECT a.vertical, a.concept_id, coalesce(c.emoji || ' ' || c.name, a.query) AS que,
                    a.busquedas, a.usuarios, a.ciudades, a.recientes, a.anteriores,

@@ -8,10 +8,12 @@ export default function ForgetConfirm({ forgetting, failed, onConfirm, onCancel 
   return (
     <div className="sheet-confirm">
       <p>
-        Borramos de nuestro servidor tus búsquedas, lo que hiciste en la app y tus pedidos, y de este navegador tu carro y
-        tus preferencias. Después la app te trata como a una persona nueva. No se puede deshacer.
+        Borramos de nuestro servidor tus búsquedas, lo que hiciste en la app y tus pedidos, y de este navegador tu carro
+        y tus preferencias. Después la app te trata como a una persona nueva. No se puede deshacer.
       </p>
-      {failed && <p role="alert">No pude borrar tus datos en el servidor. No se borró nada: inténtalo de nuevo en un rato.</p>}
+      {failed && (
+        <p role="alert">No pude borrar tus datos en el servidor. No se borró nada: inténtalo de nuevo en un rato.</p>
+      )}
       <button type="button" className="sheet-confirm-primary tap" disabled={forgetting} onClick={onConfirm}>
         Sí, borrar
       </button>

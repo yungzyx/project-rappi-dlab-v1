@@ -86,7 +86,11 @@ describe('Ofertas con el catálogo real', () => {
 
     // Cada sección tiene solo las bajas de su vertical.
     const grocery = within(screen.getByRole('region', { name: 'Bajaron de precio en Súper' }))
-    for (const name of ['Galletas de vainilla 200 g (prueba)', 'Café molido tostado 250 g (prueba)', 'Gaseosa cola 1,5 L (prueba)'])
+    for (const name of [
+      'Galletas de vainilla 200 g (prueba)',
+      'Café molido tostado 250 g (prueba)',
+      'Gaseosa cola 1,5 L (prueba)',
+    ])
       expect(grocery.getByText(name)).toBeTruthy()
     expect(grocery.queryByText('Cerveza rubia lata 470 cc (prueba)')).toBeNull()
     const express = within(screen.getByRole('region', { name: 'Bajaron de precio en Express' }))
@@ -118,7 +122,9 @@ describe('Ofertas con el catálogo real', () => {
 
     const best = within(await screen.findByRole('region', { name: 'Mejor evaluados' }))
     await waitFor(() => expect(best.getAllByRole('button')).toHaveLength(6))
-    const asked = fetchMock.mock.calls.map(([url]) => new URL(url)).find((url) => url.pathname === '/catalog/restaurants')
+    const asked = fetchMock.mock.calls
+      .map(([url]) => new URL(url))
+      .find((url) => url.pathname === '/catalog/restaurants')
     expect(Object.fromEntries(asked.searchParams)).toEqual({ sort: 'rating', limit: '6' })
 
     expect(screen.queryByText(/Envío más barato|lower fees|free|gratis|\$0/i)).toBeNull()

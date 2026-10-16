@@ -45,7 +45,8 @@ afterEach(() => {
 })
 
 /** `/search` con el ejemplo agrupado, o sin coincidencias si la consulta es «xyzzy». */
-const searchRoute = (req) => (req.query.get('q') === 'xyzzy' ? fixture('search-grouped-unmet') : fixture('search-grouped'))
+const searchRoute = (req) =>
+  req.query.get('q') === 'xyzzy' ? fixture('search-grouped-unmet') : fixture('search-grouped')
 
 describe('SearchScreen', () => {
   const setup = (params = {}, routes = {}) => {

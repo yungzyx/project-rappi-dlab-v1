@@ -9,7 +9,9 @@ const PREFIX = 'rappi-proto-'
 
 function wipe(storage) {
   try {
-    const keys = Array.from({ length: storage.length }, (_, i) => storage.key(i)).filter((key) => key?.startsWith(PREFIX))
+    const keys = Array.from({ length: storage.length }, (_, i) => storage.key(i)).filter((key) =>
+      key?.startsWith(PREFIX),
+    )
     for (const key of keys) storage.removeItem(key)
   } catch {
     // Sin almacenamiento no hay nada que borrar.

@@ -53,9 +53,23 @@ export function PopularStores({ onOpen }) {
  * anteriores. Con `onOpenVertical` (solo el buscador con el agente), sin resultados el agente no deja un callejón sin salida:
  * ofrece la vertical que tiene lo buscado o invita a buscar con otras palabras (`onTryAnother`).
  */
-export function SearchResults({ query, data, loading = false, error = null, onRetry, onOpenProduct, onOpenVertical, onTryAnother }) {
+export function SearchResults({
+  query,
+  data,
+  loading = false,
+  error = null,
+  onRetry,
+  onOpenProduct,
+  onOpenVertical,
+  onTryAnother,
+}) {
   if (error) return <OfflineNotice onRetry={onRetry} />
-  if (!data) return loading ? <p className="search-loading" role="status">Buscando…</p> : null
+  if (!data)
+    return loading ? (
+      <p className="search-loading" role="status">
+        Buscando…
+      </p>
+    ) : null
 
   const text = query.trim()
   // Sin nada que mostrar, el aviso espera a que llegue la respuesta de lo escrito (no se mezcla con lo de antes).
@@ -110,7 +124,10 @@ function ResultGroup({ group, onOpenProduct }) {
  * agregó ningún producto), que noteAccepted cuenta una sola vez.
  */
 function AgentEmpty({ query, onOpenVertical, onTryAnother }) {
-  const { data: found, loading } = useApi(() => offer('sin_resultado', { query }, { userId: userId() }).catch(() => null), [query])
+  const { data: found, loading } = useApi(
+    () => offer('sin_resultado', { query }, { userId: userId() }).catch(() => null),
+    [query],
+  )
   const events = useEvents()
   const generation = useProfile()?.resets ?? 0
   useEffect(() => {
@@ -131,11 +148,7 @@ function AgentEmpty({ query, onOpenVertical, onTryAnother }) {
       <div>
         <p>{verticalName ? found.text : `No encontré «${query}». ¿Lo buscamos con otras palabras?`}</p>
         {verticalName && <OfferWhy reason={found.reason} />}
-        <button
-          type="button"
-          className="search-agent-action tap"
-          onClick={verticalName ? see : () => onTryAnother()}
-        >
+        <button type="button" className="search-agent-action tap" onClick={verticalName ? see : () => onTryAnother()}>
           {verticalName ? `Ver en ${verticalName}` : 'Probar otra búsqueda'}
         </button>
       </div>

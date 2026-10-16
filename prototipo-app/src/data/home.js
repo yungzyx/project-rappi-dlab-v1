@@ -75,7 +75,7 @@ export const SHORTCUTS = [
 
 // Cola fija de la fila en el prototipo final: tras los 6 verticales (en el orden del motor), siempre en este orden y
 // con Loyalty y Benefits Pro al final.
-export const FINAL_TAIL = ['rappitravel', 'rappifavor', 'loyalty', 'benefitspro']
+const FINAL_TAIL = ['rappitravel', 'rappifavor', 'loyalty', 'benefitspro']
 
 /**
  * La fila de accesos en cada modo. «Rappi hoy» (`final: false`) es la réplica de la app: tal cual. En el prototipo final,

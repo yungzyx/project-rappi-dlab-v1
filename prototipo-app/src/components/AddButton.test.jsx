@@ -16,9 +16,7 @@ function Providers({ children }) {
     <DemoProvider>
       <ProfileProvider>
         <AssistantProvider>
-          <CartProvider>
-            {children}
-          </CartProvider>
+          <CartProvider>{children}</CartProvider>
         </AssistantProvider>
       </ProfileProvider>
     </DemoProvider>
@@ -38,7 +36,12 @@ describe('AddButton', () => {
     fireEvent.click(screen.getByLabelText(`Agregar ${beer.name}`))
     expect(events.track).toHaveBeenCalledWith(
       'cart_add',
-      expect.objectContaining({ concept_id: 'cerveza', vertical: 'liquor', entity_type: 'catalog_item', entity_id: '94001' }),
+      expect.objectContaining({
+        concept_id: 'cerveza',
+        vertical: 'liquor',
+        entity_type: 'catalog_item',
+        entity_id: '94001',
+      }),
     )
   })
 

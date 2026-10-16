@@ -1,6 +1,6 @@
 # Guion de demo del MVP
 
-Unos 10 minutos para mostrar el prototipo final a una persona del negocio: qué ve el usuario en la app, cómo Mochi cruza verticales y cómo invita a descubrir las que no usa. Se hace con el MVP corriendo (`make mvp`): la app no abre sin la API.
+Unos 12 minutos para mostrar el prototipo final a una persona del negocio: cómo la Home aprende de cada persona, cómo Mochi propone la siguiente vertical siguiendo la escalera de combinaciones, cómo cruza verticales al buscar y cómo invita a descubrir las que la persona no usa. Se hace con el MVP corriendo (`make mvp`): la app no abre sin la API.
 
 ## Antes de empezar
 
@@ -18,6 +18,27 @@ Si la app muestra **«Sin conexión con Mochi»**, la API todavía no terminó d
 3. Para empezar sin rastros de pruebas anteriores, toca la barra de la Home («¿Qué se te antoja hoy?») para abrir el buscador con Mochi y, arriba, en «Aprendiendo de ti», toca **Olvidar** (o, en Cuenta, **Borrar mis datos**) y confirma con **Sí, borrar**: borra en la API el perfil, los eventos y los pedidos, vacía lo que la app guardó en este navegador y la recarga en la Home, como la primera vez (vuelve el aviso de privacidad: «Entendido»). El botón aparece siempre, aunque Mochi todavía no haya aprendido nada.
 
 ## Recorrido
+
+Dos partes: primero la Home y el motor (lo que salió de la conversación con el equipo de Rappi), después el buscador con Mochi.
+
+### 1. La Home y el motor (unos 5 minutos)
+
+Para partir de cero: **↺ Repetir escena** (junto al interruptor, arriba a la izquierda), con **Olvidar** recién hecho.
+
+| # | Qué tocar | Qué mostrar | Qué decir |
+|---|---|---|---|
+| 1 | Nada: la Home recién abierta. | Mochi entra caminando y saluda. La primera vez hace una guía de 2 pasos: el buscador y qué pasa al tocarla (**Siguiente** / **Saltar**). Los accesos están en el orden fijo, con Loyalty y Benefits Pro al final y sin leyenda. | Mochi es parte de la Home, no un canal aparte. |
+| 2 | Un acceso pequeño (por ejemplo **Retail**) y volver a la Home. Con una vez basta. | Ese acceso sube al primer lugar y aparece «Ordenadas según lo que más usas». | La Home se ordena sola con lo que cada persona pide y abre. Restaurantes y Turbo no se mueven, Loyalty y Benefits Pro quedan al final y «Rappi hoy» (tecla **D**) no aprende. |
+| 3 | Tocar a Mochi y, en su globo, **¿Por qué?** | Propone una vertical donde la persona aún no pide: «¿Y si pruebas algo de …?», con un botón para abrirla y **Después**. «¿Por qué?» dice «Porque aún no pides en …». Si no tiene nada que ofrecer, calla. | Abrir una vertical no es pedir en ella: Mochi propone según los pedidos, y siempre dice por qué. |
+| 4 | **Restaurants** → un restaurante → un plato → pagar. Volver a la Home y tocar a Mochi. | Ahora propone **Turbo**: «¿Y si pruebas algo de Turbo?», con **Abrir Turbo** y **Después**. «¿Por qué?» dice la razón: hoy, «Porque aún no pides en Turbo: esto es lo que más se pide.» (con una regla de compra cruzada activa sería «Porque pides …. Para acompañar: …, en ….»), sin afirmar lo que hace la población. | La sugerencia sigue una escalera, Restaurantes → Turbo → Retail, que parte de la tabla de combinaciones que compartió Rappi: quienes combinan las tres vuelven el 93 % al mes siguiente, frente al 47 % de quienes solo piden en Restaurantes. Es una correlación, no un efecto: quien pide mucho usa más verticales y además vuelve más. El efecto real se mide con un grupo de control. Si ya pidió en esa vertical hace más de un mes, «¿Por qué?» dice «Porque hace más de un mes que no pides en …». |
+| 5 | Opcional: pedir una vez en **Turbo** y tocar de nuevo a Mochi. | El paso siguiente es Retail, en la vertical de retail que el motor pone primero para la persona. Con la combinación completa, Mochi vuelve a lo de antes. | El camino avanza con lo que la persona hace. |
+| 6 | Bajar hasta **¿Qué plan tienes hoy?** (cinco ocasiones) y elegir **Carrete**. | Un kit de varias verticales con un solo botón. Como la persona eligió la ocasión, puede traer alcohol, con la marca **+18**. | En lo que Mochi ofrece por su cuenta nunca hay alcohol, farmacia, bebé ni salud. |
+
+**Si preguntan por la compra cruzada («Porque pides …. Para acompañar: …»):** solo aparece cuando el λ del motor es mayor que 0. Hoy, con la población simulada, la validación lo deja en 0 y la razón es «Porque aún no pides en …: esto es lo que más se pide.»
+
+**La recompra («¿Repetimos …?»):** una persona que pide el mismo concepto con ritmo (por ejemplo, café cada 14 días) ve, cuando le toca, el bloque «¿Repetimos …? Pides cada N días.» en la Home, después de los accesos, con **Ver producto**. Necesita tres compras del concepto en días distintos y un ritmo regular, así que con una cuenta nueva no sale en la demo: se cuenta con la [captura de ejemplo](../prototipo-app/docs/screenshots/21-recompra.jpg). Se cuenta como aceptada cuando la persona agrega el producto al carro, no al tocar el botón.
+
+### 2. El buscador con Mochi (unos 6 minutos)
 
 En el prototipo final la barra de la Home abre el buscador con Mochi y se toca. El campo de arriba busca tiendas y productos; las ideas de Mochi están en los botones de «Toca y te armo algo».
 
@@ -39,42 +60,17 @@ En el prototipo final la barra de la Home abre el buscador con Mochi y se toca. 
 
 Los productos y precios salen del catálogo real y la sugerencia de otra vertical la decide Mochi en el servidor; la búsqueda también es de la API. Las pantallas de catálogo (verticales, tiendas, restaurantes con su menú, Turbo, Ofertas, Favoritos y la Home) leen el mismo catálogo. No hay respaldo local: si la API se cae a mitad de la demo, el buscador con Mochi dice «Sin conexión» con **Reintentar**, que vuelve a mandar la misma pregunta, y las ofertas que Mochi hace solo callan. Los botones **🍫 Algo dulce**, **🎁 Un regalo** y **🔥 Ofertas de hoy**, y el campo de búsqueda (con «Search ideas», que son ideas fijas y no un historial, y «Popular stores», como en la app) quedan para preguntas del público.
 
-### La Home con Mochi de cuerpo entero (2 minutos, opcional)
-
-Es lo primero que se ve en el prototipo final. Para partir de cero: **↺ Repetir escena** (junto al interruptor, arriba a la izquierda).
-
-1. Mochi entra caminando a la Home y saluda. No sugiere productos ni mueve la Home: la Home es la de siempre. **Qué decir:** Mochi es parte de la Home, no un canal aparte.
-1b. La primera vez, después del saludo, Mochi hace una guía de 2 pasos: el buscador y qué pasa al tocarla (**Siguiente** / **Saltar**). No vuelve a aparecer; «↺ Repetir escena» la muestra de nuevo.
-2. Baja hasta «¿Qué plan tienes hoy?» (cinco ocasiones) y elige **Carrete**: un kit de varias verticales con un solo botón. Como la persona eligió la ocasión, el kit puede traer alcohol, con la marca **+18**; en lo que Mochi ofrece por su cuenta nunca hay alcohol, farmacia, bebé ni salud.
-3. Toca a Mochi: propone una vertical que la persona aún no pide, según sus pedidos («Porque aún no pides en …») y la escalera de combinaciones (ver abajo), con sus ofertas. Con «Abrir» entra a esa vertical. Si no tiene nada que ofrecer, Mochi calla.
-
-### La escalera de combinaciones y la recompra (2 minutos, opcional)
-
-Mochi propone la siguiente vertical según lo que la persona ya usa, siguiendo una escalera: Restaurantes → Turbo → Retail. El punto de partida es la tabla de combinaciones que compartió el equipo de Rappi (retención al mes siguiente de cada combinación); el motor la mezcla con lo que aprende de la población, que hoy es simulada.
-
-1. Con **Olvidar** recién hecho, pide algo en **Restaurants** hasta pagar. Vuelve a la Home y toca a Mochi: propone **Turbo**, con productos de una compra cruzada (una regla de la población, hoy simulada) o «Lo más pedido en Turbo» si no hay una compra cruzada que mostrar. La variante «Para tu pedido de …» solo aparece cuando el λ del motor es mayor que 0; si es 0 (hoy, con los simulados), sale «Lo más pedido en …». «¿Por qué?» dice la razón («Porque pides …. Para acompañar: …, en ….»), sin afirmar lo que hace la población. **Qué decir:** la sugerencia sigue un camino (primero Turbo, después Retail) y siempre dice por qué; si la persona ya pidió en esa vertical hace más de un mes, Mochi dice «Vuelve a …».
-2. Pide una vez en Turbo (basta un pedido en los últimos 30 días) y toca de nuevo a Mochi: el paso siguiente es Retail, en la vertical de retail que el motor pone primero para la persona. Con la combinación completa, Mochi vuelve a lo de antes.
-3. La recompra: una persona que pide el mismo concepto con ritmo (por ejemplo, café cada 14 días) ve, cuando le toca, el bloque «¿Repetimos …? Pides cada N días.» en la Home, después de los accesos, con **Ver producto**. Solo aparece con tres compras del concepto y un ritmo regular; con una cuenta nueva no sale. Se cuenta como aceptada cuando agrega el producto al carro, no al tocar el botón.
-4. En el panel, «Entre verticales» muestra la tabla de Rappi junto a la medida con datos simulados («Combinaciones de verticales»), el «Motor» (evaluación y pesos) y, en «Uso del MVP», «Recompra» entre las ofertas por momento.
-
-**Qué decir:** es una propuesta con una correlación de punto de partida, no un efecto probado: quien pide mucho usa más verticales y además vuelve más. El efecto real se mide con un grupo de control.
-
-### La Home que aprende el orden (1 minuto, opcional)
-
-En el prototipo final, los 6 accesos pequeños de la Home (Grocery, Pharmacy, Retail, Liquor, Express, Chocolates) se ordenan según lo que la persona pide y abre. Quien parte de cero los ve en el orden fijo.
-
-1. Con **Olvidar** recién hecho, la fila está en el orden fijo, con Loyalty y Benefits Pro al final y sin texto.
-2. Pide algo en **Pharmacy** hasta pagar, o toca un acceso (por ejemplo **Retail**); con una vez basta.
-3. Vuelve a la Home: la app manda los toques y vuelve a pedir el orden, así que ese acceso sube al primer lugar y aparece «Ordenadas según lo que más usas». **Qué decir:** la Home se ordena sola con el uso de cada persona; Restaurantes y Turbo no se mueven, Loyalty y Benefits Pro quedan al final, y «Rappi hoy» (tecla **D**) sigue como hoy.
-
 ### El panel con lo que acaba de pasar (2 minutos, opcional)
 
 Con `make mvp` el panel ya está arriba. Después de la demo de la app, ábrelo en [http://localhost:5175/?vista=mvp&fuente=prototipo](http://localhost:5175/?vista=mvp&fuente=prototipo) (o elige **Prototipo** arriba y la pestaña **Uso del MVP**; **Actualizar** vuelve a pedir lo nuevo sin recargar).
 
-1. **Ofertas del agente por momento:** el kit de «Carrete» aparece en **Plan** y, si usaste el carro o el checkout, en **Carro** y **Antes de pagar**, con lo mostrado y lo aceptado. **Qué decir:** así se ve en qué momento la oferta de Mochi funciona; el porcentaje aparece recién con 10 mostradas, antes solo las cuentas.
+1. **Ofertas del agente por momento:** el kit de «Carrete» aparece en **Plan**, lo que propuso Mochi al tocarlo en **Vertical por probar** y, si usaste el carro o el checkout, en **Carro** y **Antes de pagar**, con lo mostrado y lo aceptado (una recompra aparecería en **Recompra**). **Qué decir:** así se ve en qué momento la oferta de Mochi funciona; el porcentaje aparece recién con 10 mostradas, antes solo las cuentas.
 2. **Búsquedas sin resultado:** una búsqueda sin resultado en la app (por ejemplo, algo que el catálogo no tiene) suma a su vertical; el concepto solo se suma si la pregunta pasó por el agente (las búsquedas de la app no llevan concepto). Nunca se ve lo que se escribió.
+3. **Accesos de la Home:** el acceso que tocaste en la parte 1 suma un toque a su vertical. **Qué decir:** son los toques con los que la Home aprende el orden de cada persona; en «Rappi hoy» no se cuenta nada.
 
 **Qué decir:** cada bloque lleva el rótulo «uso del MVP, pocas personas: no es evidencia». Son las pruebas de unas pocas personas, no una medición, y nunca se mezclan con los datos simulados del resto del panel. «Olvidar» en la app borra también los eventos de esa persona.
+
+Para cerrar, con la fuente **Simulados**, la pestaña **Entre verticales** muestra **Combinaciones de verticales** (la tabla de Rappi junto a la misma tabla medida con los datos simulados) y el **Motor** (pesos y evaluación). **Qué decir:** la tabla de Rappi es el punto de partida; la otra muestra que el motor la puede medir con datos propios, hoy simulados, que no son evidencia.
 
 ## Qué aclarar si preguntan
 
@@ -83,4 +79,5 @@ Con `make mvp` el panel ya está arriba. Después de la demo de la app, ábrelo 
 - **Por qué no está Mascotas:** la base no tiene esa vertical, así que salió de los accesos y de las pantallas.
 - **Por qué no siempre sale Restaurantes:** la vertical se elige donde el concepto es típico, no donde hay más ítems; restaurantes solo compite en lo que se pide hecho (comida, postres, café). Una vertical chica tampoco gana con un puñado de productos: necesita oferta suficiente. Ver [decisiones.md](decisiones.md#agente-mochi).
 - **Cómo se mediría el efecto:** la API ya registra cada sugerencia mostrada, aceptada y convertida en pedido (eventos seudónimos). Con datos de Rappi y un experimento A/B con grupo de control se mide si sube la frecuencia y cuántas verticales usa cada persona.
-- **Qué va con qué:** los complementos (hamburguesa → gaseosas, vino → quesos) son una lista escrita a mano. Con datos de pedidos de Rappi se reemplazan por relaciones medidas, sin cambiar el mecanismo.
+- **Qué va con qué:** hay dos fuentes. Los complementos curados (hamburguesa → gaseosas, vino → quesos) son una lista escrita a mano y deciden la sugerencia del carro y del checkout. Las reglas de compra cruzada del motor («quien pide A en una vertical pide B en otra») se aprenden de la población, hoy simulada, y se mezclan con lo más pedido en la vertical por probar. Con pedidos de Rappi se cambia la población (`MOTOR_POBLACION`) y las reglas pasan a ser relaciones medidas, sin cambiar el mecanismo.
+- **De dónde sale la escalera:** de la tabla de combinaciones que compartió el equipo de Rappi (cohortes de enero a junio de 2026), con una agrupación gruesa propia: `rest` (Restaurantes), `turbo` (Turbo) y `retail` (todo el comercio que no es restaurante ni Turbo). Detalle en [capa-de-datos.md](capa-de-datos.md#motor-multivertical).

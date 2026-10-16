@@ -14,7 +14,12 @@ const COLUMNS = [
   { key: 'dias', header: 'Días sin pedir', numeric: true, render: (row) => formatNumber(row.dias_sin_pedir) },
   { key: 'concepto', header: 'Concepto top', render: (row) => row.concepto_top ?? '—' },
   { key: 'avisos', header: 'Acepta avisos', render: (row) => (row.consiente_avisos ? 'Sí' : 'No') },
-  { key: 'accion', header: 'Acción sugerida', wide: true, render: (row) => <span className="action-cell">{row.accion}</span> },
+  {
+    key: 'accion',
+    header: 'Acción sugerida',
+    wide: true,
+    render: (row) => <span className="action-cell">{row.accion}</span>,
+  },
 ]
 
 /** Lista de usuarios en riesgo o perdidos (id seudónimo) y un aviso si la lista no alcanza a mostrar a todos. */
@@ -33,13 +38,13 @@ export function AtRiskTable({ rows, kpis }) {
     <>
       <p className="table-summary">
         Se muestran <strong className="num">{formatNumber(rows.length)}</strong> de{' '}
-        <strong className="num">{formatNumber(kpis.en_riesgo + kpis.perdidos)}</strong> usuarios ({formatNumber(kpis.en_riesgo)}{' '}
-        en riesgo y {formatNumber(kpis.perdidos)} perdidos).
+        <strong className="num">{formatNumber(kpis.en_riesgo + kpis.perdidos)}</strong> usuarios (
+        {formatNumber(kpis.en_riesgo)} en riesgo y {formatNumber(kpis.perdidos)} perdidos).
       </p>
       {missingAtRisk && (
         <p className="table-warning status status--warn">
-          La API entregó {rows.length} filas y ninguna es de un usuario en riesgo: los{' '}
-          {formatNumber(kpis.en_riesgo)} usuarios en riesgo, los más fáciles de recuperar, no alcanzan a aparecer.
+          La API entregó {rows.length} filas y ninguna es de un usuario en riesgo: los {formatNumber(kpis.en_riesgo)}{' '}
+          usuarios en riesgo, los más fáciles de recuperar, no alcanzan a aparecer.
         </p>
       )}
       <DataTable
@@ -47,7 +52,9 @@ export function AtRiskTable({ rows, kpis }) {
         columns={COLUMNS}
         rows={expanded ? rows : rows.slice(0, PREVIEW_ROWS)}
         rowKey={(row) => row.usuario}
-        rowClassName={(row, index) => (index > 0 && rows[index - 1].estado !== row.estado ? 'is-group-start' : undefined)}
+        rowClassName={(row, index) =>
+          index > 0 && rows[index - 1].estado !== row.estado ? 'is-group-start' : undefined
+        }
       />
       {rows.length > PREVIEW_ROWS && (
         <div className="view-switch">

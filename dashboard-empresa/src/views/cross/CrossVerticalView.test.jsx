@@ -17,20 +17,36 @@ describe('CrossVerticalView', () => {
 
     const shown = suggestions.data.reduce((total, row) => total + (row.mostradas ?? 0), 0)
     expect(await screen.findByText(formatNumber(shown))).toBeTruthy()
-    expect(screen.getByText('Aristas aprendidas de datos simulados: solo se ven en el panel. El agente NO las usa.')).toBeTruthy()
+    expect(
+      screen.getByText('Aristas aprendidas de datos simulados: solo se ven en el panel. El agente NO las usa.'),
+    ).toBeTruthy()
     expect(await screen.findByRole('table', { name: 'Afinidad dirigida entre conceptos' })).toBeTruthy()
     expect((await screen.findAllByText('Sin grupo: menos de 20 usuarios')).length).toBeGreaterThan(0)
     expect(screen.getByText(/Supuesto del simulador/)).toBeTruthy()
     const servicesTable = await screen.findByRole('table', { name: 'Servicios sin catálogo' })
     const travel = services.data.find((row) => row.servicio === 'rappitravel')
     expect(within(servicesTable).getByText('✈️ RappiTravel')).toBeTruthy()
-    expect(within(servicesTable).getByText(`${formatNumber(travel.ganchos_aceptados)} de ${formatNumber(travel.ganchos_mostrados)}`)).toBeTruthy()
+    expect(
+      within(servicesTable).getByText(
+        `${formatNumber(travel.ganchos_aceptados)} de ${formatNumber(travel.ganchos_mostrados)}`,
+      ),
+    ).toBeTruthy()
   })
 
   test('en una demo en vivo el titular cuenta las sugerencias sin inventar un porcentaje', async () => {
     serveFixtures()
     const fixtures = globalThis.fetch
-    const demo = [{ concepto: '🥤 Bebidas gaseosas', vertical: 'licores', mostradas: 2, aceptadas: 1, ignoradas: 0, convertidas: 1, aceptacion_pct: null }]
+    const demo = [
+      {
+        concepto: '🥤 Bebidas gaseosas',
+        vertical: 'licores',
+        mostradas: 2,
+        aceptadas: 1,
+        ignoradas: 0,
+        convertidas: 1,
+        aceptacion_pct: null,
+      },
+    ]
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url) =>
@@ -67,7 +83,15 @@ describe('CrossVerticalView', () => {
     expect(screen.getByText('Simulado: no es evidencia')).toBeTruthy()
     expect(screen.queryByText('uso del MVP, pocas personas: no es evidencia')).toBeNull()
 
-    const rows = (table) => within(table).getAllByRole('row').slice(1).map((row) => within(row).getAllByRole('cell').map((cell) => cell.textContent))
+    const rows = (table) =>
+      within(table)
+        .getAllByRole('row')
+        .slice(1)
+        .map((row) =>
+          within(row)
+            .getAllByRole('cell')
+            .map((cell) => cell.textContent),
+        )
     expect(rows(rappi).map((cells) => cells[0])).toEqual([
       'Restaurantes',
       'Turbo',
@@ -91,16 +115,27 @@ describe('CrossVerticalView', () => {
 
   test('la retención propia se muestra como porcentaje cuando la API la entrega', async () => {
     const propio = [
-      { combo: 'rest+turbo', meses_usuario: 120, pct_usuarios: 30, pct_pedidos: 45.5, pedidos_por_usuario: 5.25, retencion_m1: 0.9, retencion_n: 100, gasto_por_usuario: 150000 },
+      {
+        combo: 'rest+turbo',
+        meses_usuario: 120,
+        pct_usuarios: 30,
+        pct_pedidos: 45.5,
+        pedidos_por_usuario: 5.25,
+        retencion_m1: 0.9,
+        retencion_n: 100,
+        gasto_por_usuario: 150000,
+      },
     ]
     serveFixturesWith({ combos: { source: 'synthetic', data: { ...combos.data, propio } } })
     await renderWithData(<CrossVerticalView source="synthetic" />)
 
     const own = await screen.findByRole('table', { name: 'Combinaciones de verticales con datos propios' })
     const [row] = within(own).getAllByRole('row').slice(1)
-    expect(within(row).getAllByRole('cell').map((cell) => cell.textContent)).toEqual([
-      'Restaurantes + Turbo', '120', '30,0%', '45,5%', '5,3', '90%', '$150.000',
-    ])
+    expect(
+      within(row)
+        .getAllByRole('cell')
+        .map((cell) => cell.textContent),
+    ).toEqual(['Restaurantes + Turbo', '120', '30,0%', '45,5%', '5,3', '90%', '$150.000'])
   })
 
   test('con el prototipo, la tabla propia se rotula como uso del MVP y sin pedidos propios lo dice', async () => {
@@ -136,7 +171,15 @@ describe('CrossVerticalView', () => {
     serveFixturesWith({ motor: motorBody('synthetic') })
     await renderWithData(<CrossVerticalView source="synthetic" />)
 
-    const cells = (table) => within(table).getAllByRole('row').slice(1).map((row) => within(row).getAllByRole('cell').map((cell) => cell.textContent))
+    const cells = (table) =>
+      within(table)
+        .getAllByRole('row')
+        .slice(1)
+        .map((row) =>
+          within(row)
+            .getAllByRole('cell')
+            .map((cell) => cell.textContent),
+        )
     const next = await screen.findByRole('table', { name: 'Próximo vertical por método' })
     expect(cells(next)).toEqual([
       ['Orden fijo', '0,500', '20,0%'],
@@ -161,7 +204,15 @@ describe('CrossVerticalView', () => {
 
   test('«Motor» con aviso de validación lo muestra', async () => {
     const body = motorBody('synthetic')
-    body.data.evaluacion = { ...body.data.evaluacion, validacion: { personas: 0, ndcg_combinado: null, precision3_mezcla: null, aviso: 'Nadie para validar: quedan los pesos de la corrida anterior' } }
+    body.data.evaluacion = {
+      ...body.data.evaluacion,
+      validacion: {
+        personas: 0,
+        ndcg_combinado: null,
+        precision3_mezcla: null,
+        aviso: 'Nadie para validar: quedan los pesos de la corrida anterior',
+      },
+    }
     serveFixturesWith({ motor: body })
     await renderWithData(<CrossVerticalView source="synthetic" />)
 

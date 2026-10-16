@@ -29,7 +29,7 @@ _UNITS = {
     "und": ("und", 1.0),
 }  # fmt: skip
 # Del nombre solo se leen peso y volumen (mg, lb o mm en un nombre suelen ser dosis o medidas de otra cosa).
-_NAME_MEASURE = re.compile(
+NAME_MEASURE = re.compile(
     r"(?<![\w.,\-+/])(\d+(?:[.,]\d+)?)\s*(kg|kilos?|grs?|gr|g|gramos?|ml|cc|lts?|l|litros?)(?![\w/])", re.IGNORECASE
 )
 _THOUSANDS = re.compile(r"^\d{1,3}\.\d{3}$")
@@ -78,7 +78,7 @@ _RANGE_BEFORE = re.compile(r"\d\s*(?:a|-|–|al)\s*$")
 
 def _name_measure(name: str) -> tuple[float, str, str, str] | None:
     """(cantidad, unidad base, texto que la dijo, unidad escrita) de la primera medida de peso o volumen del nombre."""
-    for match in _NAME_MEASURE.finditer(name):
+    for match in NAME_MEASURE.finditer(name):
         before = name[: match.start()].lower().rstrip()
         if before.endswith(("hasta", "talla")) or _RANGE_BEFORE.search(before):
             continue  # «hasta 15 kg», «3.5 a 7 kg»: son pesos de uso del producto, no su contenido

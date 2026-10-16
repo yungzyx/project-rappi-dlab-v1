@@ -36,7 +36,9 @@ async function settle(page) {
 
 async function capture(page, file) {
   await settle(page)
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  )
   if (overflow > 0) console.warn(`  ! ${file}: ${overflow}px de scroll horizontal`)
   await page.screenshot({ path: `${OUT}/${file}.jpg`, type: 'jpeg', quality: 80, fullPage: true })
   console.log(`  ✓ ${file}`)

@@ -1,13 +1,15 @@
 # Contexto y problema
 
 > Por qué existe este proyecto, qué queremos responder y qué decisiones salen de eso.
-> Última actualización: 11-10-2026. Ecosistema y modelo de datos: [ecosistema-rappi.md](ecosistema-rappi.md) · Diseño del RAG, el agente y el panel: [diseno-ia.md](diseno-ia.md) · Registro de decisiones: [decisiones.md](decisiones.md) · Resultados: [README → Resultados](../README.md#resultados).
+> Última actualización: 16-10-2026. Ecosistema y modelo de datos: [ecosistema-rappi.md](ecosistema-rappi.md) · Diseño del RAG, el agente y el panel: [diseno-ia.md](diseno-ia.md) · Registro de decisiones: [decisiones.md](decisiones.md) · Resultados: [README → Resultados](../README.md#resultados).
 
 ## 1. El problema
 
 **Desde fuera, cada vertical de Rappi parece funcionar como un silo: lo que un usuario hace en uno no parece mejorar lo que se le recomienda en los otros.** Lo que alguien compra o mira en supermercado no parece cambiar lo que se le sugiere en restaurantes, farmacia o Rappi Mall.
 
 Es una observación hecha desde fuera, como usuarios de la app. No hay información pública que la confirme o la desmienta (ver [ecosistema-rappi.md](ecosistema-rappi.md#cómo-se-conectan)). Con sus datos internos, Rappi puede medirla directamente.
+
+**Lo que compartió Rappi (16-10-2026).** El equipo de Rappi compartió una tabla de Chile con las combinaciones de verticales que usa cada persona en un mes y su retención al mes siguiente (cohortes de enero a junio de 2026). El 62,6 % de los usuarios usa solo Restaurantes y vuelve el 47 %; quienes combinan Restaurantes, Turbo y Retail son el 4,7 % y vuelven el 93 % (todo Chile: 55 %). Tabla completa en la [especificación del motor](superpowers/specs/2026-10-16-motor-multivertical-design.md#3-dato-de-partida-chile--verticals-used-together). La tabla convierte la hipótesis del silo en una **correlación con datos de Rappi**: la mayoría se queda en una vertical, y quienes usan más verticales vuelven más. No prueba el efecto: quien ya pide mucho usa más verticales y además vuelve más. Sumarle una vertical a alguien solo se sabe si lo retiene con un experimento con grupo de control.
 
 Para trabajar sobre esa observación (entenderla, medir su efecto o construir algo que la aproveche) falta lo más básico: **no existe una fuente estructurada que diga qué contenido hay en cada vertical**, cuánto se repite entre verticales y en qué se diferencian. Esa información está repartida en miles de páginas públicas de rappi.cl, no en un formato que se pueda consultar.
 
@@ -31,6 +33,7 @@ Sin ese mapa de contenido no se puede:
 - La búsqueda va a las verticales que corresponden a la consulta (las de su concepto o su ocasión; sin ninguno, a todas, y quedan solo las que calzan las palabras o se parecen mucho) y muestra un grupo por vertical, con la de la pantalla primero.
 - Los intereses del usuario se guardan como **conceptos** comunes a todos los verticales (cerveza, snacks, pañales).
 - La recomendación cruzada va de concepto → complemento → búsqueda en el índice del otro vertical. Por ejemplo, quien lleva cerveza en Licores ve snacks de Express, marcados "De Express" y con su razón visible.
+- Un **motor multivertical** en la base aprende de cada persona y de la población qué verticales usa, cuál conviene sumarle (la escalera Restaurantes → Turbo → Retail, con la tabla de Rappi como punto de partida) y qué le toca pedir de nuevo. Con eso, la Home ordena sus accesos según el uso de cada persona y Mochi propone la siguiente vertical con su porqué ([capa-de-datos.md](capa-de-datos.md#motor-multivertical)).
 
 Detalle en [diseno-ia.md](diseno-ia.md#0-la-regla-que-ordena-todo).
 
@@ -72,15 +75,16 @@ Registro completo, con fechas: [decisiones.md](decisiones.md).
 
 ## 6. Fases
 
-Estado al 11-10-2026:
+Estado al 16-10-2026:
 
 | Fase | Qué es | Estado |
 |---|---|---|
 | **1. Datos** | Scraper → Postgres: catálogo, menús, precios e historial por vertical (`rappi-scraper/`) | **Hecha.** Primera descarga completa del 24 al 27-09-2026, recuperación de fallidos el 28-09 y primera descarga semanal automática el 29 y 30-09 (`make schedule`). Cifras en [README → Resultados](../README.md#resultados) |
-| **Prototipo** | App navegable: Mochi en la Home, buscador con Mochi y ofertas entre verticales (`prototipo-app/`) | **Listo para demo.** Necesita la API (`make mvp`) y usa el catálogo real; sin ella muestra «Sin conexión con Mochi». Ver [decisiones.md](decisiones.md#agente-mochi) |
+| **Prototipo** | App navegable: la Home que aprende el orden, Mochi en la Home, buscador con Mochi y ofertas entre verticales (`prototipo-app/`) | **Listo para demo.** Necesita la API (`make mvp`) y usa el catálogo real; sin ella muestra «Sin conexión con Mochi». Ver [decisiones.md](decisiones.md#agente-mochi) |
 | **2. RAG** | Conceptos (capa 2), embeddings de texto, búsqueda híbrida por vertical y evaluación (`rappi-ia/`) | **Construido.** Todos los documentos de búsqueda con embedding de texto. Evaluación en [README → Resultados](../README.md#resultados) |
 | **3. Agente** | Mochi en el backend y API: herramientas de búsqueda, reglas de conducta; LLM opcional | **Construido.** Responde solo por texto (`POST /agent/ask`) y hace ofertas (`/agent/offer`, `/agent/plans`) |
 | **4. Panel empresa** | Tendencias, demanda no satisfecha, frecuencia y abandono | **Construido** (`dashboard-empresa/`) y conectado a la API como parte del MVP: usuarios simulados, salvo la pestaña Catálogo (real) y la vista «Uso del MVP» (lo hecho en la app, pocas personas: no es evidencia) |
+| **5. Motor multivertical** | Afinidad, transiciones, combinaciones y retención, compra cruzada, tendencias y recompra en la base; la Home dinámica y las ofertas conectadas en la app; la tabla de Rappi como punto de partida ([especificación](superpowers/specs/2026-10-16-motor-multivertical-design.md)) | **Construido** (16-10-2026, en 6 etapas). Aprende la población de personas simuladas; evaluación en [resultados/motor-2026-10-16.md](resultados/motor-2026-10-16.md) y QA sobre el catálogo real en [resultados/qa-motor-2026-10-16.md](resultados/qa-motor-2026-10-16.md) |
 | **Cierre** | CI, documentación y validación final (etapa 8 de [diseno-ia.md](diseno-ia.md#7-etapas)) | **Hecha.** CI en verde y corrida post-refresh sobre el catálogo completo (30-09-2026) |
 
 ## 7. Límites y riesgos
@@ -93,13 +97,14 @@ Estado al 11-10-2026:
   - **Fines:** investigación y demostración. Las descripciones, imágenes y marcas pertenecen a Rappi y a los comercios; un uso comercial requeriría autorización.
   - **Proyecto independiente:** no está afiliado a Rappi ni cuenta con su respaldo. Las marcas pertenecen a sus dueños.
 - **Métricas con salvedades:** la relevancia de la búsqueda se juzga automáticamente por concepto, y sin el refuerzo por concepto el híbrido no se distingue del vectorial (0,860 frente a 0,849). Falta el juicio humano. La precisión de los conceptos es una estimación con jueces LLM sobre una muestra versionada del catálogo completo (06-10-2026). Detalle en [README → Resultados](../README.md#resultados).
-- **Datos simulados:** los segmentos y las métricas de negocio usan usuarios, eventos y pedidos simulados. Muestran la mecánica, no son evidencia.
+- **Datos simulados:** el motor (lo que aprende de la población), los segmentos y las métricas de negocio usan usuarios, eventos y pedidos simulados. Muestran la mecánica, no son evidencia.
+- **La tabla de Rappi es una correlación:** el motor la usa como punto de partida, no como promesa de efecto. La agrupación en `rest`, `turbo` y `retail` es un supuesto propio.
 - **Cambios del sitio:** si rappi.cl cambia su frontend, hay que ajustar los parsers. El reporte de calidad de cada corrida marca con ⚠ las respuestas anómalas; con una página nueva guardada, los tests muestran qué cambió.
 
 ## 8. Preguntas abiertas
 
 - **¿Quién lo usaría y dónde?** (equipos internos de Rappi, usuarios finales, análisis de mercado). Define la interfaz y las condiciones de uso de los datos.
-- **¿Se confirma el silo con datos internos?** Con eventos reales se puede medir qué hace un mismo usuario en distintos verticales y si las sugerencias cruzadas suben la frecuencia. Eso se valida con un grupo de control ([diseno-ia.md §5](diseno-ia.md#5-panel-para-la-empresa-vale-la-pena)).
+- **¿Sumar una vertical retiene?** La tabla de Rappi muestra que quien combina verticales vuelve más, pero no si sumarle una a alguien lo hace volver. Con eventos reales se puede medir qué hace un mismo usuario en distintos verticales y si las sugerencias cruzadas suben la frecuencia, y con pedidos reales el motor aprende de la población real en vez de la simulada (`MOTOR_POBLACION`). Eso se valida con un grupo de control ([diseno-ia.md §5](diseno-ia.md#5-panel-para-la-empresa-vale-la-pena)).
 - **¿Mejora de verdad el refuerzo por concepto?** Hay que juzgar a mano la planilla de 200 pares (`rappi-ia jev-planillas`, ver [jev.md](jev.md)) y medirlo con `rappi-ia eval-human`.
 
 Las preguntas ya resueltas (modelos, áreas iniciales, taxonomía, datos simulados) están en [decisiones.md](decisiones.md).

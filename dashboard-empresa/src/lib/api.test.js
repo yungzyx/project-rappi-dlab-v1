@@ -31,7 +31,10 @@ describe('loadAnalytics', () => {
   })
 
   test('solo el motor acepta `data: null`: otra métrica con null cae a lo guardado', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ source: 'synthetic', data: null })))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => jsonResponse({ source: 'synthetic', data: null })),
+    )
 
     const result = await loadAnalytics('kpis', 'synthetic')
 
@@ -39,13 +42,19 @@ describe('loadAnalytics', () => {
   })
 
   test('una métrica sin datos (`data: null`, el motor que no corrió) es una respuesta válida', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ source: 'prototype', data: null })))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => jsonResponse({ source: 'prototype', data: null })),
+    )
 
     await expect(loadAnalytics('motor', 'prototype')).resolves.toEqual({ data: null, offline: false, saved: null })
   })
 
   test('si la API no responde usa los datos guardados y anota la consulta', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(new TypeError('Failed to fetch'))))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Promise.reject(new TypeError('Failed to fetch'))),
+    )
     const listener = vi.fn()
     const unsubscribe = subscribeConnection(listener)
 
@@ -61,7 +70,10 @@ describe('loadAnalytics', () => {
 
   test('una consulta lenta cae a los datos guardados con el motivo', async () => {
     const timeout = new DOMException('signal timed out', 'TimeoutError')
-    vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(timeout)))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Promise.reject(timeout)),
+    )
 
     const result = await loadAnalytics('weekly', 'synthetic')
 
@@ -70,7 +82,10 @@ describe('loadAnalytics', () => {
   })
 
   test('un error HTTP también cae a los datos guardados', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ detail: 'boom' }, 500)))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => jsonResponse({ detail: 'boom' }, 500)),
+    )
 
     const result = await loadAnalytics('catalog')
 
@@ -79,7 +94,10 @@ describe('loadAnalytics', () => {
   })
 
   test('descarta una respuesta de otra fuente (nunca mezcla simulados con prototipo)', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ source: 'prototype', data: [{ x: 1 }] })))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => jsonResponse({ source: 'prototype', data: [{ x: 1 }] })),
+    )
 
     const result = await loadAnalytics('funnel', 'synthetic')
 
@@ -89,7 +107,10 @@ describe('loadAnalytics', () => {
   })
 
   test('la fuente prototipo nunca cae a datos guardados: sin la API dice que no responde', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(new TypeError('Failed to fetch'))))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Promise.reject(new TypeError('Failed to fetch'))),
+    )
 
     await expect(loadAnalytics('offers', 'prototype')).rejects.toThrow(
       'La API no responde: el uso del MVP solo se ve con la base viva.',
@@ -98,13 +119,19 @@ describe('loadAnalytics', () => {
   })
 
   test('una respuesta de otra fuente tampoco cae a datos guardados en el prototipo', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ source: 'synthetic', data: [{ x: 1 }] })))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => jsonResponse({ source: 'synthetic', data: [{ x: 1 }] })),
+    )
 
     await expect(loadAnalytics('funnel', 'prototype')).rejects.toThrow('La API no responde')
   })
 
   test('lo guardado trae su origen y su fecha, y quedan en el aviso', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(new TypeError('Failed to fetch'))))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Promise.reject(new TypeError('Failed to fetch'))),
+    )
 
     const result = await loadAnalytics('offers', 'synthetic')
 
@@ -163,7 +190,10 @@ describe('loadAnalytics', () => {
   })
 
   test('refreshSource olvida el aviso sin conexión de esa fuente y avisa', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(new TypeError('Failed to fetch'))))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Promise.reject(new TypeError('Failed to fetch'))),
+    )
     await loadAnalytics('suggestions', 'synthetic')
     await loadAnalytics('catalog')
     const listener = vi.fn()

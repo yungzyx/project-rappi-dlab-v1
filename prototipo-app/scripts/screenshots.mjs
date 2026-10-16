@@ -1,7 +1,10 @@
 // Genera las capturas de docs/screenshots recorriendo la app como un usuario (npm run screenshots).
 // Usa el Chrome instalado (playwright-core, sin descargar navegadores) y un servidor Vite propio en el 5199.
-// La app no abre sin la API: antes de capturar hay que tener el MVP corriendo (`make mvp`).
-import { mkdirSync } from 'node:fs'
+// La app no abre sin la API: antes de capturar hay que tener el MVP corriendo (`make mvp`). El recorrido paga una compra
+// y deja eventos en la base de la API: por eso no corre sin `SCREENSHOTS_ALLOW_WRITES=1`, y se corre sobre una copia
+// (`DATABASE_URL=postgresql:///rappi_staging make mvp`), nunca sobre `rappi`.
+// «¿Repetimos?» necesita tres compras con ritmo: esa oferta sale del fixture del contrato, con un café real del catálogo.
+import { mkdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright-core'
 import { createServer } from 'vite'
@@ -11,7 +14,9 @@ const OUT = `${ROOT}docs/screenshots`
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 const PORT = 5199
 const BASE = `http://localhost:${PORT}/`
-const API_HEALTH = 'http://localhost:8000/health'
+const API = 'http://localhost:8000'
+const API_HEALTH = `${API}/health`
+const REPEAT_FIXTURE = `${ROOT}src/api/fixtures/agent-offer-recompra.json`
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -39,7 +44,11 @@ async function run(page) {
     await target.screenshot({ path: `${OUT}/${name}.jpg`, type: 'jpeg', quality: 82 })
     console.log(`  ✓ ${name}`)
   }
-  const tap = (selector, text) => page.locator(selector, text ? { hasText: text } : {}).first().click()
+  const tap = (selector, text) =>
+    page
+      .locator(selector, text ? { hasText: text } : {})
+      .first()
+      .click()
   const back = () => tap('[aria-label="Volver"]')
   const tab = (label) => tap('.bottom-nav-item', label)
   // Lo que viene del catálogo llega después de abrir la pantalla: se espera a que esté (y a que carguen sus fotos).
@@ -52,10 +61,11 @@ async function run(page) {
     await tap('.home-shortcut', label)
   }
   const reset = async () => {
-    // Como quien ya vio la guía de la primera vez: sus globos taparían las capturas de la Home.
+    // Como quien ya vio la guía de la primera vez y el aviso de privacidad: taparían las capturas de la Home.
     await page.evaluate(() => {
       localStorage.clear()
       localStorage.setItem('rappi-proto-guia-vista', '1')
+      localStorage.setItem('rappi-proto-privacy-seen', '1')
     })
     await page.goto(`${BASE}?r=${Date.now()}`)
     await page.waitForSelector('.home-shortcuts')
@@ -140,16 +150,89 @@ async function run(page) {
   await tap('.loyalty-sheet-primary')
   await wait(900)
   await shot('28-loyalty-vinculado')
+
+  // --- La Home que aprende: otra persona entra dos veces a Chocolates y una a Retail ---
+  await reset()
+  await wait(4200) // el saludo de Mochi
+  for (const label of ['Chocolates', 'Chocolates', 'Retail']) {
+    await shortcut(label)
+    await page.locator('.vertical-store').first().waitFor()
+    await back()
+    await settle(400)
+  }
+  await page.getByText('Ordenadas según lo que más usas').waitFor()
+  // Abrir Retail corrió la fila hacia la derecha: vuelve al principio, como la ve quien llega a la Home.
+  await page.locator('.home-shortcuts').evaluate((row) => {
+    for (const el of [row, ...row.querySelectorAll('*')]) el.scrollLeft = 0
+  })
+  await shot('03-home-dinamica')
+
+  // Tocar a Mochi en la Home: la API propone la vertical donde la persona aún no pide.
+  await tap('.live-agent-body')
+  await page.locator('.live-bubble .offer-why-toggle').waitFor({ timeout: 15000 })
+  await tap('.live-bubble .offer-why-toggle')
+  await shot('22-vertical-por-probar')
+
+  // «¿Repetimos?»: la recompra del fixture del contrato, con un café molido real del catálogo.
+  const repeat = await repeatOffer()
+  await page.route('**/agent/offer', async (route) => {
+    if (route.request().postDataJSON()?.moment !== 'recompra') return route.continue()
+    const response = await route.fetch() // la API real (204 para esta persona): sus cabeceras CORS
+    await route.fulfill({ response, status: 200, json: repeat })
+  })
+  await tab('Offers')
+  await tab('Home') // al volver a estar arriba, la Home pide la recompra
+  const block = page.locator('.live-card--repeat')
+  await block.waitFor()
+  // La Home baja hasta que los dos accesos grandes quedan justo bajo la barra de estado: se ven los accesos y el bloque.
+  await page.locator('.home-tile--restaurants').evaluate((tile) => {
+    let scroller = tile.parentElement
+    while (scroller && scroller.scrollHeight <= scroller.clientHeight) scroller = scroller.parentElement
+    const phone = tile.closest('.phone').getBoundingClientRect()
+    scroller.scrollTop += tile.getBoundingClientRect().top - phone.top - 36
+  })
+  // La foto del producto es diferida (loading="lazy"): carga recién al quedar a la vista.
+  await block
+    .locator('img')
+    .first()
+    .evaluate((img) => img.complete || new Promise((done) => (img.onload = img.onerror = done)))
+  await shot('21-recompra')
+}
+
+async function repeatOffer() {
+  const fixture = JSON.parse(readFileSync(REPEAT_FIXTURE, 'utf8'))
+  const params = new URLSearchParams({ q: 'café molido', vertical: fixture.vertical, limit: '10' })
+  const { products } = await (await fetch(`${API}/search?${params}`)).json()
+  const product = products.find((p) => p.img && !p.age_restricted)
+  if (!product) throw new Error('No hay café molido en el catálogo para «¿Repetimos?»')
+  return {
+    ...fixture,
+    products: [product],
+    actions: fixture.actions.map((action) => ({ ...action, store_id: product.store_id })),
+  }
+}
+
+function requireWritesAllowed() {
+  if (process.env.SCREENSHOTS_ALLOW_WRITES === '1') return
+  console.error(
+    'Las capturas pagan una compra y dejan un pedido y eventos en la base que usa la API.\n' +
+      'Apunta la API a una copia, nunca a `rappi`: `DATABASE_URL=postgresql:///rappi_staging make mvp`,\n' +
+      'y después corre `SCREENSHOTS_ALLOW_WRITES=1 npm run screenshots`.',
+  )
+  process.exit(1)
 }
 
 async function requireApi() {
   const response = await fetch(API_HEALTH, { signal: AbortSignal.timeout(3000) }).catch(() => null)
   if (response?.ok) return
-  console.error('Las capturas necesitan el MVP corriendo: `make mvp`')
+  console.error(
+    'Las capturas necesitan el MVP corriendo sobre una copia: `DATABASE_URL=postgresql:///rappi_staging make mvp`',
+  )
   process.exit(1)
 }
 
 async function main() {
+  requireWritesAllowed()
   await requireApi()
   mkdirSync(OUT, { recursive: true })
 

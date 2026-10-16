@@ -31,7 +31,9 @@ function CoverageHeadline() {
     <Headline
       value={formatNumber(obtained)}
       unit={`productos en la muestra, ${formatPct((obtained * 100) / declared, 0)} de lo que declaran las tiendas`}
-      context={lowest ? `menor cobertura: ${verticalLabel(lowest.vertical)}, ${formatPct(lowest.coveragePct, 0)}` : undefined}
+      context={
+        lowest ? `menor cobertura: ${verticalLabel(lowest.vertical)}, ${formatPct(lowest.coveragePct, 0)}` : undefined
+      }
       tone="brand"
     />
   )
@@ -96,7 +98,11 @@ export function CatalogView({ source }) {
               <Quality />
             </Async>
           </Card>
-          <Card title="Productos en varios verticales" subtitle="El mismo producto a la venta en 2 o más verticales." index={2}>
+          <Card
+            title="Productos en varios verticales"
+            subtitle="El mismo producto a la venta en 2 o más verticales."
+            index={2}
+          >
             <Async>
               <Cross />
             </Async>
@@ -108,7 +114,8 @@ export function CatalogView({ source }) {
         <div className="section-head">
           <h2 id="surtido">Dónde hay más interés que oferta</h2>
           <p>
-            Ordenado por usuarios por ítem: arriba, conceptos con mucha búsqueda y poco surtido real. {DEMAND_NOTES[source]}
+            Ordenado por usuarios por ítem: arriba, conceptos con mucha búsqueda y poco surtido real.{' '}
+            {DEMAND_NOTES[source]}
           </p>
           <ProvenanceBadge kind={`demand-${source}`} />
           <Async fallback={null}>

@@ -13,5 +13,9 @@ function subscribe(onChange) {
 
 /** `true` si la persona pidió reducir el movimiento; se actualiza si lo cambia con la app abierta. */
 export function useReducedMotion() {
-  return useSyncExternalStore(subscribe, () => Boolean(media()?.matches), () => false)
+  return useSyncExternalStore(
+    subscribe,
+    () => Boolean(media()?.matches),
+    () => false,
+  )
 }

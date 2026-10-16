@@ -126,7 +126,10 @@ describe('Turbo con el catálogo real', () => {
     expect(screen.getByRole('tab', { name: 'Despensa' }).getAttribute('aria-selected')).toBe('true')
     expect(screen.getByRole('heading', { name: 'Despensa' })).toBeTruthy()
     // La tienda es la primera de la vertical (la de más productos), no la segunda.
-    expect(requests(fetchMock).map(({ path }) => path)).toEqual(['/catalog/verticals/turbo/stores', '/catalog/stores/9301'])
+    expect(requests(fetchMock).map(({ path }) => path)).toEqual([
+      '/catalog/verticals/turbo/stores',
+      '/catalog/stores/9301',
+    ])
 
     fireEvent.click(screen.getByRole('tab', { name: 'Bebidas' }))
     await waitFor(() => expect(names()).toEqual(['Gaseosa cola 1,5 L (prueba)']))

@@ -14,15 +14,7 @@ import { useAddToCart } from '../../../hooks/useAddToCart'
 import { useEvents } from '../../../state/EventsContext'
 import { useProfile } from '../../../state/ProfileContext'
 import CreditsBanner from '../CreditsBanner'
-import {
-  BestRated,
-  FastRestaurants,
-  MainTiles,
-  NearbyStores,
-  Promos,
-  Shortcuts,
-  useHomeCatalog,
-} from '../HomeSections'
+import { BestRated, FastRestaurants, MainTiles, NearbyStores, Promos, Shortcuts, useHomeCatalog } from '../HomeSections'
 import { CREDITS } from '../../../data/home'
 import '../home.css'
 import { useVerticalOrder } from '../useVerticalOrder'
@@ -120,26 +112,32 @@ export default function LiveHomeFeed({ push, active = true }) {
   }, [])
 
   /** El agente dice algo (o se calla con `null`); con `holdMs` el globo se va solo. Cada frase reemplaza a la anterior. */
-  const speak = useCallback((next, at = null, holdMs = 0) => {
-    // Cualquier otro globo que reemplace a la guía la termina: queda vista y no vuelve.
-    if (touring.current && !next?.tour) {
-      touring.current = false
-      markTourSeen()
-    }
-    if (next?.tour) touring.current = true
-    said.current = next
-    holdFor.current = next && holdMs ? holdMs : 0
-    clearTimeout(hideTimer.current)
-    setSay(next)
-    setTarget(at)
-    if (holdFor.current) armHide(holdFor.current)
-  }, [armHide])
+  const speak = useCallback(
+    (next, at = null, holdMs = 0) => {
+      // Cualquier otro globo que reemplace a la guía la termina: queda vista y no vuelve.
+      if (touring.current && !next?.tour) {
+        touring.current = false
+        markTourSeen()
+      }
+      if (next?.tour) touring.current = true
+      said.current = next
+      holdFor.current = next && holdMs ? holdMs : 0
+      clearTimeout(hideTimer.current)
+      setSay(next)
+      setTarget(at)
+      if (holdFor.current) armHide(holdFor.current)
+    },
+    [armHide],
+  )
 
   /** Mientras se lee el «¿Por qué?» del globo no se va solo; al cerrarlo vuelve a contar desde cero. */
-  const onWhyToggle = useCallback((open) => {
-    clearTimeout(hideTimer.current)
-    if (!open && said.current && holdFor.current) armHide(holdFor.current)
-  }, [armHide])
+  const onWhyToggle = useCallback(
+    (open) => {
+      clearTimeout(hideTimer.current)
+      if (!open && said.current && holdFor.current) armHide(holdFor.current)
+    },
+    [armHide],
+  )
 
   const getBlock = useCallback((id) => blockRefs.current.get(id) ?? null, [])
   const setRef = (id) => (element) => {
@@ -448,9 +446,7 @@ export default function LiveHomeFeed({ push, active = true }) {
         />
       </>
     ),
-    recompra: repeat && (
-      <RepeatBlock offer={repeat} onLater={repeatLater} onOpen={openFromBlock} />
-    ),
+    recompra: repeat && <RepeatBlock offer={repeat} onLater={repeatLater} onOpen={openFromBlock} />,
     promos: <Promos push={push} />,
     turbo: <FastRestaurants stores={catalog.fastRestaurants} push={push} />,
     plan: (

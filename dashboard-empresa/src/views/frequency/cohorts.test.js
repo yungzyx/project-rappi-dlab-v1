@@ -41,7 +41,10 @@ describe('buildCohortMatrix', () => {
   test('con los datos guardados y el corte en domingo, las semanas que la API no trajo quedan vacías', () => {
     // El caso de M21 sacado de los datos (así vale aunque se regeneren los fixtures): el corte es el domingo que
     // cierra la semana siguiente a la última que trae la cohorte más nueva (las cohortes parten en lunes).
-    const newest = saved.data.map((row) => row.cohorte).sort().at(-1)
+    const newest = saved.data
+      .map((row) => row.cohorte)
+      .sort()
+      .at(-1)
     const newestLast = Math.max(...saved.data.filter((row) => row.cohorte === newest).map((row) => row.semana))
     const sunday = new Date(Date.parse(newest) + ((newestLast + 1) * 7 + 6) * 86_400_000).toISOString().slice(0, 10)
 

@@ -20,10 +20,8 @@ function Svg({ size = 24, children, strokeWidth = 2, fill = 'none', active, ...r
   )
 }
 
-const HOUSE =
-  'M12 2.8 3.2 10v10.1c0 .5.4.9.9.9h5.3v-5.3c0-.5.4-.9.9-.9h3.4c.5 0 .9.4.9.9V21h5.3c.5 0 .9-.4.9-.9V10z'
-const STAR =
-  'M12 2.6l2.8 5.9 6.4.8-4.7 4.5 1.2 6.4L12 17.1l-5.7 3.1 1.2-6.4-4.7-4.5 6.4-.8z'
+const HOUSE = 'M12 2.8 3.2 10v10.1c0 .5.4.9.9.9h5.3v-5.3c0-.5.4-.9.9-.9h3.4c.5 0 .9.4.9.9V21h5.3c.5 0 .9-.4.9-.9V10z'
+const STAR = 'M12 2.6l2.8 5.9 6.4.8-4.7 4.5 1.2 6.4L12 17.1l-5.7 3.1 1.2-6.4-4.7-4.5 6.4-.8z'
 
 export const SearchIcon = (p) => (
   <Svg strokeWidth={2.8} {...p}>

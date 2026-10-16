@@ -55,7 +55,13 @@ export const SECTIONS = [
       // Solo del prototipo: alterna entre Rappi hoy y el prototipo final (en notebook también con la tecla D).
       { id: 'demo', label: 'Modo demo', Icon: SparkleLineIcon, action: 'demo' },
       // Solo en el prototipo final: en el celular no está el botón «Repetir escena» de la notebook.
-      { id: 'replay', label: `Repetir escena de ${AGENT_NAME}`, Icon: SparkleLineIcon, action: 'replay', finalOnly: true },
+      {
+        id: 'replay',
+        label: `Repetir escena de ${AGENT_NAME}`,
+        Icon: SparkleLineIcon,
+        action: 'replay',
+        finalOnly: true,
+      },
     ],
   },
   {

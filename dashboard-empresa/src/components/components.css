@@ -261,12 +261,6 @@
   color: var(--ink-3);
 }
 
-.chip-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
 .chip--warn {
   color: var(--warn-ink);
   background: color-mix(in srgb, var(--warn) 16%, transparent);

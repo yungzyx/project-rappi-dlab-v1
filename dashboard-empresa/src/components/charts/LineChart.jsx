@@ -87,14 +87,26 @@ export function LineChart({ points, formatValue, formatTick, label, integerTicks
         >
           {ticks.map((tick) => (
             <g key={tick} className="axis">
-              <line className={tick === 0 ? 'axis-base' : 'grid'} x1={MARGIN.left} x2={width - MARGIN.right} y1={y(tick)} y2={y(tick)} />
+              <line
+                className={tick === 0 ? 'axis-base' : 'grid'}
+                x1={MARGIN.left}
+                x2={width - MARGIN.right}
+                y1={y(tick)}
+                y2={y(tick)}
+              />
               <text x={MARGIN.left - 8} y={y(tick)} dy="0.32em" textAnchor="end">
                 {formatTick(tick)}
               </text>
             </g>
           ))}
           {monthTicks(points, x).map((tick) => (
-            <text key={tick.index} className="axis" x={tick.x} y={HEIGHT - 6} textAnchor={tick.index === 0 ? 'start' : 'middle'}>
+            <text
+              key={tick.index}
+              className="axis"
+              x={tick.x}
+              y={HEIGHT - 6}
+              textAnchor={tick.index === 0 ? 'start' : 'middle'}
+            >
               {tick.month}
             </text>
           ))}
@@ -108,7 +120,9 @@ export function LineChart({ points, formatValue, formatTick, label, integerTicks
               <path className="line-path" d={`M${run.map(at).join('L')}`} />
             </g>
           ))}
-          {beforePartial !== undefined && <path className="line-path line-path--partial" d={`M${at(beforePartial)}L${at(last)}`} />}
+          {beforePartial !== undefined && (
+            <path className="line-path line-path--partial" d={`M${at(beforePartial)}L${at(last)}`} />
+          )}
           {lastPoint && lastPoint.value !== null && (
             <circle
               className={lastPoint.partial ? 'line-dot line-dot--hollow' : 'line-dot'}
@@ -121,7 +135,9 @@ export function LineChart({ points, formatValue, formatTick, label, integerTicks
           {activePoint && (
             <g className="crosshair">
               <line x1={x(active)} x2={x(active)} y1={MARGIN.top} y2={baseline} />
-              {activePoint.value !== null && <circle className="line-dot" cx={x(active)} cy={y(activePoint.value)} r="4" />}
+              {activePoint.value !== null && (
+                <circle className="line-dot" cx={x(active)} cy={y(activePoint.value)} r="4" />
+              )}
             </g>
           )}
         </svg>

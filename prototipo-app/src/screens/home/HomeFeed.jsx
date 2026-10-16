@@ -7,15 +7,7 @@ import { useScrollState } from '../../hooks/useScrollState'
 import { useAddress } from '../../state/AddressContext'
 import { useEvents } from '../../state/EventsContext'
 import CreditsBanner from './CreditsBanner'
-import {
-  BestRated,
-  FastRestaurants,
-  MainTiles,
-  NearbyStores,
-  Promos,
-  Shortcuts,
-  useHomeCatalog,
-} from './HomeSections'
+import { BestRated, FastRestaurants, MainTiles, NearbyStores, Promos, Shortcuts, useHomeCatalog } from './HomeSections'
 import { CREDITS } from '../../data/home'
 import './home.css'
 

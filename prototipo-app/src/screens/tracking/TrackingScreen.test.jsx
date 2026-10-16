@@ -12,12 +12,17 @@ import { today } from '../../utils/today'
 import TrackingScreen from './TrackingScreen'
 
 const events = vi.hoisted(() => ({ track: vi.fn(), flush: async () => {}, clear: () => {}, settled: async () => {} }))
-vi.mock('../../state/EventsContext', async (importOriginal) => ({ ...(await importOriginal()), useEvents: () => events }))
+vi.mock('../../state/EventsContext', async (importOriginal) => ({
+  ...(await importOriginal()),
+  useEvents: () => events,
+}))
 
 // Lo que se pidió son productos de la API: la línea guarda su tipo e id, con los que Mochi arma el próximo pedido.
 const ORDER = {
   stores: ['Pizzería de prueba'],
-  items: [{ name: 'Pizza (prueba)', img: 'pizza.webp', price: '$7.990', qty: 1, entityType: 'menu_item', entityId: '95001' }],
+  items: [
+    { name: 'Pizza (prueba)', img: 'pizza.webp', price: '$7.990', qty: 1, entityType: 'menu_item', entityId: '95001' },
+  ],
   total: 7990,
 }
 

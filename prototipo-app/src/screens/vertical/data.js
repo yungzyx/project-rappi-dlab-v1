@@ -32,7 +32,12 @@ export const VERTICALS = {
       ),
     ],
     banners: [
-      { id: 'bancoestado', label: 'Promoción BancoEstado', img: a('banner-bancoestado'), toast: 'Promoción válida con Tarjeta Visa BancoEstado' },
+      {
+        id: 'bancoestado',
+        label: 'Promoción BancoEstado',
+        img: a('banner-bancoestado'),
+        toast: 'Promoción válida con Tarjeta Visa BancoEstado',
+      },
       { id: 'bancobice', label: 'Cupón Banco BICE', img: a('banner-bancobice'), toast: 'Cupón BSRAPPISEP26 copiado' },
     ],
   },

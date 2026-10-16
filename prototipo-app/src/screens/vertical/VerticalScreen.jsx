@@ -69,7 +69,6 @@ export default function VerticalScreen({ back, push, params }) {
         <CategoryGrid rows={vertical.categoryRows} scrollable={vertical.scrollCategories} onOpen={openCategory} />
       )}
 
-
       {vertical.banners && <BannerCarousel banners={vertical.banners} onOpen={(banner) => toast(banner.toast)} />}
 
       {stores.error && stores.error.status !== 404 && <OfflineNotice onRetry={retry} />}

@@ -73,12 +73,20 @@ describe('pedidos para el panel', () => {
       ctx,
     )
     expect(orders.map((o) => o.vertical)).toEqual(['supermercado', 'restaurantes'])
-    expect(orders[0].lines[0]).toMatchObject({ entity_type: 'catalog_item', entity_id: '91001', qty: 2, unit_price: 1990 })
+    expect(orders[0].lines[0]).toMatchObject({
+      entity_type: 'catalog_item',
+      entity_id: '91001',
+      qty: 2,
+      unit_price: 1990,
+    })
     expect(orders[1].lines[0]).toMatchObject({ entity_type: 'menu_item', entity_id: '98002', unit_price: 8990 })
 
     // Cada vertical de la API vuelve a ella tal cual, pase por la pantalla que pase.
     ACCEPTED.forEach((vertical) => {
-      const [order] = buildOrders([{ product: toPrototypeProduct({ ...fixture('catalog-product'), vertical }), qty: 1 }], ctx)
+      const [order] = buildOrders(
+        [{ product: toPrototypeProduct({ ...fixture('catalog-product'), vertical }), qty: 1 }],
+        ctx,
+      )
       expect(order.vertical).toBe(vertical)
     })
     // Si la vertical del backend y la de la pantalla no coinciden, manda la del backend.
@@ -141,7 +149,10 @@ describe('pedidos para el panel', () => {
 
   test("buildOrders en modo actual lleva mode 'actual' y ningún concept_id", () => {
     // En «Rappi hoy» la app no aprende: el pedido lo dice y no nombra conceptos (el backend tampoco lo lleva al perfil).
-    const items = [{ product: beer(), qty: 1 }, { product: toPrototypeProduct(fixture('catalog-product')), qty: 2 }]
+    const items = [
+      { product: beer(), qty: 1 },
+      { product: toPrototypeProduct(fixture('catalog-product')), qty: 2 },
+    ]
     const orders = buildOrders(items, { ...ctx, mode: 'actual' })
     expect(orders).toHaveLength(2)
     orders.forEach((order) => {

@@ -2,7 +2,7 @@
   "schema_version": 2,
   "diagram_type": "workflow",
   "meta": {
-    "title": "Rappi: catálogo, agente Mochi y capa de datos",
+    "title": "Rappi: catálogo, agente Mochi y motor multivertical",
     "quality_profile": "showcase",
     "views": [
       {
@@ -14,7 +14,7 @@
           "agente",
           "busqueda"
         ],
-        "note": "Una pregunta de texto llega al agente, que busca dentro del vertical y verifica antes de responder."
+        "note": "Una búsqueda llega al agente, que busca dentro del vertical y verifica antes de responder."
       },
       {
         "id": "datos",
@@ -27,30 +27,30 @@
           "busqueda",
           "conceptos"
         ],
-        "note": "Tras cada refresh: conceptos, capa de datos (atributos, marcas, grafo), embeddings e5, con un índice HNSW por vertical."
+        "note": "Tras cada refresh: conceptos, capa de datos (atributos, marcas, grafo), embeddings e5 y un índice HNSW por vertical."
       },
       {
-        "id": "cruce",
-        "label": "Entre verticales",
+        "id": "motor",
+        "label": "Motor multivertical",
         "focus": [
-          "agente",
-          "conceptos",
-          "busqueda",
+          "combos",
+          "motor",
+          "ofertas",
+          "api",
           "eventos"
         ],
-        "note": "El puente es el concepto: interés del usuario → complemento → búsqueda en el índice de otro vertical."
+        "note": "El motor junta la tabla de Rappi con los pedidos y señales: ordena la Home y da el paso y la recompra a las ofertas."
       },
       {
         "id": "negocio",
-        "label": "Eventos y segmentos",
+        "label": "Eventos y panel",
         "focus": [
           "api",
           "eventos",
-          "segmentos",
-          "conceptos",
+          "motor",
           "panel"
         ],
-        "note": "Eventos simulados y del prototipo alimentan los segmentos y las métricas de negocio: muestran la mecánica, no evidencia."
+        "note": "Los pedidos y eventos (simulados y del prototipo) alimentan el motor y el panel: muestran la mecánica, no evidencia."
       }
     ],
     "legend": {
@@ -90,11 +90,11 @@
     },
     {
       "id": "cruce_lane",
-      "label": "Entre verticales"
+      "label": "Entre verticales: motor y ofertas"
     },
     {
       "id": "negocio_lane",
-      "label": "Eventos y segmentos"
+      "label": "Panel y dato de Rappi"
     }
   ],
   "mainPath": [
@@ -138,7 +138,7 @@
       "col": 3,
       "type": "database",
       "label": "Postgres + pgvector",
-      "sublabel": "catálogo · vectores",
+      "sublabel": "catálogo · esquema capa",
       "width": 170
     },
     {
@@ -147,8 +147,8 @@
       "col": 0,
       "type": "frontend",
       "label": "prototipo-app",
-      "sublabel": "buscador · Home",
-      "width": 150
+      "sublabel": "Home dinámica · ofertas",
+      "width": 160
     },
     {
       "id": "api",
@@ -156,7 +156,7 @@
       "col": 1,
       "type": "backend",
       "label": "API FastAPI",
-      "sublabel": "/agent · /events",
+      "sublabel": "rappi-ia",
       "width": 150
     },
     {
@@ -180,9 +180,39 @@
       "width": 170
     },
     {
-      "id": "conceptos",
+      "id": "combos",
+      "lane": "negocio_lane",
+      "col": 1,
+      "type": "external",
+      "label": "Tabla de Rappi",
+      "sublabel": "combos.toml",
+      "tag": "dato compartido por Rappi",
+      "width": 160
+    },
+    {
+      "id": "motor",
+      "lane": "cruce_lane",
+      "col": 1,
+      "type": "backend",
+      "label": "Motor multivertical",
+      "sublabel": "afinidad · combos · recompra",
+      "tag": "rappi-ia motor",
+      "width": 170
+    },
+    {
+      "id": "ofertas",
       "lane": "cruce_lane",
       "col": 2,
+      "type": "backend",
+      "label": "Ofertas y Home",
+      "sublabel": "/agent/offer · /verticales",
+      "width": 170,
+      "tag": "guardias"
+    },
+    {
+      "id": "conceptos",
+      "lane": "cruce_lane",
+      "col": 3,
       "type": "database",
       "label": "Conceptos · capa 2",
       "sublabel": "perfil + complementos",
@@ -190,30 +220,21 @@
     },
     {
       "id": "eventos",
-      "lane": "negocio_lane",
-      "col": 1,
+      "lane": "cruce_lane",
+      "col": 0,
       "type": "database",
-      "label": "Eventos · capa 3",
+      "label": "Pedidos y eventos",
       "sublabel": "simulados + prototipo",
       "width": 160
     },
     {
-      "id": "segmentos",
-      "lane": "negocio_lane",
-      "col": 2,
-      "type": "backend",
-      "label": "Segmentos y métricas",
-      "sublabel": "capa · /analytics",
-      "width": 170
-    },
-    {
       "id": "panel",
       "lane": "negocio_lane",
-      "col": 3,
+      "col": 0,
       "type": "frontend",
-      "label": "Panel :5175",
-      "sublabel": "Uso del MVP · /analytics",
-      "width": 170
+      "label": "dashboard-empresa",
+      "sublabel": "Entre verticales · Uso del MVP",
+      "width": 180
     }
   ],
   "edges": [
@@ -228,7 +249,9 @@
       "id": "api-agente",
       "from": "api",
       "to": "agente",
-      "variant": "emphasis"
+      "variant": "emphasis",
+      "fromSide": "right",
+      "toSide": "left"
     },
     {
       "id": "agente-busqueda",
@@ -269,16 +292,34 @@
       "role": "async"
     },
     {
-      "id": "indexar-conceptos",
-      "from": "indexar",
-      "to": "conceptos",
-      "label": "item_concepts",
+      "id": "combos-motor",
+      "from": "combos",
+      "to": "motor",
+      "label": "retención",
       "variant": "dashed",
       "role": "async"
     },
     {
-      "id": "agente-conceptos",
-      "from": "agente",
+      "id": "api-ofertas",
+      "from": "api",
+      "to": "ofertas",
+      "label": "momento",
+      "role": "branch",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "motor-ofertas",
+      "from": "motor",
+      "to": "ofertas",
+      "label": "afinidad · paso",
+      "role": "branch",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "ofertas-conceptos",
+      "from": "ofertas",
       "to": "conceptos",
       "label": "complementos",
       "role": "branch"
@@ -291,25 +332,18 @@
       "role": "branch"
     },
     {
-      "id": "eventos-conceptos",
+      "id": "eventos-motor",
       "from": "eventos",
-      "to": "conceptos",
-      "label": "co-ocurrencia",
+      "to": "motor",
+      "label": "señales",
       "variant": "dashed",
       "role": "async"
     },
     {
-      "id": "eventos-segmentos",
+      "id": "eventos-panel",
       "from": "eventos",
-      "to": "segmentos",
-      "label": "SQL",
-      "role": "branch"
-    },
-    {
-      "id": "segmentos-panel",
-      "from": "segmentos",
       "to": "panel",
-      "label": "métricas",
+      "label": "/analytics",
       "role": "branch"
     }
   ]

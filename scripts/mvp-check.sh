@@ -7,7 +7,7 @@
 #      queda un pedido `prototype` cuyas líneas son productos (o platos) sembrados;
 #   3. kit de Mochi: «cerveza» en el buscador con Mochi (grupos por vertical) → plan «Carrete» en la Home → agregar el
 #      kit → pagar, y en rappi_ia_test (solo lectura) el pedido tiene líneas sembradas y la persona dejó al menos una
-#      `suggestion_accepted` con origen `agent-plan` (o el viejo `mochi-plan`);
+#      `suggestion_accepted` con origen `agent-plan`;
 #   4. home: la Home dinámica; una persona nueva ve el orden fijo y, tras tocar «Retail» (Rappi Mall) tres veces, Retail
 #      queda primero con el texto «Ordenadas según lo que más usas»;
 #   5. combinación: una persona nueva pide en Restaurantes, vuelve a la Home y toca a Mochi: la oferta es de Turbo (el
@@ -62,7 +62,7 @@ fi
 # El pedido de la compra: el último de la app (`prototype`; los `synthetic` son del generador) y los demás de la misma
 # persona (un kit de varias verticales son varios pedidos), con todas sus líneas productos o platos sembrados (un kit
 # puede traer un plato de restaurante). Con el argumento `kit`, además esa persona dejó al menos una
-# `suggestion_accepted` con origen `agent-plan` (o el viejo `mochi-plan`; app_events). Solo lee.
+# `suggestion_accepted` con origen `agent-plan` (app_events). Solo lee.
 # Reintenta 5 s por si el pedido o los eventos tardan en quedar confirmados.
 read -r -d '' CHECK_ORDER <<'PY' || true
 import sys
@@ -84,7 +84,7 @@ ORDER BY o.ts DESC
 """
 ACCEPTED = """
 SELECT count(*) FROM app_events
-WHERE user_id = %s AND type = 'suggestion_accepted' AND payload->>'origen' IN ('mochi-plan', 'agent-plan')
+WHERE user_id = %s AND type = 'suggestion_accepted' AND payload->>'origen' = 'agent-plan'
 """
 kit = sys.argv[1:] == ["kit"]
 

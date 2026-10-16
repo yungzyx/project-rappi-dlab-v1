@@ -71,8 +71,9 @@ export default function App() {
       <footer className="site-footer">
         <div className="container">
           <p>
-            Definiciones de cada métrica: <span className="mono">docs/diseno-ia.md §5</span>. Datos de la API de rappi-ia
-            en <span className="mono">{API_URL}</span>. <a href={`${import.meta.env.BASE_URL}presentacion.html`}>Presentación de la propuesta</a>.
+            Definiciones de cada métrica: <span className="mono">docs/diseno-ia.md §5</span>. Datos de la API de
+            rappi-ia en <span className="mono">{API_URL}</span>.{' '}
+            <a href={`${import.meta.env.BASE_URL}presentacion.html`}>Presentación de la propuesta</a>.
           </p>
           <p>Demo no oficial · prototipo independiente, no afiliado a Rappi.</p>
           <p>

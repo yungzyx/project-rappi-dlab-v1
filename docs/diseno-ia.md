@@ -1,7 +1,7 @@
 # Diseño: RAG, agente Mochi y panel para la empresa
 
-> Cómo se conectan el catálogo (scraper), la búsqueda semántica, el agente, el prototipo y un panel de negocio. Las etapas de diseño 0–8 se construyeron hasta el 30-09-2026, y el MVP integrado se armó encima en 7 etapas (10 y 11-10-2026, §7); lo que el código todavía no cubre se marca como pendiente.
-> Última actualización: 11-10-2026. Contexto: [contexto-y-problema.md](contexto-y-problema.md) · Modelo de datos: [ecosistema-rappi.md](ecosistema-rappi.md) · Resultados vigentes: [README → Resultados](../README.md#resultados).
+> Cómo se conectan el catálogo (scraper), la búsqueda semántica, el agente, el prototipo y un panel de negocio. Las etapas de diseño 0–8 se construyeron hasta el 30-09-2026, el MVP integrado se armó encima en 7 etapas (10 y 11-10-2026, §7) y el motor multivertical con la Home dinámica, en 6 etapas más (16-10-2026, §4b y §7); lo que el código todavía no cubre se marca como pendiente.
+> Última actualización: 16-10-2026. Contexto: [contexto-y-problema.md](contexto-y-problema.md) · Modelo de datos: [ecosistema-rappi.md](ecosistema-rappi.md) · Resultados vigentes: [README → Resultados](../README.md#resultados).
 > Diagramas: [flujo de datos por etapas](diagramas/rag-datos.png) y [vista por carriles](diagramas/arquitectura-ia.png). Sus versiones interactivas ([rag-datos.html](diagramas/rag-datos.html), [arquitectura-ia.html](diagramas/arquitectura-ia.html)) se descargan y se abren en el navegador.
 > Lo marcado "datos parciales" se midió el 27-09-2026, antes de terminar la descarga completa.
 > **09-10-2026:** el repo se enfocó en el prototipo final; el panel de negocio (§5 y etapa de diseño 7, `dashboard-empresa/`) quedó fuera de la propuesta; el **11-10-2026** (etapa 6 del MVP) volvió como parte del MVP, conectado a la API, con la vista «Uso del MVP» (§5).
@@ -19,6 +19,8 @@
 La recomendación cruzada se arma así: interés del usuario (concepto) → **arista de complemento** (cerveza → snacks) → búsqueda **en el índice del otro vertical**. El puente entre verticales es el concepto, no el índice.
 
 El aislamiento es una regla de búsqueda, no un límite del modelo: el silo es el problema que el prototipo busca resolver.
+
+Desde el 16-10-2026 hay un segundo camino entre verticales, el **motor multivertical** (§4b): no busca, sino que decide qué vertical proponerle a cada persona, en qué orden ve los accesos de la Home y qué le toca pedir de nuevo. Tampoco mezcla índices: la búsqueda sigue dentro de cada vertical.
 
 ## 1. Cómo funciona el RAG
 
@@ -65,7 +67,7 @@ Decisiones:
   - **Qué se muestra:** ni los vecinos del coseno ni productos de otro concepto (si el concepto pedido es testimonial, sus pocos productos sí). Sin productos a la vista, Mochi anota la demanda, salvo si se habló de síntomas: ahí los medicamentos se ocultan por la regla 6d, no por falta de surtido.
   - **Por qué no se usa solo el coseno:** en la evaluación, los cosenos de e5 se concentran en un rango estrecho (datos parciales) y separan mal; la presencia del concepto es mejor señal.
   - **Calibración:** τ se calibra por vertical con las consultas negativas del set de evaluación, pidiendo precisión ≥ 0,9. Solo cuentan las negativas que dependen de τ (sin coincidencia léxica ni concepto nombrado, y con palabras que buscar); un vertical sin ellas no recibe propuesta y conserva su τ (o 0,82 si nunca tuvo): pasarlo a 0,82 metía una falsa alarma en Mall. El reporte muestra el τ vigente y el propuesto, y advierte cuando un τ vigente está en el piso de la grilla (0,70): ahí la regla del coseno casi no se dispara.
-  - **Resultado vigente:** precisión 1,00 y recall 0,71 (29 de 41) en la búsqueda (`retrieve`), en [README → Resultados](../README.md#resultados). Mochi anota 21 de las 41, sin falsas alarmas en las 124 positivas: en las otras 8 la búsqueda la marca, pero se muestran los pocos productos del concepto pedido (surtido testimonial). El set anterior (28-09) tenía negativas desactualizadas y se renovó el 29-09.
+  - **Resultado vigente:** precisión 1,00 y recall 0,73 (30 de 41) en la búsqueda (`retrieve`), en [README → Resultados](../README.md#resultados) y el [reporte del 06-10](resultados/busqueda-2026-10-06.md). Mochi anota 23 de las 41, sin falsas alarmas en las 124 positivas: en las otras 7 la búsqueda la marca, pero se muestran productos (por ejemplo, los pocos del concepto pedido cuando su surtido es testimonial). El set anterior (28-09) tenía negativas desactualizadas y se renovó el 29-09.
   - **Por qué no se detecta todo:** de las negativas no detectadas, unas nombran un concepto que el vertical sí tiene, otras calzan por casualidad con la regla léxica estricta («neumáticos» → un renovador de neumáticos en conveniencia) y otras quedan sobre τ. El reporte explica cada una.
   - **Límite conocido:** un iPhone en el súper no cuenta, porque hay accesorios del mismo concepto.
 - **Reranker:** no por ahora. Se agrega (p. ej. `bge-reranker-v2-m3`) solo si la evaluación lo justifica, porque suma latencia y otro modelo.
@@ -187,6 +189,25 @@ Quien pide seguido lo mismo recibe un perfil («🥢 Amante de lo asiático») y
 - **API.** `GET /profile/{user_id}/gustos` (con la identidad firmada) devuelve `{"perfiles": [{id, nombre, emoji, nivel, principal, por_que, basis}]}`, o la lista vacía. `POST /agent/offer` con `moment: "perfil"` y `context: {"perfil": <id>}` devuelve la escalera, el viaje y el `reason`; sin `perfil` usa el primero que la persona tiene, y con `perfil` y sin `user_id` entrega la escalera sin «por qué» personal. Responde 204 si no hay perfil ni escalera y 422 con un id desconocido. El panel cuenta estas ofertas como el momento «Perfil de gusto» (`agent-perfil`).
 - **Estado.** El backend está; la app todavía no lo usa (sus ejemplos viven en `prototipo-app/src/api/fixtures/`). En la base real hace falta `rappi-ia concepts` y `make layers` tras fusionar: sin ellos, los conceptos asiáticos nuevos no tienen productos.
 
+## 4b. Motor multivertical y Home dinámica
+
+El motor responde por persona **qué vertical conviene sumarle** y **qué concepto le toca pedir de nuevo**, con siete tablas calculadas en la base (migración 036) y sus vistas en `capa`. Código en `rappi_ia/motor/`; tablas, fórmulas y guardias en [capa-de-datos.md](capa-de-datos.md#motor-multivertical); diseño en la [especificación](superpowers/specs/2026-10-16-motor-multivertical-design.md); cifras en [resultados/motor-2026-10-16.md](resultados/motor-2026-10-16.md).
+
+- **Qué decide.**
+  - El orden de los 6 accesos pequeños de la Home (`GET /profile/{id}/verticales`, `motor/home.py`): por la afinidad propia de la persona. Restaurantes y Turbo quedan fijos y, sin historial, el orden de siempre.
+  - La vertical por probar (`vertical_por_probar`): el siguiente paso de la escalera de combinaciones (Restaurantes → Turbo → Retail) y, dentro de ella, lo más pedido o una compra cruzada (§5, palanca «Segunda vertical»).
+  - La recompra (`recompra`): «¿Repetimos …?» cuando a un concepto que la persona pide con ritmo le toca (§5, palanca «Recompra por ciclo»).
+- **Con qué datos.**
+  - Lo personal (afinidad y recompra) sale solo de los pedidos y señales de la persona, incluido el toque a un acceso de la Home (`vertical_open`). Se recalcula después de cada pedido y de «Olvidar».
+  - Lo de la población (transiciones, combinaciones, compra cruzada y tendencias) sale de la fuente que diga `MOTOR_POBLACION`, hoy `synthetic`. Cada oferta lo declara en su `basis`.
+  - La tabla de combinaciones que compartió Rappi (`motor/combos.toml`) es el punto de partida. Es una correlación, no un efecto.
+- **Guardias.**
+  - Farmacia y Licores solo suben por señales propias.
+  - Ningún concepto sensible entra a compra cruzada, tendencias ni recompra.
+  - Las ofertas pasan por las mismas guardias que el resto (sin alcohol, Farmacia, bebé ni salud por iniciativa propia).
+  - «Rappi hoy» no enseña nada.
+- **Cómo se mide.** `rappi-ia motor` separa por fechas (entrenar, validar y probar) y elige solo en validación los pesos del próximo vertical y el λ de la compra cruzada. Sobre datos simulados mide la mecánica, no el efecto. Con el generador actual, λ = 0: la oferta «Para tu pedido de …» no aparece en la demo ([decisiones](decisiones.md#datos-simulados-y-panel)).
+
 ## 5. Panel para la empresa: ¿vale la pena?
 
 > Desde el 11-10-2026 es parte del MVP (`dashboard-empresa/`): `make mvp` lo levanta junto a la app y lee la API. Los datos simulados siguen mostrando solo la mecánica; lo que la gente hace en la app se ve aparte, en «Uso del MVP».
@@ -207,7 +228,7 @@ Quien pide seguido lo mismo recibe un perfil («🥢 Amante de lo asiático») y
 | Usuarios multi-vertical | Pidieron en 2 o más verticales en 60 días. Su retención se compara **a igual número de compras (carros) y antigüedad**: quien pide más cae más en dos verticales y además retiene más, así que la comparación directa no mide el efecto |
 | Sugerencia aceptada / convertida | Aceptada: el producto sugerido (al preguntarle al agente o en "Para ti") se agregó al carro; cuenta una vez por sugerencia (concepto, vertical y origen) en la pestaña, igual que la mostrada, así las aceptadas nunca superan a las mostradas: quitarlo y volver a agregarlo, o agregarlo otra vez en el carro siguiente, no es otra aceptación. Convertida: llegó a un pedido. El aviso sobre el carro se mide aparte: ahí aceptar es abrir al agente |
 | Servicios sin catálogo | Por servicio (RappiTravel, RappiFavor): veces que Mochi lo ofreció (`service_shown`), que se abrió (`service_opened`) y ganchos del catálogo mostrados y aceptados (sugerencias con `origen` = el servicio). Vista «Entre verticales» |
-| Ofertas del agente por momento | Sugerencias mostradas (`suggestion_shown`) y aceptadas (`suggestion_accepted`) agrupadas por el momento que dice su `origen`: `agent-plan`, `agent-carrito`, `agent-checkout`, `agent-proximo_pedido`, `agent-sin_resultado`, `agent-vertical_por_probar`, `agent-perfil`, la pregunta al agente (`agent-ask`) y «Para ti». Los nombres históricos (`mochi-<momento>`, `chat`, `para-ti-local`, `vertical-para-ti`) siguen contando; un origen sin momento o desconocido va a «sin momento» y no se pierde. Quedan fuera los servicios sin catálogo (tienen su sección) y el aviso sobre el carro. La tasa de aceptación necesita 10 mostradas, como en las sugerencias cruzadas. Solo cuentas y personas distintas |
+| Ofertas del agente por momento | Sugerencias mostradas (`suggestion_shown`) y aceptadas (`suggestion_accepted`) agrupadas por el momento que dice su `origen`: `agent-plan`, `agent-carrito`, `agent-checkout`, `agent-proximo_pedido`, `agent-sin_resultado`, `agent-vertical_por_probar`, `agent-recompra`, `agent-perfil`, la pregunta al agente (`agent-ask`) y «Para ti». Los nombres históricos (`mochi-<momento>`, `chat`, `para-ti-local`, `vertical-para-ti`) siguen contando; un origen sin momento o desconocido va a «sin momento» y no se pierde. Quedan fuera los servicios sin catálogo (tienen su sección) y el aviso sobre el carro. La tasa de aceptación necesita 10 mostradas, como en las sugerencias cruzadas. Solo cuentas y personas distintas |
 | Búsquedas sin resultado | De las búsquedas (`search`) y preguntas al agente (`ask`, antes `chat`) que saben si encontraron algo, cuántas no y, por vertical y concepto reconocido, cuántas sin resultado (hasta 20 filas). **Nunca el texto buscado**; sin concepto reconocido se rotula «Sin concepto reconocido» y los conceptos sensibles no se muestran. Una fila sin umbral de personas puede reflejar la búsqueda de una sola persona: por eso se lee como demanda que el catálogo no cubre, no como una tendencia |
 | Embudo por vertical | Sesiones que buscan (llegan a la vertical) → agregan al carro → inician pago → piden. La entrada (buscar, preguntarle al agente, navegar, aceptar una sugerencia o agregar al carro desde una lista, que solo manda el agregado) se mira en toda la sesión, porque la sugerencia cruzada lleva el pedido a otra vertical. Una sesión cuenta en una vertical si tuvo ahí algún evento que no sea ver o descartar una sugerencia: ver una sugerencia sin aceptarla no la mete en esa vertical. Por eso una sesión puede contar en dos verticales: la conversión global (el titular) cuenta cada sesión una vez |
 
@@ -217,7 +238,7 @@ Quien pide seguido lo mismo recibe un perfil («🥢 Amante de lo asiático») y
    - Demanda no satisfecha, agrupada por concepto, vertical y ciudad: cuántos usuarios la piden, su tendencia y una acción sugerida (sumar comercios o categoría, sinónimo de búsqueda, o avisar cuando llegue). «Que Mochi lo ofrezca en otra vertical» solo se sugiere donde el agente lo haría: la misma regla de `available_elsewhere`.
    - Conceptos que suben: últimas 4 semanas contra las 4 anteriores.
 2. **Frecuencia y abandono.** Embudo por vertical, retención por cohorte semanal, distribución de días entre pedidos y lista de usuarios en riesgo (id seudónimo) con la acción sugerida.
-3. **Entre verticales.** Afinidad concepto → concepto y rendimiento de las sugerencias de Mochi (mostradas, aceptadas, convertidas, ignoradas).
+3. **Entre verticales.** Afinidad concepto → concepto, rendimiento de las sugerencias de Mochi (mostradas, aceptadas, convertidas, ignoradas), las combinaciones de verticales (la tabla de Rappi junto a la medida con la fuente elegida) y la evaluación del motor.
 4. **Catálogo (muestra pública real).** Cobertura (obtenidos / declarados) por vertical y concepto, calidad (sin imagen o sin categoría) y cambios de precio. La comparación surtido vs. demanda va aparte, marcada "demanda simulada".
 
 **Aristas aprendidas** (alimentan al agente con `method = 'coocurrencia'`):
@@ -311,3 +332,16 @@ El MVP integrado se armó encima de las etapas de diseño en 7 etapas, cada una 
 | 7. Jev | Etiquetas de categorías y juez de la búsqueda, listo y apagado hasta el piloto | [etapa 7](superpowers/plans/2026-10-11-mvp-etapa-7-jev.md) |
 
 Después: la [revisión integral](superpowers/plans/2026-10-11-revision-integral.md) (11-10-2026, decisiones en [decisiones.md](decisiones.md#operación)) y, a continuación, la [etapa de calidad y despliegue](superpowers/plans/2026-10-11-calidad-y-despliegue.md).
+
+### Etapas del motor multivertical (16-10-2026)
+
+Tras conversar con el equipo de Rappi, el foco pasó a la Home dinámica y al motor de recomendaciones entre verticales ([especificación](superpowers/specs/2026-10-16-motor-multivertical-design.md), §4b).
+
+| Etapa | Entrega | Plan |
+|---|---|---|
+| 1. Sin pasaporte ni juego | Salen de la app, la API, la base (migración 035), el panel y el despliegue | [etapa 1](superpowers/plans/2026-10-16-etapa-1-sin-pasaporte-ni-juego.md) |
+| 2. Motor | Migración 036, `rappi_ia/motor/`, `make motor` con evaluación por fechas y datos simulados recalibrados con la tabla de Rappi | [etapa 2](superpowers/plans/2026-10-16-etapa-2-motor.md) |
+| 3. Home dinámica | `GET /profile/{id}/verticales`, la Home que pinta ese orden y el evento `vertical_open` | [etapa 3](superpowers/plans/2026-10-16-etapa-3-home.md) |
+| 4. Recomendaciones conectadas | La escalera en `vertical_por_probar`, compra cruzada, «¿Repetimos …?» y, en el panel, las combinaciones, el motor y «Accesos de la Home» | [etapa 4](superpowers/plans/2026-10-16-etapa-4-conectadas.md) |
+| 5. QA y mejora continua | Revisión de las ofertas sobre el catálogo real ([QA](resultados/qa-motor-2026-10-16.md)) e intentos medidos en validación ([resultados](resultados/motor-2026-10-16.md)) | [etapa 5](superpowers/plans/2026-10-16-etapa-5-qa.md) |
+| 6. Pulido | Documentación, diagramas, capturas e higiene del código ([auditoría](superpowers/plans/2026-10-16-auditoria-pulido.md)) | [etapa 6](superpowers/plans/2026-10-16-etapa-6-pulido.md) |

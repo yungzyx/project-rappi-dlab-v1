@@ -32,13 +32,23 @@ const CROSS_SELL_COLUMNS = [
   { key: 'metodo', header: 'Método', primary: true, render: (row) => row.label },
   { key: 'precision3', header: 'Precisión@3', numeric: true, render: (row) => fraction(row.precision3) },
   { key: 'cobertura', header: 'Cobertura', numeric: true, render: (row) => fraction(row.cobertura) },
-  { key: 'personas', header: 'Personas con recomendación', numeric: true, render: (row) => formatNumber(row.personas_con_prediccion) },
+  {
+    key: 'personas',
+    header: 'Personas con recomendación',
+    numeric: true,
+    render: (row) => formatNumber(row.personas_con_prediccion),
+  },
 ]
 
 const REPEAT_COLUMNS = [
   { key: 'n', header: 'Predicciones que vencen', numeric: true, render: (row) => formatNumber(row.n) },
   { key: 'compraron', header: 'Compraron', numeric: true, render: (row) => fraction(row.compraron) },
-  { key: 'error', header: 'Error mediano (días)', numeric: true, render: (row) => formatNumber(row.error_mediano_dias, 0) },
+  {
+    key: 'error',
+    header: 'Error mediano (días)',
+    numeric: true,
+    render: (row) => formatNumber(row.error_mediano_dias, 0),
+  },
   { key: 'acierto', header: 'Acierto ±7 días', numeric: true, render: (row) => fraction(row.acierto_7_dias) },
 ]
 
@@ -86,8 +96,8 @@ function Evaluation({ evaluation }) {
       <h3 className="motor-title">Recompra</h3>
       <DataTable caption="Recompra" columns={REPEAT_COLUMNS} rows={[evaluation.recompra]} rowKey={() => 'recompra'} />
       <p className="card-note">
-        «Compraron»: la parte en que la persona volvió a comprar el concepto en la prueba. El error mediano es solo sobre
-        esas; el acierto ±7 días cuenta como fallo a quien no volvió a comprar.
+        «Compraron»: la parte en que la persona volvió a comprar el concepto en la prueba. El error mediano es solo
+        sobre esas; el acierto ±7 días cuenta como fallo a quien no volvió a comprar.
       </p>
     </>
   )
