@@ -273,7 +273,18 @@ def test_grants_file_lets_the_api_role_write_only_its_tables(db):
         "INSERT INTO app_events (user_id, session_id, type, source)"
         " VALUES ('proto-permisos', 's', 'search', 'prototype')"
     )
-    for forbidden in ("DROP TABLE app_events", "DELETE FROM stores", "TRUNCATE app_users", "CREATE TABLE intrusa ()"):
+    conn.execute(  # afinidad y recompra son datos de la persona: la API las escribe; las del motor, no
+        "INSERT INTO user_vertical_affinity (user_id, vertical, score, orders, signals)"
+        " VALUES ('proto-permisos', 'turbo', 1, 0, 1)"
+    )
+    conn.execute("SELECT count(*) FROM capa.combo_stats")
+    for forbidden in (
+        "INSERT INTO combo_steps (data_source, from_combo, to_combo, users, prob) VALUES ('synthetic', 'a', 'b', 1, 1)",
+        "DROP TABLE app_events",
+        "DELETE FROM stores",
+        "TRUNCATE app_users",
+        "CREATE TABLE intrusa ()",
+    ):
         with pytest.raises(errors.InsufficientPrivilege), conn.transaction():
             conn.execute(forbidden)
     conn.rollback()

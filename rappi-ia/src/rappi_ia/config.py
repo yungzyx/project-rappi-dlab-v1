@@ -36,6 +36,10 @@ AGENT_NAME = os.environ.get("AGENT_NAME", "Mochi")
 # offers/profiles.py, CITY_COMUNAS.
 PROFILE_CITY = os.environ.get("PROFILE_CITY") or "Santiago de Chile"
 
+# De qué población aprende el motor multivertical (motor/): «synthetic» (personas simuladas, no son evidencia) o
+# «prototype» (las del prototipo). Nunca se mezclan: cada fila del motor lleva su `data_source`.
+MOTOR_POBLACION = os.environ.get("MOTOR_POBLACION", "synthetic")
+
 # LLM opcional: sin ANTHROPIC_API_KEY, el agente responde con plantillas.
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY") or None
 AGENT_LLM_MODEL = os.environ.get("AGENT_LLM_MODEL", "claude-sonnet-5")
