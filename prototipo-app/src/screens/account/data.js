@@ -18,7 +18,7 @@ import {
   SparkleLineIcon,
 } from '../../components/LineIcons'
 
-export const PROFILE = { initials: 'YC', name: 'Yung C.' }
+export const PROFILE = { initials: 'CD', name: 'Cliente Demo' }
 
 export const PRO_PLAN = { savings: '$15.400', note: 'This is what a Pro user saves on average monthly.' }
 
