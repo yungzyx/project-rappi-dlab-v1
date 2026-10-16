@@ -107,3 +107,13 @@ test('los dos accesos grandes llaman a onOpen con restaurantes y turbo', () => {
   expect(onOpen.mock.calls).toEqual([['restaurantes'], ['turbo']])
   expect(push).toHaveBeenCalledTimes(2)
 })
+
+test('la leyenda reserva su línea en el prototipo final aunque esté vacía, y Rappi hoy no la pinta', () => {
+  const { container, unmount } = render(<Shortcuts push={vi.fn()} proposal order={ENGINE} />, {
+    wrapper: ToastProvider,
+  })
+  expect(container.querySelector('.home-shortcuts-caption')?.textContent).toBe('')
+  unmount()
+  const today = render(<Shortcuts push={vi.fn()} />, { wrapper: ToastProvider })
+  expect(today.container.querySelector('.home-shortcuts-caption')).toBeNull()
+})
