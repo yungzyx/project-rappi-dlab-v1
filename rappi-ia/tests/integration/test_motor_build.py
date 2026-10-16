@@ -408,7 +408,10 @@ def test_the_build_waits_for_a_forget_in_flight_and_skips_the_person(two_people,
         building = threading.Thread(target=lambda: result.update(build_motor(db, "prototype", evaluate=False)))
         building.start()
         deadline = time.monotonic() + 10
-        while not in_flight.execute("SELECT count(*) FROM pg_locks WHERE NOT granted").fetchone()[0]:
+        waiting = """SELECT count(*) FROM pg_locks
+                     WHERE NOT granted AND locktype = 'advisory'
+                       AND database = (SELECT oid FROM pg_database WHERE datname = current_database())"""
+        while not in_flight.execute(waiting).fetchone()[0]:
             assert time.monotonic() < deadline, "el build no llegó a esperar el candado de u2"
             time.sleep(0.05)
         assert building.is_alive()
@@ -419,6 +422,57 @@ def test_the_build_waits_for_a_forget_in_flight_and_skips_the_person(two_people,
     assert _last_motor_status(db) == "done"
     assert _affinity(db, "u2") == {}
     assert _affinity(db, "u1") == {"supermercado": (4, 4)}
+
+
+def test_the_build_skips_a_person_the_purge_is_deleting_instead_of_waiting(two_people, test_url):
+    """La purga borra sin el candado por persona: el build salta a quien está borrando y no toca sus filas."""
+    db = two_people
+    build_motor(db, "prototype", evaluate=False)
+    db.execute("SET lock_timeout = '3s'")  # si el build esperara a la purga, falla en vez de colgar
+    db.commit()
+    with connect(test_url) as purging:
+        purging.execute("DELETE FROM app_users WHERE user_id = 'u2'")  # sin confirmar: tiene la fila tomada
+        counts = build_motor(db, "prototype", evaluate=False)
+        purging.rollback()
+
+    assert counts["afinidad"] == 1
+    assert _last_motor_status(db) == "done"
+    assert _affinity(db, "u2") == {"supermercado": (4, 4)}  # la purga no confirmó: lo suyo sigue como estaba
+
+
+def test_a_run_shows_its_source_from_the_start(simulated, monkeypatch, test_url):
+    """Una corrida que se corta a medias (sin llegar a `failed`) igual dice de qué fuente era."""
+    from rappi_ia.motor import build
+
+    seen = {}
+
+    def peek(_conn, _source, run, _evaluate):
+        with connect(test_url) as other:
+            seen["counts"] = other.execute("SELECT counts FROM layer_runs WHERE run_id = %s", (run,)).fetchone()[0]
+        return {"fuente": "synthetic"}
+
+    monkeypatch.setattr(build, "_build", peek)
+    build_motor(simulated, "synthetic")
+    assert seen["counts"] == {"fuente": "synthetic"}
+
+
+def test_without_orders_the_personal_phase_still_leaves_out_sensitive_concepts(db, monkeypatch):
+    """Sin pedidos al leer la población, uno que llega antes de la fase por persona igual pasa por las guardias."""
+    from rappi_ia.motor import build
+
+    seed_taxonomy(db, load_taxonomy())
+    db.execute("UPDATE concepts SET sensitive = true WHERE concept_id = 'snacks-salados'")
+    db.commit()
+    seen = {}
+    personal = build._build_personal
+
+    def spy(conn, source, now, sensitive):
+        seen["sensitive"] = sensitive
+        return personal(conn, source, now, sensitive)
+
+    monkeypatch.setattr(build, "_build_personal", spy)
+    build_motor(db, "prototype")
+    assert "snacks-salados" in seen["sensitive"]
 
 
 def test_refresh_user_leaves_synthetic_people_alone(simulated):

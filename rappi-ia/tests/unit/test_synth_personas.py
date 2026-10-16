@@ -226,6 +226,22 @@ def test_simulated_suggestions_skip_items_the_agent_would_not_offer():
     assert blocked in {catalog.pick(rng, "conveniencia", "gaseosas") for _ in range(20)}  # pedirlo, sí
 
 
+def test_a_preferred_item_offered_by_the_agent_passes_the_same_guard():
+    """Con un atributo preferido, lo que el agente ofrece tampoco trae un ítem que no ofrecería."""
+    ok, blocked = ("catalog_item", "1", 990.0), ("catalog_item", "2", 990.0)
+    catalog = synth.Catalog(
+        items={("supermercado", "galletas"): [blocked, ok]},
+        edges={},
+        names={},
+        ranked={},
+        preferred={("supermercado", "galletas", "sin-gluten"): [blocked]},
+        unofferable={("supermercado", "catalog_item", "2")},
+    )
+    rng = random.Random(1)
+    assert {catalog.pick(rng, "supermercado", "galletas", "sin-gluten", offer=True) for _ in range(30)} == {ok}
+    assert blocked in {catalog.pick(rng, "supermercado", "galletas", "sin-gluten") for _ in range(30)}  # pedirlo, sí
+
+
 def test_signups_spread_over_the_whole_period():
     """Las altas llegan parejas, como cohortes mensuales: el último cuarto del período recibe cerca de un cuarto."""
     rng = random.Random(1)

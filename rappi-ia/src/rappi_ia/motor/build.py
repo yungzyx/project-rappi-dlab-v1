@@ -57,8 +57,9 @@ def build_motor(conn: Connection, source: str, evaluate: bool = True) -> dict:
     (`motor.evaluate`); si nadie se puede validar, guarda la evaluación con su aviso y los de la última corrida de la
     fuente. Sin datos suficientes o con `evaluate=False`, los de la última corrida (`DEFAULT_WEIGHTS` y
     `CROSS_SELL_LAMBDA` si no hay); en estos dos casos, `"evaluacion"` es None."""
-    run = start_layer_run(conn, "motor", rules_version(load_combos().version, COMBOS_FILE, Path(model.__file__)))
-    conn.commit()  # la corrida se ve aunque lo demás falle
+    version = rules_version(load_combos().version, COMBOS_FILE, Path(model.__file__))
+    run = start_layer_run(conn, "motor", version, {"fuente": source})
+    conn.commit()  # la corrida se ve, con su fuente, aunque lo demás falle o se corte
     start = time.perf_counter()
     try:
         counts = _build(conn, source, run, evaluate)
@@ -95,14 +96,14 @@ def _build(conn: Connection, source: str, run: int, evaluate: bool) -> dict:
     }
     orders = load_orders(conn, source)
     counts["pedidos"] = len(orders)
+    sensitive = sensitive_concepts(conn)
     if not orders:
         conn.commit()
-        counts["afinidad"], counts["recompra"] = _build_personal(conn, source, datetime.now(UTC), frozenset())
+        counts["afinidad"], counts["recompra"] = _build_personal(conn, source, datetime.now(UTC), sensitive)
         return counts
     # Los simulados terminan en una fecha pasada; el prototipo vive en el presente, y así coinciden la corrida semanal
     # y el recálculo después de cada pedido.
     now = datetime.now(UTC) if source == "prototype" else max(o.ts for o in orders)
-    sensitive = sensitive_concepts(conn)
     if evaluate:
         start = time.perf_counter()
         signals = load_signals(conn, source)
@@ -176,24 +177,27 @@ PERSONAL_BATCH = 200  # personas por transacción: cada una tiene tomado su cand
 def _build_personal(conn: Connection, source: str, now: datetime, sensitive: frozenset[str]) -> tuple[int, int]:
     """La afinidad y la recompra de todas las personas de la fuente, por lotes confirmados uno a uno. En cada lote,
     toma el candado de cada persona (el de `refresh_user_conn` y «Olvidar»), en orden de id para que dos corridas no se
-    bloqueen en cruz; salta a quien ya no está (lo olvidaron) y relee sus datos dentro del candado: un «Olvidar» que
-    terminó mientras se armaba la población no se deshace. Devuelve cuántas filas de cada una escribió."""
+    bloqueen en cruz; salta a quien ya no está (lo olvidaron) o la purga está borrando, y relee sus datos dentro del
+    candado: un «Olvidar» que terminó mientras se armaba la población no se deshace. Solo borra y reescribe a quienes
+    siguen. Devuelve cuántas filas de cada una escribió."""
     users = sorted(u for (u,) in conn.execute("SELECT user_id FROM app_users WHERE source = %s", (source,)))
     affinity_n = replenish_n = 0
     for i in range(0, len(users), PERSONAL_BATCH):
         batch = users[i : i + PERSONAL_BATCH]
         for user_id in batch:
             lock_user_segments(conn, user_id)
-        # FOR KEY SHARE: quien borre a la persona sin el candado (la purga) espera a que este lote confirme.
+        # FOR KEY SHARE: quien borre a la persona sin el candado (la purga) espera a que este lote confirme. SKIP
+        # LOCKED: a quien la purga ya está borrando se la salta (sus filas se van con ella en cascada) sin esperarla.
         present = [
             u
             for (u,) in conn.execute(
-                "SELECT user_id FROM app_users WHERE user_id = ANY(%s) AND source = %s ORDER BY user_id FOR KEY SHARE",
+                """SELECT user_id FROM app_users WHERE user_id = ANY(%s) AND source = %s
+                   ORDER BY user_id FOR KEY SHARE SKIP LOCKED""",
                 (batch, source),
             )
         ]
-        _delete_personal(conn, "user_id = ANY(%s)", batch)
         if present:
+            _delete_personal(conn, "user_id = ANY(%s)", present)
             orders = load_orders(conn, source, present)
             affinity_rows, replenish_rows = _personal_rows(load_signals(conn, source, present), orders, now, sensitive)
             written = _write_personal(conn, affinity_rows, replenish_rows)

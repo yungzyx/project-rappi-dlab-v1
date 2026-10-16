@@ -23,8 +23,8 @@ SUPUESTOS (editables aquí):
 - El agente simulado respeta las guardias de ofertas del real (offers/guards.py: sin alcohol, bebé, salud, sensibles ni
   Farmacia o Licores, ni productos de tiendas Farmacia, Sex shop o Smoking shop o que dicen bebé) y muestra un
   complemento en una parte de los carros (SUGGESTION_SHOWN). Aun así, lo aceptado mueve personas de «rest» a
-  «rest+retail»: con el catálogo real (3.000 personas; medido en una copia, rappi_staging) queda en ~11 % de los
-  meses-persona, frente al 5,4 % de Rappi.
+  «rest+retail»: con el catálogo real (3.000 personas; medido el 16-10-2026 en una copia, rappi_staging) queda en
+  11,3 % de los meses-persona con la semilla 7 (10,5 y 10,6 con las semillas 23 y 11), frente al 5,4 % de Rappi.
 - Personas pequeñas que ejercitan los segmentos de la capa de perfiles (sin gluten, vegana, mamá con bebé, perro, gato,
   fitness, nocturno, cazaofertas, gamer, cafetera, chocolatera, parrillera); algunas prefieren ítems con un atributo.
   La oficinista ya existe como «oficina». Los pesos (`share`) se normalizan al sortear: no hace falta que sumen 1.
@@ -379,11 +379,15 @@ class Catalog:
         return [i for i in self.items.get((vertical, concept), []) if (vertical, i[0], i[1]) not in self.unofferable]
 
     def pick(self, rng: random.Random, vertical: str, concept: str, prefer: str | None = None, offer: bool = False):
+        """Un ítem del concepto en la vertical (con `prefer`, casi siempre uno con ese atributo si hay). Con `offer`,
+        solo lo que el agente sugeriría, también entre los preferidos."""
         options = self.offer_options(vertical, concept) if offer else self.items.get((vertical, concept))
         if not options:
             return None
         if prefer and rng.random() < PREFER_SHARE:
-            liked = self.preferred.get((vertical, concept, prefer))
+            liked = self.preferred.get((vertical, concept, prefer), [])
+            if offer:
+                liked = [i for i in liked if (vertical, i[0], i[1]) not in self.unofferable]
             if liked:
                 return rng.choice(liked)
         return rng.choice(options)
