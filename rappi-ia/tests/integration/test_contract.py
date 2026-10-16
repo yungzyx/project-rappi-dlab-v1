@@ -139,13 +139,13 @@ CONTRACT: tuple[Example, ...] = (
         "agent-offer-vertical-por-probar",
         "POST",
         "/agent/offer",
-        {"moment": "vertical_por_probar", "context": {"stamped": ["supermercado"]}},
+        {"moment": "vertical_por_probar", "context": {}},
     ),
     Example(
         "agent-offer-vertical-por-probar-afin",
         "POST",
         "/agent/offer",
-        {"moment": "vertical_por_probar", "user_id": "u-afin", "context": {"stamped": []}},
+        {"moment": "vertical_por_probar", "user_id": "u-afin", "context": {}},
     ),
     # La escalera de un perfil elegido, sin persona: lo que usa la demo.
     Example("agent-offer-perfil", "POST", "/agent/offer", {"moment": "perfil", "context": {"perfil": "asiatico"}}),
@@ -194,6 +194,10 @@ def client(db):
         for c in ("chocolates", "carnes")
     ]
     assert test_client.post("/events", json={"user_id": "u-afin", "events": liked}).status_code == 200
+    # Ya pidió en el súper (sin concepto, así no cambia sus gustos): la vertical por probar es otra.
+    chips = {"entity_type": "catalog_item", "entity_id": "91001"}
+    afin_order = {"user_id": "u-afin", "session_id": "s-afin", "cart_id": "c-afin-pedido", "lines": [chips]}
+    assert test_client.post("/orders", json={**afin_order, "vertical": "supermercado"}).status_code == 200
     # Una persona con un perfil de gusto (lo asiático), para `profile-gustos`: busca ramen y pide sushi dos veces. Cada
     # pedido recalcula sus segmentos. La búsqueda no dice si encontró algo (`unmet`): no cambia el uso del MVP.
     ramen = {"type": "search", "session_id": "s-gustos-1", "concept_id": "asiatica", "query": "ramen", "results": 3}

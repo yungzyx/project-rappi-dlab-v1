@@ -40,4 +40,4 @@ def test_reason_keeps_the_ids_the_app_reads():
     assert reason["concept"] == "gaseosas" and reason["from_concept"] == "pizza"
     assert engine.REASON_PLAN == "Porque elegiste «{occasion}»."
     assert engine.REASON_NO_RESULT == "Porque buscaste «{query}» y aquí sí hay."
-    assert engine.REASON_TO_TRY == "Porque aún no tienes el sello de {vertical}."
+    assert engine.REASON_TO_TRY == "Porque aún no pides en {vertical}."

@@ -4,6 +4,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
+from owner_client import OwnerClient
 from rappi_ia.agent.compose import TemplateComposer
 from rappi_ia.agent.rappi_agent import RappiAgent
 from rappi_ia.api import app as api
@@ -12,6 +13,7 @@ from rappi_ia.concepts.taxonomy import load_taxonomy
 from rappi_ia.demo.seed import seed_demo
 from rappi_ia.embeddings.base import HashEmbedder
 from rappi_ia.embeddings.text_store import embed_search_documents
+from rappi_ia.events import store as events
 from rappi_ia.offers.guards import OFFER_BLOCKED_VERTICALS, is_offerable, is_plannable
 
 # Tiendas de prueba que Rappi rotula Sex shop, Smoking shop y Farmacia: el agente no ofrece nada de ellas.
@@ -37,7 +39,7 @@ def client(db):
     api.app.dependency_overrides[api.get_services] = lambda: Services(
         RappiAgent(embedder, TemplateComposer()), embedder
     )
-    yield TestClient(api.app)
+    yield OwnerClient(api.app)
     api.app.dependency_overrides.clear()
 
 
@@ -45,8 +47,17 @@ def item(entity_id: str, entity_type: str = "catalog_item") -> dict:
     return {"entity_type": entity_type, "entity_id": entity_id}
 
 
-def offer(client, moment: str, context: dict):
-    return client.post("/agent/offer", json={"moment": moment, "context": context})
+def offer(client, moment: str, context: dict, user_id: str | None = None):
+    body = {"moment": moment, "context": context}
+    if user_id:
+        body["user_id"] = user_id
+    return client.post("/agent/offer", json=body)
+
+
+def order(db, user_id: str, vertical: str, mode: str = "propuesta") -> None:
+    """Un pedido de la persona en esa vertical (con un producto cualquiera: aquí solo cuenta dónde pidió)."""
+    line = {"entity_type": "catalog_item", "entity_id": CHIPS, "unit_price": 1990}
+    events.record_order(db, user_id, f"s-{vertical}", f"c-{vertical}-{mode}", vertical, [line], mode=mode)
 
 
 def without_why(reason: dict) -> dict:
@@ -189,17 +200,22 @@ def test_no_good_offer_is_204(client):
         ("sin_resultado", {"query": "xyzzy"}),  # no nombra ningún concepto
         ("sin_resultado", {"query": "cerveza helada"}),  # lo que se pide por su nombre no lo ofrece el agente sola
         ("sin_resultado", {"query": "pañales talla g"}),
-        (
-            "vertical_por_probar",
-            {"stamped": ["supermercado", "express", "turbo", "chocolateria", "restaurantes", "mall"]},
-        ),
     ):
         reply = offer(client, moment, context)
         assert reply.status_code == 204 and not reply.content, (moment, context)
 
 
-def test_vertical_to_try_skips_stamped_and_pharmacy(client):
-    first = offer(client, "vertical_por_probar", {"stamped": []})
+def test_vertical_to_try_is_204_when_every_offerable_vertical_has_orders(client, db):
+    for vertical in ("supermercado", "conveniencia", "turbo", "chocolateria", "restaurantes", "mall"):
+        order(db, "u1", vertical)
+
+    reply = offer(client, "vertical_por_probar", {}, "u1")
+
+    assert reply.status_code == 204 and not reply.content
+
+
+def test_vertical_to_try_without_orders_starts_with_the_supermarket(client):
+    first = offer(client, "vertical_por_probar", {})
     assert first.status_code == 200, first.text
     body = first.json()
     assert body["moment"] == "vertical_por_probar" and body["vertical"] == "supermercado"
@@ -207,31 +223,65 @@ def test_vertical_to_try_skips_stamped_and_pharmacy(client):
     assert body["text"] == "Aún no pruebas el súper: mira estas ofertas."
     assert_offerable(body)  # la farmacia que Rappi lista entre los súper tiene ofertas y no sale
 
-    # ids del prototipo y del backend; Licores y Farmacia no se proponen nunca
-    after_three = offer(client, "vertical_por_probar", {"stamped": ["grocery", "express", "turbo", "viajes"]}).json()
+
+def test_vertical_to_try_skips_verticals_with_orders_and_pharmacy(client, db):
+    # Pedidos en varias verticales; Licores y Farmacia no se proponen nunca, haya pedido o no.
+    for vertical in ("supermercado", "conveniencia", "turbo"):
+        order(db, "u1", vertical)
+    after_three = offer(client, "vertical_por_probar", {}, "u1").json()
     assert after_three["vertical"] == "chocolateria" and after_three["text"].startswith("Aún no pruebas chocolaterías")
 
-    mall = offer(
-        client,
-        "vertical_por_probar",
-        {"stamped": ["supermercado", "conveniencia", "turbo", "chocolateria", "restaurantes"]},
-    ).json()
+    order(db, "u1", "chocolateria")
+    order(db, "u1", "restaurantes")
+    mall = offer(client, "vertical_por_probar", {}, "u1").json()
     assert mall["vertical"] == "mall"  # salta Licores y Farmacia
     assert_offerable(mall)  # el sex shop y el smoking shop del mall tienen ofertas y no salen
 
-    restaurants = offer(
-        client, "vertical_por_probar", {"stamped": ["supermercado", "conveniencia", "turbo", "chocolateria", "mall"]}
-    ).json()
+    order(db, "u2", "supermercado")
+    for vertical in ("conveniencia", "turbo", "chocolateria", "mall"):
+        order(db, "u2", vertical)
+    restaurants = offer(client, "vertical_por_probar", {}, "u2").json()
     assert restaurants["vertical"] == "restaurantes" and restaurants["text"].endswith("lo que más piden.")
     assert {p["entity_type"] for p in restaurants["products"]} == {"menu_item"}
     assert_offerable(restaurants)
 
 
-def test_vertical_to_try_reason_contracts_de_el(client):
-    body = offer(client, "vertical_por_probar", {"stamped": []}).json()
+def test_vertical_to_try_ignores_actual_mode_orders(client, db):
+    order(db, "u1", "supermercado", mode="actual")  # «Rappi hoy»: no cuenta como probado
+
+    body = offer(client, "vertical_por_probar", {}, "u1").json()
 
     assert body["vertical"] == "supermercado"
-    assert body["reason"]["text"] == "Porque aún no tienes el sello del súper."
+
+
+def test_vertical_to_try_ignores_the_orders_of_other_people(client, db):
+    order(db, "u2", "supermercado")
+
+    assert offer(client, "vertical_por_probar", {}, "u1").json()["vertical"] == "supermercado"
+    assert offer(client, "vertical_por_probar", {}).json()["vertical"] == "supermercado"
+
+
+def test_vertical_to_try_rejects_the_old_stamped_context(client):
+    reply = offer(client, "vertical_por_probar", {"stamped": []})
+
+    assert reply.status_code == 422
+
+
+def test_vertical_to_try_reason_says_no_orders(client, db):
+    order(db, "u1", "supermercado")
+
+    body = offer(client, "vertical_por_probar", {}, "u1").json()
+
+    assert body["vertical"] == "conveniencia"
+    assert body["reason"]["text"] == "Porque aún no pides en Express."
+    assert body["reason"]["basis"] == [{"kind": "sin_pedidos", "id": "conveniencia", "source": "contexto"}]
+
+
+def test_vertical_to_try_reason_keeps_the_article_of_the_label(client):
+    body = offer(client, "vertical_por_probar", {}).json()
+
+    assert body["vertical"] == "supermercado"
+    assert body["reason"]["text"] == "Porque aún no pides en el súper."
 
 
 def test_offer_texts_never_say_de_el_or_a_el(client):
@@ -248,7 +298,7 @@ def test_offer_texts_never_say_de_el_or_a_el(client):
 def test_vertical_to_try_shows_what_is_typical_of_the_vertical_before_a_bigger_discount(client):
     """En el Súper de prueba las galletas (típicas de chocolaterías) tienen más descuento que el café, que es lo típico
     del súper: el café va primero y las otras completan hasta tres."""
-    body = offer(client, "vertical_por_probar", {"stamped": []}).json()
+    body = offer(client, "vertical_por_probar", {}).json()
 
     assert body["vertical"] == "supermercado"
     concepts = [p["concept"] for p in body["products"]]
@@ -363,7 +413,7 @@ def test_every_moment_has_reason_text_and_basis(client):
         "checkout": offer(client, "checkout", {"cart": [item(PISCO)]}),
         "proximo_pedido": offer(client, "proximo_pedido", {"items": [item(PIZZA_DISH, "menu_item")]}),
         "sin_resultado": offer(client, "sin_resultado", {"query": "pizza hawaiana"}),
-        "vertical_por_probar": offer(client, "vertical_por_probar", {"stamped": ["supermercado"]}),
+        "vertical_por_probar": offer(client, "vertical_por_probar", {}),
     }
 
     for moment, reply in replies.items():
@@ -380,8 +430,8 @@ def test_every_moment_has_reason_text_and_basis(client):
         {"kind": "busqueda", "id": "pizza hawaiana", "source": "contexto"}
     ]
     to_try = replies["vertical_por_probar"].json()
-    assert to_try["reason"]["text"] == "Porque aún no tienes el sello de Express."
-    assert to_try["reason"]["basis"] == [{"kind": "sello", "id": to_try["vertical"], "source": "contexto"}]
+    assert to_try["reason"]["text"] == "Porque aún no pides en el súper."
+    assert to_try["reason"]["basis"] == [{"kind": "sin_pedidos", "id": to_try["vertical"], "source": "contexto"}]
     assert "text" in to_try["reason"] and "basis" in to_try["reason"]
 
 

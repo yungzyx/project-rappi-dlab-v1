@@ -585,7 +585,7 @@ def cmd_deploy_migrate(conn, args) -> None:
 
 
 def cmd_token(conn, args) -> None:
-    """Para herramientas del operador que leen rutas de una persona (su perfil, su juego): no toca la base."""
+    """Para herramientas del operador que leen rutas de una persona (su perfil): no toca la base."""
     from .api.identity import sign
 
     try:

@@ -1,4 +1,4 @@
-"""Piloto de Jev (roles A y B contra las planillas juzgadas) y propuestas de tarjetas, siempre con `FakeJev`."""
+"""Piloto de Jev (roles A y B contra las planillas juzgadas), siempre con `FakeJev`."""
 
 import json
 from argparse import Namespace

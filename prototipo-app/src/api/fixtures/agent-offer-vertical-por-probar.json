@@ -1,9 +1,9 @@
 {
   "actions": [
     {
-      "label": "Abrir Express",
+      "label": "Abrir el súper",
       "route": [
-        "express"
+        "grocery"
       ]
     }
   ],
@@ -11,50 +11,67 @@
   "products": [
     {
       "age_restricted": false,
-      "before": "$1.990",
-      "concept": "energizantes",
-      "discount": "-20%",
-      "entity_id": "92004",
+      "before": "$4.590",
+      "concept": "cafe",
+      "discount": "-13%",
+      "entity_id": "91004",
       "entity_type": "catalog_item",
-      "id": "cat-92004",
-      "img": "https://imagenes.prueba.invalid/productos/92004.png",
-      "name": "Bebida energética 250 cc (prueba)",
-      "presentation": "250 cc",
-      "price": "$1.590",
-      "price_value": 1590.0,
-      "store": "Tienda express de prueba Centro",
-      "store_id": 9201,
-      "vertical": "conveniencia"
+      "id": "cat-91004",
+      "img": "https://imagenes.prueba.invalid/productos/91004.png",
+      "name": "Café molido tostado 250 g (prueba)",
+      "presentation": "250 g",
+      "price": "$3.990",
+      "price_value": 3990.0,
+      "store": "Supermercado de prueba Centro",
+      "store_id": 9101,
+      "vertical": "supermercado"
     },
     {
       "age_restricted": false,
-      "before": "$1.890",
-      "concept": "chocolates",
-      "discount": "-21%",
-      "entity_id": "92002",
+      "before": "$1.790",
+      "concept": "galletas",
+      "discount": "-25%",
+      "entity_id": "91002",
       "entity_type": "catalog_item",
-      "id": "cat-92002",
-      "img": "https://imagenes.prueba.invalid/productos/92002.png",
-      "name": "Chocolate con leche 100 g (prueba)",
-      "presentation": "100 g",
-      "price": "$1.490",
-      "price_value": 1490.0,
-      "store": "Tienda express de prueba Centro",
-      "store_id": 9201,
-      "vertical": "conveniencia"
+      "id": "cat-91002",
+      "img": "https://imagenes.prueba.invalid/productos/91002.png",
+      "name": "Galletas de vainilla 200 g (prueba)",
+      "presentation": "200 g",
+      "price": "$1.350",
+      "price_value": 1350.0,
+      "store": "Supermercado de prueba Norte",
+      "store_id": 9102,
+      "vertical": "supermercado"
+    },
+    {
+      "age_restricted": false,
+      "before": "$1.990",
+      "concept": "gaseosas",
+      "discount": "-10%",
+      "entity_id": "91003",
+      "entity_type": "catalog_item",
+      "id": "cat-91003",
+      "img": "https://imagenes.prueba.invalid/productos/91003.png",
+      "name": "Gaseosa cola 1,5 L (prueba)",
+      "presentation": "1,5 L",
+      "price": "$1.790",
+      "price_value": 1790.0,
+      "store": "Supermercado de prueba Centro",
+      "store_id": 9101,
+      "vertical": "supermercado"
     }
   ],
-  "prototype_vertical": "express",
+  "prototype_vertical": "grocery",
   "reason": {
     "basis": [
       {
-        "id": "conveniencia",
-        "kind": "sello",
+        "id": "supermercado",
+        "kind": "sin_pedidos",
         "source": "contexto"
       }
     ],
-    "text": "Porque aún no tienes el sello de Express."
+    "text": "Porque aún no pides en el súper."
   },
-  "text": "Aún no pruebas Express: mira estas ofertas.",
-  "vertical": "conveniencia"
+  "text": "Aún no pruebas el súper: mira estas ofertas.",
+  "vertical": "supermercado"
 }

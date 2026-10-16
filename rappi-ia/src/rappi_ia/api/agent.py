@@ -8,12 +8,12 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from psycopg import Connection
-from pydantic import Field
+from pydantic import ConfigDict, Field
 
 from .. import config
 from ..offers.engine import OfferError, home_occasions, make_offer
 from ..offers.personal import user_interests
-from .deps import Clean, backend_vertical, get_conn, get_services
+from .deps import Clean, get_conn, get_services
 from .identity import owner_in_query, owner_of_body
 from .limits import concurrency_cap
 from .services import Services
@@ -50,9 +50,10 @@ class NextOrderContext(Clean):
 
 
 class ToTryContext(Clean):
-    """Las verticales que ya tienen sello (códigos del backend o ids del prototipo)."""
+    """Sin datos: las verticales ya probadas salen de los pedidos de la persona (un cliente viejo que manda `stamped`
+    recibe un 422)."""
 
-    stamped: list[Annotated[str, Field(max_length=64)]] = Field(max_length=20)
+    model_config = ConfigDict(extra="forbid")
 
 
 class ProfileContext(Clean):
@@ -117,8 +118,6 @@ def offer(body: OfferIn, request: Request, conn: Connection = Depends(get_conn),
     arma (guagua, enfermo), es un 422."""
     owner_of_body(request, body.user_id)
     context = body.context.model_dump()
-    if body.moment == "vertical_por_probar":
-        context["stamped"] = [v for v in map(backend_vertical, context["stamped"]) if v]
     try:
         found = make_offer(conn, svc.embedder, body.moment, context, body.user_id)
     except OfferError as exc:

@@ -58,8 +58,15 @@ def _sensitive_segment(db, user, concept):
     )
 
 
-def to_try(client, user_id=None, stamped=()):
-    body = {"moment": "vertical_por_probar", "context": {"stamped": list(stamped)}}
+def _order(db, user, *verticals, mode="propuesta"):
+    """Un pedido de la persona en cada vertical: lo que ya probó."""
+    line = {"entity_type": "catalog_item", "entity_id": "91001", "unit_price": 1990}
+    for vertical in verticals:
+        events.record_order(db, user, f"s-{vertical}", f"c-{user}-{vertical}", vertical, [line], mode=mode)
+
+
+def to_try(client, user_id=None):
+    body = {"moment": "vertical_por_probar", "context": {}}
     if user_id:
         body["user_id"] = user_id
     reply = client.post("/agent/offer", json=body)
@@ -87,45 +94,50 @@ def test_vertical_to_try_follows_affinity(client, db):
     assert to_try(client)["vertical"] == "supermercado"
 
 
-def test_vertical_to_try_without_history_keeps_passport_order(client, db):
+def test_vertical_to_try_without_history_keeps_the_default_order(client, db):
     _like(db, "u1", "chocolates", source="synthetic")  # simulado: no cuenta
 
     for user in (None, "nadie", "u1"):
         body = to_try(client, user)
         assert body["vertical"] == "supermercado"
-        assert body["reason"]["text"] == "Porque aún no tienes el sello del súper."
-        assert body["reason"]["basis"] == [{"kind": "sello", "id": "supermercado", "source": "contexto"}]
+        assert body["reason"]["text"] == "Porque aún no pides en el súper."
+        assert body["reason"]["basis"] == [{"kind": "sin_pedidos", "id": "supermercado", "source": "contexto"}]
 
 
-def test_vertical_to_try_skips_stamped_even_with_affinity(client, db):
+def test_vertical_to_try_skips_verticals_with_orders_even_with_affinity(client, db):
     _like(db, "u1", "chocolates")
+    _order(db, "u1", "chocolateria")
 
-    body = to_try(client, "u1", stamped=["chocolateria"])
+    body = to_try(client, "u1")
 
     assert body["vertical"] == "supermercado"
-    assert body["reason"]["text"].startswith("Porque aún no tienes el sello")
+    assert body["reason"]["text"].startswith("Porque aún no pides en")
 
 
 def test_vertical_to_try_never_offers_farmacia_or_licores_even_with_affinity(client, db):
     _like(db, "u1", "medicamentos", "cerveza", "vino", "pisco", "panales", "vitaminas")  # lo que el agente no ofrece
     _like(db, "u2", "vino", "pisco", "chocolates")
 
-    for user in ("u1", "u2"):
-        for stamped in ([], ["supermercado", "conveniencia", "turbo", "chocolateria"], ["supermercado"]):
-            body = to_try(client, user, stamped)
-            assert body["vertical"] not in ("farmacia", "licores")
-            assert body["moment"] == "vertical_por_probar"
     assert to_try(client, "u1") == to_try(client)  # lo que no ofrece no cambia nada
     assert to_try(client, "u2")["vertical"] == "chocolateria"  # y el chocolate sí
+    for user in ("u1", "u2"):
+        for tried in ((), ("supermercado",), ("conveniencia", "turbo", "chocolateria")):
+            _order(db, user, *tried)
+            body = to_try(client, user)
+            assert body["vertical"] not in ("farmacia", "licores")
+            assert body["moment"] == "vertical_por_probar"
 
 
 def test_vertical_to_try_basis_has_the_three_concepts_that_contribute_most(client, db):
     # De la chocolatería (su vertical típica): chocolates 6, galletas, helados y pastelería 3.
-    # Golosinas es de Express (sellado) y no cuenta. La base lleva solo tres: los de más puntaje y, en empate, por id.
+    # Golosinas es de Express (con pedido) y no cuenta. La base lleva solo tres: los de más puntaje y, en empate,
+    # por id.
     _like(db, "u1", "chocolates", "helados", "golosinas", "galletas", "pasteleria")
     _like(db, "u1", "chocolates")  # otra vez: chocolate pesa más
 
-    body = to_try(client, "u1", stamped=["supermercado", "conveniencia", "turbo"])
+    _order(db, "u1", "supermercado", "conveniencia", "turbo")
+
+    body = to_try(client, "u1")
 
     assert body["vertical"] == "chocolateria"
     assert body["reason"]["text"] == "Porque te gusta 🍫 chocolates, y en chocolaterías hay más."
@@ -135,7 +147,7 @@ def test_vertical_to_try_basis_has_the_three_concepts_that_contribute_most(clien
 
 
 def test_vertical_to_try_reason_names_the_concept_of_the_offered_vertical_not_the_global_top(client, db):
-    # Lo que más le gusta (chocolate) es de la chocolatería, que ya tiene sello: se ofrece el súper, y el porqué nombra
+    # Lo que más le gusta (chocolate) es de la chocolatería, donde ya pidió: se ofrece el súper, y el porqué nombra
     # lo que le gusta del súper (pastas, y después café), no el chocolate.
     _like(db, "u1", "chocolates")
     _like(db, "u1", "chocolates", "pastas")
@@ -143,7 +155,9 @@ def test_vertical_to_try_reason_names_the_concept_of_the_offered_vertical_not_th
         db, [events.Event("u1", "s1", "search", ts=NOW, concept_id="cafe", query="cafe")], source="prototype"
     )  # café pesa menos que pastas
 
-    body = to_try(client, "u1", stamped=["chocolateria"])
+    _order(db, "u1", "chocolateria")
+
+    body = to_try(client, "u1")
 
     pastas = load_taxonomy().concepts["pastas"]
     assert body["vertical"] == "supermercado"
@@ -197,6 +211,9 @@ def test_only_sensitive_or_non_offerable_history_changes_nothing(client, db):
     _sensitive_segment(db, "u1", "chocolates")
     db.execute("INSERT INTO app_users (user_id, source) VALUES ('base', 'prototype') ON CONFLICT DO NOTHING")
 
-    for stamped in ([], ["supermercado"], ["supermercado", "conveniencia", "turbo"]):
-        assert to_try(client, "u1", stamped) == to_try(client, "base", stamped) == to_try(client, None, stamped)
+    assert to_try(client, "u1") == to_try(client, "base") == to_try(client)
+    for tried in (("supermercado",), ("conveniencia", "turbo")):
+        _order(db, "u1", *tried)
+        _order(db, "base", *tried)
+        assert to_try(client, "u1") == to_try(client, "base")
     assert plans(client, "u1") == plans(client, "base") == plans(client)

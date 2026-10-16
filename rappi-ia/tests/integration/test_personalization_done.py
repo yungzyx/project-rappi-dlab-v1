@@ -13,9 +13,7 @@ def people(db, monkeypatch):
 
 
 def to_try(client, user):
-    reply = client.post(
-        "/agent/offer", json={"moment": "vertical_por_probar", "user_id": user, "context": {"stamped": []}}
-    )
+    reply = client.post("/agent/offer", json={"moment": "vertical_por_probar", "user_id": user, "context": {}})
     assert reply.status_code == 200, reply.text
     return reply.json()
 
@@ -73,14 +71,21 @@ def test_two_users_with_different_histories_get_different_offers(people, db):
     first_plans = {user: plans(client, user)[0] for user in histories}
 
     assert to_try_offers[SWEET]["vertical"] != to_try_offers[GRILL]["vertical"]
-    assert (to_try_offers[SWEET]["vertical"], to_try_offers[GRILL]["vertical"]) == ("chocolateria", "supermercado")
+    # Cada una ya pidió en la vertical que le gusta (chocolatería y súper): la vertical por probar es otra y se
+    # explica con sus pedidos, no con sus gustos.
+    assert (to_try_offers[SWEET]["vertical"], to_try_offers[GRILL]["vertical"]) == ("supermercado", "conveniencia")
+    for user in histories:
+        offered = to_try_offers[user]
+        ordered = {v for (v,) in db.execute("SELECT vertical FROM app_orders WHERE user_id = %s", (user,))}
+        assert offered["vertical"] not in ordered
+        assert offered["reason"]["basis"] == [{"kind": "sin_pedidos", "id": offered["vertical"], "source": "contexto"}]
     assert first_plans[SWEET]["id"] != first_plans[GRILL]["id"]
     assert (first_plans[SWEET]["id"], first_plans[GRILL]["id"]) == ("antojo", "asado")
     for user, history in histories.items():
-        for reason in (to_try_offers[user]["reason"], first_plans[user]["reason"]):
-            assert reason["text"].startswith("Porque te gusta")
-            assert names_top_concept_of_basis(reason), reason
-            assert_traceable(db, user, reason, history)
+        reason = first_plans[user]["reason"]
+        assert reason["text"].startswith("Porque te gusta")
+        assert names_top_concept_of_basis(reason), reason
+        assert_traceable(db, user, reason, history)
 
 
 def test_complement_puts_the_brand_you_buy_first(people, db):

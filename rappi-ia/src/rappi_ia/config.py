@@ -124,7 +124,7 @@ API_SECRET_FILE = DATA_DIR / "api-secret"
 # proceso, como API_RATE_PER_MIN; en local, este Mac no tiene tope.
 API_NEW_USERS_PER_IP_DAY = int(os.environ.get("API_NEW_USERS_PER_IP_DAY", "20"))
 
-# `rappi-ia purge` borra a las personas del prototipo sin actividad (eventos, pedidos ni juego) en estos días.
+# `rappi-ia purge` borra a las personas del prototipo sin actividad (eventos ni pedidos) en estos días.
 PROTOTYPE_USER_RETENTION_DAYS = int(os.environ.get("PROTOTYPE_USER_RETENTION_DAYS", "180"))
 
 # Ciudad fija de la demo (Santiago): «Cerca de ti» mide la distancia a este punto de Providencia.

@@ -135,7 +135,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=config.API_CORS_ORIGINS,
     allow_origin_regex=CORS_ORIGIN_REGEX,
-    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["content-type", identity.TOKEN_HEADER.lower()],
 )
 app.add_middleware(AccessLog)  # el más externo: también los 413 y 429 llevan su id y su línea
