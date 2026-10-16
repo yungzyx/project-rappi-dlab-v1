@@ -155,6 +155,9 @@ export async function ask(payload) {
 }
 
 export const profile = (userId) => request(`/profile/${encodeURIComponent(userId)}`, { timeout: 4000 })
+/** El orden de los accesos de la Home: `{ fixed, order: [{ id, score, reason }], personalized }` (ids del backend). */
+export const homeVerticals = (userId) =>
+  request(`/profile/${encodeURIComponent(userId)}/verticales`, { timeout: 4000 })
 export const forget = (userId) => request(`/profile/${encodeURIComponent(userId)}`, { method: 'DELETE', timeout: 4000 })
 /** "Para ti" de rappi-ia: `{ user_id, interests, rows }`, con los productos de cada fila ya en el formato del prototipo. */
 export async function recommendations(userId, vertical) {

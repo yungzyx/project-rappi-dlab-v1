@@ -5,6 +5,7 @@ import PlainSearchBar from '../../components/PlainSearchBar'
 import { ChevronDown } from '../../components/Icons'
 import { useScrollState } from '../../hooks/useScrollState'
 import { useAddress } from '../../state/AddressContext'
+import { useEvents } from '../../state/EventsContext'
 import CreditsBanner from './CreditsBanner'
 import {
   BestRated,
@@ -26,6 +27,8 @@ const BACK_TO_TOP_FROM_PX = 600
 export default function HomeFeed({ push }) {
   const address = useAddress()
   const catalog = useHomeCatalog()
+  const events = useEvents()
+  const openVertical = (vertical) => events.track('vertical_open', { vertical })
   const openSearch = () => push('search')
   const screenRef = useRef(null)
   const [{ collapsed: isCollapsed, showBackToTop }, onScroll] = useScrollState({
@@ -63,8 +66,8 @@ export default function HomeFeed({ push }) {
         </section>
         <DemoDisclaimer />
 
-        <MainTiles push={push} />
-        <Shortcuts push={push} />
+        <MainTiles push={push} onOpen={openVertical} />
+        <Shortcuts push={push} onOpen={openVertical} />
         <Promos push={push} />
         <FastRestaurants stores={catalog.fastRestaurants} push={push} />
         <NearbyStores stores={catalog.nearbyStores} push={push} />

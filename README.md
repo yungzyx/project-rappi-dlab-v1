@@ -24,6 +24,7 @@ La señal existe: cada búsqueda y cada pedido dice algo de quien lo hace. Pero 
 | Pieza | Qué hace |
 |---|---|
 | **Mochi en la Home** | Mochi de cuerpo entero vive en la Home, sin canal aparte para escribirle. Saluda, acompaña el plan del día («¿Qué plan tienes hoy?», un kit de varias verticales) y, al tocarlo, propone una vertical por probar. |
+| **Home que aprende el orden** | Los accesos pequeños de la Home (Grocery, Pharmacy, Retail, Liquor, Express, Chocolates) se ordenan según lo que cada persona pide y abre: sus pedidos y sus toques. Quien no tiene historial ve el orden fijo. Restaurantes y Turbo no se mueven, Loyalty y Benefits Pro quedan siempre al final y «Rappi hoy» no cambia. Es un pedido del equipo de Rappi. |
 | **Buscador con Mochi** | La barra de la Home abre el buscador de siempre con lo que Mochi sabe de ti: lo aprendido (con «Olvidar»), ideas para tocar («Arma un carrete»), búsqueda de tiendas y productos y «Descubre con Mochi». Se toca; no se escribe. |
 
 | La Home | El buscador con Mochi |
@@ -138,7 +139,7 @@ Requisitos (el detalle, en [docs/instalacion.md](docs/instalacion.md)):
 ```bash
 make mvp          # desde la raíz del repositorio; Ctrl-C detiene los tres
 make mvp LAN=1    # abre la API y la app a la red local, para el iPhone (solo en una red de confianza)
-make mvp-check    # recorre el MVP con Chrome contra un catálogo inventado, sin tocar la base real (5 revisiones)
+make mvp-check    # recorre el MVP con Chrome contra un catálogo inventado, sin tocar la base real (6 revisiones)
 ```
 
 `make mvp` revisa las dependencias, los puertos y la base (`rappi-ia doctor`, solo lectura), aplica las migraciones pendientes (no las de una rama sin fusionar: `MIGRATE=1` lo fuerza, ver [docs/instalacion.md](docs/instalacion.md#5-el-mvp)), arranca los tres con sus registros prefijados y avisa cuando responden. La API tarda en estar lista porque carga los modelos. No descarga nada de rappi.cl. Qué revisa `make mvp-check`, en [docs/instalacion.md](docs/instalacion.md#5-el-mvp).

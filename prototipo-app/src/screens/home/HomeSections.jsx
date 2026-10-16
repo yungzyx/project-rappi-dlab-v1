@@ -6,13 +6,13 @@ import HScroll from '../../components/HScroll'
 import { useToast } from '../../components/Toast'
 import { ChevronRight } from '../../components/Icons'
 import { RestaurantCard, StoreTile } from './StoreCards'
-import { MAIN_TILES, PROMOS, PROMO_START_INDEX, SHORTCUTS } from '../../data/home'
+import { MAIN_TILES, PROMOS, PROMO_START_INDEX, SHORTCUTS, orderShortcuts } from '../../data/home'
 import './home.css'
 
 // Secciones de la Home que comparten «Rappi hoy» y el prototipo final.
 
-/** Restaurantes y Turbo. */
-export function MainTiles({ push }) {
+/** Restaurantes y Turbo. `onOpen(vertical)` avisa cuál se tocó (código del backend). */
+export function MainTiles({ push, onOpen }) {
   return (
     <section className="home-tiles">
       {MAIN_TILES.map((tile) => (
@@ -20,7 +20,10 @@ export function MainTiles({ push }) {
           key={tile.id}
           type="button"
           className={`home-tile home-tile--${tile.id} tap`}
-          onClick={() => push(tile.screen)}
+          onClick={() => {
+            onOpen?.(tile.vertical)
+            push(tile.screen)
+          }}
         >
           <img src={tile.img} alt="" />
           <span>{tile.label}</span>
@@ -30,39 +33,47 @@ export function MainTiles({ push }) {
   )
 }
 
-/** Fila de verticales. `proposal`: RappiFavor (no disponible hoy) sí abre, como en el prototipo final. */
-export function Shortcuts({ push, proposal = false }) {
+/**
+ * Fila de verticales. `proposal` es el prototipo final: RappiFavor (no disponible hoy) sí abre, y los 6 verticales siguen
+ * `order` (códigos del backend; sin él, el orden fijo) con Loyalty y Benefits Pro al final. `caption` va bajo la fila.
+ * `onOpen(vertical)` avisa qué vertical se tocó (código del backend); los accesos sin vertical no avisan.
+ */
+export function Shortcuts({ push, proposal = false, order = null, caption = null, onOpen }) {
   const toast = useToast()
   return (
-    <HScroll className="home-shortcuts">
-      {SHORTCUTS.map((item) => {
-        const enabled = proposal && item.proposalRoute
-        const unavailable = item.unavailable && !enabled
-        const route = enabled ? item.proposalRoute : item.route
-        return (
-          <button
-            key={item.id}
-            type="button"
-            className={unavailable ? 'home-shortcut is-unavailable tap' : 'home-shortcut tap'}
-            aria-label={unavailable ? `${item.label} (no disponible)` : undefined}
-            onClick={() => {
-              if (unavailable) toast(`${item.label} no está disponible`)
-              else if (route) push(...route)
-              else toast()
-            }}
-          >
-            {enabled ? (
-              <i className="home-shortcut-emoji" aria-hidden="true">
-                {item.emoji}
-              </i>
-            ) : (
-              <img src={item.img} alt="" draggable="false" loading="lazy" />
-            )}
-            {!unavailable && <span>{item.label}</span>}
-          </button>
-        )
-      })}
-    </HScroll>
+    <>
+      <HScroll className="home-shortcuts">
+        {orderShortcuts(SHORTCUTS, order, { final: proposal }).map((item) => {
+          const enabled = proposal && item.proposalRoute
+          const unavailable = item.unavailable && !enabled
+          const route = enabled ? item.proposalRoute : item.route
+          return (
+            <button
+              key={item.id}
+              type="button"
+              className={unavailable ? 'home-shortcut is-unavailable tap' : 'home-shortcut tap'}
+              aria-label={unavailable ? `${item.label} (no disponible)` : undefined}
+              onClick={() => {
+                if (item.vertical) onOpen?.(item.vertical)
+                if (unavailable) toast(`${item.label} no está disponible`)
+                else if (route) push(...route)
+                else toast()
+              }}
+            >
+              {enabled ? (
+                <i className="home-shortcut-emoji" aria-hidden="true">
+                  {item.emoji}
+                </i>
+              ) : (
+                <img src={item.img} alt="" draggable="false" loading="lazy" />
+              )}
+              {!unavailable && <span>{item.label}</span>}
+            </button>
+          )
+        })}
+      </HScroll>
+      {caption && <p className="home-shortcuts-caption">{caption}</p>}
+    </>
   )
 }
 

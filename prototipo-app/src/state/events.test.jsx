@@ -69,17 +69,24 @@ describe('eventos', () => {
     expect(body.user_id).toMatch(/^proto-/)
     expect(body.events.map((e) => e.type)).toEqual(['app_open', 'search'])
     expect(body.events[1]).toMatchObject({ query: 'chelas', concept_id: 'cerveza' })
+    expect(body.events[1].payload).toBeUndefined() // en la propuesta no van marcados: enseñan
   })
 
-  test('en modo "Rappi hoy" los eventos van sin concepto: Mochi no aprende', async () => {
+  test('en modo "Rappi hoy" los eventos van sin concepto y marcados `mode: actual`: ni Mochi ni el motor aprenden', async () => {
     localStorage.setItem('rappi-proto-demo-mode', 'actual')
     const fetchMock = vi.fn(async (url) => ({ ok: true, json: async () => (String(url).endsWith('/health') ? { capacidades: {} } : {}) }))
     vi.stubGlobal('fetch', fetchMock)
     const { result } = setup()
     act(() => result.current.track('cart_add', { concept_id: 'cerveza' }))
+    act(() => result.current.track('vertical_open', { vertical: 'farmacia' }))
+    act(() => result.current.track('service_shown', { payload: { servicio: 'travel' } }))
     await act(() => result.current.flush())
     const body = JSON.parse(fetchMock.mock.calls.find(([url]) => String(url).endsWith('/events'))[1].body)
     expect(body.events.find((e) => e.type === 'cart_add').concept_id).toBeUndefined()
+    expect(body.events.find((e) => e.type === 'vertical_open').payload).toEqual({ mode: 'actual' })
+    // Lo que ya traía el payload se conserva.
+    expect(body.events.find((e) => e.type === 'service_shown').payload).toEqual({ servicio: 'travel', mode: 'actual' })
+    expect(body.events.every((e) => e.payload?.mode === 'actual')).toBe(true)
   })
 })
 
