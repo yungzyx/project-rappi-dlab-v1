@@ -12,7 +12,7 @@ from datetime import UTC, datetime, timedelta
 from psycopg import Connection
 
 from .. import config
-from .combos import combo_of_verticals, next_step
+from .combos import combo_key, combo_of_verticals, next_step
 from .data import load_signals
 from .model import DEFAULT_WEIGHTS, OWN_SIGNALS_ONLY, affinity, rank_verticals
 
@@ -112,6 +112,14 @@ def target_step(conn: Connection, user_id: str, population: str | None = None) -
         )
     }
     return next_step(current_combo(conn, user_id), learned)
+
+
+def step_signal(step: tuple[str, str, float]) -> dict:
+    """La señal `combinacion` de un paso (`target_step`) para la `basis` de una oferta: «<actual>→<objetivo>», con la
+    tabla de Rappi como fuente."""
+    group, target, _gain = step
+    current = combo_key(set(target.split("+")) - {group})
+    return {"kind": "combinacion", "id": f"{current}→{target}", "source": "rappi"}
 
 
 def _source_of(conn: Connection, user_id: str) -> str | None:

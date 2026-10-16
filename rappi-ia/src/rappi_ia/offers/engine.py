@@ -22,7 +22,9 @@ el paso del motor, la `basis` parte con `combinacion` («<actual>→<objetivo>»
 suma de dónde salen los productos: `compra_cruzada` («<A>→<B>@<vertical>») o `lo_mas_pedido` («<vertical>»), con
 `source` «poblacion:<fuente>», y `vuelta` («<vertical>», `source` «pedidos») si la persona ya pidió ahí hace más de un
 mes; el texto habla de la persona, nunca de cifras de retención. La `recompra` lleva su señal `recompra` («<concepto>»,
-`source` «pedidos»: sale de los pedidos de la persona). Un complemento cuyo primer
+`source` «pedidos»: sale de los pedidos de la persona). Un complemento de una persona (`carrito`, `checkout`,
+`proximo_pedido`) suma `combinacion` si entre dos parecidos ganó el de la vertical que completa su combinación, y
+`compra_cruzada` si lo trajo una regla de la población (`agent.tools.suggest_complement`). Un complemento cuyo primer
 producto es de una marca que la persona compra lo dice en el `text` y suma esa señal (`marca`, con los pedidos como
 `score`). En el momento `perfil` de una persona, el porqué es el «por qué» de su perfil y la `basis`, la suya
 (`offers/profiles.py`):
@@ -44,9 +46,9 @@ from ..catalog.deals import deals
 from ..catalog.stores import BIGINT_MAX, _product, product_detail
 from ..concepts.taxonomy import Concept, Service, load_taxonomy
 from ..embeddings.base import MemoizedQueryEmbedder, TextEmbedder
-from ..motor.combos import combo_key, load_combos
+from ..motor.combos import load_combos
 from ..motor.model import TZ
-from ..motor.predict import next_verticals, target_step
+from ..motor.predict import next_verticals, step_signal, target_step
 from ..motor.recommend import CrossPick, cross_picks, latest_lambda
 from ..retrieval.hybrid import _concepts_of, detect_concepts
 from ..text import contract_articles, normalize, tokens
@@ -243,11 +245,11 @@ def make_offer(
     if moment == "plan":
         return plan(conn, embedder, context["occasion"])
     if moment == "carrito":
-        return complement(conn, embedder, "carrito", [context["product"]], bought_brands(conn, user_id))
+        return complement(conn, embedder, "carrito", [context["product"]], bought_brands(conn, user_id), user_id)
     if moment == "checkout":
-        return complement(conn, embedder, "checkout", context["cart"], bought_brands(conn, user_id))
+        return complement(conn, embedder, "checkout", context["cart"], bought_brands(conn, user_id), user_id)
     if moment == "proximo_pedido":
-        return complement(conn, embedder, "proximo_pedido", context["items"], bought_brands(conn, user_id))
+        return complement(conn, embedder, "proximo_pedido", context["items"], bought_brands(conn, user_id), user_id)
     if moment == "sin_resultado":
         return where_is_it(conn, embedder, context["query"])
     if moment == "vertical_por_probar":
@@ -374,18 +376,20 @@ def complement(
     moment: str,
     entities: list[dict],
     brands: dict[str, int] | None = None,
+    user_id: str | None = None,
 ) -> Offer | None:
     """Un complemento ofrecible (arista «complementa») de lo que hay en el carrito, el pedido o el producto, de otra
     vertical si la hay, y que no esté ya ahí. Lo que ya está puede ser cualquier cosa: solo se ofrece lo que el agente
     puede proponer. Con `brands` (las que la persona compra: brand_key → pedidos), si el primer producto es de una de
-    ellas, el porqué la nombra."""
+    ellas, el porqué la nombra. Con `user_id`, también sus compras cruzadas son candidatas y, entre dos complementos
+    parecidos, gana el de la vertical que completa su combinación (`suggest_complement`): la `basis` lo dice."""
     keys = [(e["entity_type"], e["entity_id"]) for e in entities]
     known = _concepts_of(conn, keys)
     sources = list(dict.fromkeys(known[key] for key in keys if key in known))
     if not sources:
         return None
     current = (ranked_verticals(conn, [sources[0]]) or [None])[0]  # de dónde es lo primero que lleva
-    suggestion = suggest_complement(conn, sources, current, embedder, set(sources), brands)
+    suggestion = suggest_complement(conn, sources, current, embedder, set(sources), brands, user_id)
     if suggestion is None:
         return None
     products = [p.to_dict() for p in suggestion.products if (p.entity_type, p.entity_id) not in set(keys)]
@@ -400,6 +404,7 @@ def complement(
         template = CHECKOUT_TEXT if moment == "checkout" else NEXT_ORDER_TEXT
     text = template.format(origen=origin.name.lower(), destino=target.name.lower(), vertical=vertical)
     reason = complement_reason(moment, origin, target)
+    reason["basis"] += suggestion.basis
     if suggestion.brand and products[0]["id"] == suggestion.products[0].id:  # su marca sigue encabezando la oferta
         name = conn.execute("SELECT name FROM product_brands WHERE brand_key = %s", (suggestion.brand,)).fetchone()[0]
         reason["text"] += REASON_BRAND.format(brand=name)
@@ -538,10 +543,9 @@ def _combo_offer(
     mejor compra cruzada (`cross_picks`), o lo más pedido ahí por la población (`trends`), o sus ofertas o platos de
     siempre. La `basis` parte con el paso (`combinacion`). Si ya pidió en esa vertical (hace más de un mes), lo más
     pedido y lo de siempre dicen «Vuelve a…»; la compra cruzada sigue siendo cierta y no cambia."""
-    group, target, _gain = step
+    group = step[0]
     population = config.MOTOR_POBLACION
-    current = combo_key(set(target.split("+")) - {group})
-    combo = {"kind": "combinacion", "id": f"{current}→{target}", "source": "rappi"}
+    combo = step_signal(step)
     candidates = [v for v in load_combos().groups[group] if offerable_vertical(v)]
     if len(candidates) > 1:
         order = [s.vertical for s in next_verticals(conn, user_id, population)]
@@ -563,7 +567,7 @@ def _combo_offer(
             if origin is not None and is_offerable(origin) and lam > 0:
                 return _cross_offer(vertical, products, pick, origin, combo, population)
             return _top_offer(vertical, products, combo, population, back)
-        if products := _most_ordered(conn, vertical, population):
+        if products := most_ordered(conn, vertical, population):
             return _top_offer(vertical, products, combo, population, back)
         if products := _deals_or_dishes(conn, vertical):
             if affinity is None:
@@ -642,7 +646,7 @@ LEFT JOIN item_concepts ic ON ic.entity_type = 'menu_item' AND ic.entity_id = mi
 WHERE mi.item_id = ANY(%(ids)s)"""
 
 
-def _most_ordered(conn: Connection, vertical: str, population: str) -> list[dict]:
+def most_ordered(conn: Connection, vertical: str, population: str) -> list[dict]:
     """Hasta tres de los productos más pedidos por la población en la vertical (`trends`, alcance `producto`), en su
     orden, que siguen a la venta ahí: un producto del catálogo con su oferta vigente más barata en una tienda de esa
     vertical (`_TOP_CATALOG`), o en restaurantes un plato con precio que no es de una sección de tragos

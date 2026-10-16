@@ -89,7 +89,10 @@ def test_two_users_with_different_histories_get_different_offers(people, db):
         assert_traceable(db, user, reason, history)
 
 
-def test_complement_puts_the_brand_you_buy_first(people, db):
+def test_complement_puts_the_brand_you_buy_first(people, db, monkeypatch):
+    # Sin el paso del motor: las dos personas solo piden en Retail y, entre complementos parecidos, el té helado de
+    # Turbo les completaría la combinación (test_complement_combo.py). Aquí se prueba la marca, dentro del concepto.
+    monkeypatch.setattr("rappi_ia.agent.tools.target_step", lambda *args: None)
     client = people.client
     anonymous = checkout(client, None)
     sweet, grill = checkout(client, SWEET), checkout(client, GRILL)

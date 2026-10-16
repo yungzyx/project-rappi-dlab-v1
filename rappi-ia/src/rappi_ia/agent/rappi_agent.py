@@ -52,6 +52,7 @@ class Context:
     shown_topics: list[str] = field(default_factory=list)  # conceptos ya sugeridos en la sesión
     mode: str = "propuesta"  # propuesta | actual ("Rappi hoy")
     previous: dict | None = None  # pedido anterior de la conversación: {query, concepts, vertical, product_ids}
+    user_id: str | None = None  # en «Propuesta», sus compras cruzadas y su combinación ordenan el complemento
 
 
 CHEAP_POOL = 24  # «barato»: reordenar solo los 6 más relevantes no daba lo más barato
@@ -233,7 +234,7 @@ class RappiAgent:
             else:
                 sources = [p.concept for p in products[:1] if p.concept]
             exclude = set(ctx.shown_topics) | set(intent.concepts)
-            suggestion = suggest_complement(conn, sources, vertical, self.embedder, exclude)
+            suggestion = suggest_complement(conn, sources, vertical, self.embedder, exclude, user_id=ctx.user_id)
 
         # Con tope de precio también es demanda no satisfecha si no existe a ningún precio. Por síntomas no: lo que
         # se muestra para cuidarse no es lo que se pidió.

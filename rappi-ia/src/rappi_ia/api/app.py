@@ -26,7 +26,7 @@ from pydantic import Field, ValidationError, field_validator
 from .. import config
 from ..agent.grouped_search import SpareConnector, search_grouped
 from ..agent.rappi_agent import PROTOTYPE_VERTICALS, Context
-from ..agent.tools import search_products, suggest_complement
+from ..agent.tools import VERTICAL_LABELS, search_products, suggest_complement
 from ..analytics import queries
 from ..concepts.taxonomy import load_taxonomy
 from ..demo.doctor import pending_migrations
@@ -34,9 +34,12 @@ from ..events import store as events
 from ..layers.segments import recalculate_user_segments
 from ..motor.build import refresh_user, refresh_user_conn
 from ..motor.home import home_verticals
-from ..offers.guards import is_offerable
+from ..motor.predict import next_verticals
+from ..offers.engine import most_ordered
+from ..offers.guards import is_offerable, offerable_vertical
 from ..offers.profiles import active_profiles
 from ..retrieval.hybrid import MODES
+from ..text import contract_articles
 from . import deps, identity, prewarm
 from .agent import router as agent_router
 from .catalog import router as catalog_router
@@ -416,7 +419,8 @@ def recommendations(
     conn: Connection = Depends(get_conn),
     svc: Services = Depends(get_services),
 ) -> dict:
-    """ "Para ti, de otras tiendas": intereses del usuario → complementos → productos de otro vertical."""
+    """ "Para ti, de otras tiendas": intereses del usuario → complementos → productos de otro vertical. Si quedan filas
+    libres, una más con lo más pedido de la vertical que mejor le calza (`_top_row`)."""
     interests = list(events.profile(conn, user_id))
     taxonomy = load_taxonomy()
     # La razón nombra el interés («Porque te interesa…»): el agente no nombra por su cuenta alcohol, salud ni lo
@@ -442,7 +446,37 @@ def recommendations(
             )
         if len(rows) >= limit:
             break
+    taken = {row["vertical"] for row in rows}
+    if len(rows) < limit and (top := _top_row(conn, user_id, backend_vertical(vertical), taken)):
+        rows.append(top)
     return {"user_id": user_id, "interests": interests[:5], "rows": rows}
+
+
+TOP_REASON = "Lo más pedido estas semanas en {vertical}"
+
+
+def _top_row(conn: Connection, user_id: str, current: str | None, taken: set[str]) -> dict | None:
+    """«Lo más pedido en…»: la primera vertical, en el orden de la predicción para la persona (`next_verticals`), que el
+    agente puede proponer (nunca Farmacia ni Licores), que no es la de la pantalla ni la de otra fila y que tiene algo
+    que mostrar: hasta tres de los productos que más pide la población ahí (`trends`), con el precio de esa vertical y
+    las guardias de las ofertas (`offers.engine.most_ordered`). La fila no tiene concepto; su `basis` dice la fuente."""
+    population = config.MOTOR_POBLACION
+    for score in next_verticals(conn, user_id, population):
+        vertical = score.vertical
+        if not offerable_vertical(vertical) or vertical == current or vertical in taken:
+            continue
+        if products := most_ordered(conn, vertical, population):
+            label = VERTICAL_LABELS.get(vertical, vertical)
+            return {
+                "kind": "lo_mas_pedido",
+                "reason": contract_articles(TOP_REASON.format(vertical=label)),
+                "concept": None,
+                "vertical": vertical,
+                "prototype_vertical": PROTOTYPE_VERTICALS.get(vertical),
+                "products": products,
+                "basis": [{"kind": "lo_mas_pedido", "id": vertical, "source": f"poblacion:{population}"}],
+            }
+    return None
 
 
 # ── Sesión, perfil y eventos ────────────────────────────────────────────────
@@ -637,7 +671,8 @@ def analytics(
 def _context(conn, vertical, user_id, profile, shown_topics, mode) -> Context:
     if profile is None and user_id and mode == "propuesta":
         profile = events.profile(conn, user_id)
-    return Context(_searchable(conn, backend_vertical(vertical)), profile or {}, list(shown_topics), mode)
+    vertical = _searchable(conn, backend_vertical(vertical))
+    return Context(vertical, profile or {}, list(shown_topics), mode, user_id=user_id)
 
 
 def _searchable(conn: Connection, vertical: str | None) -> str | None:

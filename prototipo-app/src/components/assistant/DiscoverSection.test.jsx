@@ -21,6 +21,17 @@ test('muestra una tarjeta por fila de recomendaciones y abre su vertical', () =>
   expect(onOpen).toHaveBeenCalledWith('express')
 })
 
+test('la fila de lo más pedido (sin concepto) se titula con su vertical', () => {
+  const onOpen = vi.fn()
+  render(<DiscoverSection rows={rows()} onOpen={onOpen} />)
+
+  const card = document.querySelectorAll('.discover-card')[1]
+  expect(card.textContent).toContain('Lo más pedido estas semanas en el súper')
+  expect(card.textContent).toContain('Lo más pedido en Súper')
+  fireEvent.click(card)
+  expect(onOpen).toHaveBeenCalledWith('grocery')
+})
+
 test('no muestra nada sin filas, ni filas de una vertical que la app no conoce', () => {
   const unknown = rows().map((row) => ({ ...row, prototype_vertical: null }))
   render(<DiscoverSection rows={unknown} onOpen={() => {}} />)

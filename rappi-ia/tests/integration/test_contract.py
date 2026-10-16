@@ -245,6 +245,14 @@ def client(db):
         cart = f"c-recompra-{days}"
         events.record_order(db, "u-recompra", f"s-recompra-{days}", cart, "supermercado", [coffee], ts=ts)
     refresh_user_conn(db, "u-recompra")
+    # Lo más pedido en el súper por la población, para la fila «Lo más pedido en…» de `recommendations` (u-contrato
+    # tiene un solo interés: le queda una fila libre).
+    for rank, product in enumerate(("91004", "91002", "91006"), start=1):
+        db.execute(
+            """INSERT INTO trends (data_source, scope, vertical, item_key, entity_type, entity_id, orders_now, rank)
+               VALUES ('synthetic', 'producto', 'supermercado', %s, 'catalog_item', %s, %s, %s)""",
+            (f"catalog_item:{product}", product, 100 - rank, rank),
+        )
     # Una persona de antes de la identidad firmada, para el ejemplo de `/session`.
     db.execute("INSERT INTO app_users (user_id, source) VALUES ('proto-0123456789abcdef', 'prototype')")
     db.commit()
