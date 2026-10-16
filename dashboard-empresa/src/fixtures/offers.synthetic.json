@@ -2,13 +2,13 @@
   "data": {
     "momentos": [
       {
-        "aceptacion_pct": 18.5,
-        "aceptadas": 12,
+        "aceptacion_pct": 31.8,
+        "aceptadas": 7,
         "momento": "sin_momento",
-        "mostradas": 65
+        "mostradas": 22
       }
     ],
-    "personas": 29
+    "personas": 16
   },
   "guardado": {
     "fecha": "2026-10-16",

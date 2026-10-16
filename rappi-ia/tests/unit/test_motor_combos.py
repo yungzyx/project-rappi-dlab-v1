@@ -70,3 +70,8 @@ def test_next_step_skips_combos_not_built_from_the_groups():
     """Favor tiene fila en la tabla de Rappi pero no es un grupo: no hay paso siguiente (antes lanzaba ValueError)."""
     assert next_step("favor") is None
     assert next_step("otra+rest") is None
+
+
+def test_combo_of_verticals_accepts_a_generator():
+    """Recorre su argumento dos veces: con un generador devolvía siempre «ninguna»."""
+    assert combo_of_verticals(v for v in ["restaurantes", "supermercado"]) == "rest+retail"

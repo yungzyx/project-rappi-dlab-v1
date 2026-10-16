@@ -164,3 +164,46 @@ def test_cadence_follows_orders_per_user():
     assert synth.archetype_cadence("rest+turbo+retail") < synth.archetype_cadence("rest+turbo")
     assert synth.archetype_cadence("rest+turbo") < synth.archetype_cadence("rest")
     assert synth.archetype_cadence("rest") == pytest.approx(30 / (1.9 * synth.SESSIONS_PER_ORDER))
+
+
+def _state(archetype: str, orders_by_vertical: dict) -> synth.UserState:
+    persona = _persona("delivery")
+    return synth.UserState(
+        "syn-x",
+        persona,
+        "Santiago",
+        8.0,
+        archetype,
+        synth.effective_interests(persona, archetype),
+        True,
+        orders_by_vertical,
+    )
+
+
+def test_the_combination_of_the_last_30_days_sets_the_retention():
+    """El supuesto explícito: pedir en otro grupo cambia la combinación y con ella la retención (0,76 de rest+retail
+    en vez de 0,47 de rest, su arquetipo)."""
+    now = END - timedelta(days=1)
+    moved = _state("rest", {"restaurantes": [now - timedelta(days=5)], "supermercado": [now - timedelta(days=3)]})
+    assert synth._stay_probability(moved, now, 30) == pytest.approx(0.76)
+    assert synth._stay_probability(moved, now, 15) == pytest.approx(0.76**0.5)
+
+
+def test_without_recent_orders_the_retention_is_the_archetype_one():
+    now = END - timedelta(days=1)
+    assert synth._stay_probability(_state("rest", {}), now, 30) == pytest.approx(0.47)
+    old = _state("rest", {"supermercado": [now - timedelta(days=45)]})  # fuera de los 30 días
+    assert synth._stay_probability(old, now, 30) == pytest.approx(0.47)
+
+
+def test_simulated_suggestions_follow_the_offer_guards():
+    """El agente real nunca ofrece alcohol ni productos de Farmacia o Licores: el simulado tampoco."""
+    item = [("catalog_item", "x", 990.0)]
+    catalog = synth.Catalog(
+        items={("licores", "cerveza"): item, ("farmacia", "gaseosas"): item, ("supermercado", "gaseosas"): item},
+        edges={"pizza": [("cerveza", 0.7), ("gaseosas", 0.6)], "frutas": [("vitaminas", 0.9)]},
+        names={},
+        ranked={"cerveza": ["licores"], "gaseosas": ["farmacia", "supermercado"], "vitaminas": ["supermercado"]},
+    )
+    assert synth._suggestion(catalog, "pizza", "restaurantes") == ("gaseosas", "supermercado", 0.6)
+    assert synth._suggestion(catalog, "frutas", "supermercado") is None  # salud

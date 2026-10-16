@@ -15,9 +15,15 @@ SUPUESTOS (editables aquí):
   porque no toda sesión termina en pedido. Ya no lo fija el perfil.
 - La retención es la M+1 de la tabla de Rappi para la combinación de sus pedidos de los últimos 30 días (la de su
   arquetipo si no tiene pedidos): en cada sesión sigue activa con probabilidad retención^(días desde la anterior / 30).
+  Es la supervivencia del estado activo, no «pide el mes siguiente»: quien sigue activa puede saltarse un mes, así que
+  la retención M+1 medida en los simulados queda bajo la de Rappi. No es una falla de calibración.
 - SUPUESTO EXPLÍCITO: la tabla es una correlación (quien pide mucho usa más grupos y además vuelve más), pero aquí se
   trata como efecto. Aceptar una sugerencia que la hace pedir en otro grupo cambia su combinación de verdad, y con ella
   su retención. Por construcción, el panel "confirma" que sumar grupos retiene: no es evidencia.
+- El agente simulado respeta las guardias de ofertas del real (offers/guards.py: sin alcohol, bebé, salud, sensibles ni
+  Farmacia o Licores) y muestra un complemento en una parte de los carros (SUGGESTION_SHOWN). Aun así, lo aceptado
+  mueve personas de «rest» a «rest+retail»: con el catálogo de la demo (1.500 personas) queda en ~10 % de los
+  meses-persona, frente al 5,4 % de Rappi.
 - Personas pequeñas que ejercitan los segmentos de la capa de perfiles (sin gluten, vegana, mamá con bebé, perro, gato,
   fitness, nocturno, cazaofertas, gamer, cafetera, chocolatera, parrillera); algunas prefieren ítems con un atributo.
   La oficinista ya existe como «oficina». Los pesos (`share`) se normalizan al sortear: no hace falta que sumen 1.
@@ -27,8 +33,8 @@ SUPUESTOS (editables aquí):
 - Quien no encuentra lo que busca (demanda no satisfecha) o abandona carros, se va antes (CHURN_*): cada búsqueda sin
   resultado o carro abandonado de las últimas 4 semanas acelera la pérdida.
 - Parte de quienes encuentran productos se va sin agregar nada al carro (BROWSE_ONLY).
-- Algunas sesiones hablan de un viaje (TRIP: RappiTravel y su gancho) y a quien no encuentra lo que busca se le
-  ofrece RappiFavor (FAVOR_OFFER).
+- Algunas sesiones hablan de un viaje (TRIP: RappiTravel, sin su gancho de Farmacia) y a quien no encuentra lo que
+  busca se le ofrece RappiFavor (FAVOR_OFFER).
 - Parte de los carros abandonados alcanza a iniciar el pago (CHECKOUT_ABANDON_SHARE); el resto se va antes.
 - Aceptar una sugerencia cruzada acorta un poco el ritmo de compra (SUGGESTION_CADENCE_BOOST).
 - Algunos antojos no existen en el catálogo y crecen con el tiempo (WISHES): alimentan "oportunidades".
@@ -48,7 +54,7 @@ from psycopg import Connection
 from ..agent.verticals import ranked_verticals
 from ..concepts.taxonomy import load_taxonomy
 from ..motor.combos import GROUP_ORDER, NONE_COMBO, SERVICE_COMBO, combo_of_verticals, expected_retention, load_combos
-from ..offers.guards import is_offerable
+from ..offers.guards import is_offerable, offerable_vertical
 
 log = logging.getLogger(__name__)
 CHILE = timezone(timedelta(hours=-3))
@@ -339,6 +345,7 @@ TRAVEL_OPEN = 0.35  # de ellas, las que abren RappiTravel
 FAVOR_OFFER = 0.6  # búsquedas sin resultado donde el agente ofrece RappiFavor (en «Propuesta»)
 FAVOR_OPEN = 0.2
 BROWSE_ONLY = 0.12  # encuentra productos y se va sin agregar nada al carro
+SUGGESTION_SHOWN = 0.3  # carros donde el agente muestra un complemento de otro vertical (no en todos)
 SUGGESTION_ACCEPT = 0.22  # probabilidad base de aceptar una sugerencia cruzada (× peso de la arista)
 SUGGESTION_CADENCE_BOOST = 0.93  # aceptar una sugerencia acorta el ritmo 7%
 MODALITIES = (("texto", 1.0),)  # solo texto; se sigue sorteando para conservar la misma secuencia aleatoria
@@ -578,27 +585,12 @@ def _session(rng, catalog: Catalog, s: UserState, ts: datetime, start: datetime,
                 emit("service_opened", clock + timedelta(seconds=9), payload=favor)
         return
 
-    if rng.random() < TRIP:  # habla de un viaje: RappiTravel y su gancho del catálogo (protector solar)
-        travel, hook = {"servicio": "rappitravel"}, {"origen": "rappitravel"}
+    if rng.random() < TRIP:  # habla de un viaje: RappiTravel (su gancho es de Farmacia y el agente no lo ofrece)
+        travel = {"servicio": "rappitravel"}
         emit("ask", clock, query="me voy de vacaciones", modality=_modality(rng), results=0)
         emit("service_shown", clock + timedelta(seconds=2), payload=travel)
         if rng.random() < TRAVEL_OPEN:
             emit("service_opened", clock + timedelta(seconds=12), payload=travel)
-        emit(
-            "suggestion_shown",
-            clock + timedelta(seconds=3),
-            vertical="farmacia",
-            concept="dermocosmetica",
-            payload=hook,
-        )
-        if rng.random() < SUGGESTION_ACCEPT:
-            emit(
-                "suggestion_accepted",
-                clock + timedelta(seconds=8),
-                vertical="farmacia",
-                concept="dermocosmetica",
-                payload=hook,
-            )
         return
 
     vertical = _weighted(rng, {v: sum(c.values()) for v, c in s.interests.items()})
@@ -639,7 +631,7 @@ def _session(rng, catalog: Catalog, s: UserState, ts: datetime, start: datetime,
         )
         lines.append((item, concept, False))
 
-    suggestion = _suggestion(catalog, concept, vertical)
+    suggestion = _suggestion(catalog, concept, vertical) if rng.random() < SUGGESTION_SHOWN else None
     if suggestion:
         target, sug_vertical, weight = suggestion
         clock += timedelta(seconds=rng.randint(5, 30))
@@ -725,9 +717,17 @@ def _maybe_wish(rng, week: float):
 
 def _suggestion(catalog: Catalog, concept: str, vertical: str):
     """Complemento curado en OTRO vertical con ítems reales: el primero en el orden del agente (`ranked_verticals`,
-    donde el concepto es más típico y restaurantes solo para lo que se pide hecho), no uno al azar."""
+    donde el concepto es más típico y restaurantes solo para lo que se pide hecho), no uno al azar. Con las guardias de
+    ofertas del agente real: nada de alcohol, bebé, salud ni sensibles, ni de Farmacia o Licores."""
+    concepts = load_taxonomy().concepts
     for target, weight in sorted(catalog.edges.get(concept, []), key=lambda e: -e[1]):
-        verticals = [v for v in catalog.ranked.get(target, []) if v != vertical and (v, target) in catalog.items]
+        if target not in concepts or not is_offerable(concepts[target]):
+            continue
+        verticals = [
+            v
+            for v in catalog.ranked.get(target, [])
+            if v != vertical and offerable_vertical(v) and (v, target) in catalog.items
+        ]
         if verticals:
             return target, verticals[0], weight
     return None

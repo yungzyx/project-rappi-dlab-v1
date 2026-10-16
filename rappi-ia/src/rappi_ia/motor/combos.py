@@ -104,6 +104,7 @@ def combo_key(groups: Iterable[str]) -> str:
 
 
 def combo_of_verticals(verticals: Iterable[str]) -> str:
+    verticals = list(verticals)  # se recorre dos veces: un generador llegaría vacío a `combo_key`
     group_of = load_combos().group_of
     unknown = {v for v in verticals if v not in group_of}
     if unknown:

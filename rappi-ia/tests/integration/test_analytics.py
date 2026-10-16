@@ -372,6 +372,14 @@ def _simulated_catalog(db):
     for pid, name, store, category, price in rows:
         add_product(db, pid, name, store, category)
         add_price(db, store, pid, price)
+    # Una pizzería: dos de cada tres simulados piden solo en Restaurantes (la mezcla de Rappi).
+    add_store(db, 4, "restaurantes", "Pizzería")
+    db.execute("INSERT INTO scrape_runs (run_id, kind, status) VALUES (999, 'restaurants', 'done')")
+    dishes = [(600 + i, f"Pizza napolitana {i}", "Pizzas") for i in range(3)]
+    dishes += [(610 + i, f"Hamburguesa clásica {i}", "Hamburguesas") for i in range(3)]
+    for item_id, name, section in dishes:
+        add_dish(db, item_id, name, 4, section)
+        db.execute("INSERT INTO menu_price_snapshots (run_id, item_id, price) VALUES (999, %s, 6990)", (item_id,))
     db.commit()
     build_search_documents(db)
     build_concepts(db)
@@ -488,7 +496,8 @@ def test_synthetic_sessions_also_use_the_services(simulated):
     db, _ = simulated
     rows = {r["servicio"]: r for r in queries.services(db, "synthetic")}
     travel, favor = rows["rappitravel"], rows["rappifavor"]
-    assert travel["ofrecido"] > travel["abierto"] > 0 and travel["ganchos_mostrados"] >= travel["ganchos_aceptados"] > 0
+    assert travel["ofrecido"] > travel["abierto"] > 0
+    assert travel["ganchos_mostrados"] == 0  # su gancho es de Farmacia: el agente no lo ofrece por su cuenta
     assert favor["ofrecido"] > favor["abierto"] > 0  # se ofrece cuando no encuentran lo que buscan
 
 
@@ -507,15 +516,18 @@ def test_synthetic_carts_are_also_abandoned_after_starting_payment(simulated):
 
 def test_synthetic_suggestions_go_to_the_vertical_bigotes_would_choose(db):
     """El generador sorteaba la vertical entre todas las que tienen 1 ítem del concepto: «Cerveza · Farmacia»
-    encabezaba la tabla de sugerencias. Ahora usa el orden de Bigotes (`ranked_verticals`)."""
-    for store_id, vertical in [(2, "licores"), (3, "conveniencia"), (4, "farmacia"), (5, "mall")]:
+    encabezaba la tabla de sugerencias. Ahora usa el orden de Bigotes (`ranked_verticals`) y sus guardias de ofertas:
+    la cerveza (el primer complemento de la pizza y de las papas) nunca se sugiere."""
+    for store_id, vertical in [(2, "supermercado"), (3, "conveniencia"), (4, "farmacia"), (5, "mall"), (7, "licores")]:
         add_store(db, store_id, vertical, vertical.title())
     add_store(db, 6, "restaurantes", "Pizzería")
-    rows = [(200 + i, f"Cerveza marca {i} lata 470 cc", 2, "Cervezas") for i in range(25)]
-    rows += [(300 + i, f"Cerveza marca {i} express", 3, "Cervezas") for i in range(5)]
+    rows = [(200 + i, f"Gaseosa cola marca {i} 1,5 L", 2, "Gaseosas") for i in range(25)]
+    rows += [(300 + i, f"Gaseosa cola marca {i} express", 3, "Gaseosas") for i in range(5)]
     rows += [(350 + i, f"Papas fritas marca {i} 180 g", 3, "Snacks salados") for i in range(5)]
-    rows += [(400, "Cerveza sin alcohol lata 350 cc", 4, "Cervezas")]
-    rows += [(500 + i, f"Cerveza artesanal de regalo {i}", 5, "Cervezas") for i in range(2)]
+    rows += [(400, "Gaseosa cola 500 cc farmacia", 4, "Gaseosas")]
+    rows += [(500 + i, f"Gaseosa de regalo {i}", 5, "Gaseosas") for i in range(2)]
+    rows += [(700 + i, f"Cerveza marca {i} lata 470 cc", 7, "Cervezas") for i in range(25)]
+    rows += [(750 + i, f"Cerveza marca {i} express", 3, "Cervezas") for i in range(5)]
     for pid, name, store, category in rows:
         add_product(db, pid, name, store, category)
         add_price(db, store, pid, 1990)
@@ -533,13 +545,15 @@ def test_synthetic_suggestions_go_to_the_vertical_bigotes_would_choose(db):
 
     shown = dict(
         db.execute(
-            """SELECT vertical, count(*) FROM app_events
-               WHERE type = 'suggestion_shown' AND concept_id = 'cerveza' GROUP BY 1"""
+            """SELECT concept_id || ' · ' || vertical, count(*) FROM app_events
+               WHERE type = 'suggestion_shown' GROUP BY 1"""
         ).fetchall()
     )
-    assert shown  # el escenario genera sugerencias de cerveza (desde snacks y pizza)
-    assert not set(shown) & {"farmacia", "mall", "restaurantes"}
-    assert max(shown, key=shown.get) == ranked_verticals(db, ["cerveza"])[0] == "licores"
+    assert not [key for key in shown if key.startswith("cerveza · ")], shown
+    verticals = {key.split(" · ")[1]: n for key, n in shown.items() if key.startswith("gaseosas · ")}
+    assert verticals, shown  # el escenario genera sugerencias de gaseosas (desde las papas y la pizza)
+    assert not set(verticals) & {"farmacia", "licores", "mall", "restaurantes"}
+    assert max(verticals, key=verticals.get) == ranked_verticals(db, ["gaseosas"])[0] == "supermercado"
 
 
 def test_at_risk_uses_pseudonyms_and_no_sensitive_concepts(simulated):
