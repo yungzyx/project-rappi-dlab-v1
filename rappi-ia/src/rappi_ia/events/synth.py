@@ -22,9 +22,12 @@ SUPUESTOS (editables aquí):
   su retención. Por construcción, el panel "confirma" que sumar grupos retiene: no es evidencia.
 - El agente simulado respeta las guardias de ofertas del real (offers/guards.py: sin alcohol, bebé, salud, sensibles ni
   Farmacia o Licores, ni productos de tiendas Farmacia, Sex shop o Smoking shop o que dicen bebé) y muestra un
-  complemento en una parte de los carros (SUGGESTION_SHOWN). Aun así, lo aceptado mueve personas de «rest» a
-  «rest+retail»: con el catálogo real (3.000 personas; medido el 16-10-2026 en una copia, rappi_staging) queda en
-  11,3 % de los meses-persona con la semilla 7 (10,5 y 10,6 con las semillas 23 y 11), frente al 5,4 % de Rappi.
+  complemento en una parte de los carros (SUGGESTION_SHOWN), en el primer vertical del orden del agente o, en la mitad
+  de los casos (TURBO_SUGGESTION), en Turbo si Turbo lo vende. SUPUESTO PROPIO: el real sigue su orden; sin esto, lo
+  aceptado llevaba a casi todos de «rest» a «rest+retail» (11,3 % de los meses-persona contra 5,4 % en Rappi) y dejaba
+  corto «rest+turbo» (4,2 % contra 6,6 %). Con el catálogo real (3.000 personas, semilla 7; medido el 16-10-2026 en una
+  copia, rappi_staging) quedan en 7,2 % y 8,0 %; la tabla reproducida está más cerca de la de Rappi en las semillas 7,
+  11 y 23 (docs/resultados/motor-2026-10-16.md, «Mejora continua»).
 - Personas pequeñas que ejercitan los segmentos de la capa de perfiles (sin gluten, vegana, mamá con bebé, perro, gato,
   fitness, nocturno, cazaofertas, gamer, cafetera, chocolatera, parrillera); algunas prefieren ítems con un atributo.
   La oficinista ya existe como «oficina». Los pesos (`share`) se normalizan al sortear: no hace falta que sumen 1.
@@ -353,6 +356,9 @@ FAVOR_OPEN = 0.2
 BROWSE_ONLY = 0.12  # encuentra productos y se va sin agregar nada al carro
 SUGGESTION_SHOWN = 0.3  # carros donde el agente muestra un complemento de otro vertical (no en todos)
 SUGGESTION_ACCEPT = 0.22  # probabilidad base de aceptar una sugerencia cruzada (× peso de la arista)
+TURBO_SUGGESTION = (
+    0.5  # sugerencias que van a Turbo cuando Turbo vende el concepto (el resto sigue el orden del agente)
+)
 SUGGESTION_CADENCE_BOOST = 0.93  # aceptar una sugerencia acorta el ritmo 7%
 MODALITIES = (("texto", 1.0),)  # solo texto; se sigue sorteando para conservar la misma secuencia aleatoria
 PREFERRED_ATTRIBUTES = ("sin-gluten", "vegano", "alto-proteina", "con-descuento")
@@ -683,7 +689,7 @@ def _session(rng, catalog: Catalog, s: UserState, ts: datetime, start: datetime,
         )
         lines.append((item, concept, False))
 
-    suggestion = _suggestion(catalog, concept, vertical) if rng.random() < SUGGESTION_SHOWN else None
+    suggestion = _suggestion(catalog, concept, vertical, rng) if rng.random() < SUGGESTION_SHOWN else None
     if suggestion:
         target, sug_vertical, weight = suggestion
         clock += timedelta(seconds=rng.randint(5, 30))
@@ -767,9 +773,10 @@ def _maybe_wish(rng, week: float):
     return None
 
 
-def _suggestion(catalog: Catalog, concept: str, vertical: str):
+def _suggestion(catalog: Catalog, concept: str, vertical: str, rng: random.Random | None = None):
     """Complemento curado en OTRO vertical con ítems reales: el primero en el orden del agente (`ranked_verticals`,
-    donde el concepto es más típico y restaurantes solo para lo que se pide hecho), no uno al azar. Con las guardias de
+    donde el concepto es más típico y restaurantes solo para lo que se pide hecho), no uno al azar; si Turbo también lo
+    vende, con `rng` va a Turbo con probabilidad TURBO_SUGGESTION (solo entonces se sortea). Con las guardias de
     ofertas del agente real: nada de alcohol, bebé, salud ni sensibles, ni de Farmacia o Licores, ni un producto de
     `Catalog.unofferable` (de una tienda Farmacia, Sex shop o Smoking shop, o que dice bebé)."""
     concepts = load_taxonomy().concepts
@@ -782,7 +789,10 @@ def _suggestion(catalog: Catalog, concept: str, vertical: str):
             if v != vertical and offerable_vertical(v) and catalog.offer_options(v, target)
         ]
         if verticals:
-            return target, verticals[0], weight
+            chosen = verticals[0]
+            if chosen != "turbo" and "turbo" in verticals and rng is not None and rng.random() < TURBO_SUGGESTION:
+                chosen = "turbo"
+            return target, chosen, weight
     return None
 
 

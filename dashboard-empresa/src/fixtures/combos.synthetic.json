@@ -4,73 +4,53 @@
     "propio": [
       {
         "combo": "rest",
-        "gasto_por_usuario": 22130.76923076923,
-        "meses_usuario": 13,
-        "pct_pedidos": 29.787233,
-        "pct_usuarios": 52.0,
-        "pedidos_por_usuario": 1.0769231,
+        "gasto_por_usuario": 28499.41176470588,
+        "meses_usuario": 17,
+        "pct_pedidos": 43.396225,
+        "pct_usuarios": 60.714287,
+        "pedidos_por_usuario": 1.3529412,
+        "retencion_m1": null,
+        "retencion_n": 6
+      },
+      {
+        "combo": "rest+turbo",
+        "gasto_por_usuario": 44521.666666666664,
+        "meses_usuario": 6,
+        "pct_pedidos": 41.509434,
+        "pct_usuarios": 21.428572,
+        "pedidos_por_usuario": 3.6666667,
+        "retencion_m1": null,
+        "retencion_n": 2
+      },
+      {
+        "combo": "retail",
+        "gasto_por_usuario": 23973.333333333332,
+        "meses_usuario": 3,
+        "pct_pedidos": 7.5471697,
+        "pct_usuarios": 10.714286,
+        "pedidos_por_usuario": 1.3333334,
         "retencion_m1": null,
         "retencion_n": 0
       },
       {
         "combo": "rest+retail",
-        "gasto_por_usuario": 37410.0,
-        "meses_usuario": 3,
-        "pct_pedidos": 19.148935,
-        "pct_usuarios": 12.0,
-        "pedidos_por_usuario": 3.0,
-        "retencion_m1": null,
-        "retencion_n": 0
-      },
-      {
-        "combo": "retail",
-        "gasto_por_usuario": 2750.0,
-        "meses_usuario": 3,
-        "pct_pedidos": 6.382979,
-        "pct_usuarios": 12.0,
-        "pedidos_por_usuario": 1.0,
-        "retencion_m1": null,
-        "retencion_n": 0
-      },
-      {
-        "combo": "rest+turbo",
-        "gasto_por_usuario": 85315.0,
-        "meses_usuario": 2,
-        "pct_pedidos": 27.659575,
-        "pct_usuarios": 8.0,
-        "pedidos_por_usuario": 6.5,
-        "retencion_m1": null,
-        "retencion_n": 1
-      },
-      {
-        "combo": "turbo",
-        "gasto_por_usuario": 4030.0,
-        "meses_usuario": 2,
-        "pct_pedidos": 6.382979,
-        "pct_usuarios": 8.0,
-        "pedidos_por_usuario": 1.5,
-        "retencion_m1": null,
-        "retencion_n": 0
-      },
-      {
-        "combo": "rest+turbo+retail",
-        "gasto_por_usuario": 21950.0,
+        "gasto_por_usuario": 16470.0,
         "meses_usuario": 1,
-        "pct_pedidos": 6.382979,
-        "pct_usuarios": 4.0,
-        "pedidos_por_usuario": 3.0,
+        "pct_pedidos": 3.7735848,
+        "pct_usuarios": 3.5714285,
+        "pedidos_por_usuario": 2.0,
         "retencion_m1": null,
         "retencion_n": 0
       },
       {
         "combo": "turbo+retail",
-        "gasto_por_usuario": 10380.0,
+        "gasto_por_usuario": 24930.0,
         "meses_usuario": 1,
-        "pct_pedidos": 4.255319,
-        "pct_usuarios": 4.0,
+        "pct_pedidos": 3.7735848,
+        "pct_usuarios": 3.5714285,
         "pedidos_por_usuario": 2.0,
         "retencion_m1": null,
-        "retencion_n": 1
+        "retencion_n": 0
       }
     ],
     "rappi": {
