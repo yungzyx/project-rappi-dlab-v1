@@ -18,11 +18,13 @@ sin_pedidos o perfil, este último en el momento `perfil` sin persona; e `id`; `
 de las señales de una persona en `offers/personal.py`). Lo que el agente no propone no entra a la base. Cuando la oferta
 se ordena por lo que le gusta a la persona (`vertical_por_probar` y las ocasiones de la Home), la `basis` son sus
 señales (`kind` concepto, con `score` y `source`) de los conceptos que más aportan. Cuando `vertical_por_probar` sigue
-el paso del motor, la `basis` parte con `combinacion` («<actual>→<objetivo>», `source` «rappi»: la tabla de Rappi) y
-suma de dónde salen los productos: `compra_cruzada` («<A>→<B>@<vertical>») o `lo_mas_pedido` («<vertical>»), con
-`source` «poblacion:<fuente>», y `vuelta` («<vertical>», `source` «pedidos») si la persona ya pidió ahí hace más de un
-mes; el texto habla de la persona, nunca de cifras de retención. La `recompra` lleva su señal `recompra` («<concepto>»,
-`source` «pedidos»: sale de los pedidos de la persona). Un complemento de una persona (`carrito`, `checkout`,
+el paso del motor, la `basis` parte con `combinacion` («<actual>→<objetivo>», `source` «rappi»: la tabla de Rappi, o
+«rappi+poblacion:<fuente>» si pesó la retención aprendida) y suma de dónde salen los productos: `compra_cruzada`
+(«<A>→<B>@<vertical>»; si A no se nombra, «<B>@<vertical>» junto a `lo_mas_pedido`) o `lo_mas_pedido`
+(«<vertical>»), con `source` «poblacion:<fuente>», y `vuelta` («<vertical>», `source` «pedidos») si la persona ya pidió
+ahí hace más de un mes; el texto habla de la persona, nunca de cifras de retención ni de lo que hace la población. La
+`recompra` lleva su señal `recompra` («<concepto>», `source` «pedidos»: sale de los pedidos de la persona). Un
+complemento de una persona (`carrito`, `checkout`,
 `proximo_pedido`) suma `combinacion` si entre dos parecidos ganó el de la vertical que completa su combinación, y
 `compra_cruzada` si lo trajo una regla de la población (`agent.tools.suggest_complement`). Un complemento cuyo primer
 producto es de una marca que la persona compra lo dice en el `text` y suma esa señal (`marca`, con los pedidos como
@@ -130,9 +132,13 @@ REASON_NEXT_ANONYMOUS = "Porque combina con lo que pediste."
 REASON_NO_RESULT = "Porque buscaste «{query}» y aquí sí hay."
 REASON_TO_TRY = "Porque aún no pides en {vertical}."
 # La vertical por probar del paso del motor: con compra cruzada, {origen} es el concepto de la persona que dispara la
-# regla y {destino} el que se ofrece; con lo más pedido de la población, la vertical.
-TO_TRY_CROSS_TEXT = "Para acompañar tu {origen}: {destino} en {vertical}."
-REASON_TO_TRY_CROSS = "Porque pides {emoji} {name} y quienes lo piden suelen sumar {destino} en {vertical}."
+# regla y {destino} el que se ofrece; con lo más pedido de la población, la vertical. El porqué no afirma lo que hace la
+# población (en la demo es simulada): la `basis` declara la fuente. Una regla de un concepto a sí mismo en otra
+# vertical (lácteos → lácteos en Turbo) tiene su propio texto.
+TO_TRY_CROSS_TEXT = "Para acompañar {origen}: {destino} en {vertical}."
+REASON_TO_TRY_CROSS = "Porque pides {emoji} {name} y {destino} combina con eso; en {vertical} lo encuentras."
+TO_TRY_SAME_TEXT = "Tu {destino}, también en {vertical}."
+REASON_TO_TRY_SAME = "Porque pides {emoji} {name}: también lo encuentras en {vertical}."
 TO_TRY_TOP_TEXT = "Lo más pedido en {vertical}."
 REASON_TO_TRY_TOP = "Porque aún no pides en {vertical}: esto es lo que más se pide."
 # Una vertical del paso que la persona ya probó (pidió ahí hace más de un mes: no está en su combinación de 30 días).
@@ -540,12 +546,13 @@ def _combo_offer(
 ) -> Offer | None:
     """Una vertical del grupo que completa la combinación: las que se pueden ofrecer, primero las que la persona no ha
     probado y, entre ellas, en el orden de `next_verticals`. Para la primera con algo que mostrar: los productos de su
-    mejor compra cruzada (`cross_picks`), o lo más pedido ahí por la población (`trends`), o sus ofertas o platos de
-    siempre. La `basis` parte con el paso (`combinacion`). Si ya pidió en esa vertical (hace más de un mes), lo más
-    pedido y lo de siempre dicen «Vuelve a…»; la compra cruzada sigue siendo cierta y no cambia."""
+    mejor compra cruzada (`cross_picks`) si una regla la empujó, o los productos más pedidos ahí por la población
+    (`trends`, `most_ordered`), o los del concepto más pedido ahí (la compra cruzada sin empuje), o sus ofertas o
+    platos de siempre. La `basis` parte con el paso (`combinacion`). Si ya pidió en esa vertical (hace más de un mes),
+    lo más pedido y lo de siempre dicen «Vuelve a…»; la compra cruzada sigue siendo cierta y no cambia."""
     group = step[0]
     population = config.MOTOR_POBLACION
-    combo = step_signal(step)
+    combo = step_signal(conn, step, population)
     candidates = [v for v in load_combos().groups[group] if offerable_vertical(v)]
     if len(candidates) > 1:
         order = [s.vertical for s in next_verticals(conn, user_id, population)]
@@ -556,18 +563,27 @@ def _combo_offer(
     best: dict[str, CrossPick] = {}  # la mejor compra cruzada de cada vertical
     for pick in cross_picks(conn, user_id, candidates, population, k=None, lam=lam):
         best.setdefault(pick.vertical, pick)
+    concepts = load_taxonomy().concepts
     affinity: dict | None = None
     for vertical in candidates:
         back = vertical in tried
         pick = best.get(vertical)
-        if pick and (products := _pick_products(conn, embedder, pick)):
-            concepts = load_taxonomy().concepts
-            origin = concepts.get(pick.from_concept) if pick.from_concept else None
-            # Solo si la regla empujó el par (λ > 0) y el agente puede nombrar lo que la persona pide.
-            if origin is not None and is_offerable(origin) and lam > 0:
+        # La regla empujó el par (λ > 0 y lift > 1); si no, la compra cruzada es solo lo más pedido.
+        pushed = pick is not None and pick.from_concept is not None and lam > 0 and (pick.lift or 0) > 1
+        if pushed and (products := _pick_products(conn, embedder, pick)):
+            origin = concepts.get(pick.from_concept)
+            if origin is not None and is_offerable(origin):
                 return _cross_offer(vertical, products, pick, origin, combo, population)
-            return _top_offer(vertical, products, combo, population, back)
+            # Lo que la persona pide no se nombra (ni en la `basis`), pero la regla movió el orden: se declara.
+            rule = {
+                "kind": "compra_cruzada",
+                "id": f"{pick.concept_id}@{vertical}",
+                "source": f"poblacion:{population}",
+            }
+            return _top_offer(vertical, products, combo, population, back, rule)
         if products := most_ordered(conn, vertical, population):
+            return _top_offer(vertical, products, combo, population, back)
+        if pick and not pushed and (products := _pick_products(conn, embedder, pick)):
             return _top_offer(vertical, products, combo, population, back)
         if products := _deals_or_dishes(conn, vertical):
             if affinity is None:
@@ -579,11 +595,16 @@ def _combo_offer(
 def _cross_offer(
     vertical: str, products: list[dict], pick: CrossPick, origin: Concept, combo: dict, population: str
 ) -> Offer:
-    """«Para acompañar tu…»: la compra cruzada que la regla de la población empujó desde lo que pide la persona."""
+    """«Para acompañar…»: la compra cruzada que la regla de la población empujó desde lo que pide la persona; si la
+    regla va del concepto a sí mismo en otra vertical, «Tu…, también en…»."""
     label = VERTICAL_LABELS.get(vertical, vertical)
     destino = load_taxonomy().concepts[pick.concept_id].name.lower()
-    text = TO_TRY_CROSS_TEXT.format(origen=origin.name.lower(), destino=destino, vertical=label)
-    why = REASON_TO_TRY_CROSS.format(emoji=origin.emoji, name=origin.name.lower(), destino=destino, vertical=label)
+    if pick.concept_id == origin.id:
+        text = TO_TRY_SAME_TEXT.format(destino=destino, vertical=label)
+        why = REASON_TO_TRY_SAME.format(emoji=origin.emoji, name=origin.name.lower(), vertical=label)
+    else:
+        text = TO_TRY_CROSS_TEXT.format(origen=origin.name.lower(), destino=destino, vertical=label)
+        why = REASON_TO_TRY_CROSS.format(emoji=origin.emoji, name=origin.name.lower(), destino=destino, vertical=label)
     signal = {
         "kind": "compra_cruzada",
         "id": f"{origin.id}→{pick.concept_id}@{vertical}",
@@ -593,17 +614,20 @@ def _cross_offer(
     return Offer("vertical_por_probar", contract_articles(text), products, vertical, reason, [_open_action(vertical)])
 
 
-def _top_offer(vertical: str, products: list[dict], combo: dict, population: str, back: bool = False) -> Offer:
-    """«Lo más pedido en…»: lo que más pide la población en la vertical (o lo de un concepto que nadie empujó). Con
-    `back`, «Vuelve a…»."""
+def _top_offer(
+    vertical: str, products: list[dict], combo: dict, population: str, back: bool = False, rule: dict | None = None
+) -> Offer:
+    """«Lo más pedido en…»: lo que más pide la población en la vertical (o lo de un concepto que nadie empujó, o que
+    empujó una regla de un concepto que no se nombra: su señal `compra_cruzada` es `rule`). Con `back`, «Vuelve a…»."""
     label = VERTICAL_LABELS.get(vertical, vertical)
     signal = {"kind": "lo_mas_pedido", "id": vertical, "source": f"poblacion:{population}"}
+    basis = [combo, rule, signal] if rule else [combo, signal]
     if back:
         text = BACK_TEXT.format(vertical=label, what=BACK_TOP)
-        reason = _back_reason(vertical, [combo, signal])
+        reason = _back_reason(vertical, basis)
     else:
         text = TO_TRY_TOP_TEXT.format(vertical=label)
-        reason = _reason(contract_articles(REASON_TO_TRY_TOP.format(vertical=label)), [combo, signal])
+        reason = _reason(contract_articles(REASON_TO_TRY_TOP.format(vertical=label)), basis)
     return Offer("vertical_por_probar", contract_articles(text), products, vertical, reason, [_open_action(vertical)])
 
 

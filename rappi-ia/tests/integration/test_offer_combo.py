@@ -129,9 +129,10 @@ def test_a_cross_sell_rule_from_their_concept_brings_its_products_and_says_why(c
     body = to_try(client, "u-sushi")
 
     assert body["vertical"] == "turbo"
-    assert body["text"] == "Para acompañar tu sushi: despensa asiática en Turbo."
+    assert body["text"] == "Para acompañar sushi: despensa asiática en Turbo."
+    # No afirma lo que hace la población (en la demo es simulada): eso lo declara la `basis`.
     assert body["reason"]["text"] == (
-        "Porque pides 🍣 sushi y quienes lo piden suelen sumar despensa asiática en Turbo."
+        "Porque pides 🍣 sushi y despensa asiática combina con eso; en Turbo lo encuentras."
     )
     assert body["reason"]["basis"] == [
         REST_TO_TURBO,
@@ -173,7 +174,46 @@ def test_a_rule_from_a_concept_the_agent_does_not_offer_is_never_named(client, d
     assert body["vertical"] == "turbo"
     assert body["text"] == "Lo más pedido en Turbo."
     assert "cerveza" not in body["reason"]["text"] and "cerveza" not in str(body["reason"]["basis"])
-    assert body["reason"]["basis"][1]["kind"] == "lo_mas_pedido"
+    # La regla movió el orden: su fuente se declara, sin nombrar de dónde sale.
+    assert body["reason"]["basis"] == [
+        REST_TO_TURBO,
+        {"kind": "compra_cruzada", "id": "despensa-asiatica@turbo", "source": "poblacion:synthetic"},
+        {"kind": "lo_mas_pedido", "id": "turbo", "source": "poblacion:synthetic"},
+    ]
+    assert {p["concept"] for p in body["products"]} == {"despensa-asiatica"}
+
+
+def test_a_rule_from_a_concept_to_itself_says_it_is_also_there(client, db):
+    order(db, "u-hielo", "restaurantes", "hielo")
+    concept_trends(db, {("hielo", "turbo"): 10, ("helados", "turbo"): 50})
+    rule(db, "hielo", "hielo", "turbo", 10.0)  # el mismo concepto, en otra vertical
+
+    body = to_try(client, "u-hielo")
+
+    assert body["vertical"] == "turbo"
+    assert body["text"] == "Tu hielo, también en Turbo."
+    assert body["reason"]["text"] == "Porque pides 🧊 hielo: también lo encuentras en Turbo."
+    assert body["reason"]["basis"][1] == {
+        "kind": "compra_cruzada",
+        "id": "hielo→hielo@turbo",
+        "source": "poblacion:synthetic",
+    }
+    assert {p["concept"] for p in body["products"]} == {"hielo"}
+
+
+def test_without_a_push_the_most_ordered_products_go_before_the_most_ordered_concept(client, db):
+    sushi_lover(db)
+    concept_trends(db, {("helados", "turbo"): 50})  # sin regla: el concepto más pedido
+    product_trends(db, "turbo", [("catalog_item", "93003")])  # el producto más pedido: té helado
+
+    body = to_try(client, "u-sushi")
+
+    assert body["text"] == "Lo más pedido en Turbo."
+    assert [p["entity_id"] for p in body["products"]] == ["93003"]
+    assert body["reason"]["basis"] == [
+        REST_TO_TURBO,
+        {"kind": "lo_mas_pedido", "id": "turbo", "source": "poblacion:synthetic"},
+    ]
 
 
 def test_the_most_ordered_products_are_current_offerable_and_of_the_vertical(client, db):
@@ -276,7 +316,7 @@ def test_a_vertical_of_the_group_tried_long_ago_is_still_offered_as_a_comeback(c
     concept_trends(db, {("despensa-asiatica", "turbo"): 10})
     rule(db, "sushi", "despensa-asiatica", "turbo", 10.0)
     body = to_try(client, "u-sushi")
-    assert body["text"] == "Para acompañar tu sushi: despensa asiática en Turbo."  # sigue siendo cierto
+    assert body["text"] == "Para acompañar sushi: despensa asiática en Turbo."  # sigue siendo cierto
     assert [s["kind"] for s in body["reason"]["basis"]] == ["combinacion", "compra_cruzada"]
 
 

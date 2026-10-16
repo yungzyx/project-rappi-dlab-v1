@@ -328,7 +328,7 @@ def suggest_complement(
                     return suggestion(best, usual, [])
             # Primero en las verticales del grupo; si ahí no hay productos, vuelve a su lugar de siempre.
             if result := search(candidate, completing):
-                return suggestion(candidate, result, [step_signal(step)])
+                return suggestion(candidate, result, [step_signal(conn, step, population)])
 
     for candidate in candidates:
         if candidate.concept in searched:
