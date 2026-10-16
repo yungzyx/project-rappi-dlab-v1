@@ -140,7 +140,19 @@ def test_vertical_open_events_count(client):
     body = verticales(client, who)
     assert body["order"][0]["id"] == "mall"
     assert body["personalized"] is True
-    assert body["order"][0]["reason"]["text"] == "Porque pides seguido en Rappi Mall."
+    # Sin pedidos en Rappi Mall, «pides seguido» sería falso (en la base real, 39 de 97 Home personalizadas)
+    assert body["order"][0]["reason"]["text"] == "Porque entras seguido a Rappi Mall."
+
+
+def test_opening_a_vertical_without_ordering_there_does_not_say_you_order(client):
+    """Pedidos en Express y visitas al súper que pesan más: el súper va primero, pero no «pides seguido en el súper»."""
+    who = person()
+    order(client, who, "conveniencia", 0)
+    events = [{"type": "vertical_open", "session_id": f"s{n}", "vertical": "supermercado"} for n in range(8)]
+    assert client.post("/events", json={"user_id": who[0], "events": events}, headers=who[1]).status_code == 200
+    body = verticales(client, who)
+    assert [v["id"] for v in body["order"]][:2] == ["supermercado", "conveniencia"]
+    assert body["order"][0]["reason"]["text"] == "Porque entras seguido al súper."
 
 
 def test_actual_mode_does_not_reorder(client):

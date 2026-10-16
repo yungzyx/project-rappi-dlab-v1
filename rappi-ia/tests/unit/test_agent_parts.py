@@ -346,3 +346,12 @@ def test_agent_name_comes_from_config(monkeypatch):
         assert "Soy Lupe" in text and "Mochi" not in text, text
     refs = {"p1": "Cerveza Escudo 470 cc"}
     assert verify_llm_text("¡Hola! Aquí Lupe: te recomiendo {p1}.", refs)  # el nombre de la config no es un invento
+
+
+def test_unmet_note_has_no_pronoun_that_must_agree_with_the_query():
+    """«sepa que lo buscas» no concuerda con «empanadas» ni «la leche»: la nota no lleva pronombre."""
+    for query in ("empanadas", "la leche", "kebab"):
+        text = TemplateComposer().compose(
+            Draft(kind="sin_resultado", query=query, vertical_label="restaurantes", unmet=True)
+        )
+        assert "Lo anoté" in text and " lo buscas" not in text and "sepa que buscas eso" in text
