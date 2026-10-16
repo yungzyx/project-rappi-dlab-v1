@@ -4,6 +4,8 @@ pedido y de «Olvidar».
 Sobre el catálogo inventado de la demo y personas simuladas: prueba la mecánica, no un efecto.
 """
 
+import threading
+import time
 from contextlib import contextmanager
 from datetime import UTC, date, datetime, timedelta
 
@@ -14,11 +16,12 @@ from owner_client import OwnerClient
 from rappi_ia.api import app as api
 from rappi_ia.concepts.store import seed_taxonomy
 from rappi_ia.concepts.taxonomy import load_taxonomy
+from rappi_ia.db import connect
 from rappi_ia.demo.seed import seed_demo
 from rappi_ia.events import store as events
 from rappi_ia.events.synth import generate
 from rappi_ia.layers.runs import finish_layer_run, start_layer_run
-from rappi_ia.motor.build import build_motor, refresh_user
+from rappi_ia.motor.build import build_motor, refresh_user, refresh_user_conn
 from rappi_ia.motor.evaluate import GRID_B, GRID_C, GRID_LAMBDA, METHODS, report
 from rappi_ia.motor.model import DEFAULT_WEIGHTS
 from rappi_ia.motor.predict import latest_weights
@@ -188,6 +191,25 @@ def test_build_motor_without_people_to_validate_keeps_the_last_weights(db):
     assert latest_weights(db, "prototype") == previous
 
 
+def test_build_motor_without_84_days_keeps_the_last_weights_and_lambda(db):
+    """Sin datos para evaluar, la corrida no vuelve a los pesos por defecto: conserva los elegidos antes."""
+    start = datetime(2026, 9, 1, 15, tzinfo=UTC)
+    for day in range(4):
+        events.record_order(
+            db, "p-1", f"s-{day}", f"c-{day}", "supermercado", [_line("1", None)], ts=start + timedelta(days=7 * day)
+        )
+    previous = {"afinidad": 1.0, "transicion": 7.0, "popularidad": 0.25}
+    run = start_layer_run(db, "motor", "v")
+    finish_layer_run(db, run, {"fuente": "prototype", "pesos": previous, "lambda_cruzada": 3.0})
+    db.commit()
+
+    counts = build_motor(db, "prototype")
+    assert counts["evaluacion"] is None
+    assert counts["pesos"] == previous
+    assert counts["lambda_cruzada"] == 3.0
+    assert latest_weights(db, "prototype") == previous and latest_lambda(db, "prototype") == 3.0
+
+
 def test_cli_writes_one_report_per_source_and_a_notice_when_not_evaluated(simulated, tmp_path, monkeypatch):
     from rappi_ia import cli, config
 
@@ -311,6 +333,92 @@ def test_forget_clears_affinity_and_replenishment(client, db):
 @contextmanager
 def _same(db):
     yield db
+
+
+# «Olvidar» mientras corre `build_motor`: con dos conexiones
+
+
+@pytest.fixture
+def two_people(client, db):
+    """u1 y u2, del prototipo, con cuatro pedidos de snacks cada 7 días: afinidad y recompra."""
+    start = datetime.now(UTC) - timedelta(days=30)
+    for user in ("u1", "u2"):
+        for day in range(4):
+            events.record_order(
+                db, user, f"s-{user}-{day}", f"c-{user}-{day}", "supermercado", [_line()],
+                ts=start + timedelta(days=7 * day),
+            )  # fmt: skip
+    db.commit()
+    return db
+
+
+def _forget_after_the_build_read_the_orders(monkeypatch, test_url, user, concept=None):
+    """«Olvidar» (como `DELETE /profile`) en otra conexión, confirmado justo después de que `build_motor` leyó los
+    pedidos de la fuente: lo que leyó ya no está al día."""
+    from rappi_ia.motor import build
+
+    read = build.transitions
+
+    def forget_then_continue(orders):
+        with connect(test_url) as other:
+            other.execute("SET lock_timeout = '3s'")  # si el build tuviera tomadas las filas, falla en vez de colgar
+            events.forget(other, user, concept)
+            refresh_user_conn(other, user)
+            other.commit()
+        return read(orders)
+
+    monkeypatch.setattr(build, "transitions", forget_then_continue)
+
+
+def _last_motor_status(db):
+    return db.execute("SELECT status FROM layer_runs WHERE layer = 'motor' ORDER BY run_id DESC LIMIT 1").fetchone()[0]
+
+
+def test_a_person_forgotten_during_the_build_does_not_fail_it(two_people, monkeypatch, test_url):
+    db = two_people
+    _forget_after_the_build_read_the_orders(monkeypatch, test_url, "u2")
+
+    counts = build_motor(db, "prototype", evaluate=False)
+
+    assert _last_motor_status(db) == "done"
+    assert counts["afinidad"] == 1
+    assert _affinity(db, "u2") == {} and _replenishment(db, "u2") == set()
+    assert _affinity(db, "u1") == {"supermercado": (4, 4)} and _replenishment(db, "u1") == {"snacks-salados"}
+
+
+def test_a_concept_forgotten_during_the_build_stays_forgotten(two_people, monkeypatch, test_url):
+    db = two_people
+    _forget_after_the_build_read_the_orders(monkeypatch, test_url, "u1", "snacks-salados")
+
+    build_motor(db, "prototype", evaluate=False)
+
+    assert _last_motor_status(db) == "done"
+    assert _replenishment(db, "u1") == set()  # el build no la reescribe con lo que leyó antes
+    assert _affinity(db, "u1") == {"supermercado": (4, 4)}
+    assert _replenishment(db, "u2") == {"snacks-salados"}
+
+
+def test_the_build_waits_for_a_forget_in_flight_and_skips_the_person(two_people, test_url):
+    """«Olvidar» tiene el candado de u2 y no confirma: el build lo espera y después salta a u2, que ya no está."""
+    db = two_people
+    with connect(test_url) as in_flight:
+        events.forget(in_flight, "u2")
+        refresh_user_conn(in_flight, "u2")
+        result: dict = {}
+        building = threading.Thread(target=lambda: result.update(build_motor(db, "prototype", evaluate=False)))
+        building.start()
+        deadline = time.monotonic() + 10
+        while not in_flight.execute("SELECT count(*) FROM pg_locks WHERE NOT granted").fetchone()[0]:
+            assert time.monotonic() < deadline, "el build no llegó a esperar el candado de u2"
+            time.sleep(0.05)
+        assert building.is_alive()
+        in_flight.commit()
+        building.join(timeout=30)
+
+    assert result["afinidad"] == 1
+    assert _last_motor_status(db) == "done"
+    assert _affinity(db, "u2") == {}
+    assert _affinity(db, "u1") == {"supermercado": (4, 4)}
 
 
 def test_refresh_user_leaves_synthetic_people_alone(simulated):

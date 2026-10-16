@@ -21,9 +21,10 @@ SUPUESTOS (editables aquí):
   trata como efecto. Aceptar una sugerencia que la hace pedir en otro grupo cambia su combinación de verdad, y con ella
   su retención. Por construcción, el panel "confirma" que sumar grupos retiene: no es evidencia.
 - El agente simulado respeta las guardias de ofertas del real (offers/guards.py: sin alcohol, bebé, salud, sensibles ni
-  Farmacia o Licores) y muestra un complemento en una parte de los carros (SUGGESTION_SHOWN). Aun así, lo aceptado
-  mueve personas de «rest» a «rest+retail»: con el catálogo real (3.000 personas; medido en una copia, rappi_staging)
-  queda en ~11 % de los meses-persona, frente al 5,4 % de Rappi.
+  Farmacia o Licores, ni productos de tiendas Farmacia, Sex shop o Smoking shop o que dicen bebé) y muestra un
+  complemento en una parte de los carros (SUGGESTION_SHOWN). Aun así, lo aceptado mueve personas de «rest» a
+  «rest+retail»: con el catálogo real (3.000 personas; medido en una copia, rappi_staging) queda en ~11 % de los
+  meses-persona, frente al 5,4 % de Rappi.
 - Personas pequeñas que ejercitan los segmentos de la capa de perfiles (sin gluten, vegana, mamá con bebé, perro, gato,
   fitness, nocturno, cazaofertas, gamer, cafetera, chocolatera, parrillera); algunas prefieren ítems con un atributo.
   La oficinista ya existe como «oficina». Los pesos (`share`) se normalizan al sortear: no hace falta que sumen 1.
@@ -57,7 +58,7 @@ from psycopg import Connection
 from ..agent.verticals import ranked_verticals
 from ..concepts.taxonomy import load_taxonomy
 from ..motor.combos import GROUP_ORDER, NONE_COMBO, SERVICE_COMBO, combo_of_verticals, expected_retention, load_combos
-from ..offers.guards import is_offerable, offerable_vertical
+from ..offers.guards import baby_in_name, is_offerable, offerable_vertical, unofferable_subverticals
 
 log = logging.getLogger(__name__)
 CHILE = timezone(timedelta(hours=-3))
@@ -369,9 +370,16 @@ class Catalog:
     # (vertical, concepto, atributo) → ítems con ese atributo: solo los usa quien lo prefiere. Aparte de `items` para no
     # inflar el surtido de las demás personas (una muestra al azar casi no trae ítems sin gluten o veganos).
     preferred: dict[tuple[str, str, str], list[tuple[str, str, float]]] = field(default_factory=dict)
+    # (vertical, entity_type, entity_id) que el agente real no ofrece por su cuenta (`_unofferable`): se pueden pedir,
+    # no sugerir.
+    unofferable: set[tuple[str, str, str]] = field(default_factory=set)
 
-    def pick(self, rng: random.Random, vertical: str, concept: str, prefer: str | None = None):
-        options = self.items.get((vertical, concept))
+    def offer_options(self, vertical: str, concept: str) -> list[tuple[str, str, float]]:
+        """Los ítems del concepto en la vertical que el agente podría sugerir, en el mismo orden."""
+        return [i for i in self.items.get((vertical, concept), []) if (vertical, i[0], i[1]) not in self.unofferable]
+
+    def pick(self, rng: random.Random, vertical: str, concept: str, prefer: str | None = None, offer: bool = False):
+        options = self.offer_options(vertical, concept) if offer else self.items.get((vertical, concept))
         if not options:
             return None
         if prefer and rng.random() < PREFER_SHARE:
@@ -435,7 +443,35 @@ def load_catalog(conn: Connection, per_concept: int = 40) -> Catalog:
     names = dict(conn.execute("SELECT concept_id, name FROM concepts").fetchall())
     targets = {target for options in edges.values() for target, _ in options}
     ranked = {target: ranked_verticals(conn, [target]) for target in targets}
-    return Catalog(items, edges, names, ranked, preferred)
+    return Catalog(items, edges, names, ranked, preferred, _unofferable(conn, items))
+
+
+def _unofferable(conn: Connection, items: dict[tuple[str, str], list]) -> set[tuple[str, str, str]]:
+    """Los productos de `items` que el agente real no ofrece (offers/guards.py), por vertical: el que dice bebé en su
+    nombre y el que en esa vertical solo venden tiendas Farmacia, Sex shop o Smoking shop. Los platos no."""
+    ids = sorted({eid for options in items.values() for etype, eid, _ in options if etype == "catalog_item"})
+    names = dict(
+        conn.execute(
+            "SELECT master_product_id::text, name FROM catalog_items WHERE master_product_id = ANY(%s::bigint[])",
+            (ids,),
+        ).fetchall()
+    )
+    sold = set(
+        conn.execute(
+            """SELECT DISTINCT v.vertical, sp.master_product_id::text
+               FROM store_products sp JOIN v_store_verticals v USING (store_id)
+               WHERE sp.master_product_id = ANY(%s::bigint[])
+                 AND NOT EXISTS (SELECT 1 FROM store_verticals own
+                                 WHERE own.store_id = sp.store_id AND own.subvertical = ANY(%s))""",
+            (ids, unofferable_subverticals()),
+        ).fetchall()
+    )
+    return {
+        (vertical, etype, eid)
+        for (vertical, _concept), options in items.items()
+        for etype, eid, _price in options
+        if etype == "catalog_item" and ((vertical, eid) not in sold or baby_in_name(etype, names.get(eid, "")))
+    }
 
 
 def draw_archetype(rng: random.Random) -> str:
@@ -649,7 +685,7 @@ def _session(rng, catalog: Catalog, s: UserState, ts: datetime, start: datetime,
         clock += timedelta(seconds=rng.randint(5, 30))
         emit("suggestion_shown", clock, vertical=sug_vertical, concept=target)
         if rng.random() < SUGGESTION_ACCEPT * (0.5 + weight):
-            sug_item = catalog.pick(rng, sug_vertical, target)
+            sug_item = catalog.pick(rng, sug_vertical, target, offer=True)
             emit("suggestion_accepted", clock + timedelta(seconds=4), vertical=sug_vertical, concept=target)
             if sug_item:
                 emit(
@@ -730,7 +766,8 @@ def _maybe_wish(rng, week: float):
 def _suggestion(catalog: Catalog, concept: str, vertical: str):
     """Complemento curado en OTRO vertical con ítems reales: el primero en el orden del agente (`ranked_verticals`,
     donde el concepto es más típico y restaurantes solo para lo que se pide hecho), no uno al azar. Con las guardias de
-    ofertas del agente real: nada de alcohol, bebé, salud ni sensibles, ni de Farmacia o Licores."""
+    ofertas del agente real: nada de alcohol, bebé, salud ni sensibles, ni de Farmacia o Licores, ni un producto de
+    `Catalog.unofferable` (de una tienda Farmacia, Sex shop o Smoking shop, o que dice bebé)."""
     concepts = load_taxonomy().concepts
     for target, weight in sorted(catalog.edges.get(concept, []), key=lambda e: -e[1]):
         if target not in concepts or not is_offerable(concepts[target]):
@@ -738,7 +775,7 @@ def _suggestion(catalog: Catalog, concept: str, vertical: str):
         verticals = [
             v
             for v in catalog.ranked.get(target, [])
-            if v != vertical and offerable_vertical(v) and (v, target) in catalog.items
+            if v != vertical and offerable_vertical(v) and catalog.offer_options(v, target)
         ]
         if verticals:
             return target, verticals[0], weight

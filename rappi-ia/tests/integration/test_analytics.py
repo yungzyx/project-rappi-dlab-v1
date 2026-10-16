@@ -556,6 +556,36 @@ def test_synthetic_suggestions_go_to_the_vertical_bigotes_would_choose(db):
     assert max(verticals, key=verticals.get) == ranked_verticals(db, ["gaseosas"])[0] == "supermercado"
 
 
+def test_the_synthetic_catalog_marks_what_the_agent_would_not_offer(db):
+    """`load_catalog` marca, por vertical, el producto que solo vende una tienda Farmacia (aunque esté en el súper) y
+    el que dice bebé en su nombre: el generador no los sugiere (offers/guards.py)."""
+    from rappi_ia.events.synth import load_catalog
+
+    add_store(db, 2, "supermercado", "Súper")
+    add_store(db, 8, "supermercado", "Farmacia de barrio")
+    db.execute("UPDATE store_verticals SET subvertical = 'Farmacia' WHERE store_id = 8")
+    for pid, name, store in [
+        (200, "Gaseosa cola 1,5 L", 2),
+        (201, "Gaseosa cola de farmacia 1,5 L", 8),
+        (202, "Gaseosa para bebé 1,5 L", 2),
+    ]:
+        add_product(db, pid, name, store, "Gaseosas")
+        add_price(db, store, pid, 1990)
+    db.execute("INSERT INTO store_products (store_id, sku, master_product_id) VALUES (2, 'sku-201', 201)")
+    add_price(db, 2, 201, 1990)
+    add_product(db, 203, "Gaseosa naranja 1,5 L", 8, "Gaseosas")  # solo en la tienda Farmacia
+    add_price(db, 8, 203, 1990)
+    db.commit()
+    build_search_documents(db)
+    build_concepts(db)
+
+    catalog = load_catalog(db)
+
+    loaded = {eid for options in catalog.items.values() for _etype, eid, _price in options}
+    assert {"200", "201", "202", "203"} <= loaded
+    assert {eid for _v, _etype, eid in catalog.unofferable} == {"202", "203"}  # la 201 también la vende el súper
+
+
 def test_at_risk_uses_pseudonyms_and_no_sensitive_concepts(simulated):
     db, _ = simulated
     for row in queries.at_risk(db, "synthetic", limit=200):

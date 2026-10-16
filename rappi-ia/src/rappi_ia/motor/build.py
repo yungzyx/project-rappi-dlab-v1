@@ -27,7 +27,6 @@ from .evaluate import evaluate as evaluate_motor
 from .model import (
     AFFINITY_WINDOW_DAYS,
     DEFAULT_ORDER,
-    DEFAULT_WEIGHTS,
     PROTOTYPE_MIN_USERS,
     TZ,
     affinity,
@@ -41,22 +40,23 @@ from .model import (
     trends,
 )
 from .predict import latest_weights
-from .recommend import CROSS_SELL_LAMBDA, latest_lambda
+from .recommend import latest_lambda
 
 log = logging.getLogger(__name__)
 
 
 def build_motor(conn: Connection, source: str, evaluate: bool = True) -> dict:
-    """Recalcula el motor de una fuente en una sola transacción: las 5 tablas de población y la afinidad y la recompra
-    de todas sus personas. `now` es el último pedido de la fuente (los simulados terminan en una fecha pasada) o, en el
-    prototipo, el momento actual; ahí, además, las tendencias de concepto y producto piden `PROTOTYPE_MIN_USERS`
-    personas. La corrida queda en `layer_runs` (capa `motor`, con la fuente, los pesos, el λ de la compra cruzada y la
-    evaluación en `counts`); si algo falla, queda `failed` y no se escribe nada.
+    """Recalcula el motor de una fuente: las 5 tablas de población, en una sola transacción, y después la afinidad y
+    la recompra de cada persona (`_build_personal`). `now` es el último pedido de la fuente (los simulados terminan en
+    una fecha pasada) o, en el prototipo, el momento actual; ahí, además, las tendencias de concepto y producto piden
+    `PROTOTYPE_MIN_USERS` personas. La corrida queda en `layer_runs` (capa `motor`, con la fuente, los pesos, el λ de la
+    compra cruzada y la evaluación en `counts`); si algo falla, queda `failed`: sin nada de población si falló antes de
+    confirmarla y, si no, con las personas de los lotes ya confirmados (cada una con sus datos al día).
 
     Con `evaluate` y al menos 84 días de pedidos, evalúa por fechas y guarda los pesos y el λ elegidos
     (`motor.evaluate`); si nadie se puede validar, guarda la evaluación con su aviso y los de la última corrida de la
-    fuente. Sin datos suficientes, `DEFAULT_WEIGHTS` y `CROSS_SELL_LAMBDA`; con `evaluate=False`, los de la última
-    corrida. En estos dos casos, `"evaluacion"` es None."""
+    fuente. Sin datos suficientes o con `evaluate=False`, los de la última corrida (`DEFAULT_WEIGHTS` y
+    `CROSS_SELL_LAMBDA` si no hay); en estos dos casos, `"evaluacion"` es None."""
     run = start_layer_run(conn, "motor", rules_version(load_combos().version, COMBOS_FILE, Path(model.__file__)))
     conn.commit()  # la corrida se ve aunque lo demás falle
     start = time.perf_counter()
@@ -79,7 +79,6 @@ def _build(conn: Connection, source: str, run: int, evaluate: bool) -> dict:
     previous_lambda = latest_lambda(conn, source)
     for table in ("vertical_transitions", "combo_stats", "combo_steps", "cross_sell_rules", "trends"):
         conn.execute(f"DELETE FROM {table} WHERE data_source = %s", (source,))
-    _delete_personal(conn, "user_id IN (SELECT user_id FROM app_users WHERE source = %s)", source)
     counts = {
         "fuente": source,
         "pedidos": 0,
@@ -90,21 +89,23 @@ def _build(conn: Connection, source: str, run: int, evaluate: bool) -> dict:
         "tendencias": 0,
         "afinidad": 0,
         "recompra": 0,
-        "pesos": dict(DEFAULT_WEIGHTS) if evaluate else previous,
-        "lambda_cruzada": CROSS_SELL_LAMBDA if evaluate else previous_lambda,
+        "pesos": previous,
+        "lambda_cruzada": previous_lambda,
         "evaluacion": None,
     }
     orders = load_orders(conn, source)
     counts["pedidos"] = len(orders)
     if not orders:
+        conn.commit()
+        counts["afinidad"], counts["recompra"] = _build_personal(conn, source, datetime.now(UTC), frozenset())
         return counts
     # Los simulados terminan en una fecha pasada; el prototipo vive en el presente, y así coinciden la corrida semanal
     # y el recálculo después de cada pedido.
     now = datetime.now(UTC) if source == "prototype" else max(o.ts for o in orders)
     sensitive = sensitive_concepts(conn)
-    signals = load_signals(conn, source)
     if evaluate:
         start = time.perf_counter()
+        signals = load_signals(conn, source)
         counts["evaluacion"] = evaluate_motor(orders, signals, sensitive, previous, previous_lambda)
         if counts["evaluacion"] is not None:
             counts["pesos"] = counts["evaluacion"]["pesos"]
@@ -164,9 +165,41 @@ def _build(conn: Connection, source: str, run: int, evaluate: bool) -> dict:
         rows,
     )
 
-    affinity_rows, replenish_rows = _personal_rows(signals, orders, now, sensitive)
-    counts["afinidad"], counts["recompra"] = _write_personal(conn, affinity_rows, replenish_rows)
+    conn.commit()  # la población, entera; las personas, en lotes con su candado
+    counts["afinidad"], counts["recompra"] = _build_personal(conn, source, now, sensitive)
     return counts
+
+
+PERSONAL_BATCH = 200  # personas por transacción: cada una tiene tomado su candado hasta confirmar
+
+
+def _build_personal(conn: Connection, source: str, now: datetime, sensitive: frozenset[str]) -> tuple[int, int]:
+    """La afinidad y la recompra de todas las personas de la fuente, por lotes confirmados uno a uno. En cada lote,
+    toma el candado de cada persona (el de `refresh_user_conn` y «Olvidar»), en orden de id para que dos corridas no se
+    bloqueen en cruz; salta a quien ya no está (lo olvidaron) y relee sus datos dentro del candado: un «Olvidar» que
+    terminó mientras se armaba la población no se deshace. Devuelve cuántas filas de cada una escribió."""
+    users = sorted(u for (u,) in conn.execute("SELECT user_id FROM app_users WHERE source = %s", (source,)))
+    affinity_n = replenish_n = 0
+    for i in range(0, len(users), PERSONAL_BATCH):
+        batch = users[i : i + PERSONAL_BATCH]
+        for user_id in batch:
+            lock_user_segments(conn, user_id)
+        # FOR KEY SHARE: quien borre a la persona sin el candado (la purga) espera a que este lote confirme.
+        present = [
+            u
+            for (u,) in conn.execute(
+                "SELECT user_id FROM app_users WHERE user_id = ANY(%s) AND source = %s ORDER BY user_id FOR KEY SHARE",
+                (batch, source),
+            )
+        ]
+        _delete_personal(conn, "user_id = ANY(%s)", batch)
+        if present:
+            orders = load_orders(conn, source, present)
+            affinity_rows, replenish_rows = _personal_rows(load_signals(conn, source, present), orders, now, sensitive)
+            written = _write_personal(conn, affinity_rows, replenish_rows)
+            affinity_n, replenish_n = affinity_n + written[0], replenish_n + written[1]
+        conn.commit()
+    return affinity_n, replenish_n
 
 
 def _personal_rows(
@@ -198,9 +231,8 @@ def _personal_rows(
 
 
 def _write_personal(conn: Connection, affinity_rows: list[tuple], replenish_rows: list[tuple]) -> tuple[int, int]:
-    """Con `ON CONFLICT`, no COPY: el recálculo de una persona después de su pedido puede guardar sus filas mientras
-    corre `build_motor` de su fuente; ninguno de los dos falla y queda el último en confirmar. Las filas van en orden
-    de llave: los dos toman los candados de fila en el mismo orden y no se bloquean en cruz."""
+    """Guarda las filas de personas cuyo candado tiene quien llama y cuyas filas anteriores ya borró
+    (`refresh_user_conn`, `_build_personal`)."""
     affinity_rows = sorted(affinity_rows, key=lambda r: (r[0], r[1]))
     replenish_rows = sorted(replenish_rows, key=lambda r: (r[0], r[1]))
     with conn.cursor() as cur:
@@ -222,7 +254,7 @@ def _write_personal(conn: Connection, affinity_rows: list[tuple], replenish_rows
     return len(affinity_rows), len(replenish_rows)
 
 
-def _delete_personal(conn: Connection, where: str, param: str) -> None:
+def _delete_personal(conn: Connection, where: str, param: str | list[str]) -> None:
     for table in ("user_vertical_affinity", "replenishment"):
         conn.execute(f"DELETE FROM {table} WHERE {where}", (param,))
 

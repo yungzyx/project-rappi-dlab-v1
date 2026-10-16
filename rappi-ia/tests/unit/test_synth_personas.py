@@ -209,6 +209,23 @@ def test_simulated_suggestions_follow_the_offer_guards():
     assert synth._suggestion(catalog, "frutas", "supermercado") is None  # salud
 
 
+def test_simulated_suggestions_skip_items_the_agent_would_not_offer():
+    """El agente real no ofrece un producto que en esa vertical solo venden tiendas Farmacia, Sex shop o Smoking shop,
+    ni uno cuyo nombre dice bebé: el simulado tampoco lo sugiere, y una vertical sin otro ítem del concepto se salta."""
+    ok, blocked = ("catalog_item", "1", 990.0), ("catalog_item", "2", 990.0)
+    catalog = synth.Catalog(
+        items={("supermercado", "gaseosas"): [blocked], ("conveniencia", "gaseosas"): [blocked, ok]},
+        edges={"pizza": [("gaseosas", 0.6)]},
+        names={},
+        ranked={"gaseosas": ["supermercado", "conveniencia"]},
+        unofferable={("supermercado", "catalog_item", "2"), ("conveniencia", "catalog_item", "2")},
+    )
+    assert synth._suggestion(catalog, "pizza", "restaurantes") == ("gaseosas", "conveniencia", 0.6)
+    rng = random.Random(1)
+    assert {catalog.pick(rng, "conveniencia", "gaseosas", offer=True) for _ in range(20)} == {ok}
+    assert blocked in {catalog.pick(rng, "conveniencia", "gaseosas") for _ in range(20)}  # pedirlo, sí
+
+
 def test_signups_spread_over_the_whole_period():
     """Las altas llegan parejas, como cohortes mensuales: el último cuarto del período recibe cerca de un cuarto."""
     rng = random.Random(1)

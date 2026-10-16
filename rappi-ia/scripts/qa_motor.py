@@ -1,7 +1,7 @@
 """QA de las ofertas del agente sobre una base real, sin escribir en ella.
 
 Para una muestra fija (semilla) de personas simuladas y todas las del prototipo, llama a la API en este mismo proceso
-(TestClient, con la conexión de cada request en solo lectura: `default_transaction_read_only = on`) y mide, por
+(TestClient, con una sola conexión compartida en solo lectura: `default_transaction_read_only = on`) y mide, por
 momento: cuántas respuestas traen oferta, qué verticales ofrece, las guardias (deben dar 0), la latencia p50/p95 y
 textos de muestra. Momentos: `vertical_por_probar`, `recompra`, `carrito` (con el último producto que pidió),
 `proximo_pedido` (con su último pedido), `/recommendations` y `/profile/{id}/verticales`. No llama a nada que
@@ -59,6 +59,7 @@ def main() -> None:
     if conn.execute("SHOW default_transaction_read_only").fetchone()[0] != "on":
         sys.exit("La conexión no quedó en solo lectura: no sigo.")
     conn.rollback()
+    conn.read_only = True  # también en psycopg: cada transacción empieza READ ONLY
 
     def read_only_conn():
         try:

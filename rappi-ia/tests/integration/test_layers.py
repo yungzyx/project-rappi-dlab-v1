@@ -170,6 +170,21 @@ def test_layer_report_lists_coverage_sources_and_a_sample(db):
     assert layer_report(db, sample=2) == report  # muestra con semilla fija: mismo reporte
 
 
+def test_layer_report_shows_the_last_motor_run_of_each_source(db):
+    """`rappi-ia motor` corre una vez por fuente: el reporte muestra las dos, no solo la última."""
+    for source, transitions in (("synthetic", 64), ("prototype", 9), ("synthetic", 65)):
+        run = start_layer_run(db, "motor", "2026-10-16")
+        finish_layer_run(db, run, {"fuente": source, "transiciones": transitions})
+    run = start_layer_run(db, "measures", "2026-10-06")
+    finish_layer_run(db, run, {"items": 3})
+
+    runs = layer_report(db).split("## Cobertura")[0]
+
+    assert "motor (synthetic)" in runs and '"transiciones": 65' in runs and '"transiciones": 64' not in runs
+    assert "motor (prototype)" in runs and '"transiciones": 9' in runs
+    assert "| measures |" in runs
+
+
 def test_pet_attributes_come_from_the_concept_group(db):
     add_store(db, 1, "supermercado")
     add_product(db, 30, "Gato Vino Cabernet Sauvignon 1 L", 1, "Vinos")
