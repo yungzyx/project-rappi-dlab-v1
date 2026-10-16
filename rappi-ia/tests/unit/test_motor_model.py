@@ -269,34 +269,40 @@ def test_trends_min_users_drops_concepts_and_products_but_not_verticals():
 # Recompra
 
 
-def test_replenishment_needs_three_days_and_regularity():
+def test_replenishment_needs_four_days_and_regularity():
     orders = [
         order("u1", day(0), "turbo", "cafe"),
         order("u1", day(14), "supermercado", "cafe"),
         order("u1", day(14, 18), "turbo", "cafe"),  # dos el mismo día cuentan como uno
         order("u1", day(28), "turbo", "cafe"),
-        order("u2", day(0), "turbo", "pan"),  # intervalos 1 y 29: irregular
-        order("u2", day(1), "turbo", "pan"),
-        order("u2", day(30), "turbo", "pan"),
-        order("u3", day(0), "turbo", "te"),  # solo dos días
-        order("u3", day(7), "turbo", "te"),
+        order("u1", day(42), "turbo", "cafe"),
+        *(order("u2", day(n), "turbo", "pan") for n in (0, 1, 30, 31)),  # intervalos 1, 29 y 1: irregular
+        *(order("u3", day(n), "turbo", "te") for n in (0, 7, 14)),  # solo tres días (dos intervalos)
         *(order("u4", day(7 * k), "farmacia", "preservativos") for k in range(4)),  # sensible
     ]
     [r] = replenishment(orders, SENSITIVE)
-    assert (r.user_id, r.concept_id, r.vertical, r.orders) == ("u1", "cafe", "turbo", 3)
+    assert (r.user_id, r.concept_id, r.vertical, r.orders) == ("u1", "cafe", "turbo", 4)
     assert r.interval_days == pytest.approx(14)
     assert r.cv == pytest.approx(0.0)
-    assert r.last_ts == day(28)
-    assert r.due_on == date(2026, 9, 29) + timedelta(days=14)
+    assert r.last_ts == day(42)
+    assert r.due_on == date(2026, 10, 13) + timedelta(days=14)
 
 
 def test_replenishment_keeps_cv_at_the_limit():
-    # Intervalos 7 y 28: media 17,5, desviación 10,5 → cv = 0,6 justo en el tope: se queda.
-    orders = [order("u1", day(n), "turbo", "cafe") for n in (0, 7, 35)]
+    # Intervalos 1, 9, 1 y 9: media 5, desviación 4 → cv = 0,8 justo en el tope: se queda.
+    orders = [order("u1", day(n), "turbo", "cafe") for n in (0, 1, 10, 11, 20)]
     [r] = replenishment(orders, SENSITIVE)
-    assert r.cv == pytest.approx(0.6)
+    assert r.cv == pytest.approx(0.8)
+    assert r.interval_days == pytest.approx(5)
+    assert replenishment([order("u1", day(n), "turbo", "cafe") for n in (0, 1, 11, 12, 22)], SENSITIVE) == []  # 0,83
+
+
+def test_replenishment_rounds_half_days_to_even():
+    # Intervalos 14, 14, 21 y 21: la mediana es 17,5 → le toca 18 días después (round redondea al par).
+    orders = [order("u1", day(n), "turbo", "cafe") for n in (0, 14, 28, 49, 70)]
+    [r] = replenishment(orders, SENSITIVE)
     assert r.interval_days == pytest.approx(17.5)
-    assert r.due_on == date(2026, 10, 6) + timedelta(days=18)  # round(17,5) = 18 (al par)
+    assert r.due_on == date(2026, 11, 10) + timedelta(days=18)
 
 
 def test_replenishment_vertical_tie_goes_to_the_most_recent():

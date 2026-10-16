@@ -41,9 +41,10 @@ TREND_MIN_PREV = 5
 TREND_TOP_PRODUCTS = 50
 # Con las pocas personas del prototipo, un concepto o producto que pidió una sola no sale: la fila apuntaría a ella.
 PROTOTYPE_MIN_USERS = 5
-# Recompra: al menos 3 días de compra distintos e intervalos regulares.
-REPLENISH_MIN_ORDERS = 3
-REPLENISH_MAX_CV = 0.6
+# Recompra: al menos 4 días de compra distintos (3 intervalos) e intervalos regulares. Con 3 días y cv ≤ 0,6 acertaba
+# menos (docs/resultados/motor-2026-10-16.md, «Mejora continua»).
+REPLENISH_MIN_ORDERS = 4
+REPLENISH_MAX_CV = 0.8
 
 DEFAULT_ORDER = ("restaurantes", "turbo", "supermercado", "farmacia", "mall", "licores", "conveniencia", "chocolateria")
 DEFAULT_WEIGHTS = {"afinidad": 1.0, "transicion": 0.3, "popularidad": 0.1}
@@ -351,8 +352,8 @@ class Replenish:
 
 
 def replenishment(orders: Iterable[Order], sensitive: frozenset[str]) -> list[Replenish]:
-    """Por persona y concepto (sin sensibles), con al menos 3 días de compra distintos (dos pedidos el mismo día
-    cuentan uno): intervalo mediano entre días, su coeficiente de variación (solo los regulares, ≤ 0,6) y el día en que
+    """Por persona y concepto (sin sensibles), con al menos 4 días de compra distintos (dos pedidos el mismo día
+    cuentan uno): intervalo mediano entre días, su coeficiente de variación (solo los regulares, ≤ 0,8) y el día en que
     le toca de nuevo. El vertical es donde más lo pide (empate: el más reciente)."""
     bought: dict[tuple[str, str], list[Order]] = defaultdict(list)
     for o in sorted(orders, key=lambda o: (o.ts, o.order_id)):
