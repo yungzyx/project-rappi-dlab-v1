@@ -274,7 +274,7 @@
       "items": [
         "migrate respalda antes de aplicar una migración (quedan 4)",
         "Cada noche, 3 en el volumen y una copia afuera con restic",
-        "La descarga semanal sigue en el Mac mini hasta que el usuario decida"
+        "La descarga semanal (rappi refresh y post-refresh, con capas y motor) sigue en el Mac mini hasta que el usuario decida"
       ]
     }
   ]

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "diagram_type": "dataflow",
   "meta": {
-    "title": "RAG de Rappi: de rappi.cl a Mochi",
+    "title": "RAG y motor: de rappi.cl a Mochi",
     "quality_profile": "showcase",
     "views": [
       {
@@ -22,48 +22,48 @@
         "focus": [
           "catalogo",
           "busqueda",
-          "jev",
           "conceptos",
           "embed",
-          "eval"
+          "motor"
         ],
-        "note": "Tras la descarga: Jev (opcional), conceptos, embeddings e5, evaluación con 3 jueces y la capa de datos (atributos, marcas, grafo)."
+        "note": "make post-refresh: conceptos, embeddings e5, evaluación, synth y make layers (capa de datos y, al final, rappi-ia motor)."
       },
       {
         "id": "consulta",
-        "label": "3. Una consulta",
+        "label": "3. Una búsqueda",
         "focus": [
           "busqueda",
           "embed",
           "conceptos",
-          "eval",
           "retrieve",
-          "agente"
+          "agente",
+          "apps"
         ],
         "note": "Léxico + vectorial dentro del vertical, fusión RRF, refuerzo por concepto y regla de sin resultado con τ."
       },
       {
-        "id": "apps",
-        "label": "4. API y prototipo",
+        "id": "motor_vista",
+        "label": "4. Motor multivertical",
+        "focus": [
+          "combos",
+          "eventos",
+          "motor",
+          "ofertas",
+          "apps"
+        ],
+        "note": "Afinidad, transiciones, combinaciones, compra cruzada, tendencias y recompra; la tabla de Rappi da el paso de combinación."
+      },
+      {
+        "id": "apps_vista",
+        "label": "5. Home, ofertas y panel",
         "focus": [
           "agente",
-          "api",
+          "ofertas",
           "apps",
           "eventos",
           "panel"
         ],
-        "note": "La API expone el agente, sus ofertas y la analítica; el prototipo y el panel la consumen y registran eventos."
-      },
-      {
-        "id": "cruce",
-        "label": "5. Entre verticales",
-        "focus": [
-          "conceptos",
-          "agente",
-          "eventos",
-          "retrieve"
-        ],
-        "note": "El puente es el concepto: interés del usuario, complemento curado y búsqueda en el otro vertical."
+        "note": "La Home ordena los verticales por afinidad y el agente ofrece por momento; cada pedido recalcula a la persona."
       }
     ],
     "viewBox": [
@@ -89,7 +89,7 @@
   },
   "stages": [
     {
-      "label": "Descarga"
+      "label": "Entradas"
     },
     {
       "label": "Postgres"
@@ -98,7 +98,7 @@
       "label": "IA offline"
     },
     {
-      "label": "Consulta"
+      "label": "API :8000"
     },
     {
       "label": "Apps"
@@ -124,6 +124,15 @@
       "tag": "domingos 03:00"
     },
     {
+      "id": "combos",
+      "type": "external",
+      "label": "Tabla de Rappi",
+      "sublabel": "combos.toml",
+      "stage": 0,
+      "row": 2,
+      "tag": "dato compartido por Rappi"
+    },
+    {
       "id": "catalogo",
       "type": "database",
       "label": "Catálogo (capa 1)",
@@ -142,31 +151,13 @@
       "tag": "GIN + HNSW"
     },
     {
-      "id": "eventos",
-      "type": "database",
-      "label": "Eventos (capa 3)",
-      "sublabel": "synth · prototipo",
-      "stage": 4,
-      "row": 2,
-      "tag": "purga 90 días"
-    },
-    {
-      "id": "jev",
-      "type": "external",
-      "label": "Jev (TypeSafe)",
-      "sublabel": "etiqueta y juzga",
-      "stage": 2,
-      "row": 1,
-      "tag": "opcional"
-    },
-    {
       "id": "conceptos",
       "type": "backend",
-      "label": "Conceptos (capa 2)",
-      "sublabel": "reglas + kNN + Jev",
+      "label": "Conceptos y capa",
+      "sublabel": "marcas · grafo",
       "stage": 2,
       "row": 0,
-      "tag": "item_concepts"
+      "tag": "esquema capa"
     },
     {
       "id": "embed",
@@ -174,26 +165,17 @@
       "label": "Embeddings e5",
       "sublabel": "768 dimensiones",
       "stage": 2,
-      "row": 3,
+      "row": 1,
       "tag": "caché por hash"
     },
     {
-      "id": "eval",
+      "id": "motor",
       "type": "backend",
-      "label": "Evaluación",
-      "sublabel": "165 consultas · 3 jueces",
+      "label": "Motor multivertical",
+      "sublabel": "6 tablas · semanal",
       "stage": 2,
       "row": 2,
-      "tag": "nDCG · τ"
-    },
-    {
-      "id": "retrieve",
-      "type": "backend",
-      "label": "Búsqueda híbrida",
-      "sublabel": "léxico + vector",
-      "stage": 3,
-      "row": 2,
-      "tag": "concepto · τ"
+      "tag": "pesos en validación"
     },
     {
       "id": "agente",
@@ -205,31 +187,49 @@
       "tag": "Claude opcional"
     },
     {
-      "id": "api",
-      "type": "cloud",
-      "label": "API :8000",
-      "sublabel": "agent · analytics",
-      "stage": 4,
-      "row": 0,
-      "tag": "make serve"
+      "id": "retrieve",
+      "type": "backend",
+      "label": "Búsqueda híbrida",
+      "sublabel": "léxico + vector",
+      "stage": 3,
+      "row": 1,
+      "tag": "concepto · τ"
+    },
+    {
+      "id": "ofertas",
+      "type": "backend",
+      "label": "Ofertas y orden",
+      "sublabel": "/agent/offer",
+      "stage": 3,
+      "row": 2,
+      "tag": "/profile/{id}/verticales"
     },
     {
       "id": "apps",
       "type": "frontend",
-      "label": "Prototipo",
-      "sublabel": ":5174",
+      "label": "Prototipo :5174",
+      "sublabel": "Home dinámica",
       "stage": 4,
-      "row": 1,
-      "tag": "Vite"
+      "row": 2,
+      "tag": "buscador · ofertas"
+    },
+    {
+      "id": "eventos",
+      "type": "database",
+      "label": "Pedidos y eventos",
+      "sublabel": "synth · prototipo",
+      "stage": 3,
+      "row": 3,
+      "tag": "purga 90 días"
     },
     {
       "id": "panel",
       "type": "frontend",
       "label": "Panel :5175",
-      "sublabel": "Uso del MVP · /analytics",
+      "sublabel": "Entre verticales",
       "stage": 4,
       "row": 3,
-      "tag": "Vite"
+      "tag": "Uso del MVP"
     }
   ],
   "flows": [
@@ -266,85 +266,27 @@
       "id": "categorias",
       "from": "catalogo",
       "to": "conceptos",
-      "label": "categorías y nombres",
+      "label": "categorías",
       "route": "straight",
       "fromSide": "right",
-      "toSide": "left",
-      "labelAt": [
-        423,
-        124
-      ]
-    },
-    {
-      "id": "nuevas",
-      "from": "catalogo",
-      "to": "jev",
-      "label": "categorías nuevas",
-      "variant": "dashed"
-    },
-    {
-      "id": "etiqueta",
-      "from": "jev",
-      "to": "conceptos",
-      "label": "etiqueta",
-      "variant": "dashed"
-    },
-    {
-      "id": "juicio",
-      "from": "jev",
-      "to": "eval",
-      "label": "juicio",
-      "variant": "dashed",
-      "labelAt": [
-        530,
-        314
-      ]
+      "toSide": "left"
     },
     {
       "id": "pendientes",
       "from": "busqueda",
       "to": "embed",
-      "label": "textos sin vector",
+      "label": "sin vector",
       "variant": "emphasis",
-      "fromSide": "bottom",
-      "toSide": "left",
-      "via": [
-        [
-          315,
-          499
-        ]
-      ]
+      "route": "straight",
+      "fromSide": "right",
+      "toSide": "left"
     },
     {
       "id": "vectores",
       "from": "embed",
       "to": "retrieve",
-      "label": "índice HNSW",
+      "label": "HNSW",
       "variant": "emphasis",
-      "fromSide": "right",
-      "toSide": "bottom",
-      "via": [
-        [
-          745,
-          499
-        ]
-      ]
-    },
-    {
-      "id": "tau",
-      "from": "eval",
-      "to": "retrieve",
-      "label": "τ por vertical",
-      "variant": "dashed",
-      "fromSide": "right",
-      "toSide": "left",
-      "route": "straight"
-    },
-    {
-      "id": "complementos",
-      "from": "conceptos",
-      "to": "agente",
-      "label": "complementos",
       "route": "straight",
       "fromSide": "right",
       "toSide": "left"
@@ -364,27 +306,58 @@
       ]
     },
     {
-      "id": "respuesta",
-      "from": "agente",
-      "to": "api",
-      "label": "respuesta",
+      "id": "complementos",
+      "from": "conceptos",
+      "to": "agente",
+      "label": "complementos",
+      "route": "straight",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "retencion",
+      "from": "combos",
+      "to": "motor",
+      "label": "retención por combinación",
+      "variant": "dashed",
+      "route": "straight",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "tablas",
+      "from": "motor",
+      "to": "ofertas",
+      "label": "tablas",
       "variant": "emphasis",
       "route": "straight",
       "fromSide": "right",
       "toSide": "left"
     },
     {
-      "id": "json",
-      "from": "api",
+      "id": "respuesta",
+      "from": "agente",
       "to": "apps",
-      "label": "preguntas y ofertas",
-      "route": "straight",
-      "fromSide": "bottom",
+      "label": "respuestas",
+      "variant": "emphasis",
+      "fromSide": "right",
       "toSide": "top",
-      "labelAt": [
-        960,
-        214
+      "via": [
+        [
+          960,
+          157
+        ]
       ]
+    },
+    {
+      "id": "oferta",
+      "from": "ofertas",
+      "to": "apps",
+      "label": "orden y oferta",
+      "variant": "emphasis",
+      "route": "straight",
+      "fromSide": "right",
+      "toSide": "left"
     },
     {
       "id": "registro",
@@ -392,12 +365,32 @@
       "to": "eventos",
       "label": "/events · /orders",
       "variant": "dashed",
-      "route": "straight",
       "fromSide": "bottom",
       "toSide": "top",
-      "labelAt": [
-        960,
-        328
+      "via": [
+        [
+          960,
+          442
+        ],
+        [
+          745,
+          442
+        ]
+      ]
+    },
+    {
+      "id": "senales",
+      "from": "eventos",
+      "to": "motor",
+      "label": "pedidos y señales",
+      "variant": "dashed",
+      "fromSide": "left",
+      "toSide": "bottom",
+      "via": [
+        [
+          530,
+          499
+        ]
       ]
     },
     {
@@ -406,12 +399,8 @@
       "to": "panel",
       "label": "/analytics",
       "route": "straight",
-      "fromSide": "bottom",
-      "toSide": "top",
-      "labelAt": [
-        960,
-        428
-      ]
+      "fromSide": "right",
+      "toSide": "left"
     }
   ],
   "cards": [
@@ -420,17 +409,17 @@
       "title": "Offline, cada domingo",
       "items": [
         "refresh-semanal.sh: rappi refresh y make post-refresh",
-        "Jev (opcional), conceptos, embeddings, evaluación, capas y purga",
-        "Candado propio: nunca corren dos descargas a la vez"
+        "Conceptos, embeddings, evaluación, synth y capas",
+        "rappi-ia motor: afinidad, combinaciones y recompra"
       ]
     },
     {
       "dot": "cyan",
-      "title": "Online, en cada consulta",
+      "title": "Online, en cada visita",
       "items": [
-        "Siempre dentro de un vertical: léxico por IDF y vectorial e5",
-        "RRF, refuerzo por concepto y sin resultado bajo τ",
-        "Respuesta con plantillas o con Claude; /analytics en la API"
+        "Búsqueda dentro de un vertical: léxico, vector e5 y RRF",
+        "Home por afinidad; ofertas por momento con su «Porque…»",
+        "Cada pedido recalcula la afinidad y la recompra"
       ]
     },
     {
@@ -438,8 +427,8 @@
       "title": "Límites",
       "items": [
         "Catálogo = muestra pública: hasta 24 productos por sub-pasillo",
-        "Usuarios y eventos: simulados",
-        "Claude y Jev son opcionales: sin claves todo sigue igual"
+        "Personas y pedidos simulados: prueban la mecánica",
+        "Tabla de Rappi: correlación; Claude y Jev, opcionales"
       ]
     }
   ]
