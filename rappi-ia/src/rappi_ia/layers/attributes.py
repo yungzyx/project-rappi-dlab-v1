@@ -86,7 +86,7 @@ def _stem(word: str) -> str:
     return word
 
 
-def _phrase_key(phrase: str) -> tuple[str, ...]:
+def phrase_key(phrase: str) -> tuple[str, ...]:
     return tuple(_stem(w) for w in normalize(phrase).split())
 
 
@@ -100,11 +100,11 @@ class _Detector:
         self.negations: dict[tuple[str, ...], list[str]] = {}
         for r in self.rules:
             for p in r.phrases:
-                self.phrases.setdefault(_phrase_key(p), []).append((r.attribute_id, p, False))
+                self.phrases.setdefault(phrase_key(p), []).append((r.attribute_id, p, False))
             for p in r.catalog_phrases:
-                self.phrases.setdefault(_phrase_key(p), []).append((r.attribute_id, p, True))
+                self.phrases.setdefault(phrase_key(p), []).append((r.attribute_id, p, True))
             for n in r.negations:
-                self.negations.setdefault(_phrase_key(n), []).append(r.attribute_id)
+                self.negations.setdefault(phrase_key(n), []).append(r.attribute_id)
         self.longest = max(len(k) for k in [*self.phrases, *self.negations])
 
     def hits(self, text: str, entity_type: str = "catalog_item") -> tuple[dict[str, str], set[str]]:

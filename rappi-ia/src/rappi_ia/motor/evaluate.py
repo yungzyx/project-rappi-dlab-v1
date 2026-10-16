@@ -17,10 +17,10 @@ from .data import Order, Signal
 from .model import (
     DEFAULT_ORDER,
     DEFAULT_WEIGHTS,
-    _concepts,
-    _local_day,
     affinity,
     cross_sell,
+    local_day,
+    order_concepts,
     popularity,
     rank_verticals,
     replenishment,
@@ -232,7 +232,7 @@ def _precision(predictions: dict[str, list[tuple[str, str]]], bought: dict[str, 
 
 
 def _pairs(orders: list[Order], sensitive: frozenset[str], skip_suggested: bool = False) -> set[tuple[str, str]]:
-    return {(c, o.vertical) for o in orders for c in _concepts(o, sensitive, skip_suggested)}
+    return {(c, o.vertical) for o in orders for c in order_concepts(o, sensitive, skip_suggested)}
 
 
 def evaluate_cross_sell(
@@ -288,7 +288,7 @@ def _cross_sell_window(history: _History, sensitive: frozenset[str], cut: dateti
     for user in window.people:
         past = history.user_orders(user, None, cut)
         had = _pairs(past, sensitive)
-        recent = {c for o in past if o.ts >= recent_start for c in _concepts(o, sensitive)}
+        recent = {c for o in past if o.ts >= recent_start for c in order_concepts(o, sensitive)}
         best: dict[tuple[str, str], tuple[float, float]] = {}
         lifts: dict[tuple[str, str], float] = {}
         for concept in recent:
@@ -373,14 +373,14 @@ def evaluate_replenishment(orders: list[Order], sensitive: frozenset[str], cut: 
 
 
 def _replenishment(history: _History, sensitive: frozenset[str], cut: datetime, end: datetime) -> dict:
-    first_day, last_day = _local_day(cut), _local_day(end)
+    first_day, last_day = local_day(cut), local_day(end)
     due = [r for r in replenishment(history.orders_before(cut), sensitive) if first_day <= r.due_on < last_day]
     errors = []
     for r in due:
         days = [
-            _local_day(o.ts)
+            local_day(o.ts)
             for o in history.user_orders(r.user_id, cut, end)
-            if r.concept_id in _concepts(o, sensitive)
+            if r.concept_id in order_concepts(o, sensitive)
         ]
         if days:
             errors.append(abs((min(days) - r.due_on).days))

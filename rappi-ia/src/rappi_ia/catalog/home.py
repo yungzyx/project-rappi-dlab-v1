@@ -7,7 +7,7 @@ from rappi_scraper.storage.search import MIN_PRICE
 from .. import config
 from .cache import cached
 from .restaurants import restaurants
-from .stores import _CURRENT_OFFERS, _OWN_VERTICAL, _card, downloaded_cte, not_pushed_params
+from .stores import CURRENT_OFFERS, OWN_VERTICAL, downloaded_cte, not_pushed_params, store_card
 
 NEARBY_STORES = 6
 FAST_RESTAURANTS = 2
@@ -26,13 +26,13 @@ nearest AS MATERIALIZED (
                          + cos(radians(%(lat)s)) * cos(radians(s.lat)) * sin(radians(s.lng - %(lng)s) / 2) ^ 2)) AS km
     FROM downloaded d
     JOIN stores s ON s.store_id = d.store_id
-    WHERE s.lat IS NOT NULL AND s.lng IS NOT NULL AND EXISTS (SELECT 1 {_CURRENT_OFFERS})
+    WHERE s.lat IS NOT NULL AND s.lng IS NOT NULL AND EXISTS (SELECT 1 {CURRENT_OFFERS})
     ORDER BY km, d.store_id
     LIMIT %(limit)s
 )
-SELECT s.store_id, btrim(coalesce(b.name, s.name)), s.raw->>'image', s.raw->>'eta_value', o.products, {_OWN_VERTICAL}
+SELECT s.store_id, btrim(coalesce(b.name, s.name)), s.raw->>'image', s.raw->>'eta_value', o.products, {OWN_VERTICAL}
 FROM nearest d
-CROSS JOIN LATERAL (SELECT count(DISTINCT sp.master_product_id) AS products {_CURRENT_OFFERS}) o
+CROSS JOIN LATERAL (SELECT count(DISTINCT sp.master_product_id) AS products {CURRENT_OFFERS}) o
 JOIN stores s ON s.store_id = d.store_id
 LEFT JOIN brands b ON b.brand_id = s.brand_id
 ORDER BY d.km, d.store_id"""
@@ -56,4 +56,4 @@ def _home(conn: Connection) -> dict:
 
 def _nearby_stores(conn: Connection, lat: float, lng: float, limit: int) -> list[dict]:
     params = {"lat": lat, "lng": lng, "limit": limit, "min_price": MIN_PRICE, **not_pushed_params()}
-    return [_card(*row) for row in conn.execute(_NEARBY, params)]
+    return [store_card(*row) for row in conn.execute(_NEARBY, params)]

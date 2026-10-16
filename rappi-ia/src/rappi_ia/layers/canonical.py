@@ -9,7 +9,7 @@ from pathlib import Path
 from psycopg import Connection
 
 from ..text import normalize
-from .measures import _NAME_MEASURE
+from .measures import NAME_MEASURE
 from .runs import finish_layer_run, rules_version, start_layer_run
 
 log = logging.getLogger(__name__)
@@ -30,7 +30,7 @@ def name_key(name: str, brand_words: set[str]) -> str:
     o un pack y la unidad, no. Un combo («Alto 1lt + Coca 1.5lt») no tiene clave."""
     if "+" in name:
         return ""
-    text = _NAME_MEASURE.sub(" ", _PACK_BEFORE_MEASURE.sub(" ", name))
+    text = NAME_MEASURE.sub(" ", _PACK_BEFORE_MEASURE.sub(" ", name))
     ignored = brand_words | _ARTICLES | _FILLER
     words = [w for w in normalize(text).split() if w not in ignored]
     return " ".join(sorted(words))

@@ -27,7 +27,7 @@ from rappi_scraper.storage.search import VERTICALS
 
 from ..concepts.taxonomy import load_taxonomy
 from ..text import normalize
-from .attributes import _phrase_key, load_attribute_rules
+from .attributes import load_attribute_rules, phrase_key
 from .runs import finish_layer_run, rules_version, start_layer_run
 
 log = logging.getLogger(__name__)
@@ -389,7 +389,7 @@ def _content_hit(signal: Signal, key: str, wanted: list[str], taxonomy) -> bool:
 
 
 def _has_phrase(text: str, phrase: str) -> bool:
-    words, target = [_phrase_key(w)[0] for w in normalize(text).split()], _phrase_key(phrase)
+    words, target = [phrase_key(w)[0] for w in normalize(text).split()], phrase_key(phrase)
     return any(tuple(words[i : i + len(target)]) == target for i in range(len(words) - len(target) + 1))
 
 

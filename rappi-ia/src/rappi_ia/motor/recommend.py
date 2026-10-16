@@ -18,7 +18,7 @@ from .. import config
 from ..concepts.taxonomy import load_taxonomy
 from ..offers.guards import is_offerable, offerable_vertical
 from .data import load_orders
-from .predict import _source_of
+from .predict import source_of
 
 CROSS_SELL_LAMBDA = 1.0  # sin una corrida que lo haya elegido
 RECENT_DAYS = 30  # los conceptos de la persona que disparan reglas, y lo que ya pidió y no se repite
@@ -71,7 +71,7 @@ def cross_picks(
     trae todos y `lam`, si quien llama ya lo leyó, evita volver a leer el λ."""
     population = population or config.MOTOR_POBLACION
     now = datetime.now(UTC)
-    source = _source_of(conn, user_id)
+    source = source_of(conn, user_id)
     since = now - timedelta(days=RECENT_DAYS)
     recent = [o for o in (load_orders(conn, source, user_id, since=since) if source else []) if o.ts <= now]
     had = {(line.concept_id, o.vertical) for o in recent for line in o.lines if line.concept_id is not None}

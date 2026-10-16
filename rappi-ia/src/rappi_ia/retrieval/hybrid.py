@@ -124,7 +124,7 @@ def retrieve(
             ranks.setdefault(key, {})[name] = position
 
     if query_concepts and mode == "hibrido":  # sin refuerzo, el concepto de cada ítem lo trae `_hydrate`
-        item_concepts = _concepts_of(conn, list(scores))
+        item_concepts = concepts_of(conn, list(scores))
         for key in scores:
             if item_concepts.get(key) in query_concepts:
                 scores[key] += CONCEPT_BONUS
@@ -346,7 +346,7 @@ def _few_within_price(conn: Connection, where: str, params: dict) -> bool:
     )
 
 
-def _concepts_of(conn: Connection, keys: list[tuple[str, str]]) -> dict[tuple[str, str], str]:
+def concepts_of(conn: Connection, keys: list[tuple[str, str]]) -> dict[tuple[str, str], str]:
     if not keys:
         return {}
     rows = conn.execute(

@@ -52,7 +52,7 @@ def next_verticals(
     now = now or datetime.now(UTC)
     aff: dict[str, float] = {}
     last_vertical = None
-    source = _source_of(conn, user_id) if user_id else None
+    source = source_of(conn, user_id) if user_id else None
     if source is not None:
         signals = [s for s in load_signals(conn, source, user_id) if s.ts <= now]
         aff = affinity(signals, now).get(user_id, {})
@@ -131,6 +131,6 @@ def _learned_retention(conn: Connection, population: str) -> dict[str, tuple[int
     }
 
 
-def _source_of(conn: Connection, user_id: str) -> str | None:
+def source_of(conn: Connection, user_id: str) -> str | None:
     row = conn.execute("SELECT source FROM app_users WHERE user_id = %s", (user_id,)).fetchone()
     return row[0] if row else None

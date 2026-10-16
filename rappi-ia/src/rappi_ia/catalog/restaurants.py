@@ -14,7 +14,7 @@ from rappi_scraper.storage.search import MIN_PRICE
 
 from ..agent.tools import clp
 from ..concepts.taxonomy import load_taxonomy
-from .stores import BIGINT_MAX, _product
+from .stores import BIGINT_MAX, product_card
 
 POPULAR_SECTION = "Lo más pedido"
 
@@ -97,7 +97,7 @@ def restaurant_menu(conn: Connection, store_id: int) -> dict | None:
     for section_id, section, entity_id, name, price, real, image, is_popular, concept_id in conn.execute(
         _MENU, {"store_id": store_id, "min_price": MIN_PRICE}
     ):
-        dish = _product(
+        dish = product_card(
             (entity_id, name, price, real, image, None, False, concept_id),
             "restaurantes",
             full_name,
