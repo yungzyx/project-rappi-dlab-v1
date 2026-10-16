@@ -39,6 +39,8 @@ PROFILE_CITY = os.environ.get("PROFILE_CITY") or "Santiago de Chile"
 # De qué población aprende el motor multivertical (motor/): «synthetic» (personas simuladas, no son evidencia) o
 # «prototype» (las del prototipo). Nunca se mezclan: cada fila del motor lleva su `data_source`.
 MOTOR_POBLACION = os.environ.get("MOTOR_POBLACION", "synthetic")
+if MOTOR_POBLACION not in ("synthetic", "prototype"):
+    raise RuntimeError(f"MOTOR_POBLACION debe ser 'synthetic' o 'prototype' (vale {MOTOR_POBLACION!r})")
 
 # LLM opcional: sin ANTHROPIC_API_KEY, el agente responde con plantillas.
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY") or None

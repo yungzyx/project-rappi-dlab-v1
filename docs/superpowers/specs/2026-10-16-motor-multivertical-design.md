@@ -71,7 +71,7 @@ Código nuevo en `rappi-ia/src/rappi_ia/motor/`; reglas en `motor/combos.toml`; 
 
 **Fuente de población.** Los patrones de población (transiciones, combinaciones, compras cruzadas, tendencias) se aprenden de una sola fuente, `MOTOR_POBLACION` (por defecto `synthetic`; con datos reales sería otra fuente). Lo personal (afinidad, recompra) sale siempre de los datos de la propia persona. Cada recomendación declara en su `reason.basis` qué fuente usó. Esto cambia una decisión anterior («el agente no usa lo aprendido de los simulados»): sin datos reales, el motor no tiene otra población de la que aprender, y lo deja dicho en cada oferta.
 
-**Tablas** (todas con `run_id` de `layer_runs`, que suma la capa `motor`):
+**Tablas** (las de población llevan `run_id` de `layer_runs`, que suma la capa `motor`; las dos personales, `user_vertical_affinity` y `replenishment`, no tienen `run_id`: se refrescan por persona, también después de cada pedido):
 
 | Tabla | Qué guarda | Cómo se calcula |
 |---|---|---|

@@ -317,3 +317,59 @@ def test_refresh_user_leaves_synthetic_people_alone(simulated):
     refresh_user(lambda: _same(db), user)
 
     assert db.execute("SELECT count(*) FROM user_vertical_affinity WHERE user_id = %s", (user,)).fetchone()[0] == before
+
+
+# La fuente prototype: presente y pocas personas
+
+
+def _recent_orders(days_ago: int, users: int):
+    from rappi_ia.motor.data import Line, Order
+
+    ts = datetime.now(UTC) - timedelta(days=days_ago)
+    line = Line(None, "catalog_item", "91001", False)
+    return [Order(f"u{i}", f"o{i}", None, ts, "turbo", 1000.0, (line,)) for i in range(users)]
+
+
+@pytest.mark.parametrize("source", ["prototype", "synthetic"])
+def test_build_uses_the_present_only_for_the_prototype(db, monkeypatch, source):
+    """El prototipo mide sus ventanas desde hoy (como el recálculo de cada pedido); los simulados, desde su último
+    pedido."""
+    from rappi_ia.motor import build
+    from rappi_ia.motor.model import TZ
+
+    orders = _recent_orders(days_ago=10, users=2)
+    monkeypatch.setattr(build, "load_orders", lambda *_args: orders)
+    monkeypatch.setattr(build, "load_signals", lambda *_args: [])
+    build_motor(db, source, evaluate=False)
+
+    window_end = db.execute("SELECT DISTINCT window_end FROM trends WHERE data_source = %s", (source,)).fetchone()[0]
+    expected = datetime.now(TZ) if source == "prototype" else orders[0].ts.astimezone(TZ)
+    assert window_end == expected.date()
+
+
+def test_prototype_trends_hide_what_one_or_two_people_ordered(db, monkeypatch):
+    from rappi_ia.motor import build
+    from rappi_ia.motor.model import PROTOTYPE_MIN_USERS
+
+    few, many = _recent_orders(2, users=2), _recent_orders(2, users=PROTOTYPE_MIN_USERS)
+    for source, orders, products in (("prototype", few, 0), ("synthetic", few, 1)):
+        monkeypatch.setattr(build, "load_orders", lambda *_args, orders=orders: orders)
+        monkeypatch.setattr(build, "load_signals", lambda *_args: [])
+        build_motor(db, source, evaluate=False)
+        assert (
+            db.execute(
+                "SELECT count(*) FROM trends WHERE data_source = %s AND scope = 'producto'", (source,)
+            ).fetchone()[0]
+            == products
+        )
+        assert (
+            db.execute(
+                "SELECT users_now FROM trends WHERE data_source = %s AND scope = 'vertical'", (source,)
+            ).fetchone()[0]
+            == 2
+        )  # el vertical es un agregado: sale siempre
+
+    monkeypatch.setattr(build, "load_orders", lambda *_args: many)
+    build_motor(db, "prototype", evaluate=False)
+    products = db.execute("SELECT count(*) FROM trends WHERE data_source = 'prototype' AND scope = 'producto'")
+    assert products.fetchone()[0] == 1

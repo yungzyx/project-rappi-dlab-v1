@@ -6,6 +6,7 @@ from rappi_ia.motor.data import Line, Order, Signal
 from rappi_ia.motor.model import (
     DEFAULT_ORDER,
     DEFAULT_WEIGHTS,
+    PROTOTYPE_MIN_USERS,
     ComboMonth,
     affinity,
     combo_months,
@@ -248,6 +249,21 @@ def test_trends_rank_and_growth():
         1,
     )
     assert ("producto", "turbo", "catalog_item:preservativos") not in rows
+
+
+def test_trends_min_users_drops_concepts_and_products_but_not_verticals():
+    end = date(2026, 10, 14)
+    when = datetime(2026, 10, 10, 15, tzinfo=UTC)
+    orders = [order(f"u{i}", when, "turbo", "cafe") for i in range(PROTOTYPE_MIN_USERS)]
+    orders += [order("solo", when, "turbo", "pan") for _ in range(3)]  # tres pedidos, una sola persona
+    rows = {(r.scope, r.item_key): r for r in trends(orders, end, SENSITIVE, PROTOTYPE_MIN_USERS)}
+
+    assert ("concepto", "pan") not in rows and ("producto", "catalog_item:pan") not in rows
+    assert ("concepto", "cafe") in rows and ("producto", "catalog_item:cafe") in rows
+    turbo = rows["vertical", "turbo"]
+    assert (turbo.orders_now, turbo.users_now) == (PROTOTYPE_MIN_USERS + 3, PROTOTYPE_MIN_USERS + 1)
+    assert rows["concepto", "cafe"].rank == 1  # el ranking se arma con lo que queda
+    assert ("concepto", "pan") in {(r.scope, r.item_key) for r in trends(orders, end, SENSITIVE)}  # sin mínimo, sale
 
 
 # Recompra

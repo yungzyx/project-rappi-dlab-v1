@@ -145,6 +145,15 @@ def test_report_warns_on_synthetic():
     assert "Datos simulados" not in report(results, "prototype")
 
 
+def test_report_labels_the_prototype_as_mvp_use():
+    orders = _graduates()
+    results = evaluate(orders, signals_of(orders), frozenset())
+
+    for text in (report(results, "prototype"), not_evaluated("prototype", "pocos días", {}, "hoy")):
+        assert "Uso del MVP, pocas personas: no es evidencia." in text
+    assert "Uso del MVP" not in report(results, "synthetic")
+
+
 def test_without_people_to_validate_keeps_the_previous_weights():
     # Pedidos al principio y al final: nadie pide antes y durante la validación.
     orders = [order(f"u{i}", d, "turbo") for i in range(5) for d in (0, 2, 88, 90)]

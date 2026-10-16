@@ -55,6 +55,33 @@ def test_affinity_rows_go_with_the_person(db):
     assert db.execute("SELECT count(*) FROM replenishment").fetchone()[0] == 0
 
 
+def test_personal_capa_views_carry_the_source_and_hide_sensitive_concepts(db):
+    db.execute("INSERT INTO app_users (user_id, source) VALUES ('u1', 'prototype'), ('u2', 'synthetic')")
+    for user in ("u1", "u2"):
+        db.execute(
+            "INSERT INTO user_vertical_affinity (user_id, vertical, score, orders, signals)"
+            " VALUES (%s, 'turbo', 1, 1, 1)",
+            (user,),
+        )
+    db.execute(
+        "INSERT INTO concepts (concept_id, name, taxonomy_version, sensitive)"
+        " VALUES ('cafe', 'Café', 'v1', false), ('pañal', 'Pañal', 'v1', true)"
+    )
+    for concept in ("cafe", "pañal"):
+        db.execute("INSERT INTO replenishment (user_id, concept_id, vertical) VALUES ('u1', %s, 'turbo')", (concept,))
+    assert dict(db.execute("SELECT user_id, source FROM capa.user_vertical_affinity").fetchall()) == {
+        "u1": "prototype",
+        "u2": "synthetic",
+    }
+    assert db.execute("SELECT concept_id, source FROM capa.replenishment").fetchall() == [("cafe", "prototype")]
+    for view in ("user_vertical_affinity", "replenishment"):
+        comment = db.execute(
+            f"""SELECT col_description('capa.{view}'::regclass, attnum) FROM pg_attribute
+                WHERE attrelid = 'capa.{view}'::regclass AND attname = 'source'"""
+        ).fetchone()[0]
+        assert comment, f"capa.{view}.source sin comentario"
+
+
 def test_population_tables_keep_synthetic_and_prototype_apart(db):
     with pytest.raises(psycopg.errors.CheckViolation), db.transaction():
         db.execute(STEP, ("mezcla",))

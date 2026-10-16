@@ -28,6 +28,7 @@ from .model import (
     AFFINITY_WINDOW_DAYS,
     DEFAULT_ORDER,
     DEFAULT_WEIGHTS,
+    PROTOTYPE_MIN_USERS,
     TZ,
     affinity,
     combo_months,
@@ -46,7 +47,9 @@ log = logging.getLogger(__name__)
 
 def build_motor(conn: Connection, source: str, evaluate: bool = True) -> dict:
     """Recalcula el motor de una fuente en una sola transacción: las 5 tablas de población y la afinidad y la recompra
-    de todas sus personas. `now` es el último pedido de la fuente (los simulados terminan en una fecha pasada). La
+    de todas sus personas. `now` es el último pedido de la fuente (los simulados terminan en una fecha pasada) o, en el
+    prototipo, el momento actual; ahí, además, las tendencias de concepto y producto piden `PROTOTYPE_MIN_USERS`
+    personas. La
     corrida queda en `layer_runs` (capa `motor`, con la fuente, los pesos y la evaluación en `counts`); si algo falla,
     queda `failed` y no se escribe nada.
 
@@ -93,7 +96,9 @@ def _build(conn: Connection, source: str, run: int, evaluate: bool) -> dict:
     counts["pedidos"] = len(orders)
     if not orders:
         return counts
-    now = max(o.ts for o in orders)
+    # Los simulados terminan en una fecha pasada; el prototipo vive en el presente, y así coinciden la corrida semanal
+    # y el recálculo después de cada pedido.
+    now = datetime.now(UTC) if source == "prototype" else max(o.ts for o in orders)
     sensitive = sensitive_concepts(conn)
     signals = load_signals(conn, source)
     if evaluate:
@@ -146,7 +151,7 @@ def _build(conn: Connection, source: str, run: int, evaluate: bool) -> dict:
     rows = [
         (source, t.scope, t.vertical, t.item_key, t.concept_id, t.entity_type, t.entity_id, t.orders_now,
          t.orders_prev, t.users_now, t.growth, t.rank, window_end, run)
-        for t in trends(orders, window_end, sensitive)
+        for t in trends(orders, window_end, sensitive, PROTOTYPE_MIN_USERS if source == "prototype" else 0)
     ]  # fmt: skip
     counts["tendencias"] = _copy(
         conn,

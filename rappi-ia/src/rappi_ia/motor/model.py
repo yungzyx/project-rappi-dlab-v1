@@ -39,6 +39,8 @@ CROSS_SELL_MIN_LIFT = 1.2
 TREND_WINDOW_DAYS = 28
 TREND_MIN_PREV = 5
 TREND_TOP_PRODUCTS = 50
+# Con las pocas personas del prototipo, un concepto o producto que pidió una sola no sale: la fila apuntaría a ella.
+PROTOTYPE_MIN_USERS = 5
 # Recompra: al menos 3 días de compra distintos e intervalos regulares.
 REPLENISH_MIN_ORDERS = 3
 REPLENISH_MAX_CV = 0.6
@@ -278,11 +280,12 @@ class TrendRow:
     rank: int
 
 
-def trends(orders: Iterable[Order], window_end: date, sensitive: frozenset[str]) -> list[TrendRow]:
+def trends(orders: Iterable[Order], window_end: date, sensitive: frozenset[str], min_users: int = 0) -> list[TrendRow]:
     """Lo más pedido y lo que sube en las 4 semanas que terminan en `window_end` (incluido) contra las 4 anteriores:
     por vertical, por concepto (sin sensibles) y por producto (los 50 más pedidos de cada vertical, sin los de un
     concepto sensible). Pedidos y personas distintas; `growth` = (ahora − antes) / max(antes, 5); `rank` por pedidos
-    recientes dentro de cada alcance y vertical. Lo que no tiene pedidos recientes no sale."""
+    recientes dentro de cada alcance y vertical. Lo que no tiene pedidos recientes no sale, y con `min_users` tampoco
+    los conceptos y productos que pidieron menos personas (los verticales, que son agregados, siempre salen)."""
     now_start = window_end - timedelta(days=TREND_WINDOW_DAYS - 1)
     prev_start = now_start - timedelta(days=TREND_WINDOW_DAYS)
     # (alcance, vertical, clave) → {"now": pedidos, "prev": pedidos, "users": personas recientes}
@@ -316,7 +319,7 @@ def trends(orders: Iterable[Order], window_end: date, sensitive: frozenset[str])
                 meta[key] = info
     groups: dict[tuple[str, str], list[tuple[str, int, int, int]]] = defaultdict(list)
     for (scope, vertical, item), s in stats.items():
-        if s["now"]:
+        if s["now"] and (scope == "vertical" or len(s["users"]) >= min_users):
             groups[scope, vertical].append((item, len(s["now"]), len(s["prev"]), len(s["users"])))
     out = []
     for (scope, vertical), items in sorted(groups.items()):

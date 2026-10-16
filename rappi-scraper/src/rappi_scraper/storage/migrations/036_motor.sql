@@ -112,21 +112,25 @@ CREATE TABLE replenishment (
 );
 
 -- Contrato estable `capa` (docs/capa-de-datos.md): una vista por tabla, con comentario en español en cada columna.
-CREATE VIEW capa.user_vertical_affinity AS SELECT * FROM user_vertical_affinity;
+-- Las dos vistas personales traen la fuente de la persona (`source`, como capa.user_segments): salen de app_users.
+CREATE VIEW capa.user_vertical_affinity AS
+SELECT t.*, u.source FROM user_vertical_affinity t JOIN app_users u USING (user_id);
 CREATE VIEW capa.vertical_transitions AS SELECT * FROM vertical_transitions;
 CREATE VIEW capa.combo_stats AS SELECT * FROM combo_stats;
 CREATE VIEW capa.combo_steps AS SELECT * FROM combo_steps;
 CREATE VIEW capa.cross_sell_rules AS SELECT * FROM cross_sell_rules;
 CREATE VIEW capa.trends AS SELECT * FROM trends;
-CREATE VIEW capa.replenishment AS SELECT * FROM replenishment;
+CREATE VIEW capa.replenishment AS
+SELECT t.*, u.source FROM replenishment t JOIN app_users u USING (user_id) JOIN concepts c USING (concept_id)
+WHERE NOT c.sensitive;
 
-COMMENT ON VIEW capa.user_vertical_affinity IS 'Cuánto le interesa cada vertical a cada persona, con sus pedidos y señales (búsquedas, vistas, aperturas). Ids de persona seudónimos; las de la fuente synthetic son simuladas (no son evidencia).';
+COMMENT ON VIEW capa.user_vertical_affinity IS 'Cuánto le interesa cada vertical a cada persona, con sus pedidos y señales (búsquedas, vistas, aperturas). Ids de persona seudónimos; las filas de la fuente synthetic son simuladas (no son evidencia).';
 COMMENT ON VIEW capa.vertical_transitions IS 'Qué vertical pide una persona después de otro, y con qué probabilidad, por fuente de datos.';
 COMMENT ON VIEW capa.combo_stats IS 'Por combinación de grupos de verticales usados en un mes (rest, turbo, retail): personas-mes, pedidos, gasto y retención al mes siguiente, medidos en las personas de cada fuente. Es una correlación, no un efecto.';
 COMMENT ON VIEW capa.combo_steps IS 'De qué combinación de grupos pasan las personas a cuál al mes siguiente, con cuántas personas y qué probabilidad.';
 COMMENT ON VIEW capa.cross_sell_rules IS 'Reglas «quien pide X en un vertical también pide Y en otro»: cuántas personas, confianza y lift. Son asociaciones, no causas.';
 COMMENT ON VIEW capa.trends IS 'Lo que crece en pedidos: verticales, conceptos y productos, comparando la ventana reciente con la anterior, con su lugar en el ranking.';
-COMMENT ON VIEW capa.replenishment IS 'Qué concepto recompra cada persona y cada cuántos días, con la fecha en que le toca de nuevo. Ids de persona seudónimos.';
+COMMENT ON VIEW capa.replenishment IS 'Qué concepto recompra cada persona y cada cuántos días, con la fecha en que le toca de nuevo. No incluye conceptos sensibles. Ids de persona seudónimos; las filas de la fuente synthetic son simuladas (no son evidencia).';
 
 COMMENT ON COLUMN capa.user_vertical_affinity.user_id IS 'Id seudónimo de la persona.';
 COMMENT ON COLUMN capa.user_vertical_affinity.vertical IS 'Vertical (código de la tabla verticals).';
@@ -135,6 +139,7 @@ COMMENT ON COLUMN capa.user_vertical_affinity.orders IS 'Pedidos de la persona e
 COMMENT ON COLUMN capa.user_vertical_affinity.signals IS 'Señales en los últimos 180 días, pedidos incluidos (pedidos, búsquedas, vistas y aperturas del vertical).';
 COMMENT ON COLUMN capa.user_vertical_affinity.last_ts IS 'Última vez que la persona hizo algo en ese vertical.';
 COMMENT ON COLUMN capa.user_vertical_affinity.updated_at IS 'Cuándo se recalculó esta fila.';
+COMMENT ON COLUMN capa.user_vertical_affinity.source IS 'synthetic (simulada) o prototype (usuarios del prototipo).';
 
 COMMENT ON COLUMN capa.vertical_transitions.data_source IS 'Fuente de las personas: synthetic (simulada) o prototype. Nunca mezcladas.';
 COMMENT ON COLUMN capa.vertical_transitions.from_vertical IS 'Vertical del pedido de partida.';
@@ -196,3 +201,4 @@ COMMENT ON COLUMN capa.replenishment.cv IS 'Variación de ese intervalo (desviac
 COMMENT ON COLUMN capa.replenishment.last_ts IS 'Último pedido de ese concepto.';
 COMMENT ON COLUMN capa.replenishment.due_on IS 'Día en que le toca pedirlo de nuevo.';
 COMMENT ON COLUMN capa.replenishment.updated_at IS 'Cuándo se recalculó esta fila.';
+COMMENT ON COLUMN capa.replenishment.source IS 'synthetic (simulada) o prototype (usuarios del prototipo).';

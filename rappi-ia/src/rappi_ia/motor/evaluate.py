@@ -37,6 +37,7 @@ CROSS_SELL_RECENT_DAYS = 30  # los conceptos de la persona que disparan reglas
 TOP_K = 3
 REPLENISH_TOLERANCE_DAYS = 7
 SYNTHETIC_WARNING = "Datos simulados: esto prueba la mecánica del motor, no su efecto."
+PROTOTYPE_WARNING = "Uso del MVP, pocas personas: no es evidencia."
 NO_VALIDATION = "Sin personas para validar (nadie pidió antes y durante la validación): quedan los pesos anteriores."
 # Lo que se lee en el informe; los ids quedan en el JSON de la corrida.
 LABELS = {
@@ -366,6 +367,8 @@ def _title(source: str) -> list[str]:
     lines = [f"# Evaluación del motor multivertical ({source})", ""]
     if source == "synthetic":
         lines += [f"> **{SYNTHETIC_WARNING}**", ""]
+    elif source == "prototype":
+        lines += [f"> **{PROTOTYPE_WARNING}**", ""]
     return lines
 
 
