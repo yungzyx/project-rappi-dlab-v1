@@ -24,6 +24,19 @@ export function serveFixtures() {
   )
 }
 
+/** La API "responde" con los fixtures, salvo lo que se le pase (`overrides`: nombre de la métrica → cuerpo completo). */
+export function serveFixturesWith(overrides) {
+  serveFixtures()
+  const fixtures = globalThis.fetch
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url) => {
+      const name = new URL(url).pathname.replace('/analytics/', '')
+      return name in overrides ? { ok: true, status: 200, json: async () => overrides[name] } : fixtures(url)
+    }),
+  )
+}
+
 /** La API está caída: el panel debe caer a los datos guardados. */
 export function apiDown() {
   retryConnection()

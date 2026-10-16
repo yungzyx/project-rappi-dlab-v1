@@ -2,7 +2,8 @@
 // agregó al carro (el agente lo comenta al volver).
 import { resetQuiet } from './agentQuiet'
 
-export const session = { played: false, lastAdded: null, plan: null, planPrompted: false }
+// `repeatLater`: tocaron «Después» en «¿Repetimos?»; no vuelve en lo que dura la pestaña.
+export const session = { played: false, lastAdded: null, plan: null, planPrompted: false, repeatLater: false }
 
 /** Lo último agregado al carro en el prototipo final (fuera de la Home): el agente lo comenta al volver. */
 export function rememberAdded(product) {
@@ -41,6 +42,7 @@ export function resetLive() {
     lastAdded: null,
     plan: null,
     planPrompted: false,
+    repeatLater: false,
   })
   resetQuiet()
   try {

@@ -12,7 +12,7 @@ from datetime import UTC, datetime, timedelta
 from psycopg import Connection
 
 from .. import config
-from .combos import combo_of_verticals, next_step
+from .combos import LEARNED_RETENTION_MIN_USERS, combo_key, combo_of_verticals, next_step
 from .data import load_signals
 from .model import DEFAULT_WEIGHTS, OWN_SIGNALS_ONLY, affinity, rank_verticals
 
@@ -103,7 +103,25 @@ def target_step(conn: Connection, user_id: str, population: str | None = None) -
     """El grupo que más retención le suma a la persona: `(grupo, combinación_objetivo, ganancia)`, con la retención de
     Rappi mezclada con la aprendida en `combo_stats` de la población; `None` si no hay paso."""
     population = population or config.MOTOR_POBLACION
-    learned = {
+    return next_step(current_combo(conn, user_id), _learned_retention(conn, population))
+
+
+def step_signal(conn: Connection, step: tuple[str, str, float], population: str | None = None) -> dict:
+    """La señal `combinacion` de un paso (`target_step`) para la `basis` de una oferta: «<actual>→<objetivo>». Su
+    fuente es la tabla de Rappi («rappi») o, si la retención aprendida de la población pesó en la combinación actual o
+    en la objetivo (con al menos `LEARNED_RETENTION_MIN_USERS` personas), «rappi+poblacion:<fuente>»."""
+    population = population or config.MOTOR_POBLACION
+    group, target, _gain = step
+    current = combo_key(set(target.split("+")) - {group})
+    learned = _learned_retention(conn, population)
+    weighed = any(learned.get(combo, (0, 0.0))[0] >= LEARNED_RETENTION_MIN_USERS for combo in (current, target))
+    source = f"rappi+poblacion:{population}" if weighed else "rappi"
+    return {"kind": "combinacion", "id": f"{current}→{target}", "source": source}
+
+
+def _learned_retention(conn: Connection, population: str) -> dict[str, tuple[int, float]]:
+    """combinación → (personas, retención M+1) aprendidas en `combo_stats` de la población."""
+    return {
         combo: (n, float(retention))
         for combo, n, retention in conn.execute(
             """SELECT combo, retention_n, retention_m1 FROM combo_stats
@@ -111,7 +129,6 @@ def target_step(conn: Connection, user_id: str, population: str | None = None) -
             (population,),
         )
     }
-    return next_step(current_combo(conn, user_id), learned)
 
 
 def _source_of(conn: Connection, user_id: str) -> str | None:

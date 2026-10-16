@@ -8,8 +8,9 @@ from psycopg.types.json import Jsonb
 
 from rappi_ia.events import store as events
 from rappi_ia.layers.runs import finish_layer_run, start_layer_run
+from rappi_ia.motor.combos import LEARNED_RETENTION_MIN_USERS
 from rappi_ia.motor.model import DEFAULT_ORDER, DEFAULT_WEIGHTS
-from rappi_ia.motor.predict import current_combo, latest_weights, next_verticals, target_step
+from rappi_ia.motor.predict import current_combo, latest_weights, next_verticals, step_signal, target_step
 
 NOW = datetime(2026, 10, 10, 15, tzinfo=UTC)
 
@@ -85,6 +86,30 @@ def test_target_step_for_a_restaurant_only_person_is_turbo(db):
     assert (group, target) == ("turbo", "rest+turbo")
     assert gain > 0
     assert target_step(db, "nadie") is None
+
+
+def _learned(db, combo, retention_n, source="synthetic"):
+    db.execute(
+        """INSERT INTO combo_stats (data_source, combo, user_months, retention_m1, retention_n)
+           VALUES (%s, %s, %s, 0.5, %s)""",
+        (source, combo, retention_n, retention_n),
+    )
+
+
+def test_the_step_signal_names_the_population_only_when_its_retention_weighed_in(db):
+    step = ("turbo", "rest+turbo", 0.1)
+    rappi = {"kind": "combinacion", "id": "rest→rest+turbo", "source": "rappi"}
+    assert step_signal(db, step, "synthetic") == rappi
+
+    _learned(db, "rest", LEARNED_RETENTION_MIN_USERS - 1)  # muy pocas personas: no pesa
+    _learned(db, "rest+turbo", 500, source="prototype")  # otra población
+    assert step_signal(db, step, "synthetic") == rappi
+
+    _learned(db, "rest+turbo", LEARNED_RETENTION_MIN_USERS)  # la combinación objetivo
+    assert step_signal(db, step, "synthetic")["source"] == "rappi+poblacion:synthetic"
+    db.execute("DELETE FROM combo_stats WHERE data_source = 'synthetic' AND combo = 'rest+turbo'")
+    db.execute("UPDATE combo_stats SET retention_n = %s WHERE combo = 'rest'", (LEARNED_RETENTION_MIN_USERS,))
+    assert step_signal(db, step, "synthetic")["source"] == "rappi+poblacion:synthetic"  # o la actual
 
 
 def test_latest_weights_default_without_runs(db):

@@ -1,0 +1,18 @@
+{
+  "data": {
+    "personas": 1,
+    "toques": 1,
+    "verticales": [
+      {
+        "personas": 1,
+        "toques": 1,
+        "vertical": "farmacia"
+      }
+    ]
+  },
+  "guardado": {
+    "fecha": "2026-10-16",
+    "origen": "make contract · recorrido corto sobre el catálogo de prueba inventado"
+  },
+  "source": "prototype"
+}

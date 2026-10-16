@@ -78,6 +78,12 @@ export default function StoreScreen({ back, params }) {
   const listed = (candidate) => candidate.id === item?.id || candidate.name === item?.name
   const visible = data?.sections ? data.sections.flatMap((section) => section.items) : products
   const chosen = item && data && !visible.some(listed) ? item : null
+  // Una sugerencia del agente que sí está en lo que se ve lleva su origen a esa fila: agregarla desde ahí cuenta la
+  // aceptación (useAddToCart), como desde «Lo que elegiste».
+  const withOrigin = (product) =>
+    item?.fromSuggestion && listed(product)
+      ? { ...product, fromSuggestion: true, suggestionOrigin: item.suggestionOrigin }
+      : product
 
   return (
     <div ref={scrollRef} className="screen store">
@@ -133,13 +139,18 @@ export default function StoreScreen({ back, params }) {
             {aisles.length > 0 && <AisleTabs aisles={aisles} active={aisle} onChoose={setAisle} />}
             {error && <OfflineNotice onRetry={retry} />}
             {!data && !error && <MenuSkeleton tabs={aisles.length === 0} />}
-            {data?.sections && <RealMenu sections={data.sections} scrollRef={scrollRef} />}
+            {data?.sections && (
+              <RealMenu
+                sections={data.sections.map((section) => ({ ...section, items: section.items.map(withOrigin) }))}
+                scrollRef={scrollRef}
+              />
+            )}
             {data?.products &&
               (products.length > 0 ? (
                 <>
                   <ul className="store-products">
                     {products.map((product) => (
-                      <ProductRow key={product.id} product={product} />
+                      <ProductRow key={product.id} product={withOrigin(product)} />
                     ))}
                   </ul>
                   {hasMore && (

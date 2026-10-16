@@ -70,15 +70,16 @@ def test_two_users_with_different_histories_get_different_offers(people, db):
     to_try_offers = {user: to_try(client, user) for user in histories}
     first_plans = {user: plans(client, user)[0] for user in histories}
 
-    assert to_try_offers[SWEET]["vertical"] != to_try_offers[GRILL]["vertical"]
-    # Cada una ya pidió en la vertical que le gusta (chocolatería y súper): la vertical por probar es otra y se
-    # explica con sus pedidos, no con sus gustos.
-    assert (to_try_offers[SWEET]["vertical"], to_try_offers[GRILL]["vertical"]) == ("supermercado", "conveniencia")
+    # Cada una ya pidió en la vertical que le gusta (chocolatería y súper), las dos de retail: la vertical por probar
+    # es la que más retiene sumarles (Turbo) y se explica con sus pedidos, no con sus gustos.
     for user in histories:
         offered = to_try_offers[user]
         ordered = {v for (v,) in db.execute("SELECT vertical FROM app_orders WHERE user_id = %s", (user,))}
-        assert offered["vertical"] not in ordered
-        assert offered["reason"]["basis"] == [{"kind": "sin_pedidos", "id": offered["vertical"], "source": "contexto"}]
+        assert offered["vertical"] == "turbo" and offered["vertical"] not in ordered
+        assert offered["reason"]["basis"] == [
+            {"kind": "combinacion", "id": "retail→turbo+retail", "source": "rappi"},
+            {"kind": "sin_pedidos", "id": "turbo", "source": "contexto"},
+        ]
     assert first_plans[SWEET]["id"] != first_plans[GRILL]["id"]
     assert (first_plans[SWEET]["id"], first_plans[GRILL]["id"]) == ("antojo", "asado")
     for user, history in histories.items():
@@ -97,6 +98,7 @@ def test_complement_puts_the_brand_you_buy_first(people, db):
     assert people.sweet_brand_product in ids and ids[0] != people.sweet_brand_product  # no era la primera
     assert [p["entity_id"] for p in sweet["products"]][0] == people.sweet_brand_product
     assert sweet["reason"]["text"].endswith(f" Es {SWEET_BRAND[1]}, la marca que compras.")
+    assert not any(s["kind"] == "combinacion" for s in sweet["reason"]["basis"])  # su marca gana al desempate
     brand = [s for s in sweet["reason"]["basis"] if s["kind"] == "marca"]
     assert brand == [{"kind": "marca", "id": SWEET_BRAND[0], "score": 2, "source": "pedidos"}]  # sus dos pedidos
     ordered = db.execute(
@@ -106,4 +108,8 @@ def test_complement_puts_the_brand_you_buy_first(people, db):
         (SWEET, SWEET_BRAND[0]),
     ).fetchone()[0]
     assert ordered == brand[0]["score"]  # rastreable hasta sus pedidos
-    assert grill == anonymous  # quien no compra esa marca ve la oferta de siempre
+    # Quien no compra esa marca no la ve nombrada. Sin una marca suya, entre complementos parecidos gana el que completa
+    # su combinación (solo pide en Retail: el té helado de Turbo), y la base lo dice.
+    assert not any(s["kind"] == "marca" for s in grill["reason"]["basis"])
+    assert "la marca que compras" not in grill["reason"]["text"]
+    assert {"kind": "combinacion", "id": "retail→turbo+retail", "source": "rappi"} in grill["reason"]["basis"]

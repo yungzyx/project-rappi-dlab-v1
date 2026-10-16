@@ -5,6 +5,8 @@ import { ProvenanceBadge } from '../../components/ProvenanceBadge.jsx'
 import { formatNumber, formatPct, formatPoints } from '../../lib/format.js'
 import { useAnalytics } from '../../lib/useAnalytics.js'
 import { AffinityTable } from './AffinityTable.jsx'
+import { ComboTables } from './ComboTables.jsx'
+import { MotorEvaluation } from './MotorEvaluation.jsx'
 import { MultiVerticalRetention } from './MultiVerticalRetention.jsx'
 import { ServiceEngagement } from './ServiceEngagement.jsx'
 import { strataRows } from './strata.js'
@@ -101,6 +103,14 @@ function MultiVertical({ source }) {
   return <MultiVerticalRetention rows={useAnalytics('multi-vertical', source)} />
 }
 
+function Combos({ source }) {
+  return <ComboTables data={useAnalytics('combos', source)} />
+}
+
+function Motor({ source }) {
+  return <MotorEvaluation data={useAnalytics('motor', source)} source={source} />
+}
+
 export function CrossVerticalView({ source }) {
   return (
     <div className="view">
@@ -185,6 +195,42 @@ export function CrossVerticalView({ source }) {
               que acá esa relación aparece por construcción. Con datos reales se mide y puede no cumplirse.
             </p>
           )}
+        </div>
+      </section>
+
+      <section className="section" aria-labelledby="combinaciones">
+        <div className="section-head">
+          <h2 id="combinaciones">Combinaciones de verticales</h2>
+          <p>
+            Una fila es el conjunto de verticales que una persona usó en un mes (M0) y la retención M+1, la parte que
+            vuelve a pedir al mes siguiente. «Retail» agrupa todo el comercio que no es restaurante ni Turbo. A la
+            izquierda, la tabla que compartió Rappi; a la derecha, la misma tabla medida con los datos de esta fuente.
+            Es una correlación, no un efecto: quien pide mucho usa más verticales y además vuelve más. El motor la toma
+            como punto de partida, no como promesa.
+          </p>
+          <ProvenanceBadge kind={source} />
+        </div>
+        <div className="block enter">
+          <Async>
+            <Combos source={source} />
+          </Async>
+        </div>
+      </section>
+
+      <section className="section" aria-labelledby="motor">
+        <div className="section-head">
+          <h2 id="motor">Motor</h2>
+          <p>
+            Cómo se mide el motor que ordena los verticales y recomienda: separación por fecha en tres tramos (entrenar,
+            validar y probar). Los pesos del próximo vertical y el λ de la compra cruzada se eligen solos en validación y
+            las métricas son del tramo de prueba, contra líneas base simples.
+          </p>
+          <ProvenanceBadge kind={source} />
+        </div>
+        <div className="block enter">
+          <Async>
+            <Motor source={source} />
+          </Async>
         </div>
       </section>
     </div>

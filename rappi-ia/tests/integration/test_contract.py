@@ -17,7 +17,7 @@ import json
 import os
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -30,11 +30,14 @@ from rappi_ia.api import app as api
 from rappi_ia.api.services import Services
 from rappi_ia.demo.seed import seed_demo
 from rappi_ia.embeddings.base import HashEmbedder
+from rappi_ia.events import store as events
 from rappi_ia.events.synth import generate
+from rappi_ia.motor.build import build_motor, refresh_user_conn
+from rappi_ia.motor.model import TZ
 
 FIXTURES = Path(__file__).resolve().parents[3] / "prototipo-app" / "src" / "api" / "fixtures"
 PANEL_FIXTURES = Path(__file__).resolve().parents[3] / "dashboard-empresa" / "src" / "fixtures"
-PANEL_METRICS = ("offers", "unmet")
+PANEL_METRICS = ("offers", "unmet", "combos", "motor", "home")
 # Las métricas de /analytics que guarda `npm run fixtures` (dashboard-empresa/scripts/update-fixtures.mjs).
 PANEL_SHAPE = (
     "kpis",
@@ -147,6 +150,20 @@ CONTRACT: tuple[Example, ...] = (
         "/agent/offer",
         {"moment": "vertical_por_probar", "user_id": "u-afin", "context": {}},
     ),
+    # Solo pide sushi en restaurantes (u-gustos): la combinación que más retiene le suma Turbo.
+    Example(
+        "agent-offer-vertical-por-probar-combinacion",
+        "POST",
+        "/agent/offer",
+        {"moment": "vertical_por_probar", "user_id": "u-gustos", "context": {}},
+    ),
+    # Pide café en el súper cada 7 días y el último fue hace 7 (u-recompra): le toca hoy.
+    Example(
+        "agent-offer-recompra",
+        "POST",
+        "/agent/offer",
+        {"moment": "recompra", "user_id": "u-recompra", "context": {}},
+    ),
     # La escalera de un perfil elegido, sin persona: lo que usa la demo.
     Example("agent-offer-perfil", "POST", "/agent/offer", {"moment": "perfil", "context": {"perfil": "asiatico"}}),
     Example("profile-gustos", "GET", "/profile/u-gustos/gustos"),
@@ -197,10 +214,13 @@ def client(db):
         for c in ("chocolates", "carnes")
     ]
     assert test_client.post("/events", json={"user_id": "u-afin", "events": liked}).status_code == 200
-    # Ya pidió en el súper (sin concepto, así no cambia sus gustos): la vertical por probar es otra.
+    # Ya pidió en el súper, en restaurantes y en Turbo (unas papas, sin concepto, así no cambian sus gustos): con la
+    # combinación completa el motor no tiene un paso que sugerir, y la vertical por probar es la que más le gusta de
+    # las que no ha probado (no el súper).
     chips = {"entity_type": "catalog_item", "entity_id": "91001"}
-    afin_order = {"user_id": "u-afin", "session_id": "s-afin", "cart_id": "c-afin-pedido", "lines": [chips]}
-    assert test_client.post("/orders", json={**afin_order, "vertical": "supermercado"}).status_code == 200
+    for vertical in ("supermercado", "restaurants", "turbo"):
+        afin_order = {"user_id": "u-afin", "session_id": "s-afin", "cart_id": f"c-afin-{vertical}", "lines": [chips]}
+        assert test_client.post("/orders", json={**afin_order, "vertical": vertical}).status_code == 200
     # Una persona con un perfil de gusto (lo asiático), para `profile-gustos`: busca ramen y pide sushi dos veces. Cada
     # pedido recalcula sus segmentos. La búsqueda no dice si encontró algo (`unmet`): no cambia el uso del MVP.
     ramen = {"type": "search", "session_id": "s-gustos-1", "concept_id": "asiatica", "query": "ramen", "results": 3}
@@ -216,6 +236,23 @@ def client(db):
         farmacia = {"user_id": "u-verticales", "session_id": f"s-verticales-{n}", "cart_id": f"c-verticales-{n}"}
         order = {**farmacia, "vertical": "farmacia", "lines": [chips]}
         assert test_client.post("/orders", json=order).status_code == 200
+    # Una persona que pide café en el súper cada 7 días, el último hace 7, para `agent-offer-recompra`. Los pedidos van
+    # a mediodía de Santiago de días contados desde hoy: la respuesta es la misma cada día.
+    today = datetime.now(TZ).date()
+    coffee = {"entity_type": "catalog_item", "entity_id": "91004", "concept_id": "cafe", "unit_price": 3990}
+    for days in (21, 14, 7):
+        ts = datetime.combine(today - timedelta(days=days), time(12), TZ)
+        cart = f"c-recompra-{days}"
+        events.record_order(db, "u-recompra", f"s-recompra-{days}", cart, "supermercado", [coffee], ts=ts)
+    refresh_user_conn(db, "u-recompra")
+    # Lo más pedido en el súper por la población, para la fila «Lo más pedido en…» de `recommendations` (u-contrato
+    # tiene un solo interés: le queda una fila libre).
+    for rank, product in enumerate(("91004", "91002", "91006"), start=1):
+        db.execute(
+            """INSERT INTO trends (data_source, scope, vertical, item_key, entity_type, entity_id, orders_now, rank)
+               VALUES ('synthetic', 'producto', 'supermercado', %s, 'catalog_item', %s, %s, %s)""",
+            (f"catalog_item:{product}", product, 100 - rank, rank),
+        )
     # Una persona de antes de la identidad firmada, para el ejemplo de `/session`.
     db.execute("INSERT INTO app_users (user_id, source) VALUES ('proto-0123456789abcdef', 'prototype')")
     db.commit()
@@ -316,6 +353,7 @@ def prototype_journey(client) -> None:
             "results": 0,
             "unmet": search["unmet"],
         },
+        {"type": "vertical_open", "session_id": "s-panel", "vertical": "farmacia"},
     ]
     assert client.post("/events", json={"user_id": "u-panel", "events": sent}).json() == {"guardados": len(sent)}
 
@@ -327,6 +365,12 @@ def test_panel_examples_are_up_to_date(client, db, name, source):
         prototype_journey(client)
     else:
         generate(db, users=40, weeks=8, seed=11, until=date(2026, 10, 4))
+    # Lo que muestran `motor` y `combos` sale de la corrida del motor. Las combinaciones del prototipo salen de pedidos
+    # fechados desde hoy (cambian con el mes): su ejemplo es el de «sin pedidos propios».
+    if name == "motor" or (name == "combos" and source == "synthetic"):
+        build_motor(db, source)
+        db.execute("UPDATE layer_runs SET finished_at = '2026-10-04 12:00+00' WHERE layer = 'motor'")  # la fecha varía
+        db.commit()
     example = Example(f"{name}.{source}", "GET", f"/analytics/{name}?source={source}")
     reply = client.request(example.method, example.path)
     write = os.environ.get("RAPPI_CONTRACT_WRITE") == "1"

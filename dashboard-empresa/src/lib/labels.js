@@ -12,6 +12,15 @@ const VERTICALS = {
 
 export const verticalLabel = (code) => VERTICALS[code] ?? code
 
+const COMBO_GROUPS = { rest: 'Restaurantes', turbo: 'Turbo', retail: 'Retail', favor: 'Favor', total: 'Todo Chile' }
+
+/** "rest+turbo" → "Restaurantes + Turbo": los grupos gruesos de la tabla de Rappi (retail = todo el comercio). */
+export const comboLabel = (combo) =>
+  combo
+    .split('+')
+    .map((group) => COMBO_GROUPS[group] ?? group)
+    .join(' + ')
+
 export const SOURCE_LABELS = { synthetic: 'Simulados', prototype: 'Prototipo' }
 
 /** Nombre de una demanda no satisfecha: el concepto (con emoji) o, si no hay concepto, la consulta literal. */
@@ -38,6 +47,9 @@ const ENDPOINTS = {
   services: 'servicios sin catálogo',
   offers: 'ofertas por momento',
   unmet: 'búsquedas sin resultado',
+  combos: 'combinaciones de verticales',
+  motor: 'motor',
+  home: 'accesos de la Home',
 }
 
 const MAX_LISTED = 3

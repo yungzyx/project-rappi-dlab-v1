@@ -21,16 +21,18 @@ export function firstShowing(row) {
 /**
  * Registra la sugerencia del agente mostrada (`suggestion_shown`): una vez por pestaña, concepto, vertical, origen y
  * generación del perfil (`generation` = `profile.resets`). `track` es `useEvents().track`; `origin` es
- * `agent-<momento>`, `agent-ask`, etc. Si no se dan `concept` o `vertical`, salen del primer producto. Devuelve si la
- * registró (false si ya estaba contada o no hay concepto).
+ * `agent-<momento>`, `agent-ask`, etc. Si no se dan `concept` o `vertical`, salen del primer producto. Con `kind` (la
+ * fila «Lo más pedido» de «Para ti»: `lo_mas_pedido`), va también en el payload. Devuelve si la registró (false si ya
+ * estaba contada o no hay concepto).
  */
-export function noteShown(track, products, { origin, concept, vertical, generation = 0 }) {
+export function noteShown(track, products, { origin, concept, vertical, generation = 0, kind }) {
   const [first] = products ?? []
   const shownConcept = concept ?? (first && conceptOf(first))
   const shownVertical = vertical ?? first?.vertical
   if (!shownConcept || !firstShowing({ concept: shownConcept, vertical: shownVertical, origin, generation }))
     return false
-  track('suggestion_shown', { concept_id: shownConcept, vertical: shownVertical, payload: { origen: origin } })
+  const payload = kind ? { origen: origin, kind } : { origen: origin }
+  track('suggestion_shown', { concept_id: shownConcept, vertical: shownVertical, payload })
   return true
 }
 

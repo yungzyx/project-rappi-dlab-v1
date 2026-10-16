@@ -56,6 +56,12 @@ class ToTryContext(Clean):
     model_config = ConfigDict(extra="forbid")
 
 
+class RepeatContext(Clean):
+    """Sin datos: lo que le toca repetir sale de los pedidos de la persona (la tabla `replenishment` del motor)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class ProfileContext(Clean):
     """El perfil de gusto que se pide (`offers/perfiles.toml`); sin él, el primero de los de la persona."""
 
@@ -96,13 +102,19 @@ class ToTryIn(OfferBase):
     context: ToTryContext
 
 
+class RepeatIn(OfferBase):
+    moment: Literal["recompra"]
+    context: RepeatContext
+
+
 class ProfileIn(OfferBase):
     moment: Literal["perfil"]
     context: ProfileContext
 
 
 OfferIn = Annotated[
-    PlanIn | CartIn | CheckoutIn | NoResultIn | NextOrderIn | ToTryIn | ProfileIn, Field(discriminator="moment")
+    PlanIn | CartIn | CheckoutIn | NoResultIn | NextOrderIn | ToTryIn | RepeatIn | ProfileIn,
+    Field(discriminator="moment"),
 ]
 
 

@@ -67,6 +67,8 @@ def test_load_orders_only_proposal_mode_and_one_source(people):
     assert synthetic.order_id == "o4"
     assert synthetic.lines == ()  # un pedido sin líneas
     assert [o.order_id for o in load_orders(people, "prototype", before=T3)] == ["o1"]
+    assert [o.order_id for o in load_orders(people, "prototype", since=T1)] == ["o3"]  # estrictamente después
+    assert [o.order_id for o in load_orders(people, "prototype", since=T1, before=T3)] == []
     assert load_orders(people, "prototype", user_id="s1") == []
 
 

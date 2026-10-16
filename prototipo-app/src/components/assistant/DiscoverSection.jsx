@@ -15,9 +15,16 @@ const conceptLabel = (concept) => {
   return words.charAt(0).toUpperCase() + words.slice(1)
 }
 
+/** El título de una tarjeta: el complemento y su vertical, o «Lo más pedido en…» (fila sin concepto). */
+const cardTitle = (row) => {
+  const vertical = VERTICAL_NAMES[row.prototype_vertical]
+  return row.kind === 'lo_mas_pedido' ? `Lo más pedido en ${vertical}` : `${conceptLabel(row.concept)} en ${vertical}`
+}
+
 /**
  * «Descubre con el agente»: tarjetas de /recommendations, cada una con un complemento de lo que le gusta a la persona en una
- * vertical que quizá aún no abre. `rows` son las filas de la API (hasta 3); tocar una tarjeta abre su vertical.
+ * vertical que quizá aún no abre, o con lo más pedido en una vertical (`kind: 'lo_mas_pedido'`). `rows` son las filas de
+ * la API (hasta 3); tocar una tarjeta abre su vertical.
  */
 export default function DiscoverSection({ rows, onOpen }) {
   const cards = rows.filter((row) => VERTICAL_NAMES[row.prototype_vertical])
@@ -32,7 +39,7 @@ export default function DiscoverSection({ rows, onOpen }) {
       <div className="discover-cards">
         {cards.map((row, i) => (
           <button
-            key={`${row.concept}-${row.prototype_vertical}`}
+            key={`${row.concept ?? row.kind}-${row.prototype_vertical}`}
             type="button"
             className="discover-card tap"
             style={{ animationDelay: `${180 + i * 80}ms` }}
@@ -43,9 +50,7 @@ export default function DiscoverSection({ rows, onOpen }) {
             </span>
             <span className="discover-card-body">
               <small>{row.reason}</small>
-              <strong>
-                {conceptLabel(row.concept)} en {VERTICAL_NAMES[row.prototype_vertical]}
-              </strong>
+              <strong>{cardTitle(row)}</strong>
               <span className="discover-card-foot">
                 <span className="discover-thumbs" aria-hidden="true">
                   {row.products.slice(0, THUMBS).map((product) => (

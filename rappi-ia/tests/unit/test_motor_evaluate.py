@@ -9,6 +9,7 @@ from rappi_ia.motor.data import Line, Order, Signal
 from rappi_ia.motor.evaluate import (
     GRID_B,
     GRID_C,
+    GRID_LAMBDA,
     evaluate,
     evaluate_cross_sell,
     evaluate_next_vertical,
@@ -18,6 +19,7 @@ from rappi_ia.motor.evaluate import (
     rank_metrics,
     report,
     tune,
+    tune_lambda,
 )
 
 T0 = datetime(2026, 5, 1, 15, 0, tzinfo=UTC)
@@ -115,6 +117,63 @@ def test_evaluate_cross_sell_precision_and_coverage():
     baseline = out["lo_mas_pedido"]
     assert baseline["precision3"] == 0 and baseline["aciertos_sobre_3"] == 0
     assert baseline["cobertura"] == pytest.approx(1.0)
+
+
+def _mixable():
+    """Una regla sushi en Restaurantes → salsas en Turbo (lift ≈ 2,17) que aprenden 12 personas al principio, cuatro
+    pares de Supermercado que son lo más pedido antes de la validación (4 pedidos cada uno) y salsas en Turbo detrás
+    (2). Cinco personas piden sushi justo antes de la validación y salsas en Turbo durante ella: lo más pedido solo no
+    las acierta; la mezcla, sí, desde λ = 1 (con 0,5 la regla no alcanza a subir salsas sobre los cuatro)."""
+    orders = [order(f"d{i}", 5, "mall", "ropa") for i in range(20)]
+    for i in range(12):
+        orders += [order(f"a{i}", 10 + i, "restaurantes", "sushi"), order(f"a{i}", 12 + i, "turbo", "salsas")]
+    orders += [order(f"b{i}", 60 + i, "supermercado", "pan", "leche", "huevos", "cafe") for i in range(4)]
+    orders += [order(f"c{i}", 70, "turbo", "salsas") for i in range(2)]
+    for i in range(5):
+        orders += [order(f"v{i}", 75, "restaurantes", "sushi"), order(f"v{i}", 90, "turbo", "salsas")]
+    orders.append(order("z", 140, "mall", "ropa"))  # el final de los datos: la validación es [84, 112)
+    return sorted(orders, key=lambda o: o.ts)
+
+
+def test_mix_beats_the_most_ordered_when_rules_apply():
+    orders = _mixable()
+    split = make_split(orders)
+
+    plain = evaluate_cross_sell(orders, frozenset(), split.train_end, split.valid_end, lam=0)
+    mixed = evaluate_cross_sell(orders, frozenset(), split.train_end, split.valid_end, lam=1)
+
+    assert plain["personas"] == mixed["personas"] == 5
+    assert plain["mezcla"]["precision3"] == plain["lo_mas_pedido"]["precision3"] == 0  # λ = 0: lo más pedido
+    assert mixed["mezcla"]["precision3"] == pytest.approx(1 / 3)  # salsas, y dos de Supermercado que no pide
+    assert mixed["mezcla"]["personas_con_prediccion"] == 5
+    assert mixed["mezcla"]["precision3_mismas_personas"] == pytest.approx(1 / 3)
+    assert mixed["precision3"] == 1  # las reglas solas: una recomendación y acierta
+
+
+def test_tune_lambda_picks_the_best_precision_and_the_smallest_on_ties():
+    orders = _mixable()
+    assert tune_lambda(orders, frozenset(), make_split(orders)) == 1  # 1, 2 y 4 empatan; 0 y 0,5 no aciertan
+    assert set(GRID_LAMBDA) == {0, 0.5, 1, 2, 4}
+
+    graduates = _graduates()  # sin conceptos: ningún λ recomienda nada y gana el menor
+    assert tune_lambda(graduates, frozenset(), make_split(graduates)) == 0
+
+    nobody = sorted((order(f"u{i}", d, "turbo", "pan") for i in range(5) for d in (0, 2, 88, 90)), key=lambda o: o.ts)
+    assert tune_lambda(nobody, frozenset(), make_split(nobody)) is None
+
+
+def test_evaluate_stores_the_lambda_and_reports_the_mix():
+    orders = _mixable()
+    results = evaluate(orders, signals_of(orders), frozenset())
+
+    assert results["lambda_cruzada"] == 1
+    assert results["validacion"]["precision3_mezcla"] == pytest.approx(1 / 3, abs=1e-4)
+    assert {"precision3", "lo_mas_pedido", "mezcla"} <= set(results["compra_cruzada"])  # reglas, base y mezcla
+    text = report(results, "synthetic")
+    assert "| Mezcla |" in text and "λ = 1" in text
+
+    nobody = sorted((order(f"u{i}", d, "turbo", "pan") for i in range(5) for d in (0, 2, 88, 90)), key=lambda o: o.ts)
+    assert evaluate(nobody, signals_of(nobody), frozenset(), previous_lambda=2.0)["lambda_cruzada"] == 2.0
 
 
 def test_evaluate_replenishment_error_in_days():

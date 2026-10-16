@@ -19,9 +19,10 @@ from rappi_ia.events import store as events
 from rappi_ia.events.synth import generate
 from rappi_ia.layers.runs import finish_layer_run, start_layer_run
 from rappi_ia.motor.build import build_motor, refresh_user
-from rappi_ia.motor.evaluate import GRID_B, GRID_C, METHODS, report
+from rappi_ia.motor.evaluate import GRID_B, GRID_C, GRID_LAMBDA, METHODS, report
 from rappi_ia.motor.model import DEFAULT_WEIGHTS
 from rappi_ia.motor.predict import latest_weights
+from rappi_ia.motor.recommend import latest_lambda
 
 POPULATION_TABLES = ("vertical_transitions", "combo_stats", "combo_steps", "cross_sell_rules", "trends")
 COUNT_OF_TABLE = {
@@ -145,6 +146,9 @@ def test_build_motor_chooses_weights_and_stores_the_evaluation(simulated):
     ]
     assert stored["evaluacion"] == evaluation
     assert latest_weights(db, "synthetic") == counts["pesos"]
+    assert counts["lambda_cruzada"] == evaluation["lambda_cruzada"] in GRID_LAMBDA
+    assert latest_lambda(db, "synthetic") == counts["lambda_cruzada"]
+    assert {"precision3", "precision3_mismas_personas"} <= set(evaluation["compra_cruzada"]["mezcla"])
     assert "Datos simulados" in report(evaluation, "synthetic")
 
 
@@ -152,13 +156,15 @@ def test_build_motor_without_evaluating_keeps_the_last_weights(simulated):
     db = simulated
     tuned = build_motor(db, "synthetic")["pesos"]
     db.execute(
-        "UPDATE layer_runs SET counts = jsonb_set(counts, '{pesos,transicion}', '7') WHERE layer = 'motor'"
+        "UPDATE layer_runs SET counts = jsonb_set(jsonb_set(counts, '{pesos,transicion}', '7'), '{lambda_cruzada}', "
+        "'3') WHERE layer = 'motor'"
     )  # pesos que no salen de la grilla: se ve que vienen de la corrida anterior
     db.commit()
 
     counts = build_motor(db, "synthetic", evaluate=False)
     assert counts["evaluacion"] is None
     assert counts["pesos"] == {**tuned, "transicion": 7.0}
+    assert counts["lambda_cruzada"] == 3.0
 
 
 def test_build_motor_without_people_to_validate_keeps_the_last_weights(db):
@@ -201,6 +207,7 @@ def test_build_without_orders_writes_nothing_and_finishes(db):
     counts = build_motor(db, "prototype")
     assert counts["transiciones"] == counts["afinidad"] == counts["tendencias"] == 0
     assert counts["pesos"] == DEFAULT_WEIGHTS and counts["evaluacion"] is None
+    assert counts["lambda_cruzada"] == 1.0
     status = db.execute("SELECT status FROM layer_runs WHERE layer = 'motor'").fetchone()[0]
     assert status == "done"
 

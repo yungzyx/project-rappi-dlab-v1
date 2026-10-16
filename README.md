@@ -24,6 +24,7 @@ La señal existe: cada búsqueda y cada pedido dice algo de quien lo hace. Pero 
 | Pieza | Qué hace |
 |---|---|
 | **Mochi en la Home** | Mochi de cuerpo entero vive en la Home, sin canal aparte para escribirle. Saluda, acompaña el plan del día («¿Qué plan tienes hoy?», un kit de varias verticales) y, al tocarlo, propone una vertical por probar. |
+| **Recomendaciones conectadas** | Mochi sugiere la siguiente vertical siguiendo la escalera **Restaurantes → Turbo → Retail**, que parte de la tabla de combinaciones que compartió Rappi (qué combinaciones retienen más), y la mezcla con lo que el motor aprende de la población. Cada sugerencia dice por qué («Porque pides … y … combina con eso; en … lo encuentras.»), sin afirmar lo que hace la población (la fuente queda en la `basis`). También propone repetir lo que la persona pide con ritmo («¿Repetimos …? Lo pides cada 14 días.»). |
 | **Home que aprende el orden** | Los accesos pequeños de la Home (Grocery, Pharmacy, Retail, Liquor, Express, Chocolates) se ordenan según lo que cada persona pide y abre: sus pedidos y sus toques. Quien no tiene historial ve el orden fijo. Restaurantes y Turbo no se mueven, Loyalty y Benefits Pro quedan siempre al final y «Rappi hoy» no cambia. Es un pedido del equipo de Rappi. |
 | **Buscador con Mochi** | La barra de la Home abre el buscador de siempre con lo que Mochi sabe de ti: lo aprendido (con «Olvidar»), ideas para tocar («Arma un carrete»), búsqueda de tiendas y productos y «Descubre con Mochi». Se toca; no se escribe. |
 
@@ -41,6 +42,8 @@ La app busca en las verticales que corresponden a la consulta (las de su concept
 | Compra pañales en el supermercado | pañales | alimentación de bebé | la vertical donde ese concepto es más típico (farmacia), no la de más ítems | «De Farmacia · ¿Te tinca sumar alimentación de bebé? Porque llevas pañales» |
 
 Las sugerencias siguen reglas para no perder la confianza del cliente: como máximo una sugerencia cruzada por respuesta y con su razón visible; nunca productos sensibles por iniciativa propia (medicamentos, salud sexual, tabaco y vapeo; Farmacia se puede jugar pero nunca se propone); Mochi nunca ofrece alcohol por su cuenta: solo aparece en el kit de una ocasión que la persona eligió, siempre con el aviso +18; y lo aprendido se ve y se borra («Olvidar»).
+
+**La escalera.** El motor decide qué vertical sumarle a cada persona con la tabla de combinaciones de Rappi como punto de partida (es una correlación, no un efecto: quien pide mucho usa más verticales y además vuelve más) y la mezcla con la retención aprendida de la población, que hoy es simulada. Quien pide en Restaurantes ve primero Turbo, y quien ya combina esas dos, Retail. Dentro de la vertical elegida ofrece lo que quienes piden lo mismo suelen sumar (compra cruzada); si no hay un patrón, lo más pedido ahí. Si la persona compra una marca, esa marca gana a la combinación en un empate. Cómo aprende y cuánto se equivoca: [Motor multivertical](#motor-multivertical-datos-simulados-prueban-la-mecánica-no-el-efecto).
 
 El efecto real (frecuencia, venta cruzada, verticales nuevas por persona) solo se puede medir con datos de Rappi y un experimento A/B con grupo de control.
 
@@ -106,7 +109,7 @@ Corrida del 16-10-2026 (`rappi-ia motor`) sobre una copia del catálogo real y *
 | Qué | Métrica | Valor | Tipo de dato |
 |---|---|---|---|
 | Próximo vertical | nDCG@8 | combinado 0,961 · solo afinidad 0,958 · popularidad 0,891 · orden fijo 0,883 | Simulado |
-| Compra cruzada | precisión@3 | reglas aprendidas 0,076 (66 de 357 personas con alguna regla) · lo más pedido 0,124. **Las reglas aún no superan a lo más pedido** | Simulado |
+| Compra cruzada | precisión@3 | **mezcla** de lo más pedido y las reglas 0,129 · lo más pedido 0,124 · solo reglas aprendidas 0,076. Entre las 66 personas con alguna regla: mezcla 0,056 · lo más pedido 0,030. La diferencia es chica: no se puede afirmar que la mezcla supere a lo simple | Simulado |
 | Recompra | acierto ±7 días | 0,158 sobre 76 predicciones (volvieron a comprar el 34 %; error mediano de 9 días) | Simulado |
 
 El generador de datos simulados se calibró con la tabla de combinaciones de verticales y retención que **compartió el equipo de Rappi** (dato compartido por Rappi, cohortes de enero a junio de 2026): es una correlación, no un efecto, y el simulador la trata como efecto, así que sus cifras no prueban que sumar verticales retenga. La agrupación de verticales en `rest`, `turbo` y `retail` es un supuesto propio. Detalle: [docs/capa-de-datos.md](docs/capa-de-datos.md#motor-multivertical).
@@ -139,7 +142,7 @@ Requisitos (el detalle, en [docs/instalacion.md](docs/instalacion.md)):
 ```bash
 make mvp          # desde la raíz del repositorio; Ctrl-C detiene los tres
 make mvp LAN=1    # abre la API y la app a la red local, para el iPhone (solo en una red de confianza)
-make mvp-check    # recorre el MVP con Chrome contra un catálogo inventado, sin tocar la base real (6 revisiones)
+make mvp-check    # recorre el MVP con Chrome contra un catálogo inventado, sin tocar la base real (7 revisiones)
 ```
 
 `make mvp` revisa las dependencias, los puertos y la base (`rappi-ia doctor`, solo lectura), aplica las migraciones pendientes (no las de una rama sin fusionar: `MIGRATE=1` lo fuerza, ver [docs/instalacion.md](docs/instalacion.md#5-el-mvp)), arranca los tres con sus registros prefijados y avisa cuando responden. La API tarda en estar lista porque carga los modelos. No descarga nada de rappi.cl. Qué revisa `make mvp-check`, en [docs/instalacion.md](docs/instalacion.md#5-el-mvp).
