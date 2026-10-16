@@ -17,7 +17,7 @@ Requiere Node 22.22+ o 24.15+ (ver `.nvmrc` en la raíz). Como la app no abre si
 ```bash
 make mvp              # API :8000, app http://localhost:5174 y panel :5175; Ctrl-C detiene los tres
 make mvp LAN=1        # abre la API y la app a la red local, para el iPhone (misma red wifi o su hotspot)
-make mvp-check        # recorre el MVP con Chrome contra un catálogo inventado, sin tocar la base real (5 revisiones)
+make mvp-check        # recorre el MVP con Chrome contra un catálogo inventado, sin tocar la base real (6 revisiones)
 ```
 
 Requisitos, qué revisa `make mvp-check` y qué hacer si falla algo: [docs/instalacion.md](../docs/instalacion.md#5-el-mvp). Para correr solo la app, con la API ya levantada por su cuenta (`cd rappi-ia && make serve`):
@@ -72,7 +72,7 @@ El interruptor junto al teléfono (tecla **D**, o Account → Modo demo en el ce
 | <img src="docs/screenshots/02-home-rappi-hoy.jpg" width="300" alt="Home de Rappi hoy"> | <img src="docs/screenshots/01-home-final.jpg" width="300" alt="Home del prototipo final con Mochi"> |
 | Buscador original | Mochi vive en la Home y la misma barra abre su buscador |
 
-En el **prototipo final** Mochi de cuerpo entero vive en la Home (`src/screens/home/live/`), sin canal aparte para escribirle. Al entrar saluda y, la primera vez, hace una guía de 2 pasos (el buscador y qué pasa al tocarlo, con «Siguiente» y «Saltar»; no vuelve a aparecer, salvo con «Repetir escena»); no sugiere productos ni reordena la Home. La Home suma «¿Qué plan tienes hoy?» (un kit de varias verticales) y, al tocar a Mochi, una vertical por probar. Mochi saluda al llegar, salta, apunta y gira según lo que dice, y en espera mira alrededor, baila o se estira; sin nada que decir se asoma desde el borde y al hacer scroll se esconde, para no tapar la Home. Lo que se agrega al carro fuera de la Home lo comenta al volver, si combina con algo de otra vertical. La barra de la Home y la lupa de abajo abren el buscador con Mochi (ver más abajo), y al entregar un pedido ofrece armar el próximo. En el celular, «Repetir escena de Mochi» está en Account. «↺ Repetir escena», junto al interruptor, vuelve a empezar. Respeta «reducir movimiento» del sistema.
+En el **prototipo final** Mochi de cuerpo entero vive en la Home (`src/screens/home/live/`), sin canal aparte para escribirle. Al entrar saluda y, la primera vez, hace una guía de 2 pasos (el buscador y qué pasa al tocarlo, con «Siguiente» y «Saltar»; no vuelve a aparecer, salvo con «Repetir escena»); no sugiere productos. La Home suma «¿Qué plan tienes hoy?» (un kit de varias verticales) y, al tocar a Mochi, una vertical por probar. Mochi saluda al llegar, salta, apunta y gira según lo que dice, y en espera mira alrededor, baila o se estira; sin nada que decir se asoma desde el borde y al hacer scroll se esconde, para no tapar la Home. Lo que se agrega al carro fuera de la Home lo comenta al volver, si combina con algo de otra vertical. La barra de la Home y la lupa de abajo abren el buscador con Mochi (ver más abajo), y al entregar un pedido ofrece armar el próximo. En el celular, «Repetir escena de Mochi» está en Account. «↺ Repetir escena», junto al interruptor, vuelve a empezar. Respeta «reducir movimiento» del sistema.
 
 ## Lo nuevo de la propuesta
 
@@ -193,5 +193,5 @@ src/
 └── utils/          Utilidades sueltas (`today`: la fecha local)
 docs/screenshots/   Capturas de este README
 public/             Íconos y manifiesto para "Agregar a pantalla de inicio"
-scripts/            Íconos, capturas y el recorrido de `make mvp-check` (Home, compra, kit de Mochi, panel y API caída)
+scripts/            Íconos, capturas y el recorrido de `make mvp-check` (Home, compra, kit de Mochi, Home dinámica, panel y API caída)
 ```

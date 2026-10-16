@@ -48,6 +48,14 @@ Es lo primero que se ve en el prototipo final. Para partir de cero: **↺ Repeti
 2. Baja hasta «¿Qué plan tienes hoy?» (cinco ocasiones) y elige **Carrete**: un kit de varias verticales con un solo botón. Como la persona eligió la ocasión, el kit puede traer alcohol, con la marca **+18**; en lo que Mochi ofrece por su cuenta nunca hay alcohol, farmacia, bebé ni salud.
 3. Toca a Mochi: propone una vertical que la persona aún no pide, según sus pedidos («Porque aún no pides en …»), con sus ofertas. Con «Abrir» entra a esa vertical. Si no tiene nada que ofrecer, Mochi calla.
 
+### La Home que aprende el orden (1 minuto, opcional)
+
+En el prototipo final, los 6 accesos pequeños de la Home (Grocery, Pharmacy, Retail, Liquor, Express, Chocolates) se ordenan según lo que la persona pide y abre. Quien parte de cero los ve en el orden fijo.
+
+1. Con **Olvidar** recién hecho, la fila está en el orden fijo, con Loyalty y Benefits Pro al final y sin texto.
+2. Pide algo en **Pharmacy** hasta pagar, o toca un acceso (por ejemplo **Retail**) tres o cuatro veces, volviendo a la Home cada vez. La app manda los toques en lotes cada 5 s: espera un momento.
+3. Vuelve a la Home (o recárgala): ese acceso sube al primer lugar y aparece «Ordenadas según lo que más pides». **Qué decir:** la Home se ordena sola con el uso de cada persona; Restaurantes y Turbo no se mueven, Loyalty y Benefits Pro quedan al final, y «Rappi hoy» (tecla **D**) sigue como hoy.
+
 ### El panel con lo que acaba de pasar (2 minutos, opcional)
 
 Con `make mvp` el panel ya está arriba. Después de la demo de la app, ábrelo en [http://localhost:5175/?vista=mvp&fuente=prototipo](http://localhost:5175/?vista=mvp&fuente=prototipo) (o elige **Prototipo** arriba y la pestaña **Uso del MVP**; **Actualizar** vuelve a pedir lo nuevo sin recargar).

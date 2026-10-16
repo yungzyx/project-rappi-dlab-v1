@@ -8,10 +8,12 @@
 #   3. kit de Mochi: «cerveza» en el buscador con Mochi (grupos por vertical) → plan «Carrete» en la Home → agregar el
 #      kit → pagar, y en rappi_ia_test (solo lectura) el pedido tiene líneas sembradas y la persona dejó al menos una
 #      `suggestion_accepted` con origen `agent-plan` (o el viejo `mochi-plan`);
-#   4. panel: «Uso del MVP» del panel (fuente prototipo) muestra lo que dejó la revisión 3 (una oferta aceptada en
+#   4. home: la Home dinámica; una persona nueva ve el orden fijo y, tras tocar «Retail» (Rappi Mall) tres veces, Retail
+#      queda primero con el texto «Ordenadas según lo que más pides»;
+#   5. panel: «Uso del MVP» del panel (fuente prototipo) muestra lo que dejó la revisión 3 (una oferta aceptada en
 #      «Plan») con el rótulo «uso del MVP, pocas personas: no es evidencia». Corre después de las demás, con la API
 #      todavía en marcha;
-#   5. sin API: se detiene la API y la app muestra «Sin conexión con Mochi».
+#   6. sin API: se detiene la API y la app muestra «Sin conexión con Mochi».
 set -euo pipefail
 SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 cd "$(dirname "$0")/.."
@@ -119,10 +121,11 @@ wait_for_url "La app" "$APP" 30 app
 wait_for_url "El panel" "$PANEL" 30 panel
 
 passed=0
-total=5
+total=6
 if node "$CHECK" --app "$APP"; then passed=$((passed + 1)); fi
 if node "$CHECK" --app "$APP" --shop && "$IA_PY" -c "$CHECK_ORDER"; then passed=$((passed + 1)); fi
 if node "$CHECK" --app "$APP" --kit && "$IA_PY" -c "$CHECK_ORDER" kit; then passed=$((passed + 1)); fi
+if node "$CHECK" --app "$APP" --home; then passed=$((passed + 1)); fi
 if node "$CHECK" --panel "$PANEL" --api http://localhost:8010; then passed=$((passed + 1)); fi
 stop_one api
 if node "$CHECK" --app "$APP" --expect-offline; then passed=$((passed + 1)); fi

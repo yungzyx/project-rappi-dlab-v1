@@ -1,5 +1,5 @@
 // Revisa en un Chrome real que la app del MVP responda como debe (lo corre scripts/mvp-check.sh con `make mvp-check`).
-// Uso: node scripts/mvp-check.mjs --app http://localhost:5184 [--api http://localhost:8010] [--shop | --kit | --expect-offline | --panel http://localhost:5185]
+// Uso: node scripts/mvp-check.mjs --app http://localhost:5184 [--api http://localhost:8010] [--shop | --kit | --home | --expect-offline | --panel http://localhost:5185]
 //   sin banderas: la app abre en la Home conectada, con la barra «Busca o pídele ideas a <agente>» y el aviso de privacidad
 //     de la primera visita (que se cierra con «Entendido»);
 //   con --shop: Home → vertical Grocery → primera tienda → agregar un producto → carrito → pagar, y la API recibe el
@@ -7,6 +7,10 @@
 //   con --kit: busca «cerveza» en el buscador con Mochi (ve la búsqueda agrupada por vertical), vuelve a la Home, elige
 //     la ocasión «Carrete», agrega el kit que arma Mochi (`plan`) y paga; scripts/mvp-check.sh verifica después en la base
 //     de prueba que el pedido tiene líneas sembradas y al menos una aceptación `agent-plan`;
+//   con --home: Home dinámica. Una persona nueva ve los 6 accesos en el orden fijo, con Loyalty y Benefits Pro al final y
+//     sin el texto «Ordenadas según lo que más pides»; toca «Retail» (Rappi Mall) tres veces, volviendo a la Home cada
+//     vez, espera a que la API reciba los toques (`vertical_open`; la app los manda en lotes cada 5 s) y recarga la Home:
+//     Retail queda primero y el texto aparece;
 //   con --expect-offline: la API está detenida y la app muestra «Sin conexión con <agente>»;
 //   con --panel <url del panel> (sin --app): corre después de las demás, con la API en marcha. Espera a que la API ya
 //     cuente lo que dejó el kit (una oferta aceptada en «Plan»), abre el panel en «Uso del MVP» con la fuente del
@@ -167,6 +171,55 @@ async function checkKit(page) {
   return `buscó «cerveza» (${found} grupos), pidió el kit «Carrete», lo agregó y la API aceptó el pedido`
 }
 
+const ORDER_CAPTION = 'Ordenadas según lo que más pides'
+const FIXED_LABELS = ['Grocery', 'Pharmacy', 'Retail', 'Liquor', 'Express', 'Chocolates']
+const TAIL_LABELS = ['Loyalty', 'Benefits Pro']
+
+/** Los nombres de los accesos de la fila de la Home, en el orden en que se ven. */
+const shortcutLabels = (page) =>
+  page.locator('.home-shortcut').evaluateAll((nodes) => nodes.map((node) => node.innerText.trim()))
+
+/**
+ * Home dinámica: sin historial, el orden fijo; tras tocar Retail tres veces, Retail va primero y la Home dice por qué.
+ * Los toques se ven en `POST /events` (la app los manda en lotes cada 5 s): se esperan antes de recargar.
+ */
+async function checkHome(page) {
+  await checkOnline(page)
+  const row = page.locator('.home-shortcut').first()
+  await step(page, 'ver la fila de accesos', () => row.waitFor())
+  const before = await shortcutLabels(page)
+  if (before.slice(0, 6).join() !== FIXED_LABELS.join())
+    throw new Error(`una persona nueva ve ${before.slice(0, 6).join(', ')} y se esperaba ${FIXED_LABELS.join(', ')}`)
+  if (before.slice(-2).join() !== TAIL_LABELS.join())
+    throw new Error(`la fila debe terminar en ${TAIL_LABELS.join(' y ')} y termina en ${before.slice(-2).join(' y ')}`)
+  if ((await page.getByText(ORDER_CAPTION).count()) > 0)
+    throw new Error(`una persona nueva ve «${ORDER_CAPTION}» sin historial`)
+
+  let opens = 0
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && new URL(request.url()).pathname === '/events')
+      opens += (request.postData() ?? '').split('"vertical_open"').length - 1
+  })
+  for (let tap = 1; tap <= 3; tap++) {
+    await step(page, `tocar «Retail» (${tap} de 3)`, () =>
+      page.locator('.home-shortcut', { hasText: 'Retail' }).first().click(),
+    )
+    await step(page, 'volver a la Home', () => page.locator('[aria-label="Volver"]').first().click())
+    await step(page, 'ver la Home de nuevo', () => row.waitFor())
+  }
+  const deadline = Date.now() + EVENTS_WAIT_MS
+  while (opens < 3 && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 250))
+  if (opens < 3) throw new Error(`la app mandó ${opens} de 3 toques (POST /events con vertical_open) tras 30 s`)
+
+  await page.reload({ timeout: TIMEOUT_MS })
+  await step(page, `ver el texto «${ORDER_CAPTION}»`, () => page.getByText(ORDER_CAPTION).waitFor())
+  const after = await shortcutLabels(page)
+  if (after[0] !== 'Retail') throw new Error(`tras tocar Retail 3 veces el primero es «${after[0]}»`)
+  if (after.slice(-2).join() !== TAIL_LABELS.join())
+    throw new Error(`con el orden personal, la fila debe terminar en ${TAIL_LABELS.join(' y ')}`)
+  return `orden fijo sin historial; tras 3 toques a Retail queda primero (${after.slice(0, 3).join(', ')}…) con el texto «${ORDER_CAPTION}»`
+}
+
 /** Cuánto se espera a que la API cuente los eventos de las revisiones anteriores (la app los manda en lotes cada 5 s). */
 const EVENTS_WAIT_MS = 30_000
 const NOT_EVIDENCE = 'uso del MVP, pocas personas: no es evidencia'
@@ -246,6 +299,7 @@ const { values } = parseArgs({
     app: { type: 'string' },
     shop: { type: 'boolean', default: false },
     kit: { type: 'boolean', default: false },
+    home: { type: 'boolean', default: false },
     api: { type: 'string', default: API_DEFAULT },
     'expect-offline': { type: 'boolean', default: false },
     panel: { type: 'string' },
@@ -258,9 +312,11 @@ const label = values.panel
     ? 'sin API'
     : values.kit
       ? 'kit de Mochi'
-      : values.shop
-        ? 'compra'
-        : 'en línea'
+      : values.home
+        ? 'home'
+        : values.shop
+          ? 'compra'
+          : 'en línea'
 
 /** Con MVP_CHECK_ARTIFACTS=<carpeta> (lo usa el CI), una revisión que falla deja la captura de lo que se veía. */
 async function saveFailureScreenshot(page) {
@@ -288,6 +344,7 @@ async function main() {
     const problems = watchProblems(page)
     if (!values.panel) await page.goto(values.app, { timeout: TIMEOUT_MS })
     const checks = {
+      home: checkHome,
       kit: checkKit,
       shop: checkShop,
     }
