@@ -143,6 +143,46 @@ def cmd_segments(conn, args) -> None:
     print(build_segments(conn, args.source, args.user))
 
 
+def cmd_motor(conn, args) -> None:
+    from datetime import datetime
+
+    from .motor.build import build_motor
+    from .motor.evaluate import not_evaluated, report
+
+    out_dir = config.DATA_DIR / "eval"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for source in [args.source] if args.source else ["synthetic", "prototype"]:
+        counts = build_motor(conn, source, evaluate=not args.sin_evaluar)
+        print(
+            f"Motor ({source}): {counts['transiciones']} transiciones, {counts['combinaciones']} combinaciones "
+            f"({counts['pasos']} pasos), {counts['reglas']} reglas de compra cruzada, {counts['tendencias']} "
+            f"tendencias, {counts['afinidad']} filas de afinidad y {counts['recompra']} de recompra"
+        )
+        weights = counts["pesos"]
+        evaluation = counts["evaluacion"]
+        out = out_dir / f"motor-{source}.md"  # uno por fuente: una no pisa a la otra
+        if evaluation is None:
+            if args.sin_evaluar:
+                why = "se pidió sin evaluar (--sin-evaluar)"
+            elif counts["pedidos"] == 0:
+                why = "sin pedidos"
+            else:
+                why = "menos de 84 días de pedidos"
+            print(f"  Sin evaluar ({why}); pesos: {weights}")
+            when = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M")
+            out.write_text(not_evaluated(source, why, weights, when), encoding="utf-8")
+        else:
+            nv = evaluation["proximo_vertical"]
+            notice = evaluation["validacion"].get("aviso")
+            print(
+                f"  Pesos {'(sin validar, los anteriores)' if notice else 'elegidos'}: {weights}; nDCG en prueba: "
+                f"combinado {nv['combinado']['ndcg']}, afinidad {nv['afinidad']['ndcg']}, popularidad "
+                f"{nv['popularidad']['ndcg']}, orden fijo {nv['orden_fijo']['ndcg']}"
+            )
+            out.write_text(report(evaluation, source), encoding="utf-8")
+        print(f"  Informe en {out}")
+
+
 def cmd_brands(conn, args) -> None:
     print(build_brands(conn))
 
@@ -444,10 +484,11 @@ def cmd_synth(conn, args) -> None:
     from datetime import date
 
     from .analytics.queries import learn_edges
-    from .events.synth import generate
+    from .events.synth import DEFAULT_USERS, generate
 
     until = date.fromisoformat(args.hasta) if args.hasta else None
-    print(generate(conn, users=args.usuarios, weeks=args.semanas, seed=args.semilla, until=until))
+    users = DEFAULT_USERS if args.usuarios is None else args.usuarios
+    print(generate(conn, users=users, weeks=args.semanas, seed=args.semilla, until=until))
     print(f"Aristas aprendidas (simuladas, el agente no las usa): {learn_edges(conn, 'synthetic')}")
 
 
@@ -608,6 +649,7 @@ COMMANDS = {
     "canonical": cmd_canonical,
     "relations": cmd_relations,
     "segments": cmd_segments,
+    "motor": cmd_motor,
     "layer-sample": cmd_layer_sample,
     "layer-precision": cmd_layer_precision,
     "layer-report": cmd_layer_report,
@@ -662,6 +704,16 @@ def build_parser() -> argparse.ArgumentParser:
     sg = sub.add_parser("segments", help="capa de perfiles: segmentos de usuario por comportamiento (con historia)")
     sg.add_argument("--source", choices=["synthetic", "prototype"], default="synthetic")
     sg.add_argument("--user", help="recalcula solo a esta persona")
+    mt = sub.add_parser(
+        "motor",
+        help="motor multivertical: transiciones, combinaciones, compra cruzada, tendencias, afinidad y recompra",
+    )
+    mt.add_argument("--source", choices=["synthetic", "prototype"], help="solo esta fuente (sin él, las dos)")
+    mt.add_argument(
+        "--sin-evaluar",
+        action="store_true",
+        help="no evalúa por fechas ni vuelve a elegir los pesos (quedan los de la corrida anterior)",
+    )
     sub.add_parser("measures", help="capa de perfiles: tamaño, unidad y pack normalizados de cada ítem")
     mc = sub.add_parser(
         "map-categories", help="exporta las categorías sin mapeo revisado, con concepto sugerido, a un CSV para revisar"
@@ -700,7 +752,7 @@ def build_parser() -> argparse.ArgumentParser:
     sheets_cmd.add_argument("--forzar", action="store_true", help="reemplaza planillas que ya tienen juicios")
     sub.add_parser("jev-piloto", help="mide a Jev contra las planillas juzgadas y escribe la propuesta de adopción")
     synth = sub.add_parser("synth", help="genera usuarios y eventos SIMULADOS (source = synthetic)")
-    synth.add_argument("--usuarios", type=int, default=1500)
+    synth.add_argument("--usuarios", type=int, help="personas (por defecto DEFAULT_USERS)")
     synth.add_argument("--semanas", type=int, default=26)
     synth.add_argument("--semilla", type=int, default=7)
     synth.add_argument("--hasta", help="fecha final AAAA-MM-DD (por defecto hoy)")

@@ -32,6 +32,7 @@ from ..concepts.taxonomy import load_taxonomy
 from ..demo.doctor import pending_migrations
 from ..events import store as events
 from ..layers.segments import recalculate_user_segments
+from ..motor.build import refresh_user, refresh_user_conn
 from ..offers.guards import is_offerable
 from ..offers.profiles import active_profiles
 from ..retrieval.hybrid import MODES
@@ -486,6 +487,7 @@ def tastes(user_id: ShortPath, conn: Connection = Depends(get_conn)) -> dict:
 @app.delete("/profile/{user_id}", dependencies=[Depends(owner_in_path)])
 def forget(user_id: ShortPath, concept: ShortQuery | None = None, conn: Connection = Depends(get_conn)) -> dict:
     deleted = events.forget(conn, user_id, concept)
+    refresh_user_conn(conn, user_id)  # la afinidad y la recompra, sin lo que olvidó
     conn.commit()
     return {"user_id": user_id, "concept": concept, "eventos_borrados": deleted}
 
@@ -550,8 +552,8 @@ def post_order(
     connector=Depends(get_connector),
 ) -> dict:
     """Guarda el pedido con el precio del catálogo en la tienda de cada línea (las que no tienen precio vigente quedan
-    fuera y se cuentan en `lineas_omitidas`) y, ya respondido, recalcula los segmentos de esa persona (solo los suyos,
-    con otra conexión del pool, ya devuelta la del pedido)."""
+    fuera y se cuentan en `lineas_omitidas`) y, ya respondido, recalcula los segmentos y el motor (afinidad y recompra)
+    de esa persona (solo lo suyo, con otra conexión del pool, ya devuelta la del pedido)."""
     owner_of_body(request, body.user_id)
     vertical = backend_vertical(body.vertical)
     if vertical is None:  # un pedido es de una tienda: sin vertical del catálogo no se puede guardar
@@ -569,6 +571,7 @@ def post_order(
     if skipped:
         log.warning("Pedido %s: %d línea(s) sin precio vigente quedaron fuera", order_id, skipped)
     background.add_task(recalculate_user_segments, connector, body.user_id)
+    background.add_task(refresh_user, connector, body.user_id)
     return {"order_id": order_id, "lineas_omitidas": skipped}
 
 

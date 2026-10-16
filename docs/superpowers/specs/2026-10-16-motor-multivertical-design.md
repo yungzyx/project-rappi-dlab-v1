@@ -71,7 +71,7 @@ Código nuevo en `rappi-ia/src/rappi_ia/motor/`; reglas en `motor/combos.toml`; 
 
 **Fuente de población.** Los patrones de población (transiciones, combinaciones, compras cruzadas, tendencias) se aprenden de una sola fuente, `MOTOR_POBLACION` (por defecto `synthetic`; con datos reales sería otra fuente). Lo personal (afinidad, recompra) sale siempre de los datos de la propia persona. Cada recomendación declara en su `reason.basis` qué fuente usó. Esto cambia una decisión anterior («el agente no usa lo aprendido de los simulados»): sin datos reales, el motor no tiene otra población de la que aprender, y lo deja dicho en cada oferta.
 
-**Tablas** (todas con `run_id` de `layer_runs`, que suma la capa `motor`):
+**Tablas** (las de población llevan `run_id` de `layer_runs`, que suma la capa `motor`; las dos personales, `user_vertical_affinity` y `replenishment`, no tienen `run_id`: se refrescan por persona, también después de cada pedido):
 
 | Tabla | Qué guarda | Cómo se calcula |
 |---|---|---|
@@ -89,9 +89,11 @@ Código nuevo en `rappi-ia/src/rappi_ia/motor/`; reglas en `motor/combos.toml`; 
 
 **Datos simulados recalibrados** (`events/synth.py`): cada persona simulada recibe un **arquetipo de combinación** sorteado con las proporciones de la tabla (sin Favor, renormalizado; un 5 % «otras» mezcla libre). El arquetipo dice en qué grupos pide; la persona (los 21 perfiles de hoy) dice qué conceptos. Si su perfil no tiene conceptos de un grupo del arquetipo, usa los del súper para Turbo, o los de un perfil vecino. La cadencia sale de pedidos/usuario de su combinación, y el abandono mensual de la retención M+1 de su combinación del mes. Aceptar una sugerencia que suma un grupo mueve a la persona de combinación: **supuesto explícito** de que la correlación de la tabla fuera efecto, rotulado en el código, en los documentos y en el panel.
 
-**Evaluación** (`rappi-ia motor-eval`): separación por fecha en tres tramos (entrenar, validar y probar, 28 días cada uno de los dos últimos). Métricas: próximo vertical (acierto@1, acierto@3, MRR, nDCG@8) contra el orden fijo de hoy, la popularidad, solo afinidad y solo transiciones; compra cruzada (precisión@3 contra lo más pedido del vertical); recompra (error absoluto mediano en días y cobertura). Informe en `rappi-ia/data/eval/motor.md` y resumen en `docs/resultados/`. **Sobre datos simulados la evaluación prueba la mecánica, no el efecto.**
+Al implementarlo (16-10) se dejaron fuera el 5 % «otras» y el «perfil vecino»: quedan los 7 arquetipos de la tabla renormalizados y, para un grupo sin verticales en el perfil, `GENERIC_INTERESTS` (Turbo copia antes lo ofrecible del súper y Express de la persona).
 
-**Comandos:** `rappi-ia motor [--source]` (calcula todo y guarda la corrida), `rappi-ia motor-eval`. `make layers` y `post-refresh` corren `motor` después de `synth` y `segments`. Un pedido (`POST /orders`) recalcula la afinidad y la recompra de esa persona en segundo plano, como los segmentos.
+**Evaluación** (dentro de `rappi-ia motor`; `--sin-evaluar` la salta): separación por fecha en tres tramos (entrenar, validar y probar, 28 días cada uno de los dos últimos). Métricas: próximo vertical (acierto@1, acierto@3, MRR, nDCG@8) contra el orden fijo de hoy, la popularidad, solo afinidad y solo transiciones; compra cruzada (precisión@3 contra lo más pedido del vertical, con su cobertura); recompra (`compraron`: la parte que volvió a comprar el concepto en la prueba; `error_mediano_dias`, solo sobre esas; `acierto_7_dias`, error de hasta 7 días sobre todas las predicciones que vencen). Los pesos del próximo vertical se eligen solos en validación y no se guardan pesos nuevos si no hay a quién validar. Informe por fuente en `rappi-ia/data/eval/motor-{fuente}.md` y resumen con fecha en `docs/resultados/`. El generador de datos simulados crea 3.000 personas por defecto (`DEFAULT_USERS`), con altas repartidas en todo el período para que la ventana de prueba tenga gente. **Sobre datos simulados la evaluación prueba la mecánica, no el efecto.**
+
+**Comandos:** `rappi-ia motor [--source] [--sin-evaluar]` (calcula todo, evalúa y guarda la corrida; no hay un `motor-eval` aparte). `make layers` y `post-refresh` corren `motor` después de `synth` y `segments`. Un pedido (`POST /orders`) recalcula la afinidad y la recompra de esa persona en segundo plano, como los segmentos.
 
 **Evento nuevo:** `vertical_open` (tocar un acceso de la Home), en `EVENT_TYPES` y en el `CHECK` (migración 036).
 
@@ -113,7 +115,7 @@ Código nuevo en `rappi-ia/src/rappi_ia/motor/`; reglas en `motor/combos.toml`; 
 ### Etapa 5: QA y mejora continua
 
 - Revisar el motor sobre la base real (casos sensibles, Farmacia, Licores, bebé, rendimiento de las consultas nuevas) y en `mvp-check`.
-- Ciclo propio: medir con `motor-eval`, encontrar el punto más débil, ajustar y volver a medir, hasta que las mejoras dejen de ser claras. Cada ajuste queda con su cifra antes y después.
+- Ciclo propio: medir con `rappi-ia motor`, encontrar el punto más débil, ajustar y volver a medir, hasta que las mejoras dejen de ser claras. Cada ajuste queda con su cifra antes y después.
 - La mejora sigue sola: la tarea semanal recalcula el motor y vuelve a elegir los pesos.
 
 ### Etapa 6: pulido final

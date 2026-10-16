@@ -1,113 +1,83 @@
 {
   "data": {
-    "busquedas": 219,
-    "personas": 37,
+    "busquedas": 82,
+    "personas": 30,
     "por_vertical": [
       {
-        "concepto": "🥗 Ensaladas y bowls",
-        "sin_resultado": 14,
-        "vertical": "restaurantes"
-      },
-      {
-        "concepto": "🧽 Limpieza",
-        "sin_resultado": 10,
-        "vertical": "supermercado"
-      },
-      {
-        "concepto": "🥛 Leche y yogur",
-        "sin_resultado": 9,
-        "vertical": "supermercado"
-      },
-      {
-        "concepto": "☕ Café",
-        "sin_resultado": 8,
-        "vertical": "conveniencia"
-      },
-      {
-        "concepto": "🍪 Galletas",
-        "sin_resultado": 6,
-        "vertical": "conveniencia"
-      },
-      {
-        "concepto": "🎮 Videojuegos",
-        "sin_resultado": 6,
-        "vertical": "mall"
-      },
-      {
-        "concepto": "🍝 Pastas",
-        "sin_resultado": 6,
-        "vertical": "restaurantes"
-      },
-      {
-        "concepto": "🥩 Carnes y parrilla",
-        "sin_resultado": 6,
-        "vertical": "supermercado"
-      },
-      {
-        "concepto": "🥡 Comida asiática",
-        "sin_resultado": 5,
-        "vertical": "restaurantes"
-      },
-      {
         "concepto": "🍗 Pollo frito y asado",
-        "sin_resultado": 5,
+        "sin_resultado": 6,
+        "vertical": "restaurantes"
+      },
+      {
+        "concepto": "🥗 Ensaladas y bowls",
+        "sin_resultado": 3,
         "vertical": "restaurantes"
       },
       {
         "concepto": "🍎 Frutas",
-        "sin_resultado": 5,
-        "vertical": "supermercado"
-      },
-      {
-        "concepto": "🌱 Alternativas vegetales",
-        "sin_resultado": 5,
-        "vertical": "supermercado"
-      },
-      {
-        "concepto": "🎧 Audio",
         "sin_resultado": 3,
-        "vertical": "mall"
+        "vertical": "supermercado"
+      },
+      {
+        "concepto": "🍝 Pastas",
+        "sin_resultado": 2,
+        "vertical": "restaurantes"
+      },
+      {
+        "concepto": "🥛 Leche y yogur",
+        "sin_resultado": 2,
+        "vertical": "supermercado"
+      },
+      {
+        "concepto": "☕ Café",
+        "sin_resultado": 1,
+        "vertical": "conveniencia"
+      },
+      {
+        "concepto": "🍪 Galletas",
+        "sin_resultado": 1,
+        "vertical": "conveniencia"
+      },
+      {
+        "concepto": "🥙 Comida árabe",
+        "sin_resultado": 1,
+        "vertical": "restaurantes"
+      },
+      {
+        "concepto": "🥡 Comida asiática",
+        "sin_resultado": 1,
+        "vertical": "restaurantes"
       },
       {
         "concepto": "🌮 Comida mexicana",
-        "sin_resultado": 3,
+        "sin_resultado": 1,
         "vertical": "restaurantes"
       },
       {
         "concepto": "🇵🇪 Comida peruana",
-        "sin_resultado": 3,
+        "sin_resultado": 1,
         "vertical": "restaurantes"
       },
       {
-        "concepto": "🐈 Alimento para gatos",
-        "sin_resultado": 3,
+        "concepto": "🥜 Frutos secos",
+        "sin_resultado": 1,
         "vertical": "supermercado"
       },
       {
-        "concepto": "💻 Computación",
-        "sin_resultado": 2,
-        "vertical": "mall"
+        "concepto": "🧽 Limpieza",
+        "sin_resultado": 1,
+        "vertical": "supermercado"
       },
       {
-        "concepto": "🛏️ Textiles del hogar",
-        "sin_resultado": 2,
-        "vertical": "mall"
-      },
-      {
-        "concepto": "🥞 Desayunos y brunch",
-        "sin_resultado": 2,
-        "vertical": "restaurantes"
-      },
-      {
-        "concepto": "🦴 Accesorios para mascotas",
-        "sin_resultado": 2,
+        "concepto": "🍞 Pan",
+        "sin_resultado": 1,
         "vertical": "supermercado"
       }
     ],
-    "sin_resultado": 118
+    "sin_resultado": 25
   },
   "guardado": {
-    "fecha": "2026-10-14",
+    "fecha": "2026-10-16",
     "origen": "make contract · simulación chica con semilla fija (40 personas, 8 semanas)"
   },
   "source": "synthetic"

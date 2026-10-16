@@ -49,9 +49,10 @@ La tarea semanal del scraper (`make schedule` en `rappi-scraper/`) ya lo hace so
 | `make concepts` | Capa 2: conceptos por producto y plato (con kNN si está el extra `ml`) |
 | `make embed` | Embeddings de texto (incrementales) + índices HNSW por vertical. No corre si hay una descarga del scraper en curso |
 | `make eval` | Evalúa la búsqueda (léxico, vectorial, híbrido y ablación sin refuerzo), guarda τ en `src/rappi_ia/eval/thresholds.json` (solo en verticales con negativas que dependen de τ; los demás conservan el suyo; `make eval EVAL_ARGS=` no guarda) y deja el reporte en `data/eval/busqueda.md`. Con `--jev-auto` (lo que usa `make eval`) suma a Jev como tercer juez solo si hay clave y adopción |
-| `make synth` | Usuarios y eventos **simulados** para métricas y segmentos (1.500 usuarios × 26 semanas, semilla 7; reemplaza los anteriores) |
+| `make synth` | Usuarios y eventos **simulados** para métricas y segmentos (3.000 usuarios × 26 semanas, semilla 7; reemplaza los anteriores) |
 | `make purge` | Borra el texto de las consultas con más de 90 días y a las personas del prototipo sin actividad en 180 (`PROTOTYPE_USER_RETENTION_DAYS`) |
-| `make layers` / `make layer-report` | Capa de datos (medidas, marcas, canónicos, atributos, grafo y segmentos) / su reporte de calidad |
+| `make layers` / `make layer-report` | Capa de datos (medidas, marcas, canónicos, atributos, grafo, segmentos y motor) / su reporte de calidad |
+| `make motor` | Motor multivertical (`rappi-ia motor --source synthetic` o `prototype`; sin `--source`, las dos): transiciones entre verticales, combinaciones de grupos con su retención, compra cruzada, tendencias, y la afinidad y la recompra de cada persona; además evalúa por fechas contra líneas base, elige solo los pesos del próximo vertical y escribe un informe por fuente en `data/eval/motor-{fuente}.md` (`--sin-evaluar` lo salta y deja los pesos anteriores). La población de la que aprende la predicción es `MOTOR_POBLACION` (por defecto `synthetic`). La afinidad y la recompra de una persona del prototipo se recalculan solas después de cada pedido y de «Olvidar» ([docs/capa-de-datos.md](../docs/capa-de-datos.md#motor-multivertical)) |
 | `make migrate` / `make db-test` | Aplica las migraciones pendientes / crea la base de tests `rappi_ia_test` |
 | `make deploy-migrate` | El paso de migrar de un despliegue: respalda si hay pendientes (`pre-migracion_<fecha>.dump`), migra y, con `DB_API_ROLE`, aplica los permisos de la API ([docs/despliegue.md](../docs/despliegue.md)) |
 | `make analytics` | Resumen de las métricas de negocio en la terminal |
@@ -183,6 +184,7 @@ rappi-ia/
 │   ├── catalog/       pantallas de catálogo para la API (/catalog)
 │   ├── offers/        ofertas del agente por momento (/agent/offer, /agent/plans) y perfiles de gusto (perfiles.toml, destinos.toml)
 │   ├── layers/        capa de datos: medidas, marcas, atributos, grafo y segmentos (esquema capa)
+│   ├── motor/         motor multivertical: modelo, tablas por fuente y predicción del próximo vertical
 │   ├── demo/          catálogo inventado de `seed-demo` (solo bases _test)
 │   ├── jev.py         cliente de Jev (opcional, fuera de línea)
 │   ├── events/        eventos, perfil con decaimiento, "olvidar", generador simulado
