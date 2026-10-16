@@ -9,7 +9,7 @@
 #      kit → pagar, y en rappi_ia_test (solo lectura) el pedido tiene líneas sembradas y la persona dejó al menos una
 #      `suggestion_accepted` con origen `agent-plan` (o el viejo `mochi-plan`);
 #   4. home: la Home dinámica; una persona nueva ve el orden fijo y, tras tocar «Retail» (Rappi Mall) tres veces, Retail
-#      queda primero con el texto «Ordenadas según lo que más pides»;
+#      queda primero con el texto «Ordenadas según lo que más usas»;
 #   5. panel: «Uso del MVP» del panel (fuente prototipo) muestra lo que dejó la revisión 3 (una oferta aceptada en
 #      «Plan») con el rótulo «uso del MVP, pocas personas: no es evidencia». Corre después de las demás, con la API
 #      todavía en marcha;
