@@ -13,7 +13,7 @@ from ..concepts.taxonomy import load_taxonomy
 from ..embeddings.base import TextEmbedder
 from ..motor.combos import load_combos
 from ..motor.predict import step_signal, target_step
-from ..motor.recommend import CrossPick, cross_picks, latest_lambda
+from ..motor.recommend import RECENT_DAYS, CrossPick, cross_picks, latest_lambda
 from ..offers.guards import (
     alcohol_in_name,
     alcohol_section,
@@ -217,13 +217,15 @@ def suggest_complement(
     sensibles), preferentemente de OTRO vertical, con productos reales.
 
     Candidatos: las aristas curadas y las aprendidas de datos que no son simulados (`concept_edges`, con su peso) y,
-    con `user_id`, sus compras cruzadas (`motor.recommend.cross_picks`, si el λ de la corrida es > 0) que salen de uno
-    de los `source_concepts` que el agente puede nombrar, con peso min(1, (lift − 1) / CROSS_LIFT_SPAN); de un mismo
-    concepto vale el mayor peso. Van de mayor a menor peso, salvo que, con `user_id` y un paso del motor
+    con `user_id`, sus compras cruzadas (`motor.recommend.cross_picks`, si el λ de la corrida es > 0 y la persona pidió
+    hace poco alguno de los `source_concepts`) que salen de uno de ellos que el agente puede nombrar, con peso
+    min(1, (lift − 1) / CROSS_LIFT_SPAN), y que se buscan solo en la vertical de la regla; de un mismo concepto vale el
+    mayor peso. Van de mayor a menor peso (a igual peso, por id), salvo que, con `user_id` y un paso del motor
     (`target_step`), entre los que pesan menos de `SIMILAR_MARGIN` por debajo del primero haya uno que se vende en una
     vertical del grupo que completa su combinación (sin contar la actual) y el primero no: ese va primero y busca antes
-    en esas verticales. La `basis` de la sugerencia dice `combinacion` si ese desempate la eligió y `compra_cruzada`
-    («<A>→<B>@<vertical>» de la regla) si la trajo una compra cruzada.
+    en esas verticales. La marca de la persona gana a ese desempate: si el primero trae un producto de una marca que
+    compra (`prefer_brands`), queda el orden de siempre. La `basis` de la sugerencia dice `combinacion` si el desempate
+    la eligió y `compra_cruzada` («<A>→<B>@<vertical>» de la regla) si la trajo una compra cruzada.
 
     Con `prefer_brands` (brand_key → pedidos de la persona), se miran más candidatos del concepto y el de la marca
     comprada con más pedidos va primero. Si ninguno es de sus marcas, el resultado es el de siempre."""
@@ -236,24 +238,24 @@ def suggest_complement(
            FROM concept_edges
            WHERE from_concept = ANY(%s) AND (method = 'curado' OR data_source <> 'synthetic')
            GROUP BY 1, 2
-           ORDER BY weight DESC""",
+           ORDER BY weight DESC, to_concept""",
         (sources,),
     ).fetchall()
     found: dict[str, _Candidate] = {}
     for source, target, weight in edges:
         found.setdefault(target, _Candidate(target, source, float(weight)))
     population = config.MOTOR_POBLACION
-    step = None
-    if user_id is not None:
-        if (lam := latest_lambda(conn, population)) > 0:
-            for pick in cross_picks(conn, user_id, population=population, k=None, lam=lam):
-                origin = taxonomy.concepts.get(pick.from_concept) if pick.from_concept else None
-                if origin is None or origin.id not in sources or not is_offerable(origin) or not pick.lift > 1:
-                    continue
-                weight = min(1.0, (pick.lift - 1) / CROSS_LIFT_SPAN)
-                if pick.concept_id not in found or weight > found[pick.concept_id].weight:
-                    found[pick.concept_id] = _Candidate(pick.concept_id, origin.id, weight, pick)
-        step = target_step(conn, user_id, population)
+    lam = None
+    if user_id is not None and _ordered_lately(conn, user_id, sources):
+        lam = latest_lambda(conn, population)
+    if lam is not None and lam > 0:
+        for pick in cross_picks(conn, user_id, population=population, k=None, lam=lam):
+            origin = taxonomy.concepts.get(pick.from_concept) if pick.from_concept else None
+            if origin is None or origin.id not in sources or not is_offerable(origin) or not pick.lift > 1:
+                continue
+            weight = min(1.0, (pick.lift - 1) / CROSS_LIFT_SPAN)
+            if pick.concept_id not in found or weight > found[pick.concept_id].weight:
+                found[pick.concept_id] = _Candidate(pick.concept_id, origin.id, weight, pick)
 
     candidates = sorted(
         (
@@ -264,49 +266,86 @@ def suggest_complement(
             and c.concept not in exclude
             and c.concept not in sources
         ),
-        key=lambda c: -c.weight,
+        key=lambda c: (-c.weight, c.concept),
     )
-    # Cada intento: (candidato, verticales donde buscarlo o None para las de siempre, si lo eligió el desempate).
-    attempts: list[tuple[_Candidate, list[str] | None, bool]] = [(c, None, False) for c in candidates]
-    if step is not None and candidates:
-        group = {v for v in load_combos().groups[step[0]] if offerable_vertical(v)}
-        for candidate in candidates:
-            # Los pesos son `real`: redondeados, 0,4 − 0,3 no queda bajo el margen por el error de coma flotante.
-            if round(candidates[0].weight - candidate.weight, 6) >= SIMILAR_MARGIN:
-                break
-            verticals = _verticals_for(conn, candidate.concept, current_vertical)
-            if completing := [v for v in verticals if v in group and v != current_vertical]:
-                if candidate is not candidates[0]:  # si el primero ya completa la combinación, el orden de siempre
-                    # Primero en las verticales del grupo; si ahí no hay productos, vuelve a su lugar de siempre.
-                    attempts.insert(0, (candidate, completing, True))
-                break
+    if not candidates:
+        return None
 
-    for candidate, verticals, completes in attempts:
-        target, concept = candidate.concept, taxonomy.concepts[candidate.concept]
-        if verticals is None:
-            verticals = _verticals_for(conn, target, current_vertical)
-        if candidate.pick:  # primero la vertical de la regla, si se puede buscar ahí
-            verticals = sorted(verticals, key=lambda v: v != candidate.pick.vertical)
+    def verticals_of(candidate: _Candidate) -> list[str]:
+        if candidate.pick:  # la compra cruzada es de la vertical de la regla: solo ahí
+            return [candidate.pick.vertical]
+        return _verticals_for(conn, candidate.concept, current_vertical)
+
+    def search(candidate: _Candidate, verticals: list[str]) -> tuple[str, list[Product], str | None] | None:
+        """(vertical, productos, marca) de la primera vertical donde el candidato tiene productos."""
+        concept = taxonomy.concepts[candidate.concept]
         for vertical in verticals:
             if not offerable_vertical(vertical):
                 continue
             brand = None
             if prefer_brands:
-                pool = search_products(conn, vertical, concept.name, [target], embedder, k=BRAND_CANDIDATES, offer=True)
-                products, brand = _brand_first(conn, [p for p in pool.products if p.concept == target], prefer_brands)
+                pool = search_products(
+                    conn, vertical, concept.name, [concept.id], embedder, k=BRAND_CANDIDATES, offer=True
+                )
+                products, brand = _brand_first(
+                    conn, [p for p in pool.products if p.concept == concept.id], prefer_brands
+                )
             if brand is None:
-                outcome = search_products(conn, vertical, concept.name, [target], embedder, k=4, offer=True)
-                products = [p for p in outcome.products if p.concept == target]
-            products = _dedupe(products)
-            if products:
-                origin = taxonomy.concepts[candidate.source]
-                reason = f"Porque llevas {origin.emoji} {origin.name.lower()}"
-                basis = [step_signal(step)] if completes else []
-                if candidate.pick:
-                    rule = f"{origin.id}→{target}@{candidate.pick.vertical}"
-                    basis.append({"kind": "compra_cruzada", "id": rule, "source": f"poblacion:{population}"})
-                return Suggestion(target, candidate.source, vertical, reason, products[:3], brand, basis)
+                outcome = search_products(conn, vertical, concept.name, [concept.id], embedder, k=4, offer=True)
+                products = [p for p in outcome.products if p.concept == concept.id]
+            if products := _dedupe(products):
+                return vertical, products[:3], brand
+        return None
+
+    def suggestion(candidate: _Candidate, result: tuple[str, list[Product], str | None], basis: list[dict]):
+        vertical, products, brand = result
+        origin = taxonomy.concepts[candidate.source]
+        reason = f"Porque llevas {origin.emoji} {origin.name.lower()}"
+        if candidate.pick:
+            rule = f"{origin.id}→{candidate.concept}@{candidate.pick.vertical}"
+            basis = [*basis, {"kind": "compra_cruzada", "id": rule, "source": f"poblacion:{population}"}]
+        return Suggestion(candidate.concept, candidate.source, vertical, reason, products, brand, basis)
+
+    best = candidates[0]
+    searched: dict[str, tuple[str, list[Product], str | None] | None] = {}  # lo ya buscado de un candidato
+    # Los pesos son `real`: redondeados, 0,4 − 0,3 no queda bajo el margen por el error de coma flotante.
+    similar = [c for c in candidates[1:] if round(best.weight - c.weight, 6) < SIMILAR_MARGIN]
+    step = target_step(conn, user_id, population) if user_id is not None and similar else None
+    if step is not None:
+        group = {v for v in load_combos().groups[step[0]] if offerable_vertical(v)}
+        for candidate in (best, *similar):
+            if completing := [v for v in verticals_of(candidate) if v in group and v != current_vertical]:
+                break
+        # Si el primero ya completa la combinación, o ninguno la completa, el orden de siempre.
+        if completing and candidate is not best:
+            # Su marca gana al desempate: el primero con un producto de una marca que compra va igual primero.
+            if prefer_brands:
+                usual = searched[best.concept] = search(best, verticals_of(best))
+                if usual is not None and usual[2] is not None:
+                    return suggestion(best, usual, [])
+            # Primero en las verticales del grupo; si ahí no hay productos, vuelve a su lugar de siempre.
+            if result := search(candidate, completing):
+                return suggestion(candidate, result, [step_signal(step)])
+
+    for candidate in candidates:
+        if candidate.concept in searched:
+            result = searched[candidate.concept]
+        else:
+            result = search(candidate, verticals_of(candidate))
+        if result:
+            return suggestion(candidate, result, [])
     return None
+
+
+def _ordered_lately(conn: Connection, user_id: str, concepts: list[str]) -> bool:
+    """Si la persona pidió alguno de esos conceptos en «Propuesta» en los últimos `RECENT_DAYS` días: solo entonces sus
+    reglas de compra cruzada (`cross_picks`) pueden salir de ellos."""
+    return conn.execute(
+        """SELECT EXISTS (SELECT 1 FROM app_orders o JOIN app_order_lines l USING (order_id)
+                          WHERE o.user_id = %s AND o.mode = 'propuesta' AND l.concept_id = ANY(%s)
+                            AND o.ts > now() - make_interval(days => %s) AND o.ts <= now())""",
+        (user_id, concepts, RECENT_DAYS),
+    ).fetchone()[0]
 
 
 BRAND_CANDIDATES = 12  # productos del concepto que se miran para encontrar una marca que la persona compra

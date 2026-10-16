@@ -89,10 +89,7 @@ def test_two_users_with_different_histories_get_different_offers(people, db):
         assert_traceable(db, user, reason, history)
 
 
-def test_complement_puts_the_brand_you_buy_first(people, db, monkeypatch):
-    # Sin el paso del motor: las dos personas solo piden en Retail y, entre complementos parecidos, el té helado de
-    # Turbo les completaría la combinación (test_complement_combo.py). Aquí se prueba la marca, dentro del concepto.
-    monkeypatch.setattr("rappi_ia.agent.tools.target_step", lambda *args: None)
+def test_complement_puts_the_brand_you_buy_first(people, db):
     client = people.client
     anonymous = checkout(client, None)
     sweet, grill = checkout(client, SWEET), checkout(client, GRILL)
@@ -101,6 +98,7 @@ def test_complement_puts_the_brand_you_buy_first(people, db, monkeypatch):
     assert people.sweet_brand_product in ids and ids[0] != people.sweet_brand_product  # no era la primera
     assert [p["entity_id"] for p in sweet["products"]][0] == people.sweet_brand_product
     assert sweet["reason"]["text"].endswith(f" Es {SWEET_BRAND[1]}, la marca que compras.")
+    assert not any(s["kind"] == "combinacion" for s in sweet["reason"]["basis"])  # su marca gana al desempate
     brand = [s for s in sweet["reason"]["basis"] if s["kind"] == "marca"]
     assert brand == [{"kind": "marca", "id": SWEET_BRAND[0], "score": 2, "source": "pedidos"}]  # sus dos pedidos
     ordered = db.execute(
@@ -110,4 +108,8 @@ def test_complement_puts_the_brand_you_buy_first(people, db, monkeypatch):
         (SWEET, SWEET_BRAND[0]),
     ).fetchone()[0]
     assert ordered == brand[0]["score"]  # rastreable hasta sus pedidos
-    assert grill == anonymous  # quien no compra esa marca ve la oferta de siempre
+    # Quien no compra esa marca no la ve nombrada. Sin una marca suya, entre complementos parecidos gana el que completa
+    # su combinación (solo pide en Retail: el té helado de Turbo), y la base lo dice.
+    assert not any(s["kind"] == "marca" for s in grill["reason"]["basis"])
+    assert "la marca que compras" not in grill["reason"]["text"]
+    assert {"kind": "combinacion", "id": "retail→turbo+retail", "source": "rappi"} in grill["reason"]["basis"]

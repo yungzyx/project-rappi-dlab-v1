@@ -682,6 +682,19 @@ describe('Para ti y Descubre con Mochi', () => {
     expect(tracked('suggestion_shown').filter((fields) => fields.payload.origen === 'para-ti')).toHaveLength(1)
   })
 
+  test('la fila «Lo más pedido» de Para ti se cuenta como mostrada con su tipo', async () => {
+    const data = fixture('recommendations')
+    data.rows = data.rows.filter((row) => row.kind === 'lo_mas_pedido')
+    stubCatalog({ '/recommendations': data })
+    await renderPanel()
+
+    expect(document.querySelector('.agent-msg-reason').textContent).toBe('Lo más pedido estas semanas en el súper')
+    const shown = tracked('suggestion_shown').filter((fields) => fields.payload.origen === 'para-ti')
+    expect(shown).toEqual([
+      { concept_id: 'cafe', vertical: 'grocery', payload: { origen: 'para-ti', kind: 'lo_mas_pedido' } },
+    ])
+  })
+
   test('lo que se agrega desde Para ti se cuenta como aceptado con ese origen', async () => {
     stubCatalog({ '/recommendations': rows() })
     await renderPanel()

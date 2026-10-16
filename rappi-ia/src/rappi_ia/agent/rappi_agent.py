@@ -383,6 +383,7 @@ class RappiAgent:
             "prototype_vertical": PROTOTYPE_VERTICALS.get(suggestion.vertical),
             "concept": suggestion.concept,
             "products": [p.to_dict() for p in suggestion.products],
+            "basis": suggestion.basis,  # las fuentes del motor que la eligieron (`combinacion`, `compra_cruzada`)
         }
 
     def _also_in(self, conn, ctx: Context, intent: Intent, products, vertical, offer: bool = False) -> dict | None:

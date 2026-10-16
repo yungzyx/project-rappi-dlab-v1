@@ -224,7 +224,8 @@ export default function AssistantPanel({ push, vertical, depth = 1 }) {
       const waited = new Promise((resolve) => later(() => resolve([]), FOR_YOU_WAIT_MS))
       const [row] = await Promise.race([rows, waited])
       if (!row) return { text: GREETING }
-      noteShown(events.track, row.products, { origin: 'para-ti', concept: row.concept, generation: profile.resets })
+      const shown = { origin: 'para-ti', concept: row.concept, generation: profile.resets, kind: row.kind }
+      noteShown(events.track, row.products, shown)
       return { text: GREETING, products: row.products.map(asForYou), reason: row.reason }
     })
   }

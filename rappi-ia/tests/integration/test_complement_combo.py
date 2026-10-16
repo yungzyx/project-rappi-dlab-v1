@@ -91,6 +91,39 @@ def test_with_two_similar_complements_the_one_of_the_target_vertical_wins(demo):
     assert chosen.reason == "Porque llevas 🍕 pizza"  # la razón sigue hablando de lo que lleva la persona
 
 
+def coffee_brand(db):
+    """El café del súper de prueba (91004) es de una marca que la persona compra."""
+    db.execute("INSERT INTO product_brands (brand_key, name) VALUES ('marca-cafe', 'Café del Sur')")
+    db.execute(
+        """INSERT INTO item_brands (entity_type, entity_id, brand_key, source)
+           VALUES ('catalog_item', '91004', 'marca-cafe', 'regla')"""
+    )
+    db.commit()
+
+
+def test_with_two_similar_complements_the_brand_you_buy_beats_the_combination(demo):
+    db, embedder = demo
+    pizza_goes_with(db, {"cafe": 0.6, "hielo": 0.55})
+    coffee_brand(db)
+
+    chosen = suggest_complement(db, ["pizza"], "restaurantes", embedder, set(), {"marca-cafe": 2}, "u-sushi")
+
+    assert (chosen.concept, chosen.vertical, chosen.brand) == ("cafe", "supermercado", "marca-cafe")
+    assert chosen.products[0].entity_id == "91004"
+    assert chosen.basis == []  # no lo eligió el desempate
+
+
+def test_with_two_similar_complements_and_no_brand_of_theirs_the_combination_wins(demo):
+    db, embedder = demo
+    pizza_goes_with(db, {"cafe": 0.6, "hielo": 0.55})
+    coffee_brand(db)
+
+    chosen = suggest_complement(db, ["pizza"], "restaurantes", embedder, set(), {"otra-marca": 3}, "u-sushi")
+
+    assert (chosen.concept, chosen.vertical, chosen.brand) == ("hielo", "turbo", None)
+    assert chosen.basis == [REST_TO_TURBO]
+
+
 def test_with_one_clearly_better_that_one_wins(demo):
     db, embedder = demo
     pizza_goes_with(db, {"cafe": 0.7, "hielo": 0.55})
@@ -142,6 +175,34 @@ def test_a_cross_sell_rule_from_the_source_is_a_candidate_and_says_so(demo):
     ]
 
 
+def test_a_cross_sell_rule_is_only_searched_in_the_vertical_of_the_rule(demo):
+    db, embedder = demo
+    # La despensa asiática también se vende en el súper, pero la regla es de Express, donde no hay: no se ofrece.
+    rule(db, "sushi", "despensa-asiatica", "conveniencia", 4.0)
+
+    chosen = suggest_complement(db, ["sushi"], "restaurantes", embedder, user_id="u-sushi")
+
+    assert chosen is None or not any(signal["kind"] == "compra_cruzada" for signal in chosen.basis)
+    assert chosen is None or (chosen.concept, chosen.vertical) != ("despensa-asiatica", "supermercado")
+
+
+def test_without_a_recent_order_of_the_source_the_rules_of_the_person_do_not_apply(demo):
+    db, embedder = demo
+    rule(db, "pizza", "hielo", "turbo", 4.0)  # u-sushi no ha pedido pizza
+    pizza_goes_with(db, {"cafe": 0.9})
+
+    chosen = suggest_complement(db, ["pizza"], "restaurantes", embedder, user_id="u-sushi")
+
+    assert chosen.concept == "cafe" and chosen.basis == []
+
+
+def test_equal_weights_keep_the_same_order_every_time(demo):
+    db, embedder = demo
+    pizza_goes_with(db, {"hielo": 0.6, "cafe": 0.6})
+
+    assert suggest_complement(db, ["pizza"], "restaurantes", embedder).concept == "cafe"  # a igual peso, por id
+
+
 def test_a_rule_the_validation_chose_not_to_push_is_not_a_candidate(demo):
     db, embedder = demo
     rule(db, "sushi", "despensa-asiatica", "turbo", 4.0)
@@ -189,9 +250,10 @@ def test_the_agent_uses_the_person_only_in_the_final_prototype(demo):
 
     final = agent.reply(db, "pizza", Context(vertical="restaurantes", user_id="u-sushi"))
     assert final["suggestion"]["concept"] == "hielo" and final["suggestion"]["vertical"] == "turbo"
+    assert final["suggestion"]["basis"] == [REST_TO_TURBO]  # /agent/ask también declara la fuente
 
     anonymous = agent.reply(db, "pizza", Context(vertical="restaurantes"))
-    assert anonymous["suggestion"]["concept"] == "cafe"
+    assert anonymous["suggestion"]["concept"] == "cafe" and anonymous["suggestion"]["basis"] == []
 
     today = agent.reply(db, "pizza", Context(vertical="restaurantes", mode="actual", user_id="u-sushi"))
     assert "suggestion" not in today  # «Rappi hoy» no sugiere nada cruzado
