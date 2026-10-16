@@ -29,7 +29,10 @@ SUPUESTOS (editables aquí):
   La oficinista ya existe como «oficina». Los pesos (`share`) se normalizan al sortear: no hace falta que sumen 1.
 - Una persona asiática (sushi, comida asiática y su despensa, snacks y bebidas en Restaurantes, Súper, Turbo y Express)
   alimenta el perfil de gusto principal; su peso sale del de la persona de carrete.
-- 26 semanas: la retención (días 61 a 120) necesita usuarios con 120 días de historia.
+- 26 semanas: la retención (días 61 a 120) necesita usuarios con 120 días de historia. Las altas llegan parejas en todo
+  el período, como cohortes mensuales (la tabla de Rappi junta cohortes con gente nueva cada mes): así la población
+  activa no se vacía al final y la ventana de prueba del motor (28 días) tiene gente. Las métricas de retención
+  (días 61 a 120) solo cuentan a quien tiene esa historia.
 - Quien no encuentra lo que busca (demanda no satisfecha) o abandona carros, se va antes (CHURN_*): cada búsqueda sin
   resultado o carro abandonado de las últimas 4 semanas acelera la pérdida.
 - Parte de quienes encuentran productos se va sin agregar nada al carro (BROWSE_ONLY).
@@ -340,6 +343,8 @@ GENERIC_INTERESTS: dict[str, dict[str, float]] = {
 }
 _GROUP_FALLBACK = {"rest": "restaurantes", "turbo": "turbo", "retail": "supermercado"}  # vertical del grupo vacío
 _TURBO_SOURCES = ("supermercado", "conveniencia")  # de dónde copia Turbo cuando el perfil no lo tiene
+# Personas por defecto (también en el CLI): con el catálogo real, el último mes completo queda con ~400 o más activas.
+DEFAULT_USERS = 3000
 TRIP = 0.03  # sesiones que hablan de un viaje (RappiTravel)
 TRAVEL_OPEN = 0.35  # de ellas, las que abren RappiTravel
 FAVOR_OFFER = 0.6  # búsquedas sin resultado donde el agente ofrece RappiFavor (en «Propuesta»)
@@ -476,7 +481,14 @@ def _offerable_copy(persona: Persona, verticals: tuple[str, ...]) -> dict[str, f
     return copied
 
 
-def generate(conn: Connection, users: int = 1500, weeks: int = 26, seed: int = 7, until: date | None = None) -> dict:
+def draw_signup(rng: random.Random, start: datetime, weeks: int) -> datetime:
+    """Fecha de alta: pareja en todo el período (cohortes mensuales), no solo en su primera parte."""
+    return start + timedelta(days=rng.uniform(0, weeks * 7))
+
+
+def generate(
+    conn: Connection, users: int = DEFAULT_USERS, weeks: int = 26, seed: int = 7, until: date | None = None
+) -> dict:
     """Borra los datos simulados anteriores y genera nuevos (reproducible con la misma semilla y fecha)."""
     rng = random.Random(seed)
     catalog = load_catalog(conn)
@@ -497,7 +509,7 @@ def generate(conn: Connection, users: int = 1500, weeks: int = 26, seed: int = 7
             archetype=archetype,
             interests=effective_interests(persona, archetype, catalog),
         )
-        signup = start + timedelta(days=rng.uniform(0, weeks * 7 * 0.6))
+        signup = draw_signup(rng, start, weeks)
         _write(buffers["users"], state.user_id, "synthetic", persona.id, state.city, rng.random() < 0.4, _iso(signup))
         counts["usuarios"] += 1
         _simulate_user(rng, catalog, state, signup, end, start, buffers, counts)

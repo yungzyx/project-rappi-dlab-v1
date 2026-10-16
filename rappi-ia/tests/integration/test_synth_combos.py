@@ -49,3 +49,12 @@ def test_more_groups_retain_more_in_the_simulation(simulated):
     retention = {combo: sum(flags) / len(flags) for combo, flags in kept.items()}
     assert len(kept["rest+turbo+retail"]) >= 20, kept.keys()
     assert retention["rest+turbo+retail"] > retention["rest"], retention
+
+
+def test_activity_does_not_collapse_at_the_end(simulated):
+    """La población activa no se vacía hacia el final: el último mes completo conserva buena parte de la del pico."""
+    active: Counter[date] = Counter()
+    for _user, month in _user_months(simulated):
+        active[month] += 1
+    last_full = date(2026, 9, 1)  # `until` cae el 4 de octubre: octubre no está completo
+    assert active[last_full] >= 0.4 * max(active.values()), sorted(active.items())

@@ -207,3 +207,12 @@ def test_simulated_suggestions_follow_the_offer_guards():
     )
     assert synth._suggestion(catalog, "pizza", "restaurantes") == ("gaseosas", "supermercado", 0.6)
     assert synth._suggestion(catalog, "frutas", "supermercado") is None  # salud
+
+
+def test_signups_spread_over_the_whole_period():
+    """Las altas llegan parejas, como cohortes mensuales: el último cuarto del período recibe cerca de un cuarto."""
+    rng = random.Random(1)
+    signups = [synth.draw_signup(rng, START, 26) for _ in range(2000)]
+    assert all(START <= s < END for s in signups)
+    last_quarter = sum(1 for s in signups if s >= START + (END - START) * 0.75)
+    assert 0.20 <= last_quarter / len(signups) <= 0.30, last_quarter

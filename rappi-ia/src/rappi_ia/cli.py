@@ -484,10 +484,11 @@ def cmd_synth(conn, args) -> None:
     from datetime import date
 
     from .analytics.queries import learn_edges
-    from .events.synth import generate
+    from .events.synth import DEFAULT_USERS, generate
 
     until = date.fromisoformat(args.hasta) if args.hasta else None
-    print(generate(conn, users=args.usuarios, weeks=args.semanas, seed=args.semilla, until=until))
+    users = DEFAULT_USERS if args.usuarios is None else args.usuarios
+    print(generate(conn, users=users, weeks=args.semanas, seed=args.semilla, until=until))
     print(f"Aristas aprendidas (simuladas, el agente no las usa): {learn_edges(conn, 'synthetic')}")
 
 
@@ -751,7 +752,7 @@ def build_parser() -> argparse.ArgumentParser:
     sheets_cmd.add_argument("--forzar", action="store_true", help="reemplaza planillas que ya tienen juicios")
     sub.add_parser("jev-piloto", help="mide a Jev contra las planillas juzgadas y escribe la propuesta de adopción")
     synth = sub.add_parser("synth", help="genera usuarios y eventos SIMULADOS (source = synthetic)")
-    synth.add_argument("--usuarios", type=int, default=1500)
+    synth.add_argument("--usuarios", type=int, help="personas (por defecto DEFAULT_USERS)")
     synth.add_argument("--semanas", type=int, default=26)
     synth.add_argument("--semilla", type=int, default=7)
     synth.add_argument("--hasta", help="fecha final AAAA-MM-DD (por defecto hoy)")
