@@ -93,3 +93,15 @@ def test_latest_lambda_default_without_runs(db):
     finish_layer_run(db, run, {"fuente": "prototype", "lambda_cruzada": 2.0})
     assert latest_lambda(db, "prototype") == 2.0
     assert latest_lambda(db, "synthetic") == 1.0
+
+
+def test_cross_picks_can_bring_every_pair_and_take_the_lambda_from_the_caller(population):
+    every = cross_picks(population, "u1", population="synthetic", k=None)
+    assert [(p.concept_id, p.vertical) for p in every] == [
+        ("salsas", "turbo"),
+        ("snacks-salados", "supermercado"),
+        ("pizza", "restaurantes"),
+        ("helados", "turbo"),
+    ]
+    plain = cross_picks(population, "u1", population="synthetic", k=None, lam=0.0)  # sin empuje: lo más pedido
+    assert [(p.concept_id, p.vertical) for p in plain][:2] == [("snacks-salados", "supermercado"), ("salsas", "turbo")]

@@ -201,18 +201,23 @@ def test_the_most_ordered_products_are_current_offerable_and_of_the_vertical(cli
     ]
 
 
-def test_the_group_skips_pharmacy_and_liquor_and_follows_the_prediction(client, db):
-    order(db, "u1", "restaurantes")
-    order(db, "u1", "turbo")  # rest+turbo: le falta retail
+def mall_browser(db, user="u1"):
+    """Pide en restaurantes y en Turbo (le falta retail) y abre mucho Farmacia y Licores, y algo el mall."""
+    order(db, user, "restaurantes")
+    order(db, user, "turbo")
     opened = [("farmacia", 6), ("licores", 6), ("mall", 2)]
     events.record(
         db,
         [
-            events.Event("u1", "s1", "vertical_open", ts=NOW, vertical=vertical)
+            events.Event(user, "s1", "vertical_open", ts=NOW, vertical=vertical)
             for vertical, times in opened
             for _ in range(times)
         ],
     )
+
+
+def test_the_group_skips_pharmacy_and_liquor_and_follows_the_prediction(client, db):
+    mall_browser(db)
 
     body = to_try(client, "u1")
 
@@ -225,11 +230,64 @@ def test_the_group_skips_pharmacy_and_liquor_and_follows_the_prediction(client, 
     assert all(p["vertical"] == "mall" for p in body["products"])
 
 
-def test_a_vertical_of_the_group_tried_long_ago_is_still_offered(client, db):
+def test_the_most_ordered_never_comes_from_a_store_the_agent_does_not_push(client, db):
+    mall_browser(db)
+    product_trends(db, "mall", [("catalog_item", "96101"), ("catalog_item", "96007")])  # la vela del sex shop, y otra
+
+    body = to_try(client, "u1")
+
+    assert body["vertical"] == "mall" and body["text"] == "Lo más pedido en Rappi Mall."
+    assert [p["entity_id"] for p in body["products"]] == ["96007"]
+
+
+def test_the_most_ordered_has_the_price_of_the_vertical_even_if_it_is_cheaper_elsewhere(client, db):
+    sushi_lover(db)
+    product_trends(db, "turbo", [("catalog_item", "91001")])  # papas: $1.990 en el súper, $2.490 en Turbo
+
+    body = to_try(client, "u-sushi")
+
+    [chips] = body["products"]
+    assert (chips["entity_id"], chips["vertical"], chips["price"]) == ("91001", "turbo", "$2.490")
+    assert chips["store"].startswith("Tienda turbo")
+
+
+def test_a_vertical_of_the_group_tried_long_ago_is_still_offered_as_a_comeback(client, db):
     sushi_lover(db)
     order(db, "u-sushi", "turbo", days_ago=40)  # probó Turbo hace más de un mes: su combinación sigue siendo «rest»
+    back = {"kind": "vuelta", "id": "turbo", "source": "pedidos"}
 
     body = to_try(client, "u-sushi")
 
     assert body["vertical"] == "turbo"
-    assert body["reason"]["basis"][0] == REST_TO_TURBO
+    assert body["text"] == "Vuelve a Turbo: mira estas ofertas."
+    assert body["reason"]["text"] == "Porque hace más de un mes que no pides en Turbo."
+    assert body["reason"]["basis"] == [REST_TO_TURBO, back]
+
+    product_trends(db, "turbo", [("catalog_item", "93001")])
+    body = to_try(client, "u-sushi")
+    assert body["text"] == "Vuelve a Turbo: mira lo más pedido."
+    assert body["reason"]["text"] == "Porque hace más de un mes que no pides en Turbo."
+    assert body["reason"]["basis"] == [
+        REST_TO_TURBO,
+        {"kind": "lo_mas_pedido", "id": "turbo", "source": "poblacion:synthetic"},
+        back,
+    ]
+
+    concept_trends(db, {("despensa-asiatica", "turbo"): 10})
+    rule(db, "sushi", "despensa-asiatica", "turbo", 10.0)
+    body = to_try(client, "u-sushi")
+    assert body["text"] == "Para acompañar tu sushi: despensa asiática en Turbo."  # sigue siendo cierto
+    assert [s["kind"] for s in body["reason"]["basis"]] == ["combinacion", "compra_cruzada"]
+
+
+def test_a_comeback_to_the_supermarket_contracts_the_article(client, db):
+    order(db, "u1", "restaurantes")
+    order(db, "u1", "turbo")
+    for vertical in ("supermercado", "conveniencia", "mall", "chocolateria"):
+        order(db, "u1", vertical, days_ago=40)
+
+    body = to_try(client, "u1")
+
+    assert body["vertical"] == "supermercado"
+    assert body["text"] == "Vuelve al súper: mira estas ofertas."
+    assert body["reason"]["text"] == "Porque hace más de un mes que no pides en el súper."

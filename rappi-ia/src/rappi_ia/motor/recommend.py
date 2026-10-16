@@ -59,13 +59,15 @@ def cross_picks(
     user_id: str,
     verticals: Iterable[str] | None = None,
     population: str | None = None,
-    k: int = 3,
+    k: int | None = 3,
+    lam: float | None = None,
 ) -> list[CrossPick]:
     """Los `k` pares (concepto, vertical) que más conviene ofrecerle: los conceptos de sus pedidos `propuesta` de los
     últimos 30 días disparan las reglas de `cross_sell_rules` de la población, que se mezclan (`mix_scores`, con el λ
     de la última corrida) con lo más pedido de `trends`. Sin lo que ya pidió en ese vertical en esos 30 días, sin
     conceptos ni verticales que las guardias de ofertas no dejan proponer, y solo de `verticals` si se da. Sin pedidos
-    recientes, es lo más pedido. `population` por defecto es `config.MOTOR_POBLACION`, leída al llamar."""
+    recientes, es lo más pedido. `population` por defecto es `config.MOTOR_POBLACION`, leída al llamar; `k=None` los
+    trae todos y `lam`, si quien llama ya lo leyó, evita volver a leer el λ."""
     population = population or config.MOTOR_POBLACION
     now = datetime.now(UTC)
     source = _source_of(conn, user_id)
@@ -104,7 +106,8 @@ def cross_picks(
         and concept in taxonomy
         and is_offerable(taxonomy[concept])
     }
-    scores = mix_scores(popular, {pair: lift for pair, (lift, _c) in rules.items()}, latest_lambda(conn, population))
+    lam = latest_lambda(conn, population) if lam is None else lam
+    scores = mix_scores(popular, {pair: lift for pair, (lift, _c) in rules.items()}, lam)
     best = sorted(scores, key=lambda pair: (-scores[pair], pair))[:k]
     return [
         CrossPick(

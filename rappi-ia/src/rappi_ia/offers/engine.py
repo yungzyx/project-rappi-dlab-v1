@@ -30,13 +30,14 @@ la evidencia de sus segmentos (`source` «segmento:<id>», el peso de su nivel c
 from dataclasses import dataclass, field
 
 from psycopg import Connection
+from rappi_scraper.storage.search import MIN_PRICE
 
 from .. import config
 from ..agent.grouped_search import SCREEN_VERTICALS
 from ..agent.tools import VERTICAL_LABELS, Product, search_products, suggest_complement
 from ..agent.verticals import contending_verticals, ranked_verticals, typical_verticals
 from ..catalog.deals import deals
-from ..catalog.stores import product_detail
+from ..catalog.stores import BIGINT_MAX, _product, product_detail
 from ..concepts.taxonomy import Concept, Service, load_taxonomy
 from ..embeddings.base import MemoizedQueryEmbedder, TextEmbedder
 from ..motor.combos import combo_key, load_combos
@@ -127,6 +128,10 @@ TO_TRY_CROSS_TEXT = "Para acompañar tu {origen}: {destino} en {vertical}."
 REASON_TO_TRY_CROSS = "Porque pides {emoji} {name} y quienes lo piden suelen sumar {destino} en {vertical}."
 TO_TRY_TOP_TEXT = "Lo más pedido en {vertical}."
 REASON_TO_TRY_TOP = "Porque aún no pides en {vertical}: esto es lo que más se pide."
+# Una vertical del paso que la persona ya probó (pidió ahí hace más de un mes: no está en su combinación de 30 días).
+BACK_TEXT = "Vuelve a {vertical}: mira {what}."
+BACK_TOP = "lo más pedido"
+REASON_BACK = "Porque hace más de un mes que no pides en {vertical}."
 SEE_ACTION = "Ver {destino}"
 OPEN_ACTION = "Abrir {vertical}"
 REASON_LIKES_VERTICAL = "Porque te gusta {emoji} {name}, y en {vertical} hay más."
@@ -474,21 +479,37 @@ def _deals_or_dishes(conn: Connection, vertical: str) -> list[dict]:
 
 
 def _usual_offer(
-    vertical: str, products: list[dict], interests: Interests, affinity: dict, basis: tuple[dict, ...] = ()
+    vertical: str,
+    products: list[dict],
+    interests: Interests,
+    affinity: dict,
+    basis: tuple[dict, ...] = (),
+    back: bool = False,
 ) -> Offer:
     """La oferta de siempre de una vertical por probar: «Aún no pides en…» y, si algo de ahí le gusta, «Porque te
-    gusta…»; `basis` va antes de sus señales."""
+    gusta…»; `basis` va antes de sus señales. Con `back` (una vertical del paso donde ya pidió), «Vuelve a…»."""
     label = VERTICAL_LABELS.get(vertical, vertical)
     what = TO_TRY_DISHES if vertical == "restaurantes" else TO_TRY_DEALS
-    text = TO_TRY_TEXT.format(vertical=label, what=what)
-    if likes := affinity.get(vertical):
-        reason = _likes_reason(REASON_LIKES_VERTICAL, likes, interests, vertical=label)
+    if back:
+        text = contract_articles(BACK_TEXT.format(vertical=label, what=what))
+        reason = _back_reason(vertical, [])
     else:
-        reason = _reason(
-            contract_articles(REASON_TO_TRY.format(vertical=label)), [_context_signal("sin_pedidos", vertical)]
-        )
+        text = TO_TRY_TEXT.format(vertical=label, what=what)
+        if likes := affinity.get(vertical):
+            reason = _likes_reason(REASON_LIKES_VERTICAL, likes, interests, vertical=label)
+        else:
+            reason = _reason(
+                contract_articles(REASON_TO_TRY.format(vertical=label)), [_context_signal("sin_pedidos", vertical)]
+            )
     reason["basis"] = [*basis, *reason["basis"]]
     return Offer("vertical_por_probar", text, products, vertical, reason, [_open_action(vertical)])
+
+
+def _back_reason(vertical: str, basis: list[dict]) -> dict:
+    """«Porque hace más de un mes que no pides en…», con la señal `vuelta` (de sus pedidos) al final de `basis`."""
+    label = VERTICAL_LABELS.get(vertical, vertical)
+    signal = {"kind": "vuelta", "id": vertical, "source": "pedidos"}
+    return _reason(contract_articles(REASON_BACK.format(vertical=label)), [*basis, signal])
 
 
 def _combo_offer(
@@ -502,56 +523,71 @@ def _combo_offer(
     """Una vertical del grupo que completa la combinación: las que se pueden ofrecer, primero las que la persona no ha
     probado y, entre ellas, en el orden de `next_verticals`. Para la primera con algo que mostrar: los productos de su
     mejor compra cruzada (`cross_picks`), o lo más pedido ahí por la población (`trends`), o sus ofertas o platos de
-    siempre. La `basis` parte con el paso (`combinacion`)."""
+    siempre. La `basis` parte con el paso (`combinacion`). Si ya pidió en esa vertical (hace más de un mes), lo más
+    pedido y lo de siempre dicen «Vuelve a…»; la compra cruzada sigue siendo cierta y no cambia."""
     group, target, _gain = step
     population = config.MOTOR_POBLACION
     current = combo_key(set(target.split("+")) - {group})
     combo = {"kind": "combinacion", "id": f"{current}→{target}", "source": "rappi"}
-    order = [s.vertical for s in next_verticals(conn, user_id, population)]
     candidates = [v for v in load_combos().groups[group] if offerable_vertical(v)]
+    if len(candidates) > 1:
+        order = [s.vertical for s in next_verticals(conn, user_id, population)]
+        candidates.sort(key=lambda v: (v in tried, order.index(v)))
+    if not candidates:
+        return None
+    lam = latest_lambda(conn, population)
+    best: dict[str, CrossPick] = {}  # la mejor compra cruzada de cada vertical
+    for pick in cross_picks(conn, user_id, candidates, population, k=None, lam=lam):
+        best.setdefault(pick.vertical, pick)
     affinity: dict | None = None
-    for vertical in sorted(candidates, key=lambda v: (v in tried, order.index(v))):
-        label = VERTICAL_LABELS.get(vertical, vertical)
-        picks = cross_picks(conn, user_id, [vertical], population, k=1)
-        if picks and (products := _pick_products(conn, embedder, picks[0])):
-            pick = picks[0]
+    for vertical in candidates:
+        back = vertical in tried
+        pick = best.get(vertical)
+        if pick and (products := _pick_products(conn, embedder, pick)):
             concepts = load_taxonomy().concepts
             origin = concepts.get(pick.from_concept) if pick.from_concept else None
             # Solo si la regla empujó el par (λ > 0) y el agente puede nombrar lo que la persona pide.
-            if origin is not None and is_offerable(origin) and latest_lambda(conn, population) > 0:
-                destino = concepts[pick.concept_id].name.lower()
-                text = TO_TRY_CROSS_TEXT.format(origen=origin.name.lower(), destino=destino, vertical=label)
-                why = REASON_TO_TRY_CROSS.format(
-                    emoji=origin.emoji, name=origin.name.lower(), destino=destino, vertical=label
-                )
-                signal = {
-                    "kind": "compra_cruzada",
-                    "id": f"{origin.id}→{pick.concept_id}@{vertical}",
-                    "source": f"poblacion:{population}",
-                }
-                reason = _reason(
-                    contract_articles(why), [combo, signal], concept=pick.concept_id, from_concept=origin.id
-                )
-                return Offer(
-                    "vertical_por_probar", contract_articles(text), products, vertical, reason, [_open_action(vertical)]
-                )
-            return _top_offer(vertical, products, combo, population)
+            if origin is not None and is_offerable(origin) and lam > 0:
+                return _cross_offer(vertical, products, pick, origin, combo, population)
+            return _top_offer(vertical, products, combo, population, back)
         if products := _most_ordered(conn, vertical, population):
-            return _top_offer(vertical, products, combo, population)
+            return _top_offer(vertical, products, combo, population, back)
         if products := _deals_or_dishes(conn, vertical):
             if affinity is None:
                 affinity = _vertical_affinity(conn, interests) if interests.concepts else {}
-            return _usual_offer(vertical, products, interests, affinity, (combo,))
+            return _usual_offer(vertical, products, interests, affinity, (combo,), back)
     return None
 
 
-def _top_offer(vertical: str, products: list[dict], combo: dict, population: str) -> Offer:
-    """«Lo más pedido en…»: lo que más pide la población en la vertical (o lo de un concepto que nadie empujó)."""
+def _cross_offer(
+    vertical: str, products: list[dict], pick: CrossPick, origin: Concept, combo: dict, population: str
+) -> Offer:
+    """«Para acompañar tu…»: la compra cruzada que la regla de la población empujó desde lo que pide la persona."""
+    label = VERTICAL_LABELS.get(vertical, vertical)
+    destino = load_taxonomy().concepts[pick.concept_id].name.lower()
+    text = TO_TRY_CROSS_TEXT.format(origen=origin.name.lower(), destino=destino, vertical=label)
+    why = REASON_TO_TRY_CROSS.format(emoji=origin.emoji, name=origin.name.lower(), destino=destino, vertical=label)
+    signal = {
+        "kind": "compra_cruzada",
+        "id": f"{origin.id}→{pick.concept_id}@{vertical}",
+        "source": f"poblacion:{population}",
+    }
+    reason = _reason(contract_articles(why), [combo, signal], concept=pick.concept_id, from_concept=origin.id)
+    return Offer("vertical_por_probar", contract_articles(text), products, vertical, reason, [_open_action(vertical)])
+
+
+def _top_offer(vertical: str, products: list[dict], combo: dict, population: str, back: bool = False) -> Offer:
+    """«Lo más pedido en…»: lo que más pide la población en la vertical (o lo de un concepto que nadie empujó). Con
+    `back`, «Vuelve a…»."""
     label = VERTICAL_LABELS.get(vertical, vertical)
     signal = {"kind": "lo_mas_pedido", "id": vertical, "source": f"poblacion:{population}"}
-    reason = _reason(contract_articles(REASON_TO_TRY_TOP.format(vertical=label)), [combo, signal])
-    text = contract_articles(TO_TRY_TOP_TEXT.format(vertical=label))
-    return Offer("vertical_por_probar", text, products, vertical, reason, [_open_action(vertical)])
+    if back:
+        text = BACK_TEXT.format(vertical=label, what=BACK_TOP)
+        reason = _back_reason(vertical, [combo, signal])
+    else:
+        text = TO_TRY_TOP_TEXT.format(vertical=label)
+        reason = _reason(contract_articles(REASON_TO_TRY_TOP.format(vertical=label)), [combo, signal])
+    return Offer("vertical_por_probar", contract_articles(text), products, vertical, reason, [_open_action(vertical)])
 
 
 def _pick_products(conn: Connection, embedder: TextEmbedder | None, pick: CrossPick) -> list[dict]:
@@ -564,35 +600,66 @@ def _pick_products(conn: Connection, embedder: TextEmbedder | None, pick: CrossP
     return _offerable_products(conn, found)[:SHOWN_PRODUCTS]
 
 
+# Lo más pedido de una vertical, con el precio de esa vertical: la oferta vigente más barata (`v_latest_offers`, la
+# única definición de oferta vigente) de una tienda de la vertical que lo tiene en un pasillo (la regla de
+# `catalog.stores._CURRENT_OFFERS`). Una sola consulta para todos los candidatos.
+_TOP_CATALOG = """
+SELECT DISTINCT ON (sp.master_product_id)
+       sp.master_product_id::text, ci.name, l.price, l.real_price, btrim(coalesce(b.name, s.name)), s.store_id,
+       NULLIF(ci.image_url, ''), ci.presentation, ci.is_alcoholic OR ci.age_restricted, ic.concept_id
+FROM store_products sp
+JOIN v_latest_offers l ON l.store_id = sp.store_id AND l.sku = sp.sku
+JOIN aisles a ON a.store_id = sp.store_id AND a.aisle_id = sp.aisle_id AND a.parent_aisle_id IS NULL
+JOIN stores s ON s.store_id = sp.store_id
+JOIN catalog_items ci ON ci.master_product_id = sp.master_product_id
+LEFT JOIN brands b ON b.brand_id = s.brand_id
+LEFT JOIN item_concepts ic ON ic.entity_type = 'catalog_item' AND ic.entity_id = ci.master_product_id::text
+WHERE sp.master_product_id = ANY(%(ids)s) AND l.current AND l.in_stock IS NOT FALSE AND l.price >= %(min_price)s
+  AND EXISTS (SELECT 1 FROM v_store_verticals v WHERE v.store_id = sp.store_id AND v.vertical = %(vertical)s)
+ORDER BY sp.master_product_id, l.price, sp.store_id"""
+# Los platos con su último precio (`latest_menu_prices`) y la sección del menú donde están.
+_TOP_DISHES = """
+SELECT mi.item_id::text, mi.name, mp.price, mp.real_price, s.name, s.store_id, NULLIF(mi.image_url, ''),
+       ic.concept_id, ms.name
+FROM menu_items mi
+JOIN stores s ON s.store_id = mi.store_id
+JOIN latest_menu_prices mp ON mp.item_id = mi.item_id
+LEFT JOIN menu_sections ms ON ms.store_id = mi.store_id AND ms.section_id = mi.section_id
+LEFT JOIN item_concepts ic ON ic.entity_type = 'menu_item' AND ic.entity_id = mi.item_id::text
+WHERE mi.item_id = ANY(%(ids)s)"""
+
+
 def _most_ordered(conn: Connection, vertical: str, population: str) -> list[dict]:
-    """Hasta tres de los productos más pedidos por la población en la vertical (`trends`, alcance `producto`) que
-    siguen a la venta: un producto del catálogo con oferta vigente (`v_latest_offers`, por `product_detail`) en una
-    tienda de esa vertical, o un plato con precio (`latest_menu_prices`) que no es de una sección de tragos. Pasan las
-    guardias de las ofertas (`_offerable_products`)."""
+    """Hasta tres de los productos más pedidos por la población en la vertical (`trends`, alcance `producto`), en su
+    orden, que siguen a la venta ahí: un producto del catálogo con su oferta vigente más barata en una tienda de esa
+    vertical (`_TOP_CATALOG`), o en restaurantes un plato con precio que no es de una sección de tragos
+    (`_TOP_DISHES`). Pasan las guardias de las ofertas (`_offerable_products`), también la de su tienda."""
+    kind = "menu_item" if vertical == "restaurantes" else "catalog_item"
     rows = conn.execute(
-        """SELECT entity_type, entity_id FROM trends
-           WHERE data_source = %s AND scope = 'producto' AND vertical = %s AND entity_type IS NOT NULL
+        """SELECT entity_id FROM trends
+           WHERE data_source = %s AND scope = 'producto' AND vertical = %s AND entity_type = %s
            ORDER BY rank, item_key""",
-        (population, vertical),
+        (population, vertical, kind),
     ).fetchall()
-    dishes = [int(i) for t, i in rows if t == "menu_item" and i.isascii() and i.isdigit()]
-    sections = conn.execute(
-        """SELECT mi.item_id::text, ms.name FROM menu_items mi
-           JOIN menu_sections ms ON ms.store_id = mi.store_id AND ms.section_id = mi.section_id
-           WHERE mi.item_id = ANY(%s)""",
-        (dishes,),
-    ).fetchall()
-    drinks = {item_id for item_id, section in sections if alcohol_section(section)}
-    products: list[dict] = []
-    for entity_type, entity_id in rows:
-        if entity_id in drinks:
-            continue
-        product = product_detail(conn, entity_type, entity_id)
-        if product and product["vertical"] == vertical and _offerable_products(conn, [product]):
-            products.append(product)
-            if len(products) >= SHOWN_PRODUCTS:
-                break
-    return products
+    ids = [i for (i,) in rows if i.isascii() and i.isdigit() and int(i) <= BIGINT_MAX]
+    if not ids:
+        return []
+    params = {"ids": [int(i) for i in ids], "vertical": vertical, "min_price": MIN_PRICE}
+    taxonomy = load_taxonomy()
+    found: dict[str, Product] = {}
+    if kind == "catalog_item":
+        for id_, name, price, real, store, store_id, image, presentation, adult, concept in conn.execute(
+            _TOP_CATALOG, params
+        ):
+            row = (id_, name, price, real, image, presentation, adult, concept)
+            found[id_] = _product(row, vertical, store, store_id, taxonomy)
+    else:
+        for id_, name, price, real, store, store_id, image, concept, section in conn.execute(_TOP_DISHES, params):
+            if not alcohol_section(section):
+                row = (id_, name, price, real, image, None, False, concept)
+                found[id_] = _product(row, vertical, store, store_id, taxonomy, kind)
+    ranked = [found[i].to_dict() for i in ids if i in found and found[i].price_value is not None]
+    return _offerable_products(conn, ranked)[:SHOWN_PRODUCTS]
 
 
 def _open_action(vertical: str) -> dict:
