@@ -7,6 +7,7 @@ ALTER TABLE layer_runs DROP CONSTRAINT layer_runs_layer_check;
 ALTER TABLE layer_runs ADD CONSTRAINT layer_runs_layer_check CHECK (
     layer IN ('attributes', 'measures', 'brands', 'canonical', 'relations', 'segments', 'motor')
 );
+COMMENT ON COLUMN capa.layer_runs.layer IS 'measures, brands, canonical, attributes, relations, segments o motor.';
 -- El motor sí deja registradas sus corridas en curso y las que fallan (la 026 decía que una corrida fallida no queda).
 COMMENT ON COLUMN capa.layer_runs.status IS 'running mientras corre, done al terminar, failed si falló: el motor deja registrada la corrida que falla; las demás capas la deshacen con su transacción y no queda.';
 

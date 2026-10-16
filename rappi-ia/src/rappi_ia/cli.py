@@ -145,14 +145,33 @@ def cmd_segments(conn, args) -> None:
 
 def cmd_motor(conn, args) -> None:
     from .motor.build import build_motor
+    from .motor.evaluate import report
 
+    reports = []
     for source in [args.source] if args.source else ["synthetic", "prototype"]:
-        counts = build_motor(conn, source)
+        counts = build_motor(conn, source, evaluate=not args.sin_evaluar)
         print(
             f"Motor ({source}): {counts['transiciones']} transiciones, {counts['combinaciones']} combinaciones "
             f"({counts['pasos']} pasos), {counts['reglas']} reglas de compra cruzada, {counts['tendencias']} "
             f"tendencias, {counts['afinidad']} filas de afinidad y {counts['recompra']} de recompra"
         )
+        weights = counts["pesos"]
+        evaluation = counts["evaluacion"]
+        if evaluation is None:
+            why = "sin evaluar" if args.sin_evaluar else "menos de 84 días de pedidos: sin evaluar"
+            print(f"  Pesos ({why}): {weights}")
+            continue
+        nv = evaluation["proximo_vertical"]
+        print(
+            f"  Pesos elegidos: {weights}; nDCG en prueba: combinado {nv['combinado']['ndcg']}, afinidad "
+            f"{nv['afinidad']['ndcg']}, popularidad {nv['popularidad']['ndcg']}, orden fijo {nv['orden_fijo']['ndcg']}"
+        )
+        reports.append(report(evaluation, source))
+    if reports:
+        out = config.DATA_DIR / "eval" / "motor.md"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text("\n".join(reports), encoding="utf-8")
+        print(f"Informe en {out}")
 
 
 def cmd_brands(conn, args) -> None:
@@ -680,6 +699,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="motor multivertical: transiciones, combinaciones, compra cruzada, tendencias, afinidad y recompra",
     )
     mt.add_argument("--source", choices=["synthetic", "prototype"], help="solo esta fuente (sin él, las dos)")
+    mt.add_argument(
+        "--sin-evaluar",
+        action="store_true",
+        help="no evalúa por fechas ni vuelve a elegir los pesos (quedan los de la corrida anterior)",
+    )
     sub.add_parser("measures", help="capa de perfiles: tamaño, unidad y pack normalizados de cada ítem")
     mc = sub.add_parser(
         "map-categories", help="exporta las categorías sin mapeo revisado, con concepto sugerido, a un CSV para revisar"

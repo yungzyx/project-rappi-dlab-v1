@@ -35,6 +35,11 @@ def test_layer_runs_accepts_motor(db):
     db.execute("INSERT INTO layer_runs (layer, rules_version) VALUES ('motor', 'v1')")
     with pytest.raises(psycopg.errors.CheckViolation), db.transaction():
         db.execute("INSERT INTO layer_runs (layer, rules_version) VALUES ('otra', 'v1')")
+    comment = db.execute(
+        """SELECT col_description('capa.layer_runs'::regclass, attnum) FROM pg_attribute
+           WHERE attrelid = 'capa.layer_runs'::regclass AND attname = 'layer'"""
+    ).fetchone()[0]
+    assert "motor" in comment
 
 
 def test_affinity_rows_go_with_the_person(db):

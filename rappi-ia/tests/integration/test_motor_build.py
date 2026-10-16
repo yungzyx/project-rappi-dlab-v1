@@ -18,7 +18,9 @@ from rappi_ia.demo.seed import seed_demo
 from rappi_ia.events import store as events
 from rappi_ia.events.synth import generate
 from rappi_ia.motor.build import build_motor, refresh_user
+from rappi_ia.motor.evaluate import GRID_B, GRID_C, METHODS, report
 from rappi_ia.motor.model import DEFAULT_WEIGHTS
+from rappi_ia.motor.predict import latest_weights
 
 POPULATION_TABLES = ("vertical_transitions", "combo_stats", "combo_steps", "cross_sell_rules", "trends")
 COUNT_OF_TABLE = {
@@ -64,7 +66,7 @@ def test_build_motor_fills_every_table_and_records_the_run(simulated):
         assert _rows(db, table) == counts[COUNT_OF_TABLE[table]], table
     assert counts["afinidad"] == _personal(db, "user_vertical_affinity") > 0
     assert counts["recompra"] == _personal(db, "replenishment") > 0
-    assert counts["pesos"] == DEFAULT_WEIGHTS
+    assert set(counts["pesos"]) == set(DEFAULT_WEIGHTS)
 
     status, stored, version = db.execute(
         "SELECT status, counts, rules_version FROM layer_runs WHERE layer = 'motor' ORDER BY run_id DESC LIMIT 1"
@@ -125,9 +127,43 @@ def test_build_synthetic_keeps_prototype_rows(simulated):
     assert _personal(db, "user_vertical_affinity", "prototype") == 1
 
 
+def test_build_motor_chooses_weights_and_stores_the_evaluation(simulated):
+    db = simulated
+    counts = build_motor(db, "synthetic")
+
+    evaluation = counts["evaluacion"]
+    assert counts["pesos"] == evaluation["pesos"]
+    assert counts["pesos"]["afinidad"] == 1
+    assert counts["pesos"]["transicion"] in GRID_B and counts["pesos"]["popularidad"] in GRID_C
+    assert set(evaluation["proximo_vertical"]) == set(METHODS)
+    assert evaluation["proximo_vertical"]["combinado"]["personas"] > 0
+    assert {"precision3", "cobertura", "lo_mas_pedido"} <= set(evaluation["compra_cruzada"])
+    assert {"n", "error_mediano_dias", "acierto_7_dias"} <= set(evaluation["recompra"])
+    stored = db.execute("SELECT counts FROM layer_runs WHERE layer = 'motor' ORDER BY run_id DESC LIMIT 1").fetchone()[
+        0
+    ]
+    assert stored["evaluacion"] == evaluation
+    assert latest_weights(db, "synthetic") == counts["pesos"]
+    assert "Datos simulados" in report(evaluation, "synthetic")
+
+
+def test_build_motor_without_evaluating_keeps_the_last_weights(simulated):
+    db = simulated
+    tuned = build_motor(db, "synthetic")["pesos"]
+    db.execute(
+        "UPDATE layer_runs SET counts = jsonb_set(counts, '{pesos,transicion}', '7') WHERE layer = 'motor'"
+    )  # pesos que no salen de la grilla: se ve que vienen de la corrida anterior
+    db.commit()
+
+    counts = build_motor(db, "synthetic", evaluate=False)
+    assert counts["evaluacion"] is None
+    assert counts["pesos"] == {**tuned, "transicion": 7.0}
+
+
 def test_build_without_orders_writes_nothing_and_finishes(db):
     counts = build_motor(db, "prototype")
     assert counts["transiciones"] == counts["afinidad"] == counts["tendencias"] == 0
+    assert counts["pesos"] == DEFAULT_WEIGHTS and counts["evaluacion"] is None
     status = db.execute("SELECT status FROM layer_runs WHERE layer = 'motor'").fetchone()[0]
     assert status == "done"
 

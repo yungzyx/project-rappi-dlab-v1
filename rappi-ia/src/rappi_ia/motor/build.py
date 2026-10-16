@@ -23,6 +23,7 @@ from . import model
 from .combos import FILE as COMBOS_FILE
 from .combos import load_combos
 from .data import Order, Signal, load_orders, load_signals, sensitive_concepts
+from .evaluate import evaluate as evaluate_motor
 from .model import (
     AFFINITY_WINDOW_DAYS,
     DEFAULT_ORDER,
@@ -38,20 +39,25 @@ from .model import (
     transitions,
     trends,
 )
+from .predict import latest_weights
 
 log = logging.getLogger(__name__)
 
 
-def build_motor(conn: Connection, source: str) -> dict:
+def build_motor(conn: Connection, source: str, evaluate: bool = True) -> dict:
     """Recalcula el motor de una fuente en una sola transacción: las 5 tablas de población y la afinidad y la recompra
     de todas sus personas. `now` es el último pedido de la fuente (los simulados terminan en una fecha pasada). La
-    corrida queda en `layer_runs` (capa `motor`, con la fuente y los pesos en `counts`); si algo falla, queda `failed`
-    y no se escribe nada."""
+    corrida queda en `layer_runs` (capa `motor`, con la fuente, los pesos y la evaluación en `counts`); si algo falla,
+    queda `failed` y no se escribe nada.
+
+    Con `evaluate` y al menos 84 días de pedidos, evalúa por fechas y guarda los pesos elegidos (`motor.evaluate`);
+    sin datos suficientes, `DEFAULT_WEIGHTS`; con `evaluate=False`, los pesos de la última corrida de la fuente. En
+    los dos últimos casos, `"evaluacion"` es None."""
     run = start_layer_run(conn, "motor", rules_version(load_combos().version, COMBOS_FILE, Path(model.__file__)))
     conn.commit()  # la corrida se ve aunque lo demás falle
     start = time.perf_counter()
     try:
-        counts = _build(conn, source, run)
+        counts = _build(conn, source, run, evaluate)
     except Exception as exc:
         conn.rollback()
         finish_layer_run(conn, run, {"fuente": source, "error": type(exc).__name__}, "failed")
@@ -59,11 +65,13 @@ def build_motor(conn: Connection, source: str) -> dict:
         raise
     finish_layer_run(conn, run, counts)
     conn.commit()
-    log.info("Motor (%s) en %.1f s: %s", source, time.perf_counter() - start, counts)
+    summary = {k: v for k, v in counts.items() if k != "evaluacion"}  # la evaluación va al informe
+    log.info("Motor (%s) en %.1f s: %s", source, time.perf_counter() - start, summary)
     return counts
 
 
-def _build(conn: Connection, source: str, run: int) -> dict:
+def _build(conn: Connection, source: str, run: int, evaluate: bool) -> dict:
+    weights = dict(DEFAULT_WEIGHTS) if evaluate else latest_weights(conn, source)
     for table in ("vertical_transitions", "combo_stats", "combo_steps", "cross_sell_rules", "trends"):
         conn.execute(f"DELETE FROM {table} WHERE data_source = %s", (source,))
     _delete_personal(conn, "user_id IN (SELECT user_id FROM app_users WHERE source = %s)", source)
@@ -76,13 +84,21 @@ def _build(conn: Connection, source: str, run: int) -> dict:
         "tendencias": 0,
         "afinidad": 0,
         "recompra": 0,
-        "pesos": dict(DEFAULT_WEIGHTS),
+        "pesos": weights,
+        "evaluacion": None,
     }
     orders = load_orders(conn, source)
     if not orders:
         return counts
     now = max(o.ts for o in orders)
     sensitive = sensitive_concepts(conn)
+    signals = load_signals(conn, source)
+    if evaluate:
+        start = time.perf_counter()
+        counts["evaluacion"] = evaluate_motor(orders, signals, sensitive)
+        if counts["evaluacion"] is not None:
+            counts["pesos"] = counts["evaluacion"]["pesos"]
+        log.info("Evaluación del motor (%s) en %.1f s", source, time.perf_counter() - start)
 
     probs = transitions(orders)
     rows = [
@@ -137,7 +153,7 @@ def _build(conn: Connection, source: str, run: int) -> dict:
         rows,
     )
 
-    affinity_rows, replenish_rows = _personal_rows(load_signals(conn, source), orders, now, sensitive)
+    affinity_rows, replenish_rows = _personal_rows(signals, orders, now, sensitive)
     counts["afinidad"], counts["recompra"] = _write_personal(conn, affinity_rows, replenish_rows)
     return counts
 
