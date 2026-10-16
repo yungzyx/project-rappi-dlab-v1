@@ -104,13 +104,13 @@ Documentos al 04-10-2026 (segunda descarga semanal automática); «Con concepto�
 
 ### Motor multivertical (datos simulados: prueban la mecánica, no el efecto)
 
-Corrida del 16-10-2026 (`rappi-ia motor`) sobre una copia del catálogo real y **3.000 personas simuladas**, con tramos por fecha: entrenar, validar y probar (28 días cada uno de los dos últimos; 365 personas en la prueba). Cifras después de la mejora continua de la etapa 5 (recompra más estricta y un generador más cercano a la tabla de Rappi). Informe completo, intentos descartados y ruido entre semillas en [docs/resultados/motor-2026-10-16.md](docs/resultados/motor-2026-10-16.md#mejora-continua-etapa-5-datos-simulados).
+Corrida del 16-10-2026 (`rappi-ia motor`) sobre una copia del catálogo real y **3.000 personas simuladas**, con tramos por fecha: entrenar, validar y probar (28 días cada uno de los dos últimos; 365 personas en la prueba). Cifras después de la mejora continua de la etapa 5 (un generador más cercano a la tabla de Rappi; la recompra no cambió). Informe completo, intentos descartados y ruido entre semillas en [docs/resultados/motor-2026-10-16.md](docs/resultados/motor-2026-10-16.md#mejora-continua-etapa-5-datos-simulados).
 
 | Qué | Métrica | Valor | Tipo de dato |
 |---|---|---|---|
 | Próximo vertical | nDCG@8 | combinado 0,958 · solo afinidad 0,957 · popularidad 0,898 · orden fijo 0,892 | Simulado |
-| Compra cruzada | precisión@3 | **mezcla** de lo más pedido y las reglas 0,128 · lo más pedido 0,128 · solo reglas aprendidas 0,128 (47 personas con alguna regla). En validación, λ quedó en 0: la mezcla es lo más pedido, y las reglas no suman | Simulado |
-| Recompra | acierto ±7 días | 0,177 sobre 62 predicciones (volvieron a comprar el 35 %; error mediano de 7,5 días). Con la regla anterior (3 compras), 0,114 sobre 79 | Simulado |
+| Compra cruzada | precisión@3 | **mezcla** de lo más pedido y las reglas 0,128 · lo más pedido 0,128 (365 personas). En validación λ quedó en 0, así que hoy las reglas no cambian lo que se ofrece; en la prueba, entre las 47 con regla, reglas 0,128 frente a 0,106 de lo más pedido (pocas personas) | Simulado |
+| Recompra | acierto ±7 días | 0,114 sobre 79 predicciones (volvieron a comprar el 24 %; error mediano de 9 días). Una variante más estricta (4 compras) subió a 0,177 en la prueba, pero no en validación y se descartó | Simulado |
 
 El generador de datos simulados se calibró con la tabla de combinaciones de verticales y retención que **compartió el equipo de Rappi** (dato compartido por Rappi, cohortes de enero a junio de 2026): es una correlación, no un efecto, y el simulador la trata como efecto, así que sus cifras no prueban que sumar verticales retenga. La agrupación de verticales en `rest`, `turbo` y `retail` es un supuesto propio. Detalle: [docs/capa-de-datos.md](docs/capa-de-datos.md#motor-multivertical).
 

@@ -356,9 +356,8 @@ FAVOR_OPEN = 0.2
 BROWSE_ONLY = 0.12  # encuentra productos y se va sin agregar nada al carro
 SUGGESTION_SHOWN = 0.3  # carros donde el agente muestra un complemento de otro vertical (no en todos)
 SUGGESTION_ACCEPT = 0.22  # probabilidad base de aceptar una sugerencia cruzada (× peso de la arista)
-TURBO_SUGGESTION = (
-    0.5  # sugerencias que van a Turbo cuando Turbo vende el concepto (el resto sigue el orden del agente)
-)
+# Sugerencias que van a Turbo cuando Turbo vende el concepto (el resto sigue el orden del agente).
+TURBO_SUGGESTION = 0.5
 SUGGESTION_CADENCE_BOOST = 0.93  # aceptar una sugerencia acorta el ritmo 7%
 MODALITIES = (("texto", 1.0),)  # solo texto; se sigue sorteando para conservar la misma secuencia aleatoria
 PREFERRED_ATTRIBUTES = ("sin-gluten", "vegano", "alto-proteina", "con-descuento")

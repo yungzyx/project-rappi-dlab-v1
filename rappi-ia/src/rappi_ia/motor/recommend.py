@@ -1,9 +1,10 @@
 """Compras cruzadas para una persona: lo más pedido de la población, empujado por las reglas que salen de lo que ella
 pidió hace poco.
 
-Las reglas solas aciertan menos que lo más pedido (con datos simulados en `rappi_staging`, precisión@3 0,076 contra
-0,124): por eso la base es la popularidad del par (concepto, vertical) y el lift de las reglas solo la sube. El peso del
-empuje (λ) se elige en validación, como los demás pesos del motor (`motor.evaluate`), y queda en la corrida como
+Las reglas solas acertaron menos que lo más pedido (16-10, antes de la etapa 5, con datos simulados en
+`rappi_staging`: precisión@3 0,076 contra 0,124; las cifras vigentes, en `docs/resultados/motor-2026-10-16.md`): por
+eso la base es la popularidad del par (concepto, vertical) y el lift de las reglas solo la sube. El peso del empuje (λ)
+se elige en validación, como los demás pesos del motor (`motor.evaluate`), y queda en la corrida como
 `lambda_cruzada`.
 """
 
