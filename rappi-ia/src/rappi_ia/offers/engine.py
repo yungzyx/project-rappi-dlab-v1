@@ -132,18 +132,22 @@ REASON_NEXT_ANONYMOUS = "Porque combina con lo que pediste."
 REASON_NO_RESULT = "Porque buscaste «{query}» y aquí sí hay."
 REASON_TO_TRY = "Porque aún no pides en {vertical}."
 # La vertical por probar del paso del motor: con compra cruzada, {origen} es el concepto de la persona que dispara la
-# regla y {destino} el que se ofrece; con lo más pedido de la población, la vertical. El porqué no afirma lo que hace la
-# población (en la demo es simulada): la `basis` declara la fuente. Una regla de un concepto a sí mismo en otra
-# vertical (lácteos → lácteos en Turbo) tiene su propio texto.
-TO_TRY_CROSS_TEXT = "Para acompañar {origen}: {destino} en {vertical}."
-REASON_TO_TRY_CROSS = "Porque pides {emoji} {name} y {destino} combina con eso; en {vertical} lo encuentras."
-TO_TRY_SAME_TEXT = "Tu {destino}, también en {vertical}."
-REASON_TO_TRY_SAME = "Porque pides {emoji} {name}: también lo encuentras en {vertical}."
+# regla y {destino} el que se ofrece; con lo más pedido de la población, la vertical. Los conceptos son singulares
+# («sushi»), plurales («frutas») o compuestos («sándwiches y completos»): las plantillas no llevan artículo ni verbo que
+# deba concordar con ellos. El porqué no afirma lo que hace la población (en la demo es simulada): la `basis` declara
+# la fuente. Una regla de un concepto a sí mismo en otra vertical (lácteos → lácteos en Turbo) tiene su propio texto.
+TO_TRY_CROSS_TEXT = "Para tu pedido de {origen}: {destino} en {vertical}."
+REASON_TO_TRY_CROSS = "Porque pides {emoji} {name}. Para acompañar: {destino}, en {vertical}."
+TO_TRY_SAME_TEXT = "También hay {destino} en {vertical}."
+REASON_TO_TRY_SAME = "Porque pides {emoji} {name}; en {vertical} también hay."
 TO_TRY_TOP_TEXT = "Lo más pedido en {vertical}."
 REASON_TO_TRY_TOP = "Porque aún no pides en {vertical}: esto es lo que más se pide."
+# Una regla eligió los productos, pero lo que pide la persona no se nombra: no son «lo más pedido» de la población.
+TO_TRY_RULE_TEXT = "Para sumar en {vertical}."
 # Una vertical del paso que la persona ya probó (pidió ahí hace más de un mes: no está en su combinación de 30 días).
 BACK_TEXT = "Vuelve a {vertical}: mira {what}."
 BACK_TOP = "lo más pedido"
+BACK_RULE = "estos productos"
 REASON_BACK = "Porque hace más de un mes que no pides en {vertical}."
 # La recompra: {destino} es el concepto, {cada} cada cuánto lo pide («cada día» o «cada N días», `_every`) y {hace}
 # «hoy», «ayer» o «hace N días».
@@ -595,8 +599,8 @@ def _combo_offer(
 def _cross_offer(
     vertical: str, products: list[dict], pick: CrossPick, origin: Concept, combo: dict, population: str
 ) -> Offer:
-    """«Para acompañar…»: la compra cruzada que la regla de la población empujó desde lo que pide la persona; si la
-    regla va del concepto a sí mismo en otra vertical, «Tu…, también en…»."""
+    """«Para tu pedido de…»: la compra cruzada que la regla de la población empujó desde lo que pide la persona; si la
+    regla va del concepto a sí mismo en otra vertical, «También hay… en…»."""
     label = VERTICAL_LABELS.get(vertical, vertical)
     destino = load_taxonomy().concepts[pick.concept_id].name.lower()
     if pick.concept_id == origin.id:
@@ -617,14 +621,18 @@ def _cross_offer(
 def _top_offer(
     vertical: str, products: list[dict], combo: dict, population: str, back: bool = False, rule: dict | None = None
 ) -> Offer:
-    """«Lo más pedido en…»: lo que más pide la población en la vertical (o lo de un concepto que nadie empujó, o que
-    empujó una regla de un concepto que no se nombra: su señal `compra_cruzada` es `rule`). Con `back`, «Vuelve a…»."""
+    """«Lo más pedido en…»: lo que más pide la población en la vertical (o lo de un concepto que nadie empujó). Si lo
+    eligió una regla de un concepto que no se nombra (su señal `compra_cruzada` es `rule`), no son lo más pedido:
+    «Para sumar en…». Con `back`, «Vuelve a…»."""
     label = VERTICAL_LABELS.get(vertical, vertical)
     signal = {"kind": "lo_mas_pedido", "id": vertical, "source": f"poblacion:{population}"}
     basis = [combo, rule, signal] if rule else [combo, signal]
     if back:
-        text = BACK_TEXT.format(vertical=label, what=BACK_TOP)
+        text = BACK_TEXT.format(vertical=label, what=BACK_RULE if rule else BACK_TOP)
         reason = _back_reason(vertical, basis)
+    elif rule:
+        text = TO_TRY_RULE_TEXT.format(vertical=label)
+        reason = _reason(contract_articles(REASON_TO_TRY.format(vertical=label)), basis)
     else:
         text = TO_TRY_TOP_TEXT.format(vertical=label)
         reason = _reason(contract_articles(REASON_TO_TRY_TOP.format(vertical=label)), basis)

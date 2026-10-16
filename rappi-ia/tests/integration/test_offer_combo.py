@@ -11,11 +11,15 @@ from rappi_ia.agent.compose import TemplateComposer
 from rappi_ia.agent.rappi_agent import RappiAgent
 from rappi_ia.api import app as api
 from rappi_ia.api.services import Services
+from rappi_ia.concepts.taxonomy import load_taxonomy
 from rappi_ia.demo.seed import seed_demo
 from rappi_ia.embeddings.base import HashEmbedder
 from rappi_ia.embeddings.text_store import embed_search_documents
 from rappi_ia.events import store as events
 from rappi_ia.layers.runs import finish_layer_run, start_layer_run
+from rappi_ia.motor.recommend import CrossPick
+from rappi_ia.offers.engine import _cross_offer, _top_offer
+from rappi_ia.offers.guards import is_offerable
 
 NOW = datetime.now(UTC)
 SUSHI_ROLL = "98005"  # un plato de sushi del restaurante de prueba
@@ -129,11 +133,9 @@ def test_a_cross_sell_rule_from_their_concept_brings_its_products_and_says_why(c
     body = to_try(client, "u-sushi")
 
     assert body["vertical"] == "turbo"
-    assert body["text"] == "Para acompañar sushi: despensa asiática en Turbo."
+    assert body["text"] == "Para tu pedido de sushi: despensa asiática en Turbo."
     # No afirma lo que hace la población (en la demo es simulada): eso lo declara la `basis`.
-    assert body["reason"]["text"] == (
-        "Porque pides 🍣 sushi y despensa asiática combina con eso; en Turbo lo encuentras."
-    )
+    assert body["reason"]["text"] == ("Porque pides 🍣 sushi. Para acompañar: despensa asiática, en Turbo.")
     assert body["reason"]["basis"] == [
         REST_TO_TURBO,
         {"kind": "compra_cruzada", "id": "sushi→despensa-asiatica@turbo", "source": "poblacion:synthetic"},
@@ -172,7 +174,8 @@ def test_a_rule_from_a_concept_the_agent_does_not_offer_is_never_named(client, d
     body = to_try(client, "u-chela")
 
     assert body["vertical"] == "turbo"
-    assert body["text"] == "Lo más pedido en Turbo."
+    assert body["text"] == "Para sumar en Turbo."  # la regla eligió los productos: no son «lo más pedido»
+    assert body["reason"]["text"] == "Porque aún no pides en Turbo."
     assert "cerveza" not in body["reason"]["text"] and "cerveza" not in str(body["reason"]["basis"])
     # La regla movió el orden: su fuente se declara, sin nombrar de dónde sale.
     assert body["reason"]["basis"] == [
@@ -191,8 +194,8 @@ def test_a_rule_from_a_concept_to_itself_says_it_is_also_there(client, db):
     body = to_try(client, "u-hielo")
 
     assert body["vertical"] == "turbo"
-    assert body["text"] == "Tu hielo, también en Turbo."
-    assert body["reason"]["text"] == "Porque pides 🧊 hielo: también lo encuentras en Turbo."
+    assert body["text"] == "También hay hielo en Turbo."
+    assert body["reason"]["text"] == "Porque pides 🧊 hielo; en Turbo también hay."
     assert body["reason"]["basis"][1] == {
         "kind": "compra_cruzada",
         "id": "hielo→hielo@turbo",
@@ -316,7 +319,7 @@ def test_a_vertical_of_the_group_tried_long_ago_is_still_offered_as_a_comeback(c
     concept_trends(db, {("despensa-asiatica", "turbo"): 10})
     rule(db, "sushi", "despensa-asiatica", "turbo", 10.0)
     body = to_try(client, "u-sushi")
-    assert body["text"] == "Para acompañar sushi: despensa asiática en Turbo."  # sigue siendo cierto
+    assert body["text"] == "Para tu pedido de sushi: despensa asiática en Turbo."  # sigue siendo cierto
     assert [s["kind"] for s in body["reason"]["basis"]] == ["combinacion", "compra_cruzada"]
 
 
@@ -331,3 +334,52 @@ def test_a_comeback_to_the_supermarket_contracts_the_article(client, db):
     assert body["vertical"] == "supermercado"
     assert body["text"] == "Vuelve al súper: mira estas ofertas."
     assert body["reason"]["text"] == "Porque hace más de un mes que no pides en el súper."
+
+
+OFFERABLE = [c for c in load_taxonomy().concepts.values() if is_offerable(c)]
+# Singulares («sushi»), plurales («frutas»), compuestos con «y» («sándwiches y completos») y con comas.
+SAMPLE_CONCEPTS = [c.id for c in OFFERABLE]
+
+
+def _all_texts(offer):
+    return [offer.text, offer.reason["text"]]
+
+
+def _assert_reads_well(texts, name):
+    for text in texts:
+        assert "  " not in text and text == text.strip(), text
+        assert "combina" not in text, text  # el verbo no concuerda con un plural ni con un compuesto
+        assert f"tu {name}" not in text.lower() and f"tus {name}" not in text.lower(), text
+        assert " de el " not in text and " a el " not in text, text
+
+
+@pytest.mark.parametrize("origin_id", SAMPLE_CONCEPTS)
+def test_cross_texts_read_well_with_any_concept_as_origin_and_destination(origin_id):
+    concepts = load_taxonomy().concepts
+    origin = concepts[origin_id]
+    combo = {"kind": "combinacion", "id": "rest→rest+turbo", "source": "rappi"}
+    for destination_id in (origin_id, "frutas", "sandwiches"):
+        if destination_id not in concepts:
+            continue
+        pick = CrossPick(destination_id, "turbo", 1.0, origin_id, 5.0)
+        offer = _cross_offer("turbo", [], pick, origin, combo, "synthetic")
+        name = concepts[destination_id].name.lower()
+        _assert_reads_well(_all_texts(offer), name)
+        assert offer.text.endswith(".") and offer.reason["text"].endswith(".")
+        assert name in offer.text and origin.name.lower() in offer.reason["text"]
+
+
+@pytest.mark.parametrize("vertical", ["turbo", "supermercado", "mall"])
+def test_a_rule_without_a_nameable_origin_never_claims_the_most_ordered(vertical):
+    combo = {"kind": "combinacion", "id": "rest→rest+turbo", "source": "rappi"}
+    rule = {"kind": "compra_cruzada", "id": f"helados@{vertical}", "source": "poblacion:synthetic"}
+
+    new = _top_offer(vertical, [], combo, "synthetic", False, rule)
+    back = _top_offer(vertical, [], combo, "synthetic", True, rule)
+    plain = _top_offer(vertical, [], combo, "synthetic", False)
+
+    for offer in (new, back):
+        assert "más pedido" not in (offer.text + offer.reason["text"]) and "más se pide" not in offer.reason["text"]
+    assert new.text.startswith("Para sumar en ") and new.reason["text"].startswith("Porque aún no pides en ")
+    assert back.text.startswith("Vuelve a") and back.reason["text"].startswith("Porque hace más de un mes")
+    assert plain.text.startswith("Lo más pedido en ")  # sin regla, sí son lo más pedido de la población
