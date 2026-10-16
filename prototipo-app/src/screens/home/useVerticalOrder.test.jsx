@@ -61,3 +61,28 @@ test('al olvidar (cambian las `resets`) pide otra vez y descarta la respuesta de
   expect(latest.personalized).toBe(false)
   expect(latest.order[0]).toBe('supermercado')
 })
+
+test('al volver a estar arriba pide otra vez; mientras llega deja el orden que había, sin parpadear', async () => {
+  let calls = 0
+  const api = stubApi({
+    'GET /profile/*': () => {
+      calls += 1
+      return calls === 1 ? fixture('profile-verticales-nueva') : { slow: 200, body: fixture('profile-verticales') }
+    },
+  })
+  const { result, rerender } = renderHook(({ active }) => useVerticalOrder(active), {
+    wrapper,
+    initialProps: { active: true },
+  })
+  await waitFor(() => expect(result.current.order).not.toBeNull())
+  rerender({ active: true })
+  await new Promise((resolve) => setTimeout(resolve, 50))
+  expect(requests(api)).toBe(1) // seguir arriba no pide de nuevo
+  rerender({ active: false })
+  rerender({ active: true })
+  await waitFor(() => expect(requests(api)).toBe(2))
+  expect(result.current).toMatchObject({ personalized: false }) // la respuesta aún no llega: queda el orden de antes
+  expect(result.current.order[0]).toBe('supermercado')
+  await waitFor(() => expect(result.current.personalized).toBe(true))
+  expect(result.current.order[0]).toBe('farmacia')
+})

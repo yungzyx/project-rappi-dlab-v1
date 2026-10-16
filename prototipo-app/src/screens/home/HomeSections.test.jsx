@@ -75,13 +75,13 @@ test('Rappi hoy no cambia el orden', () => {
 
 test('Shortcuts con `proposal` pinta el orden recibido y el texto de debajo; sin él, el orden de hoy', () => {
   const { unmount } = render(
-    <Shortcuts push={vi.fn()} proposal order={ENGINE} caption="Ordenadas según lo que más pides" />,
+    <Shortcuts push={vi.fn()} proposal order={ENGINE} caption="Ordenadas según lo que más usas" />,
     {
       wrapper: ToastProvider,
     },
   )
   expect(labels().slice(0, 3)).toEqual(['Pharmacy', 'Retail', 'Grocery'])
-  expect(screen.getByText('Ordenadas según lo que más pides')).toBeTruthy()
+  expect(screen.getByText('Ordenadas según lo que más usas')).toBeTruthy()
   unmount()
   render(<Shortcuts push={vi.fn()} order={ENGINE} />, { wrapper: ToastProvider })
   expect(labels()[0]).toBe('Grocery')

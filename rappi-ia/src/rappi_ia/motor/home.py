@@ -13,10 +13,14 @@ HOME_ORDERABLE = ("supermercado", "farmacia", "mall", "licores", "conveniencia",
 
 def home_verticals(conn: Connection, user_id: str) -> dict:
     """`{fixed, order, personalized}`: `order` son los 6 de `HOME_ORDERABLE`. Primero los que la persona usa (afinidad
-    > 0), por puntaje de la predicción; después el resto, en el orden de `HOME_ORDERABLE`, para que la Home de quien
-    no ha usado nada no cambie con la población. Solo el primero lleva `reason`, y solo si la persona lo usa."""
+    > 0), de más a menos uso propio (afinidad; a igual afinidad, por puntaje de la predicción), así el texto «Porque
+    pides seguido en…» es cierto; después el resto, en el orden de `HOME_ORDERABLE`, para que la Home de quien no ha
+    usado nada no cambie con la población. Solo el primero lleva `reason`, y solo si la persona lo usa."""
     scores = {s.vertical: s for s in next_verticals(conn, user_id)}
-    used = [v for v in scores if v in HOME_ORDERABLE and scores[v].affinity > 0]  # `next_verticals` ya los ordena
+    used = sorted(
+        (v for v in scores if v in HOME_ORDERABLE and scores[v].affinity > 0),
+        key=lambda v: (-scores[v].affinity, -scores[v].score),
+    )
     ids = used + [v for v in HOME_ORDERABLE if v not in used]
     order = [{"id": v, "score": round(scores[v].score, 4), "reason": None} for v in ids]
     if used:

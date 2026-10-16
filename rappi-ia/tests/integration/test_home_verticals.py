@@ -32,7 +32,7 @@ def client(db):
     api.app.dependency_overrides.clear()
 
 
-def person(client, user_id: str = "u-home") -> tuple[str, dict]:
+def person(user_id: str = "u-home") -> tuple[str, dict]:
     return user_id, {"X-User-Token": identity.sign(user_id)}
 
 
@@ -62,7 +62,7 @@ def test_constants():
 
 
 def test_new_person_gets_the_fixed_order(client):
-    body = verticales(client, person(client))
+    body = verticales(client, person())
     assert body["fixed"] == ["restaurantes", "turbo"]
     assert [v["id"] for v in body["order"]] == FIXED_ORDER
     assert body["personalized"] is False
@@ -70,7 +70,7 @@ def test_new_person_gets_the_fixed_order(client):
 
 
 def test_pharmacy_orders_put_pharmacy_first(client):
-    who = person(client)
+    who = person()
     for n in range(3):
         order(client, who, "farmacia", n)
     body = verticales(client, who)
@@ -85,9 +85,47 @@ def test_pharmacy_orders_put_pharmacy_first(client):
     assert first["score"] > 0 and all(v["reason"] is None for v in rest)
 
 
+def test_used_verticals_go_by_own_use(client):
+    """Entre los que la persona usa, primero el que más usa; después el resto, en el orden de siempre."""
+    who = person()
+    for n in range(3):
+        order(client, who, "farmacia", n)
+    order(client, who, "supermercado", 0)
+    body = verticales(client, who)
+    assert [v["id"] for v in body["order"]] == [
+        "farmacia",
+        "supermercado",
+        "mall",
+        "licores",
+        "conveniencia",
+        "chocolateria",
+    ]
+    assert body["order"][0]["reason"]["text"] == "Porque pides seguido en farmacia."
+
+
+def test_heavy_restaurant_user_sees_own_use_first(client, db):
+    """Con muchos pedidos de Restaurantes (y una población que después de Restaurantes pide Súper), manda el uso
+    propio: Farmacia (3 pedidos) antes que Súper (2), y el texto dice la verdad."""
+    db.execute(
+        """INSERT INTO vertical_transitions (data_source, from_vertical, to_vertical, n, prob)
+           VALUES ('synthetic', 'restaurantes', 'supermercado', 10, 1.0),
+                  ('prototype', 'restaurantes', 'supermercado', 10, 1.0)"""
+    )
+    who = person()
+    for n in range(3):
+        order(client, who, "farmacia", n)
+    for n in range(2):
+        order(client, who, "supermercado", n)
+    for n in range(8):
+        order(client, who, "restaurantes", n)
+    body = verticales(client, who)
+    assert [v["id"] for v in body["order"]][:2] == ["farmacia", "supermercado"]
+    assert body["order"][0]["reason"]["text"] == "Porque pides seguido en farmacia."
+
+
 def test_restaurant_orders_alone_keep_the_fixed_order(client):
     """Restaurantes va fijo arriba: sin afinidad entre los 6, el orden es el de siempre."""
-    who = person(client)
+    who = person()
     for n in range(3):
         order(client, who, "restaurantes", n)
     body = verticales(client, who)
@@ -96,7 +134,7 @@ def test_restaurant_orders_alone_keep_the_fixed_order(client):
 
 
 def test_vertical_open_events_count(client):
-    who = person(client)
+    who = person()
     events = [{"type": "vertical_open", "session_id": f"s{n}", "vertical": "mall"} for n in range(4)]
     assert client.post("/events", json={"user_id": who[0], "events": events}, headers=who[1]).status_code == 200
     body = verticales(client, who)
@@ -106,7 +144,7 @@ def test_vertical_open_events_count(client):
 
 
 def test_actual_mode_does_not_reorder(client):
-    who = person(client)
+    who = person()
     for n in range(3):
         order(client, who, "farmacia", n, mode="actual")
     body = verticales(client, who)
@@ -114,9 +152,22 @@ def test_actual_mode_does_not_reorder(client):
     assert body["personalized"] is False
 
 
+def test_actual_mode_events_do_not_reorder(client):
+    """Un toque en «Rappi hoy» llega con `payload.mode = 'actual'`: no enseña."""
+    who = person()
+    events = [
+        {"type": "vertical_open", "session_id": f"s{n}", "vertical": "mall", "payload": {"mode": "actual"}}
+        for n in range(4)
+    ]
+    assert client.post("/events", json={"user_id": who[0], "events": events}, headers=who[1]).status_code == 200
+    body = verticales(client, who)
+    assert [v["id"] for v in body["order"]] == FIXED_ORDER
+    assert body["personalized"] is False
+
+
 def test_other_person_is_403(client):
-    alice, _ = person(client, "u-alice")
-    _, as_bob = person(client, "u-bob")
+    alice, _ = person("u-alice")
+    _, as_bob = person("u-bob")
     reply = client.get(f"/profile/{alice}/verticales", headers=as_bob)
     assert (reply.status_code, reply.json()) == (403, {"detail": "No autorizado"})
     assert client.get(f"/profile/{alice}/verticales").status_code == 401

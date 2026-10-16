@@ -4,7 +4,8 @@ import { randomId, readStore, userId, writeStore } from '../api/user'
 import { useDemo } from './DemoContext'
 
 // Eventos de uso para el panel de la empresa (búsquedas, carrito, sugerencias, pedidos). Se envían en lotes a
-// rappi-ia; sin API esperan en la cola (con tope) hasta que contesta. En "Rappi hoy" se envían sin concepto: el agente no aprende.
+// rappi-ia; sin API esperan en la cola (con tope) hasta que contesta. En "Rappi hoy" se envían sin concepto y con
+// `payload.mode = 'actual'`: ni el agente ni el motor aprenden de ellos.
 const SESSION_KEY = 'rappi-proto-session'
 const SESSION_IDLE_MS = 30 * 60 * 1000 // una sesión termina tras 30 min sin actividad
 const FLUSH_MS = 5000
@@ -87,7 +88,11 @@ export function EventsProvider({ children }) {
 
   const track = useCallback((type, fields = {}) => {
     const event = withinLimits({ type, session_id: sessionId(), ...fields })
-    if (!proposal.current) delete event.concept_id
+    // En «Rappi hoy» el evento va sin concepto y marcado `payload.mode = 'actual'`: el motor y los segmentos lo saltan.
+    if (!proposal.current) {
+      delete event.concept_id
+      event.payload = { ...event.payload, mode: 'actual' }
+    }
     queue.current.push(event)
     if (queue.current.length > MAX_QUEUE) queue.current.shift()
   }, [])

@@ -65,7 +65,7 @@ export default function LiveHomeFeed({ push, active = true }) {
   const { add: addToCart } = useAddToCart()
   const profile = useProfile()
   const events = useEvents()
-  const verticalOrder = useVerticalOrder()
+  const verticalOrder = useVerticalOrder(active)
   const reduceMotion = useReducedMotion()
   const [replays, setReplays] = useState(0)
 
@@ -416,7 +416,7 @@ export default function LiveHomeFeed({ push, active = true }) {
           push={push}
           proposal
           order={verticalOrder.order}
-          caption={verticalOrder.personalized ? 'Ordenadas según lo que más pides' : null}
+          caption={verticalOrder.personalized ? 'Ordenadas según lo que más usas' : null}
           onOpen={openVertical}
         />
       </>

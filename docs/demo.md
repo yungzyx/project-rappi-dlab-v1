@@ -53,8 +53,8 @@ Es lo primero que se ve en el prototipo final. Para partir de cero: **↺ Repeti
 En el prototipo final, los 6 accesos pequeños de la Home (Grocery, Pharmacy, Retail, Liquor, Express, Chocolates) se ordenan según lo que la persona pide y abre. Quien parte de cero los ve en el orden fijo.
 
 1. Con **Olvidar** recién hecho, la fila está en el orden fijo, con Loyalty y Benefits Pro al final y sin texto.
-2. Pide algo en **Pharmacy** hasta pagar, o toca un acceso (por ejemplo **Retail**) tres o cuatro veces, volviendo a la Home cada vez. La app manda los toques en lotes cada 5 s: espera un momento.
-3. Vuelve a la Home (o recárgala): ese acceso sube al primer lugar y aparece «Ordenadas según lo que más pides». **Qué decir:** la Home se ordena sola con el uso de cada persona; Restaurantes y Turbo no se mueven, Loyalty y Benefits Pro quedan al final, y «Rappi hoy» (tecla **D**) sigue como hoy.
+2. Pide algo en **Pharmacy** hasta pagar, o toca un acceso (por ejemplo **Retail**); con una vez basta.
+3. Vuelve a la Home: la app manda los toques y vuelve a pedir el orden, así que ese acceso sube al primer lugar y aparece «Ordenadas según lo que más usas». **Qué decir:** la Home se ordena sola con el uso de cada persona; Restaurantes y Turbo no se mueven, Loyalty y Benefits Pro quedan al final, y «Rappi hoy» (tecla **D**) sigue como hoy.
 
 ### El panel con lo que acaba de pasar (2 minutos, opcional)
 

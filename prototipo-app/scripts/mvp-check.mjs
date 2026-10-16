@@ -8,9 +8,9 @@
 //     la ocasión «Carrete», agrega el kit que arma Mochi (`plan`) y paga; scripts/mvp-check.sh verifica después en la base
 //     de prueba que el pedido tiene líneas sembradas y al menos una aceptación `agent-plan`;
 //   con --home: Home dinámica. Una persona nueva ve los 6 accesos en el orden fijo, con Loyalty y Benefits Pro al final y
-//     sin el texto «Ordenadas según lo que más pides»; toca «Retail» (Rappi Mall) tres veces, volviendo a la Home cada
-//     vez, espera a que la API reciba los toques (`vertical_open`; la app los manda en lotes cada 5 s) y recarga la Home:
-//     Retail queda primero y el texto aparece;
+//     sin el texto «Ordenadas según lo que más usas»; toca «Retail» (Rappi Mall) tres veces, volviendo a la Home cada
+//     vez, espera a que la API acepte los toques (`vertical_open`; al volver a la Home la app los manda y vuelve a pedir
+//     el orden) y, sin recargar, Retail queda primero y el texto aparece;
 //   con --expect-offline: la API está detenida y la app muestra «Sin conexión con <agente>»;
 //   con --panel <url del panel> (sin --app): corre después de las demás, con la API en marcha. Espera a que la API ya
 //     cuente lo que dejó el kit (una oferta aceptada en «Plan»), abre el panel en «Uso del MVP» con la fuente del
@@ -171,7 +171,7 @@ async function checkKit(page) {
   return `buscó «cerveza» (${found} grupos), pidió el kit «Carrete», lo agregó y la API aceptó el pedido`
 }
 
-const ORDER_CAPTION = 'Ordenadas según lo que más pides'
+const ORDER_CAPTION = 'Ordenadas según lo que más usas'
 const FIXED_LABELS = ['Grocery', 'Pharmacy', 'Retail', 'Liquor', 'Express', 'Chocolates']
 const TAIL_LABELS = ['Loyalty', 'Benefits Pro']
 
@@ -181,7 +181,8 @@ const shortcutLabels = (page) =>
 
 /**
  * Home dinámica: sin historial, el orden fijo; tras tocar Retail tres veces, Retail va primero y la Home dice por qué.
- * Los toques se ven en `POST /events` (la app los manda en lotes cada 5 s): se esperan antes de recargar.
+ * Los toques se cuentan en las respuestas 200 de `POST /events` (al volver a la Home la app los manda y después vuelve a
+ * pedir el orden): la Home se reordena sin recargar.
  */
 async function checkHome(page) {
   await checkOnline(page)
@@ -196,8 +197,9 @@ async function checkHome(page) {
     throw new Error(`una persona nueva ve «${ORDER_CAPTION}» sin historial`)
 
   let opens = 0
-  page.on('request', (request) => {
-    if (request.method() === 'POST' && new URL(request.url()).pathname === '/events')
+  page.on('response', (response) => {
+    const request = response.request()
+    if (request.method() === 'POST' && new URL(request.url()).pathname === '/events' && response.status() === 200)
       opens += (request.postData() ?? '').split('"vertical_open"').length - 1
   })
   for (let tap = 1; tap <= 3; tap++) {
@@ -209,9 +211,8 @@ async function checkHome(page) {
   }
   const deadline = Date.now() + EVENTS_WAIT_MS
   while (opens < 3 && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 250))
-  if (opens < 3) throw new Error(`la app mandó ${opens} de 3 toques (POST /events con vertical_open) tras 30 s`)
+  if (opens < 3) throw new Error(`la API aceptó ${opens} de 3 toques (POST /events con vertical_open) tras 30 s`)
 
-  await page.reload({ timeout: TIMEOUT_MS })
   await step(page, `ver el texto «${ORDER_CAPTION}»`, () => page.getByText(ORDER_CAPTION).waitFor())
   const after = await shortcutLabels(page)
   if (after[0] !== 'Retail') throw new Error(`tras tocar Retail 3 veces el primero es «${after[0]}»`)

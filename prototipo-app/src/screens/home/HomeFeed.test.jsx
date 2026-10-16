@@ -75,7 +75,7 @@ describe('Home de «Rappi hoy»', () => {
       'Pharmacy',
     ])
     expect(fetchMock.mock.calls.some(([url]) => url.includes('/verticales'))).toBe(false)
-    expect(screen.queryByText('Ordenadas según lo que más pides')).toBeNull()
+    expect(screen.queryByText('Ordenadas según lo que más usas')).toBeNull()
     fireEvent.click(screen.getByText('Pharmacy'))
     expect(events.track).toHaveBeenCalledWith('vertical_open', { vertical: 'farmacia' })
   })

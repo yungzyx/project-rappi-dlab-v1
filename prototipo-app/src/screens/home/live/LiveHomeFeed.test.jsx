@@ -646,7 +646,7 @@ describe('Home del prototipo final', () => {
       await advance(300)
       expect(tiles(container).slice(0, 2)).toEqual(['Pharmacy', 'Grocery'])
       expect(tiles(container).slice(-2)).toEqual(['Loyalty', 'Benefits Pro'])
-      expect(screen.getByText('Ordenadas según lo que más pides')).toBeTruthy()
+      expect(screen.getByText('Ordenadas según lo que más usas')).toBeTruthy()
     })
 
     test('una persona nueva ve el orden fijo y sin el texto', async () => {
@@ -654,7 +654,7 @@ describe('Home del prototipo final', () => {
       const { container } = await renderHome()
       await advance(300)
       expect(tiles(container).slice(0, 6)).toEqual(['Grocery', 'Pharmacy', 'Retail', 'Liquor', 'Express', 'Chocolates'])
-      expect(screen.queryByText('Ordenadas según lo que más pides')).toBeNull()
+      expect(screen.queryByText('Ordenadas según lo que más usas')).toBeNull()
     })
 
     test('con la API caída, el orden fijo y sin el texto (Loyalty y Benefits Pro al final)', async () => {
@@ -673,7 +673,37 @@ describe('Home del prototipo final', () => {
         'Loyalty',
         'Benefits Pro',
       ])
-      expect(screen.queryByText('Ordenadas según lo que más pides')).toBeNull()
+      expect(screen.queryByText('Ordenadas según lo que más usas')).toBeNull()
+    })
+
+    test('al volver a la Home manda los toques en cola y vuelve a pedir el orden, sin volver a montarse', async () => {
+      const orderRequests = () => api.mock.calls.filter(([url]) => url.includes('/verticales')).length
+      let calls = 0
+      api = stubAgent({
+        'GET /profile/*': () => (++calls === 1 ? fixture('profile-verticales-nueva') : fixture('profile-verticales')),
+      })
+      const flushed = [] // cuántas veces se había pedido el orden cuando se mandaron los eventos
+      const flush = events.flush
+      events.flush = async () => void flushed.push(orderRequests())
+      try {
+        const { container, rerender } = await renderHome()
+        await advance(300)
+        expect(tiles(container)[0]).toBe('Grocery')
+        const home = container.querySelector('.home--live')
+        fireEvent.click(screen.getByText('Pharmacy'))
+        rerender(homeTree({ active: false })) // otra pantalla encima
+        await advance(300)
+        expect(orderRequests()).toBe(1)
+        rerender(homeTree({ active: true })) // vuelve a la Home
+        await advance(300)
+        expect(flushed).toEqual([1]) // primero los toques, después el orden
+        expect(orderRequests()).toBe(2)
+        expect(tiles(container).slice(0, 2)).toEqual(['Pharmacy', 'Grocery'])
+        expect(screen.getByText('Ordenadas según lo que más usas')).toBeTruthy()
+        expect(container.querySelector('.home--live')).toBe(home) // la misma Home: no se volvió a montar
+      } finally {
+        events.flush = flush
+      }
     })
 
     test('tocar un vertical manda vertical_open con su código; Loyalty, RappiTravel y RappiFavor no mandan nada', async () => {
