@@ -49,7 +49,7 @@ def keep_logging_config():
     root = logging.getLogger()
     handlers, level = list(root.handlers), root.level
     factory = logging.getLogRecordFactory()
-    quiet = {name: logging.getLogger(name).level for name in ("httpx", "httpcore")}
+    quiet = {name: logging.getLogger(name).level for name in ("httpx", "httpx2", "httpcore")}
     yield
     root.handlers[:] = handlers
     root.setLevel(level)

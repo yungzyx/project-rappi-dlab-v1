@@ -38,7 +38,7 @@ def configure_logging(level: str = "INFO") -> None:
     root.addHandler(handler)
     root.setLevel(level)
     # Las peticiones a huggingface.co y a Claude (una línea por llamada) taparían lo que importa.
-    for noisy in ("httpx", "httpcore"):
+    for noisy in ("httpx", "httpx2", "httpcore"):
         logging.getLogger(noisy).setLevel(logging.DEBUG if root.level == logging.DEBUG else logging.WARNING)
     _stamp_records_with_request_id()
 

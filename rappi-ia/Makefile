@@ -64,7 +64,7 @@ EVAL_ARGS ?= --guardar-tau
 eval:  ## Evalúa la búsqueda (léxico vs vectorial vs híbrido) y calibra τ
 	$(PY) -m rappi_ia eval-search $(EVAL_ARGS) --jev-auto
 
-synth:  ## Usuarios y eventos SIMULADOS para el panel (reemplaza los anteriores)
+synth:  ## Usuarios y eventos SIMULADOS para el panel y el motor (reemplaza los anteriores)
 	$(PY) -m rappi_ia synth
 
 analytics:  ## Resumen de métricas del panel
@@ -121,7 +121,7 @@ probar-agente:  ## Prueba al agente con las frases de usuarios (con la API corri
 purge:  ## Borra el texto de consultas con más de 90 días (docs/diseno-ia.md §2) y a las personas del prototipo sin actividad en 180
 	$(PY) -m rappi_ia purge
 
-layers:  ## Capa de perfiles: medidas, marcas, atributos, grafo, segmentos y motor (crece con las etapas del plan)
+layers:  ## Capa de datos: medidas, marcas, atributos, grafo, segmentos y motor
 	$(PY) -m rappi_ia measures
 	$(PY) -m rappi_ia brands
 	$(PY) -m rappi_ia canonical

@@ -1,7 +1,8 @@
 // Genera las capturas de docs/screenshots recorriendo la app como un usuario (npm run screenshots).
 // Usa el Chrome instalado (playwright-core, sin descargar navegadores) y un servidor Vite propio en el 5199.
 // La app no abre sin la API: antes de capturar hay que tener el MVP corriendo (`make mvp`). El recorrido paga una compra
-// y deja eventos: mejor sobre una copia de la base (`DATABASE_URL=postgresql:///rappi_staging make mvp`).
+// y deja eventos en la base de la API: por eso no corre sin `SCREENSHOTS_ALLOW_WRITES=1`, y se corre sobre una copia
+// (`DATABASE_URL=postgresql:///rappi_staging make mvp`), nunca sobre `rappi`.
 // «¿Repetimos?» necesita tres compras con ritmo: esa oferta sale del fixture del contrato, con un café real del catálogo.
 import { mkdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -211,6 +212,16 @@ async function repeatOffer() {
   }
 }
 
+function requireWritesAllowed() {
+  if (process.env.SCREENSHOTS_ALLOW_WRITES === '1') return
+  console.error(
+    'Las capturas pagan una compra y dejan un pedido y eventos en la base que usa la API.\n' +
+      'Apunta la API a una copia, nunca a `rappi`: `DATABASE_URL=postgresql:///rappi_staging make mvp`,\n' +
+      'y después corre `SCREENSHOTS_ALLOW_WRITES=1 npm run screenshots`.',
+  )
+  process.exit(1)
+}
+
 async function requireApi() {
   const response = await fetch(API_HEALTH, { signal: AbortSignal.timeout(3000) }).catch(() => null)
   if (response?.ok) return
@@ -219,6 +230,7 @@ async function requireApi() {
 }
 
 async function main() {
+  requireWritesAllowed()
   await requireApi()
   mkdirSync(OUT, { recursive: true })
 
