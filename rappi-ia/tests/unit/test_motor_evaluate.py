@@ -14,6 +14,7 @@ from rappi_ia.motor.evaluate import (
     evaluate_next_vertical,
     evaluate_replenishment,
     make_split,
+    not_evaluated,
     rank_metrics,
     report,
     tune,
@@ -23,8 +24,8 @@ T0 = datetime(2026, 5, 1, 15, 0, tzinfo=UTC)
 _seq = iter(range(1, 1_000_000))
 
 
-def order(user, days, vertical, *concepts):
-    lines = tuple(Line(c, "catalog_item", c, False) for c in concepts)
+def order(user, days, vertical, *concepts, suggested=False):
+    lines = tuple(Line(c, "catalog_item", c, suggested) for c in concepts)
     return Order(user, f"o{next(_seq)}", None, T0 + timedelta(days=days), vertical, 1000.0, lines)
 
 
@@ -96,18 +97,23 @@ def test_evaluate_cross_sell_precision_and_coverage():
         orders += [order(f"a{i}", 10 + i, "restaurantes", "sushi"), order(f"a{i}", 12 + i, "turbo", "salsa-soya")]
     # Otras 12 piden pan en Supermercado (lo más pedido de los últimos 28 días, sin relación con sushi).
     orders += [order(f"b{i}", 80 + i, "supermercado", "pan") for i in range(12)]
-    # Dos personas a evaluar: pidieron sushi hace poco; una compra la soya después del corte y la otra no.
+    # Personas que vuelven a pedir después del corte (las únicas que se evalúan): x, y, w pidieron sushi hace poco;
+    # x compra la soya, y no, y w la compra solo porque se la sugirieron (no cuenta). z no tiene regla que aplique.
     orders += [order("x", 95, "restaurantes", "sushi"), order("x", 103, "turbo", "salsa-soya")]
     orders += [order("y", 96, "restaurantes", "sushi"), order("y", 104, "restaurantes", "sushi")]
+    orders += [order("w", 97, "restaurantes", "sushi"), order("w", 105, "turbo", "salsa-soya", suggested=True)]
+    orders += [order("z", 90, "supermercado", "pan"), order("z", 105, "supermercado", "pan")]
     orders.sort(key=lambda o: o.ts)
 
     out = evaluate_cross_sell(orders, frozenset(), cut, cut + timedelta(days=28))
-    # Solo x e y tienen predicción (la soya); los demás ya la pidieron o no pidieron sushi en los últimos 30 días.
-    assert out["precision3"] == pytest.approx(0.5)
-    assert out["personas_con_prediccion"] == 2
-    assert out["cobertura"] == pytest.approx(2 / 26)
+    # Los a y b no vuelven a pedir: no cuentan (si no, la precisión mediría el abandono).
+    assert out["personas"] == 4
+    assert out["personas_con_prediccion"] == 3
+    assert out["cobertura"] == pytest.approx(3 / 4)
+    assert out["precision3"] == pytest.approx(1 / 3)  # x 1/1, y 0/1, w 0/1
+    assert out["aciertos_sobre_3"] == pytest.approx((1 / 3) / 3)
     baseline = out["lo_mas_pedido"]
-    assert baseline["precision3"] < out["precision3"]
+    assert baseline["precision3"] == 0 and baseline["aciertos_sobre_3"] == 0
     assert baseline["cobertura"] == pytest.approx(1.0)
 
 
@@ -132,8 +138,32 @@ def test_report_warns_on_synthetic():
 
     text = report(results, "synthetic")
     assert "Datos simulados: esto prueba la mecánica del motor, no su efecto" in text
-    assert "combinado" in text and "orden_fijo" in text
+    for label in ("Orden fijo", "Solo afinidad", "Solo transiciones", "Combinado", "Lo más pedido"):
+        assert label in text
+    assert "orden_fijo" not in text and "lo_mas_pedido" not in text  # los ids quedan en el JSON
+    assert "aciertos / recomendaciones hechas (hasta 3)" in text
     assert "Datos simulados" not in report(results, "prototype")
+
+
+def test_without_people_to_validate_keeps_the_previous_weights():
+    # Pedidos al principio y al final: nadie pide antes y durante la validación.
+    orders = [order(f"u{i}", d, "turbo") for i in range(5) for d in (0, 2, 88, 90)]
+    orders.sort(key=lambda o: o.ts)
+    split = make_split(orders)
+    assert split is not None
+    assert tune(orders, signals_of(orders), split) is None
+
+    previous = {"afinidad": 1.0, "transicion": 2.0, "popularidad": 0.5}
+    results = evaluate(orders, signals_of(orders), frozenset(), previous)
+    assert results["pesos"] == previous
+    assert results["validacion"]["personas"] == 0
+    assert results["validacion"]["aviso"]
+    assert results["validacion"]["aviso"] in report(results, "synthetic")
+
+
+def test_not_evaluated_stub_says_so():
+    text = not_evaluated("prototype", "sin evaluar", {"afinidad": 1.0}, "2026-10-16 03:20")
+    assert "no se evaluó" in text and "prototype" in text and "2026-10-16 03:20" in text
 
 
 def test_evaluate_without_enough_data_is_none():

@@ -51,8 +51,9 @@ def build_motor(conn: Connection, source: str, evaluate: bool = True) -> dict:
     queda `failed` y no se escribe nada.
 
     Con `evaluate` y al menos 84 días de pedidos, evalúa por fechas y guarda los pesos elegidos (`motor.evaluate`);
-    sin datos suficientes, `DEFAULT_WEIGHTS`; con `evaluate=False`, los pesos de la última corrida de la fuente. En
-    los dos últimos casos, `"evaluacion"` es None."""
+    si nadie se puede validar, guarda la evaluación con su aviso y los pesos de la última corrida de la fuente. Sin
+    datos suficientes, `DEFAULT_WEIGHTS`; con `evaluate=False`, los pesos de la última corrida. En estos dos casos,
+    `"evaluacion"` es None."""
     run = start_layer_run(conn, "motor", rules_version(load_combos().version, COMBOS_FILE, Path(model.__file__)))
     conn.commit()  # la corrida se ve aunque lo demás falle
     start = time.perf_counter()
@@ -71,12 +72,13 @@ def build_motor(conn: Connection, source: str, evaluate: bool = True) -> dict:
 
 
 def _build(conn: Connection, source: str, run: int, evaluate: bool) -> dict:
-    weights = dict(DEFAULT_WEIGHTS) if evaluate else latest_weights(conn, source)
+    previous = latest_weights(conn, source)  # la corrida en curso no cuenta: todavía no está `done`
     for table in ("vertical_transitions", "combo_stats", "combo_steps", "cross_sell_rules", "trends"):
         conn.execute(f"DELETE FROM {table} WHERE data_source = %s", (source,))
     _delete_personal(conn, "user_id IN (SELECT user_id FROM app_users WHERE source = %s)", source)
     counts = {
         "fuente": source,
+        "pedidos": 0,
         "transiciones": 0,
         "combinaciones": 0,
         "pasos": 0,
@@ -84,10 +86,11 @@ def _build(conn: Connection, source: str, run: int, evaluate: bool) -> dict:
         "tendencias": 0,
         "afinidad": 0,
         "recompra": 0,
-        "pesos": weights,
+        "pesos": dict(DEFAULT_WEIGHTS) if evaluate else previous,
         "evaluacion": None,
     }
     orders = load_orders(conn, source)
+    counts["pedidos"] = len(orders)
     if not orders:
         return counts
     now = max(o.ts for o in orders)
@@ -95,7 +98,7 @@ def _build(conn: Connection, source: str, run: int, evaluate: bool) -> dict:
     signals = load_signals(conn, source)
     if evaluate:
         start = time.perf_counter()
-        counts["evaluacion"] = evaluate_motor(orders, signals, sensitive)
+        counts["evaluacion"] = evaluate_motor(orders, signals, sensitive, previous)
         if counts["evaluacion"] is not None:
             counts["pesos"] = counts["evaluacion"]["pesos"]
         log.info("Evaluación del motor (%s) en %.1f s", source, time.perf_counter() - start)

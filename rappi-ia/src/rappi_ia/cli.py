@@ -144,10 +144,13 @@ def cmd_segments(conn, args) -> None:
 
 
 def cmd_motor(conn, args) -> None:
-    from .motor.build import build_motor
-    from .motor.evaluate import report
+    from datetime import datetime
 
-    reports = []
+    from .motor.build import build_motor
+    from .motor.evaluate import not_evaluated, report
+
+    out_dir = config.DATA_DIR / "eval"
+    out_dir.mkdir(parents=True, exist_ok=True)
     for source in [args.source] if args.source else ["synthetic", "prototype"]:
         counts = build_motor(conn, source, evaluate=not args.sin_evaluar)
         print(
@@ -157,21 +160,27 @@ def cmd_motor(conn, args) -> None:
         )
         weights = counts["pesos"]
         evaluation = counts["evaluacion"]
+        out = out_dir / f"motor-{source}.md"  # uno por fuente: una no pisa a la otra
         if evaluation is None:
-            why = "sin evaluar" if args.sin_evaluar else "menos de 84 días de pedidos: sin evaluar"
-            print(f"  Pesos ({why}): {weights}")
-            continue
-        nv = evaluation["proximo_vertical"]
-        print(
-            f"  Pesos elegidos: {weights}; nDCG en prueba: combinado {nv['combinado']['ndcg']}, afinidad "
-            f"{nv['afinidad']['ndcg']}, popularidad {nv['popularidad']['ndcg']}, orden fijo {nv['orden_fijo']['ndcg']}"
-        )
-        reports.append(report(evaluation, source))
-    if reports:
-        out = config.DATA_DIR / "eval" / "motor.md"
-        out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text("\n".join(reports), encoding="utf-8")
-        print(f"Informe en {out}")
+            if args.sin_evaluar:
+                why = "se pidió sin evaluar (--sin-evaluar)"
+            elif counts["pedidos"] == 0:
+                why = "sin pedidos"
+            else:
+                why = "menos de 84 días de pedidos"
+            print(f"  Sin evaluar ({why}); pesos: {weights}")
+            when = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M")
+            out.write_text(not_evaluated(source, why, weights, when), encoding="utf-8")
+        else:
+            nv = evaluation["proximo_vertical"]
+            notice = evaluation["validacion"].get("aviso")
+            print(
+                f"  Pesos {'(sin validar, los anteriores)' if notice else 'elegidos'}: {weights}; nDCG en prueba: "
+                f"combinado {nv['combinado']['ndcg']}, afinidad {nv['afinidad']['ndcg']}, popularidad "
+                f"{nv['popularidad']['ndcg']}, orden fijo {nv['orden_fijo']['ndcg']}"
+            )
+            out.write_text(report(evaluation, source), encoding="utf-8")
+        print(f"  Informe en {out}")
 
 
 def cmd_brands(conn, args) -> None:

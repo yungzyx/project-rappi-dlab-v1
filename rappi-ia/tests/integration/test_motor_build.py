@@ -17,6 +17,7 @@ from rappi_ia.concepts.taxonomy import load_taxonomy
 from rappi_ia.demo.seed import seed_demo
 from rappi_ia.events import store as events
 from rappi_ia.events.synth import generate
+from rappi_ia.layers.runs import finish_layer_run, start_layer_run
 from rappi_ia.motor.build import build_motor, refresh_user
 from rappi_ia.motor.evaluate import GRID_B, GRID_C, METHODS, report
 from rappi_ia.motor.model import DEFAULT_WEIGHTS
@@ -158,6 +159,42 @@ def test_build_motor_without_evaluating_keeps_the_last_weights(simulated):
     counts = build_motor(db, "synthetic", evaluate=False)
     assert counts["evaluacion"] is None
     assert counts["pesos"] == {**tuned, "transicion": 7.0}
+
+
+def test_build_motor_without_people_to_validate_keeps_the_last_weights(db):
+    # Pedidos al principio y al final (90 días): nadie pide antes y durante la validación.
+    start = datetime(2026, 6, 1, 15, tzinfo=UTC)
+    for person in range(3):
+        for day in (0, 2, 88, 90):
+            events.record_order(
+                db, f"p-{person}", f"s-{person}-{day}", f"c-{person}-{day}", "supermercado", [_line("1", None)],
+                ts=start + timedelta(days=day),
+            )  # fmt: skip
+    previous = {"afinidad": 1.0, "transicion": 2.0, "popularidad": 0.5}
+    run = start_layer_run(db, "motor", "v")
+    finish_layer_run(db, run, {"fuente": "prototype", "pesos": previous})
+    db.commit()
+
+    counts = build_motor(db, "prototype")
+    assert counts["pesos"] == previous
+    assert counts["evaluacion"]["validacion"]["personas"] == 0
+    assert counts["evaluacion"]["validacion"]["aviso"]
+    assert latest_weights(db, "prototype") == previous
+
+
+def test_cli_writes_one_report_per_source_and_a_notice_when_not_evaluated(simulated, tmp_path, monkeypatch):
+    from rappi_ia import cli, config
+
+    monkeypatch.setattr(config, "DATA_DIR", tmp_path)
+    cli.cmd_motor(simulated, cli.build_parser().parse_args(["motor"]))
+    synthetic = (tmp_path / "eval" / "motor-synthetic.md").read_text(encoding="utf-8")
+    assert "Combinado" in synthetic and "Datos simulados" in synthetic
+    prototype = (tmp_path / "eval" / "motor-prototype.md").read_text(encoding="utf-8")
+    assert "no se evaluó: sin pedidos" in prototype
+
+    cli.cmd_motor(simulated, cli.build_parser().parse_args(["motor", "--source", "synthetic", "--sin-evaluar"]))
+    stub = (tmp_path / "eval" / "motor-synthetic.md").read_text(encoding="utf-8")
+    assert "no se evaluó" in stub and "Combinado" not in stub
 
 
 def test_build_without_orders_writes_nothing_and_finishes(db):

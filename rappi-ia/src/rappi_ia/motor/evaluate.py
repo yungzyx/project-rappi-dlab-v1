@@ -16,6 +16,7 @@ from datetime import datetime, timedelta
 from .data import Order, Signal
 from .model import (
     DEFAULT_ORDER,
+    DEFAULT_WEIGHTS,
     _concepts,
     _local_day,
     affinity,
@@ -36,6 +37,17 @@ CROSS_SELL_RECENT_DAYS = 30  # los conceptos de la persona que disparan reglas
 TOP_K = 3
 REPLENISH_TOLERANCE_DAYS = 7
 SYNTHETIC_WARNING = "Datos simulados: esto prueba la mecánica del motor, no su efecto."
+NO_VALIDATION = "Sin personas para validar (nadie pidió antes y durante la validación): quedan los pesos anteriores."
+# Lo que se lee en el informe; los ids quedan en el JSON de la corrida.
+LABELS = {
+    "orden_fijo": "Orden fijo",
+    "popularidad": "Popularidad",
+    "afinidad": "Solo afinidad",
+    "transicion": "Solo transiciones",
+    "combinado": "Combinado",
+    "reglas": "Reglas aprendidas",
+    "lo_mas_pedido": "Lo más pedido",
+}
 
 
 @dataclass(frozen=True)
@@ -176,8 +188,11 @@ def evaluate_next_vertical(
     return _next_vertical(_window(_History(orders, signals), cut, end), weights)
 
 
-def _tune(history: _History, split: Split) -> tuple[dict[str, float], float]:
+def _tune(history: _History, split: Split) -> tuple[dict[str, float] | None, float | None, int]:
+    """`(pesos, nDCG en validación, personas en validación)`; sin personas, `(None, None, 0)`."""
     window = _window(history, split.train_end, split.valid_end)
+    if not window.cases:
+        return None, None, 0
     best: tuple[float, dict[str, float]] | None = None
     for b in GRID_B:  # en orden creciente: ante un empate queda el primero (b más chico y, después, c más chico)
         for c in GRID_C:
@@ -186,12 +201,13 @@ def _tune(history: _History, split: Split) -> tuple[dict[str, float], float]:
             ndcg = round(_method_metrics(window, "combinado", weights)["ndcg"], 12)
             if best is None or ndcg > best[0]:
                 best = (ndcg, weights)
-    return best[1], best[0]
+    return best[1], best[0], len(window.cases)
 
 
-def tune(orders: list[Order], signals: list[Signal], split: Split) -> dict[str, float]:
+def tune(orders: list[Order], signals: list[Signal], split: Split) -> dict[str, float] | None:
     """Los pesos del próximo vertical: a = 1 y el (b, c) de `GRID_B` × `GRID_C` con mejor nDCG en validación (lo
-    anterior a `train_end` contra `[train_end, valid_end)`); ante un empate, los más chicos."""
+    anterior a `train_end` contra `[train_end, valid_end)`); ante un empate, los más chicos. `None` si nadie pidió
+    antes y durante la validación (no hay con qué elegir)."""
     return _tune(_History(orders, signals), split)[0]
 
 
@@ -199,25 +215,30 @@ def tune(orders: list[Order], signals: list[Signal], split: Split) -> dict[str, 
 
 
 def _precision(predictions: dict[str, list[tuple[str, str]]], bought: dict[str, set], people: int) -> dict:
+    """Entre quienes tienen alguna predicción: `precision3` = aciertos / recomendaciones hechas (hasta 3) y
+    `aciertos_sobre_3` = aciertos / 3, en promedio por persona."""
     with_prediction = [user for user, pairs in predictions.items() if pairs]
-    precisions = [len(set(predictions[u]) & bought[u]) / len(predictions[u]) for u in with_prediction]
+    hits = {u: len(set(predictions[u]) & bought[u]) for u in with_prediction}
     return {
-        "precision3": statistics.fmean(precisions) if precisions else 0.0,
+        "precision3": statistics.fmean(hits[u] / len(predictions[u]) for u in with_prediction) if hits else 0.0,
+        "aciertos_sobre_3": statistics.fmean(n / TOP_K for n in hits.values()) if hits else 0.0,
         "cobertura": len(with_prediction) / people if people else 0.0,
         "personas_con_prediccion": len(with_prediction),
     }
 
 
-def _pairs(orders: list[Order], sensitive: frozenset[str]) -> set[tuple[str, str]]:
-    return {(c, o.vertical) for o in orders for c in _concepts(o, sensitive)}
+def _pairs(orders: list[Order], sensitive: frozenset[str], skip_suggested: bool = False) -> set[tuple[str, str]]:
+    return {(c, o.vertical) for o in orders for c in _concepts(o, sensitive, skip_suggested)}
 
 
 def evaluate_cross_sell(orders: list[Order], sensitive: frozenset[str], cut: datetime, end: datetime) -> dict:
-    """Reglas aprendidas con lo anterior a `cut`; a cada persona con pedidos antes, las 3 (concepto, vertical) de mayor
-    confianza entre las reglas de los conceptos que pidió en los 30 días previos, sin lo que ya pidió en ese vertical.
-    Acierto si lo pide en `[cut, end)`. `precision3` = media de aciertos / predicciones entre quienes tienen alguna;
-    `cobertura` = la parte de las personas con alguna. Línea base `lo_mas_pedido`: los pares más pedidos de los 28
-    días previos, los mismos para todos (sin lo que la persona ya pidió)."""
+    """Reglas aprendidas con lo anterior a `cut`; a cada persona con pedidos antes de `cut` y en `[cut, end)` (quien no
+    vuelve no cuenta: si no, se mediría el abandono), las 3 (concepto, vertical) de mayor confianza entre las reglas
+    de los conceptos que pidió en los 30 días previos, sin lo que ya pidió en ese vertical. Acierto si lo pide en
+    `[cut, end)` sin que se lo sugieran (como al aprender las reglas). `precision3` = media de aciertos /
+    predicciones entre quienes tienen alguna; `aciertos_sobre_3`, lo mismo dividido por 3; `cobertura` = la parte de
+    las personas con alguna. Línea base `lo_mas_pedido`: los pares más pedidos de los 28 días previos, los mismos para
+    todos (sin lo que la persona ya pidió)."""
     return _cross_sell(_History(orders, []), sensitive, cut, end)
 
 
@@ -232,7 +253,11 @@ def _cross_sell(history: _History, sensitive: frozenset[str], cut: datetime, end
     )
     by_popularity = sorted(popular, key=lambda p: (-popular[p], p))
 
-    people = [user for user in sorted(history.by_user) if history.user_orders(user, None, cut)]
+    people = [
+        user
+        for user in sorted(history.by_user)
+        if history.user_orders(user, None, cut) and history.user_orders(user, cut, end)
+    ]
     rules_pred: dict[str, list[tuple[str, str]]] = {}
     baseline_pred: dict[str, list[tuple[str, str]]] = {}
     bought: dict[str, set] = {}
@@ -248,8 +273,8 @@ def _cross_sell(history: _History, sensitive: frozenset[str], cut: datetime, end
                     best[pair] = max(best.get(pair, (0.0, 0.0)), (r.confidence, r.lift))
         rules_pred[user] = sorted(best, key=lambda p: (-best[p][0], -best[p][1], p))[:TOP_K]
         baseline_pred[user] = [p for p in by_popularity if p not in had][:TOP_K]
-        bought[user] = _pairs(history.user_orders(user, cut, end), sensitive)
-    out = _precision(rules_pred, bought, len(people))
+        bought[user] = _pairs(history.user_orders(user, cut, end), sensitive, skip_suggested=True)
+    out = {"personas": len(people), **_precision(rules_pred, bought, len(people))}
     out["lo_mas_pedido"] = _precision(baseline_pred, bought, len(people))
     # La línea base sobre las mismas personas que las reglas: así las dos precisiones se comparan sobre la misma gente.
     same = {u: baseline_pred[u] for u, pairs in rules_pred.items() if pairs}
@@ -298,14 +323,24 @@ def _rounded(value):
     return value
 
 
-def evaluate(orders: list[Order], signals: list[Signal], sensitive: frozenset[str]) -> dict | None:
+def evaluate(
+    orders: list[Order],
+    signals: list[Signal],
+    sensitive: frozenset[str],
+    previous_weights: dict[str, float] | None = None,
+) -> dict | None:
     """Elige los pesos en validación y mide en prueba el próximo vertical, la compra cruzada y la recompra. `None` si
-    no hay 84 días de datos. Un diccionario serializable a JSON (fechas ISO, cifras con 4 decimales)."""
+    no hay 84 días de datos. Si nadie se puede validar, quedan `previous_weights` (por defecto `DEFAULT_WEIGHTS`) y
+    `validacion.aviso` lo dice. Un diccionario serializable a JSON (fechas ISO, cifras con 4 decimales)."""
     split = make_split(orders)
     if split is None:
         return None
     history = _History(orders, signals)
-    weights, valid_ndcg = _tune(history, split)
+    weights, valid_ndcg, valid_people = _tune(history, split)
+    validation = {"personas": valid_people, "ndcg_combinado": valid_ndcg}
+    if weights is None:
+        weights = dict(previous_weights or DEFAULT_WEIGHTS)
+        validation["aviso"] = NO_VALIDATION
     test = _window(history, split.valid_end, split.test_end)
     return _rounded(
         {
@@ -315,7 +350,7 @@ def evaluate(orders: list[Order], signals: list[Signal], sensitive: frozenset[st
                 "probar_hasta": split.test_end.isoformat(),
             },
             "pesos": weights,
-            "validacion_ndcg_combinado": valid_ndcg,
+            "validacion": validation,
             "proximo_vertical": _next_vertical(test, weights),
             "compra_cruzada": _cross_sell(history, sensitive, split.valid_end, split.test_end),
             "recompra": _replenishment(history, sensitive, split.valid_end, split.test_end),
@@ -327,48 +362,61 @@ def _fmt(value) -> str:
     return "—" if value is None else f"{value:.3f}".rstrip("0").rstrip(".") if isinstance(value, float) else str(value)
 
 
-def report(results: dict, source: str) -> str:
-    """El informe en markdown, en español."""
+def _title(source: str) -> list[str]:
     lines = [f"# Evaluación del motor multivertical ({source})", ""]
     if source == "synthetic":
         lines += [f"> **{SYNTHETIC_WARNING}**", ""]
-    t = results["tramos"]
+    return lines
+
+
+def report(results: dict, source: str) -> str:
+    """El informe en markdown, en español."""
+    lines = _title(source)
+    t, w, v = results["tramos"], results["pesos"], results["validacion"]
     lines += [
         f"Tramos por fecha: entrenar hasta {t['entrenar_hasta'][:10]}, validar hasta {t['validar_hasta'][:10]} y "
         f"probar hasta {t['probar_hasta'][:10]} (28 días cada uno de los dos últimos).",
         "",
-        "## Pesos elegidos",
+        "## Pesos",
         "",
-        "Con a = 1, (b, c) de la grilla con mejor nDCG en validación; ante un empate, los más chicos.",
-        "",
-        "| afinidad | transición | popularidad | nDCG en validación |",
-        "|---:|---:|---:|---:|",
-        f"| {_fmt(results['pesos']['afinidad'])} | {_fmt(results['pesos']['transicion'])} | "
-        f"{_fmt(results['pesos']['popularidad'])} | {_fmt(results['validacion_ndcg_combinado'])} |",
+    ]
+    if "aviso" in v:
+        lines += [f"**{v['aviso']}**", ""]
+    else:
+        lines += ["Con a = 1, (b, c) de la grilla con mejor nDCG en validación; ante un empate, los más chicos.", ""]
+    lines += [
+        "| Afinidad | Transición | Popularidad | Personas en validación | nDCG en validación |",
+        "|---:|---:|---:|---:|---:|",
+        f"| {_fmt(w['afinidad'])} | {_fmt(w['transicion'])} | {_fmt(w['popularidad'])} | {v['personas']} | "
+        f"{_fmt(v['ndcg_combinado'])} |",
         "",
     ]
     nv = results["proximo_vertical"]
-    people = nv["combinado"]["personas"]
     lines += [
-        f"## Próximo vertical (prueba, {people} personas)",
+        f"## Próximo vertical (prueba, {nv['combinado']['personas']} personas)",
         "",
-        "Lo relevante: los verticales que la persona pidió en los 28 días de prueba.",
+        "Personas con pedidos antes y durante la prueba; lo relevante: los verticales que pidió en esos 28 días.",
         "",
         "| Método | Acierto@1 | Acierto@3 | MRR | nDCG@8 |",
         "|---|---:|---:|---:|---:|",
+        *(f"| {LABELS[m]} | " + " | ".join(_fmt(nv[m][k]) for k in METRICS) + " |" for m in METHODS),
+        "",
     ]
-    lines += [f"| {m} | " + " | ".join(_fmt(nv[m][k]) for k in METRICS) + " |" for m in METHODS]
     cs = results["compra_cruzada"]
     base = cs["lo_mas_pedido"]
     lines += [
+        f"## Compra cruzada (prueba, {cs['personas']} personas)",
         "",
-        "## Compra cruzada (prueba)",
+        "Personas con pedidos antes y durante la prueba. Precisión@3 = aciertos / recomendaciones hechas (hasta 3);",
+        "aciertos / 3 divide siempre por 3. Las dos, en promedio entre quienes tienen alguna recomendación. Un acierto",
+        "es pedir ese concepto en ese vertical durante la prueba, sin que se lo sugieran.",
         "",
-        "| Método | Precisión@3 | Cobertura | Personas con predicción |",
-        "|---|---:|---:|---:|",
+        "| Método | Precisión@3 | Aciertos / 3 | Cobertura | Personas con recomendación |",
+        "|---|---:|---:|---:|---:|",
         *(
-            f"| {name} | {_fmt(m['precision3'])} | {_fmt(m['cobertura'])} | {m['personas_con_prediccion']} |"
-            for name, m in (("reglas aprendidas", cs), ("lo_mas_pedido", base))
+            f"| {LABELS[key]} | {_fmt(m['precision3'])} | {_fmt(m['aciertos_sobre_3'])} | {_fmt(m['cobertura'])} | "
+            f"{m['personas_con_prediccion']} |"
+            for key, m in (("reglas", cs), ("lo_mas_pedido", base))
         ),
         "",
         "Lo más pedido sobre las mismas personas que tienen reglas: precisión@3 "
@@ -379,9 +427,20 @@ def report(results: dict, source: str) -> str:
     lines += [
         "## Recompra (prueba)",
         "",
+        "Predicciones que vencen durante la prueba. «Compraron»: la parte en que la persona volvió a comprar el",
+        "concepto en la prueba; las demás cuentan como fallo en el acierto ±7 días. El error mediano es solo sobre las",
+        "que compraron.",
+        "",
         "| Predicciones | Compraron | Error mediano (días) | Acierto ±7 días |",
         "|---:|---:|---:|---:|",
         f"| {rp['n']} | {_fmt(rp['compraron'])} | {_fmt(rp['error_mediano_dias'])} | {_fmt(rp['acierto_7_dias'])} |",
         "",
     ]
+    return "\n".join(lines)
+
+
+def not_evaluated(source: str, reason: str, weights: dict[str, float], when: str) -> str:
+    """El informe de una corrida que no se evaluó: así uno viejo nunca parece el de la última corrida."""
+    lines = _title(source)
+    lines += [f"La última corrida del motor ({when}) no se evaluó: {reason}.", "", f"Pesos en uso: {weights}.", ""]
     return "\n".join(lines)
