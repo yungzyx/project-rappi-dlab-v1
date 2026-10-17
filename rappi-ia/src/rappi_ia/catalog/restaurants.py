@@ -14,6 +14,7 @@ from rappi_scraper.storage.search import MIN_PRICE
 
 from ..agent.tools import clp
 from ..concepts.taxonomy import load_taxonomy
+from .cache import cached
 from .stores import BIGINT_MAX, product_card
 
 POPULAR_SECTION = "Lo más pedido"
@@ -77,8 +78,14 @@ ORDER BY ms.position, ms.section_id, mi.rappi_item_id, mi.item_id"""
 
 def restaurants(conn: Connection, cuisine: str | None = None, sort: Sort = "rating", limit: int = 30) -> list[dict]:
     """Las tarjetas de los restaurantes con algún plato con precio, de una cocina si se pide, por mejor nota
-    (`rating`), menor tiempo de entrega (`eta`) o menor costo de envío (`fee`)."""
-    return [_card(*row) for row in _card_rows(conn, sort=sort, cuisine=cuisine, limit=limit)]
+    (`rating`), menor tiempo de entrega (`eta`) o menor costo de envío (`fee`). Sin cocina sale de la caché del
+    catálogo (catalog/cache.py): la consulta recorre todos los platos y la lista solo cambia con una corrida. Con
+    cocina (texto libre, que la app no pide) no se guarda: cada texto distinto sería una entrada más, sin tope."""
+
+    def compute() -> list[dict]:
+        return [_card(*row) for row in _card_rows(conn, sort=sort, cuisine=cuisine, limit=limit)]
+
+    return compute() if cuisine is not None else cached(f"restaurants:{sort}:{limit}", conn, compute)
 
 
 def restaurant_menu(conn: Connection, store_id: int) -> dict | None:
