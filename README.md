@@ -124,7 +124,7 @@ Las cuatro primeras filas son del generador de la etapa 5; la escalera fina se m
 | Capa de datos | Atributos, marcas y grafo | 83 atributos sobre 79.617 ítems · 6.359 marcas · 23.534 productos canónicos · 32.105 aristas en 12 relaciones | Real, con reglas propias; atributos 92 % y marcas 97 a 99 % de precisión estimada | `make layers`, 06-10-2026 |
 | Búsqueda | nDCG@10 | híbrido 0,917 · sin refuerzo por concepto 0,860 · vectorial 0,849 · léxico 0,776 | Evaluación automática | [reporte del 06-10](docs/resultados/busqueda-2026-10-06.md) |
 | Búsqueda | «Sin resultado» | precisión 1,00 (0 falsas alarmas) · recall 0,73 (30 de 41) | Evaluación automática | [reporte del 06-10](docs/resultados/busqueda-2026-10-06.md) |
-| Calidad | Tests (16-10-2026) | rappi-ia 2.416 · scraper 271 · prototipo 560 · panel 129 | Verificación local y CI | `make test` · `npm test` |
+| Calidad | Tests (16-10-2026) | rappi-ia 2.416 · scraper 271 · prototipo 600 · panel 129 | Verificación local y CI | `make test` · `npm test` |
 
 La búsqueda se evaluó con 124 consultas positivas en las 8 verticales y 41 negativas, con relevancia juzgada automáticamente por concepto ([`queries.json`](rappi-ia/src/rappi_ia/eval/queries.json)). Por tipo de consulta, el híbrido logra 0,988 en las exactas, 0,973 sin tildes y 0,712 en necesidades en lenguaje natural («algo para el carrete»), frente a 0,563 del léxico. Detalle por vertical y con la historia de cada reevaluación: [docs/resultados/](docs/resultados/).
 

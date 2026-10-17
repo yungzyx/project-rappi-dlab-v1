@@ -91,6 +91,8 @@ SNAPSHOT_ALLOW_WRITES=1 DEMO_API_URL=http://127.0.0.1:8020 npm run demo:snapshot
 DEMO_HTML_COPY="$HOME/Desktop/Prototipo MVP.html" npm run demo:html
 ```
 
+`demo:snapshot` muestra la API que va a usar antes de escribir nada y se niega con el puerto 8000 (la API de `make mvp`, sobre `rappi`) o con un host que no sea de este equipo; `SNAPSHOT_ALLOW_MAIN_API=1` lo permite, solo si esa API corre sobre una copia.
+
 Con la muestra ya grabada, `npm run demo:html` basta para volver a armar el HTML tras un cambio en la app.
 
 ## Modo demo: Rappi hoy y Prototipo final

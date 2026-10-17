@@ -30,7 +30,7 @@ const snapshot = {
 const persona = (id) => personas(snapshot).find((p) => p.id === id)
 const stateOf = (id) => ({ userId: 'proto-test', ...personaHistory(snapshot, persona(id), NOW) })
 
-test('the ladder personas sit where their name says, and the readout shows it', () => {
+test('las personas de la escalera están donde dice su nombre, y la línea del panel lo muestra', () => {
   expect(targetStep(COMBOS, stateOf('restaurantes'), NOW).vertical).toBe('turbo')
   expect(targetStep(COMBOS, stateOf('rest-turbo'), NOW).vertical).toBe('supermercado')
   expect(targetStep(COMBOS, stateOf('todo'), NOW).vertical).toBe('favor')
@@ -39,13 +39,13 @@ test('the ladder personas sit where their name says, and the readout shows it', 
   expect(ladderReadout(snapshot, stateOf('nueva'), NOW)).toMatch(/^Hoy: sin pedidos/)
 })
 
-test('«Usa mucho Farmacia» moves Farmacia first on the Home, and Mochi still never offers it', () => {
+test('«Usa mucho Farmacia» la sube primera en la Home y Mochi igual nunca la ofrece', () => {
   const state = stateOf('farmacia')
   expect(homeVerticals(state, NOW, LABELS).order[0].id).toBe('farmacia')
   expect(targetStep(COMBOS, state, NOW).vertical).toBe('turbo')
 })
 
-test('a taste persona activates its profile (three orders of its concepts) and gets its recorded ladder', () => {
+test('una persona de gusto activa su perfil (tres pedidos de sus conceptos) y recibe su escalera grabada', () => {
   const taste = persona('gusto-asiatico')
   expect(taste.label).toBe('🥢 Amante de lo asiático')
   const state = stateOf('gusto-asiatico')
@@ -56,7 +56,7 @@ test('a taste persona activates its profile (three orders of its concepts) and g
   expect(profileOffer(snapshot, two)).toBeNull()
 })
 
-test('a ladder persona orders a different concept in each vertical (no accidental «¿Repetimos?»)', () => {
+test('una persona de la escalera pide un concepto distinto en cada vertical (sin «¿Repetimos?» por accidente)', () => {
   // El primer producto de Rappi Mall es del mismo concepto que el de Restaurantes: se elige el siguiente.
   const pool = VERTICALS.map((vertical, i) => product(i + 1, { vertical, concept: `c${i}` }))
   const clash = product(20, { vertical: 'mall', concept: 'c0' })

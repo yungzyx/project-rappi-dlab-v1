@@ -1,6 +1,11 @@
-// Una muestra mínima para los tests de la API simulada (no se importa desde la app): la tabla de combinaciones de
-// rappi-ia/src/rappi_ia/motor/combos.toml y unos pocos conceptos y productos inventados. La muestra real
-// (snapshot.json) no está en git.
+// Una muestra mínima para los tests de la API simulada (no se importa desde la app; la muestra real, snapshot.json, no
+// está en git). Copia del backend, a mano (si cambian allá, cambiar acá):
+// - COMBOS: rappi-ia/src/rappi_ia/motor/combos.toml ([grupos], retencion_m1 de cada [combinaciones], [rendimiento_
+//   decreciente] y [servicios]) y, de motor/combos.py, FINE_ORDER, SERVICES y OWN_SIGNALS_ONLY;
+// - LABELS: VERTICAL_LABELS de rappi-ia/src/rappi_ia/agent/tools.py;
+// - SCREENS: SCREEN_VERTICALS de rappi-ia/src/rappi_ia/agent/grouped_search.py;
+// - SERVICES: id, nombre y ruta de RappiFavor y RappiTravel en concepts/taxonomy.toml (el `pitch` está acortado).
+// CONCEPTS y los productos son inventados (con los grupos y la marca `offerable` que daría offers/guards.py).
 
 export const COMBOS = {
   groups: {

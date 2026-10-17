@@ -7,6 +7,8 @@
 //   DATABASE_URL=postgresql:///rappi_staging HF_HUB_OFFLINE=1 API_PREWARM=0 \
 //     .venv/bin/python -m uvicorn rappi_ia.api.app:app --host 127.0.0.1 --port 8020
 //   SNAPSHOT_ALLOW_WRITES=1 DEMO_API_URL=http://127.0.0.1:8020 npm run demo:snapshot
+// Se niega a usar el puerto 8000 (la API de `make mvp`, sobre `rappi`) o un host que no sea de este equipo, salvo con
+// SNAPSHOT_ALLOW_MAIN_API=1.
 // Las tablas que la API no expone (conceptos con sus guardias, combinaciones de Rappi, servicios) las da
 // scripts/demo-snapshot-meta.py con el Python de rappi-ia.
 import { execFileSync } from 'node:child_process'
@@ -58,6 +60,26 @@ function requireWritesAllowed() {
       '  SNAPSHOT_ALLOW_WRITES=1 DEMO_API_URL=http://127.0.0.1:8020 npm run demo:snapshot',
   )
   process.exit(1)
+}
+
+// El puerto de `make mvp` / `make serve` (la API sobre `rappi`) y los hosts locales. La muestra se toma de una API propia
+// sobre una copia, en otro puerto y en este equipo: lo demás se niega salvo con SNAPSHOT_ALLOW_MAIN_API=1.
+const MAIN_API_PORT = '8000'
+const LOOPBACK = new Set(['127.0.0.1', 'localhost', '[::1]', '::1'])
+
+function requireSafeTarget() {
+  const target = new URL(API)
+  const port = target.port || (target.protocol === 'https:' ? '443' : '80')
+  console.log(`API de la muestra: ${API}`)
+  if (process.env.SNAPSHOT_ALLOW_MAIN_API === '1') return
+  if (port === MAIN_API_PORT || !LOOPBACK.has(target.hostname)) {
+    console.error(
+      `No tomo la muestra desde ${API}: el puerto ${MAIN_API_PORT} es la API del MVP (base \`rappi\`) y solo se ` +
+        'aceptan hosts de este equipo. Levanta una API sobre `rappi_staging` en otro puerto (p. ej. 8020); si de ' +
+        'verdad es una copia, SNAPSHOT_ALLOW_MAIN_API=1 lo permite.',
+    )
+    process.exit(1)
+  }
 }
 
 async function call(path, { method = 'GET', body, token, allow = [] } = {}) {
@@ -335,6 +357,7 @@ function intern(snapshot) {
 
 async function main() {
   requireWritesAllowed()
+  requireSafeTarget() // antes de cualquier petición
   const health = await call('/health')
   if (health?.ok !== true) throw new Error(`${API} no es la API de rappi-ia`)
   console.log(`Muestra desde ${API} (${health.documentos} documentos)`)

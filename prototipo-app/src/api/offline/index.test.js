@@ -19,7 +19,7 @@ const call = (method, path, body) => {
 
 beforeEach(() => localStorage.clear())
 
-test('session, events and orders shape the Home order; «Rappi hoy» does not; «Olvidar» clears it', () => {
+test('la sesión, los eventos y los pedidos ordenan la Home; «Rappi hoy» no; «Olvidar» lo borra', () => {
   const { body: session } = call('POST', '/session', {})
   expect(session.user_id).toMatch(/^proto-/)
   const id = session.user_id
@@ -51,7 +51,7 @@ test('session, events and orders shape the Home order; «Rappi hoy» does not; �
   expect(call('GET', `/profile/${id}/verticales`).body.personalized).toBe(false)
 })
 
-test('an offer with nothing to say is a 204; an unknown route is a 404', () => {
+test('una oferta sin nada que decir es un 204; una ruta desconocida, un 404', () => {
   expect(call('POST', '/agent/offer', { moment: 'recompra', context: {} })).toEqual({ status: 204, body: null })
   expect(call('GET', '/analytics/kpis').status).toBe(404)
   expect(call('GET', '/health').body).toMatchObject({ ok: true, documentos: 3 })

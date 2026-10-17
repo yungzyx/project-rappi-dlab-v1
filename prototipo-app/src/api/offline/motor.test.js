@@ -24,8 +24,8 @@ const home = (s) => homeVerticals(s, NOW, LABELS)
 const ids = (reply) => reply.order.map((entry) => entry.id)
 const step = (s) => targetStep(COMBOS, s, NOW)
 
-describe('Home ordering (motor/home.py)', () => {
-  test('without history keeps the fixed order, with no reason and not personalized', () => {
+describe('orden de la Home (motor/home.py)', () => {
+  test('sin historial queda el orden fijo, sin porqué y sin personalizar', () => {
     const reply = home(state())
     expect(reply.fixed).toEqual(['restaurantes', 'turbo'])
     expect(ids(reply)).toEqual(['supermercado', 'farmacia', 'mall', 'licores', 'conveniencia', 'chocolateria'])
@@ -33,7 +33,7 @@ describe('Home ordering (motor/home.py)', () => {
     expect(reply.order.every((entry) => entry.reason === null)).toBe(true)
   })
 
-  test('taps on Farmacia move it first among the small tiles, with «Porque entras seguido a…»', () => {
+  test('los toques a Farmacia la suben primera entre los accesos chicos, con «Porque entras seguido a…»', () => {
     const reply = home(state({ events: [open('farmacia'), open('farmacia'), open('mall')] }))
     expect(ids(reply)).toEqual(['farmacia', 'mall', 'supermercado', 'licores', 'conveniencia', 'chocolateria'])
     expect(reply.personalized).toBe(true)
@@ -44,21 +44,21 @@ describe('Home ordering (motor/home.py)', () => {
     expect(reply.order[1].reason).toBeNull()
   })
 
-  test('orders say «Porque pides seguido en…» and contract the article', () => {
+  test('los pedidos dicen «Porque pides seguido en…» y contraen el artículo', () => {
     const reply = home(state({ orders: [order('supermercado')] }))
     expect(reply.order[0]).toMatchObject({ id: 'supermercado', reason: { text: 'Porque pides seguido en el súper.' } })
     const visits = home(state({ events: [open('supermercado')] }))
     expect(visits.order[0].reason.text).toBe('Porque entras seguido al súper.')
   })
 
-  test('Restaurantes and Turbo stay fixed: using them does not move the small tiles', () => {
+  test('Restaurantes y Turbo quedan fijos: usarlos no mueve los accesos chicos', () => {
     const reply = home(state({ orders: [order('restaurantes'), order('turbo')], events: [open('turbo')] }))
     expect(reply.fixed).toEqual(['restaurantes', 'turbo'])
     expect(ids(reply)).toEqual(['supermercado', 'farmacia', 'mall', 'licores', 'conveniencia', 'chocolateria'])
     expect(reply.personalized).toBe(false)
   })
 
-  test('«Rappi hoy» taps and orders do not teach', () => {
+  test('los toques y pedidos de «Rappi hoy» no enseñan', () => {
     const reply = home(
       state({
         orders: [order('chocolateria', { mode: 'actual' })],
@@ -69,13 +69,13 @@ describe('Home ordering (motor/home.py)', () => {
     expect(ids(reply)[0]).toBe('supermercado')
   })
 
-  test('signals older than 180 days do not count', () => {
+  test('las señales de hace más de 180 días no cuentan', () => {
     const reply = home(state({ events: [open('mall', { ago: 181 * 86_400_000 })] }))
     expect(reply.personalized).toBe(false)
   })
 })
 
-describe('the fine ladder (motor/combos.py, predict.py)', () => {
+describe('la escalera fina (motor/combos.py, predict.py)', () => {
   test('restaurantes → turbo', () => {
     const s = state({ orders: [order('restaurantes')] })
     expect(step(s)).toMatchObject({ vertical: 'turbo', current: 'restaurantes', target: 'restaurantes+turbo' })
@@ -90,31 +90,31 @@ describe('the fine ladder (motor/combos.py, predict.py)', () => {
     expect(step(state({ orders: [order('turbo')] })).vertical).toBe('restaurantes')
   })
 
-  test('restaurantes + turbo → supermercado (the first retail vertical, by its tie-break order)', () => {
+  test('restaurantes + turbo → supermercado (la primera de retail, por el orden que desempata)', () => {
     const s = state({ orders: [order('restaurantes'), order('turbo')] })
     expect(step(s)).toMatchObject({ vertical: 'supermercado', target: 'restaurantes+turbo+supermercado' })
   })
 
-  test('the person’s own use breaks the tie inside retail', () => {
+  test('el uso propio de la persona desempata dentro de retail', () => {
     const s = state({ orders: [order('restaurantes'), order('turbo')], events: [open('chocolateria')] })
     expect(step(s).vertical).toBe('chocolateria')
   })
 
-  test('within a group the diminishing assumption applies and the basis says so', () => {
+  test('dentro de un grupo se aplica el supuesto del rendimiento decreciente y la basis lo dice', () => {
     const s = state({ orders: [order('restaurantes'), order('turbo'), order('supermercado')] })
     const next = step(s)
     expect(next.vertical).toBe('mall') // sin afinidad, el orden de siempre desempata (mall antes que Express)
     expect(stepSignal(COMBOS, next).source).toBe('rappi+supuesto')
   })
 
-  test('all the catalog → RappiFavor → RappiTravel, then nothing', () => {
+  test('todo el catálogo → RappiFavor → RappiTravel, y después nada', () => {
     const all = ['restaurantes', 'turbo', 'supermercado', 'conveniencia', 'mall', 'chocolateria'].map((v) => order(v))
     expect(step(state({ orders: all })).vertical).toBe('favor')
     expect(step(state({ orders: all, events: [serviceOpened('rappifavor')] })).vertical).toBe('travel')
     expect(step(state({ orders: all, events: [serviceOpened('rappifavor'), serviceOpened('rappitravel')] }))).toBeNull()
   })
 
-  test('never Farmacia or Licores, even when they are the most used', () => {
+  test('nunca Farmacia ni Licores, aunque sean las más usadas', () => {
     const events = Array.from({ length: 20 }, () => [open('farmacia'), open('licores')]).flat()
     const s = state({ orders: [order('restaurantes'), order('turbo')], events })
     expect(step(s).vertical).toBe('supermercado')
@@ -122,13 +122,13 @@ describe('the fine ladder (motor/combos.py, predict.py)', () => {
     expect(step(state({ orders: all, events })).vertical).toBe('favor')
   })
 
-  test('the basis never names Farmacia or Licores, though they count in the combination', () => {
+  test('la basis nunca nombra Farmacia ni Licores, aunque cuenten en la combinación', () => {
     const s = state({ orders: [order('restaurantes'), order('farmacia'), order('licores')] })
     expect(currentFine(COMBOS, s, NOW)).toBe('restaurantes+farmacia+licores')
     expect(stepSignal(COMBOS, step(s)).id).toBe('restaurantes→restaurantes+turbo')
   })
 
-  test('without orders there is no step; «Rappi hoy» orders and services opened there do not count', () => {
+  test('sin pedidos no hay paso; los pedidos de «Rappi hoy» y los servicios abiertos ahí no cuentan', () => {
     expect(step(state())).toBeNull()
     expect(step(state({ orders: [order('restaurantes', { mode: 'actual' })] }))).toBeNull()
     const all = ['restaurantes', 'turbo', 'supermercado', 'conveniencia', 'mall', 'chocolateria'].map((v) => order(v))
@@ -136,14 +136,14 @@ describe('the fine ladder (motor/combos.py, predict.py)', () => {
     expect(step(state({ orders: all, events: [opened] })).vertical).toBe('favor')
   })
 
-  test('orders older than 30 days count only when there are none in 30 (90-day window)', () => {
+  test('los pedidos de hace más de 30 días cuentan solo si no hay en 30 (ventana de 90)', () => {
     const DAY = 86_400_000
     const s = state({ orders: [order('turbo', { ago: 45 * DAY })] })
     expect(currentFine(COMBOS, s, NOW)).toBe('turbo')
     expect(currentFine(COMBOS, state({ orders: [order('turbo', { ago: 120 * DAY })] }), NOW)).toBe('ninguna')
   })
 
-  test('expected retention matches the Rappi table and never reaches 1', () => {
+  test('la retención esperada calza con la tabla de Rappi y nunca llega a 1', () => {
     expect(fineExpectation(COMBOS, 'restaurantes+turbo')).toEqual([0.82, false])
     const [value, used] = fineExpectation(COMBOS, 'restaurantes+turbo+supermercado+conveniencia+favor')
     expect(value).toBeCloseTo(1 - 0.07 * 0.9 * 0.95, 10)

@@ -243,20 +243,26 @@ export default function AssistantPanel({ push, vertical, depth = 1 }) {
 
   /**
    * El perfil de gusto principal de la persona (`GET /profile/{id}/gustos`) con su escalera (el momento `perfil`), o
-   * null si no tiene, si no hay escalera o si la API no contesta: entonces el panel queda como siempre. Sus productos
-   * cuentan como sugerencias mostradas (una vez por pestaña, como las demás).
+   * null si no tiene, si no hay escalera o si la API no contesta: entonces el panel queda como siempre.
    */
   const loadTaste = async () => {
     try {
       const [main] = await tasteProfiles()
       const ladder = main ? await profileLadder(main.id) : null
-      if (!ladder?.steps.length) return null
-      for (const step of ladder.steps)
-        noteShown(events.track, step.products, { origin: 'agent-perfil', generation: profile.resets })
-      return { profile: main, ladder }
+      return ladder?.steps.length ? { profile: main, ladder } : null
     } catch {
       return null
     }
+  }
+
+  /**
+   * Muestra el perfil y cuenta sus productos como sugerencias mostradas (una vez por pestaña, como las demás). Cuentan
+   * todos los peldaños: la escalera se pinta entera (una fila horizontal, como «Para ti»), aunque no quepa en pantalla.
+   */
+  const showTaste = (found) => {
+    setTaste(found)
+    for (const step of found?.ladder.steps ?? [])
+      noteShown(events.track, step.products, { origin: 'agent-perfil', generation: profile.resets })
   }
 
   // Abrir, paso 1: el buscador se pinta fuera de la pantalla, a la derecha (como el de «Rappi hoy»).
@@ -281,7 +287,8 @@ export default function AssistantPanel({ push, vertical, depth = 1 }) {
       .then((data) => data.rows.filter((row) => row.products.length > 0))
       .catch(() => [])
     rows.then((list) => fresh() && setDiscoverRows(list.slice(0, DISCOVER_ROWS)))
-    loadTaste().then((found) => fresh() && setTaste(found))
+    // Solo si sigue siendo la misma persona («Olvidar» mientras llegaba): ni se muestra ni se cuenta.
+    loadTaste().then((found) => fresh() && showTaste(found))
 
     if (messages.length === 0) greet(rows)
     if (session.product) later(() => askPairing(session.product), OPEN_MS)
@@ -374,6 +381,7 @@ export default function AssistantPanel({ push, vertical, depth = 1 }) {
     profile.reset()
     setLearnedRemote(null)
     setDiscoverRows([])
+    setTaste(null)
     try {
       // Lo que ya salió (preguntas pendientes, un lote de eventos, un pedido) podría recrear lo olvidado en el
       // servidor: forgetAll lo espera antes del DELETE, descarta lo que haya dejado en cola, y deja el navegador en

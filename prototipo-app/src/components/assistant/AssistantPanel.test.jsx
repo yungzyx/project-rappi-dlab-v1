@@ -1066,6 +1066,18 @@ describe('perfil de gusto', () => {
     expect(push).toHaveBeenCalledWith(...routeForScreen('grocery'))
   })
 
+  test('«Olvidar» quita el perfil del panel', async () => {
+    stubCatalog({
+      'GET /profile/*': fixture('profile-gustos'),
+      'POST /agent/offer': (req) => (req.body.moment === 'perfil' ? fixture('agent-offer-perfil') : 204),
+    })
+    await renderPanel()
+    expect(screen.getByRole('region', { name: 'Tu perfil' })).toBeTruthy()
+    await forget()
+    expect(screen.queryByRole('region', { name: 'Tu perfil' })).toBeNull()
+    expect(screen.queryByText('Para ti en otras verticales')).toBeNull()
+  })
+
   test('sin perfil activo, el panel queda como siempre', async () => {
     const fetchMock = stubCatalog({ 'GET /profile/*': { perfiles: [] } })
     await renderPanel()

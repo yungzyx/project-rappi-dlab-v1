@@ -16,8 +16,12 @@ export function readState() {
   }
 }
 
+/** Se avisa cada vez que cambia lo guardado (un pedido, un lote de eventos, «Olvidar»): lo escucha el panel de la demo. */
+export const OFFLINE_STATE_EVENT = 'rappi-demo-state'
+
 export function writeState(state) {
   memory = state
+  if (typeof window !== 'undefined') queueMicrotask(() => window.dispatchEvent(new Event(OFFLINE_STATE_EVENT)))
   try {
     localStorage.setItem(KEY, JSON.stringify(state))
   } catch {

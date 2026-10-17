@@ -56,8 +56,8 @@ function snapshotWith(fields = {}) {
 }
 const offer = (moment, s, context = {}, snapshot = snapshotWith()) => makeOffer(snapshot, s, NOW, { moment, context })
 
-describe('guards (offers/guards.py)', () => {
-  test('never +18, Farmacia, Licores, unofferable concepts, or names that say alcohol or baby', () => {
+describe('guardias (offers/guards.py)', () => {
+  test('nunca +18, Farmacia, Licores, conceptos que no se ofrecen ni nombres que dicen alcohol o bebé', () => {
     expect(offerableProduct(coffee, CONCEPTS)).toBe(true)
     expect(offerableProduct({ ...coffee, age_restricted: true }, CONCEPTS)).toBe(false)
     expect(offerableProduct({ ...coffee, vertical: 'farmacia' }, CONCEPTS)).toBe(false)
@@ -71,7 +71,7 @@ describe('guards (offers/guards.py)', () => {
     expect(offerableProduct({ ...coffee, name: 'Galletas Ronda ginger' }, CONCEPTS)).toBe(true)
   })
 
-  test('a recorded offer loses the products that fail the guards; with none left, nothing is offered', () => {
+  test('una oferta grabada pierde los productos que no pasan las guardias; sin ninguno, no se ofrece nada', () => {
     const snapshot = snapshotWith({ toTry: { turbo: recordedStep('turbo', [beer, turboSnack]) } })
     const made = offer('vertical_por_probar', state({ orders: [order('restaurantes')] }), {}, snapshot)
     expect(made.products).toEqual([turboSnack])
@@ -81,7 +81,7 @@ describe('guards (offers/guards.py)', () => {
 })
 
 describe('vertical_por_probar', () => {
-  test('without orders: the usual one (el súper), with «Aún no pides en…» and its basis', () => {
+  test('sin pedidos: la de siempre (el súper), con «Aún no pides en…» y su basis', () => {
     const made = offer('vertical_por_probar', state())
     expect(made).toMatchObject({
       vertical: 'supermercado',
@@ -93,7 +93,7 @@ describe('vertical_por_probar', () => {
     })
   })
 
-  test('the step’s recorded offer carries this person’s combination first', () => {
+  test('la oferta grabada del paso lleva primero la combinación de esta persona', () => {
     const made = offer('vertical_por_probar', state({ orders: [order('restaurantes')] }))
     expect(made.vertical).toBe('turbo')
     expect(made.reason.basis).toEqual([
@@ -102,7 +102,7 @@ describe('vertical_por_probar', () => {
     ])
   })
 
-  test('with all the catalog: «¿Conoces RappiFavor?», no products, an action that opens it', () => {
+  test('con todo el catálogo: «¿Conoces RappiFavor?», sin productos y con una acción que lo abre', () => {
     const made = offer('vertical_por_probar', state({ orders: ALL.map((v) => order(v)) }))
     expect(made).toMatchObject({
       text: '¿Conoces RappiFavor? Un Rappitendero lleva lo que necesites.',
@@ -117,7 +117,7 @@ describe('vertical_por_probar', () => {
 })
 
 describe('recompra', () => {
-  test('a concept bought in two orders: «¿Repetimos…?» with the last product bought', () => {
+  test('un concepto en dos pedidos: «¿Repetimos…?» con el último producto comprado', () => {
     const s = state({ orders: [order('supermercado', [line(coffee)]), order('supermercado', [line(coffee)])] })
     const made = offer('recompra', s)
     expect(made).toMatchObject({
@@ -129,7 +129,7 @@ describe('recompra', () => {
     })
   })
 
-  test('one order is not enough; alcohol and «Rappi hoy» orders never repeat', () => {
+  test('un pedido no basta; el alcohol y los pedidos de «Rappi hoy» nunca se repiten', () => {
     expect(offer('recompra', state({ orders: [order('supermercado', [line(coffee)])] }))).toBeNull()
     const beers = [order('licores', [line(beer)]), order('licores', [line(beer)])]
     expect(offer('recompra', state({ orders: beers }))).toBeNull()
@@ -138,15 +138,15 @@ describe('recompra', () => {
   })
 })
 
-describe('complements', () => {
+describe('complementos', () => {
   const entity = (p) => ({ entity_type: p.entity_type, entity_id: p.entity_id })
 
-  test('carrito: the recorded complement of the product’s concept', () => {
+  test('carrito: el complemento grabado del concepto del producto', () => {
     const made = offer('carrito', state(), { product: entity(coffee) })
     expect(made).toMatchObject({ moment: 'carrito', products: [cookies], reason: { concept: 'galletas' } })
   })
 
-  test('checkout and proximo_pedido re-word it; what is already in the cart is not offered', () => {
+  test('checkout y proximo_pedido cambian el texto; lo que ya está en el carro no se ofrece', () => {
     const checkout = offer('checkout', state(), { cart: [entity(coffee)] })
     expect(checkout.text).toBe('Para completar lo que llevas: galletas, en Express.')
     const next = offer('proximo_pedido', state(), { items: [entity(coffee)] })
@@ -158,7 +158,7 @@ describe('complements', () => {
   })
 })
 
-test('decodeSnapshot rebuilds products from their rows and puts them back in the responses', () => {
+test('decodeSnapshot arma los productos desde sus filas y los vuelve a poner en las respuestas', () => {
   const raw = {
     productFields: ['entity_type', 'entity_id', 'name', 'img'],
     imgPrefix: 'https://images.rappi.cl/products/',

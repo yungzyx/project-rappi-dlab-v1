@@ -8,6 +8,7 @@ import {
   switchPersona,
 } from '../../api/offline/personas'
 import { loadSnapshot } from '../../api/offline/snapshot'
+import { OFFLINE_STATE_EVENT } from '../../api/offline/state'
 import './offline-demo-panel.css'
 
 // Los 6 accesos chicos que ordena la Home (motor/home.py), con su nombre en la fila de accesos.
@@ -37,8 +38,13 @@ export default function OfflineDemoPanel() {
     if (!snapshot || !open) return undefined
     const update = () => setReadout(ladderReadout(snapshot))
     update()
+    // Cambia con el panel y también con lo que se hace en la app (un pedido, abrir RappiFavor…).
     window.addEventListener(DEMO_HISTORY_EVENT, update)
-    return () => window.removeEventListener(DEMO_HISTORY_EVENT, update)
+    window.addEventListener(OFFLINE_STATE_EVENT, update)
+    return () => {
+      window.removeEventListener(DEMO_HISTORY_EVENT, update)
+      window.removeEventListener(OFFLINE_STATE_EVENT, update)
+    }
   }, [snapshot, open])
 
   return (

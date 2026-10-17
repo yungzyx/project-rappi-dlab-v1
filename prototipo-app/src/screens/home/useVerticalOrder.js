@@ -11,7 +11,8 @@ import { useProfile } from '../../state/ProfileContext'
  * montada bajo las pantallas que se abren encima). Al volver, antes de pedir manda los eventos en cola (los toques a
  * los accesos), para que el orden ya los cuente. La respuesta de una petición anterior no pisa a la última, y mientras
  * llega la nueva se mantiene el orden que había (salvo tras «Olvidar», que no muestra el de antes).
- * Sin API (o con error) `order` es null: la Home queda en el orden fijo y sin el texto.
+ * Sin API (o con error) `order` es null: la Home queda en el orden fijo y sin el texto. En la demo sin conexión pide
+ * también cuando el «Panel de la demo» cambia el historial.
  */
 export function useVerticalOrder(active = true) {
   const { resets } = useProfile()
@@ -34,8 +35,10 @@ export function useVerticalOrder(active = true) {
     }
   }, [active, events])
 
-  // Demo sin conexión: el «Panel de la demo» cambia el historial y la Home vuelve a pedir su orden (en los demás builds
-  // la condición se pliega y esto no existe).
+  // Demo sin conexión («Prototipo MVP.html»): con «+1 visita» o «Borrar historial» el «Panel de la demo» cambia el
+  // historial sin que la Home deje de estar arriba, y avisa con `rappi-demo-history` (DEMO_HISTORY_EVENT de
+  // src/api/offline/personas.js; no se importa para no traer ese código). En los demás builds Vite pliega la condición:
+  // el efecto queda vacío y no escucha nada.
   useEffect(() => {
     if (import.meta.env.VITE_OFFLINE_DEMO !== '1') return undefined
     const again = () => setReturns((n) => n + 1)
