@@ -211,6 +211,10 @@ export function toPrototypeProduct(p) {
     vertical: screenForBackend(p.vertical) ?? p.vertical,
     backendVertical: p.vertical,
     ageRestricted: Boolean(p.age_restricted),
+    // Lo más pedido del restaurante según su menú en Rappi (solo bajo el primer plato de cada local, si lo tiene).
+    topDishes: p.top_dishes
+      ? { source: p.top_dishes.source, label: p.top_dishes.label, dishes: p.top_dishes.dishes.map(toPrototypeProduct) }
+      : undefined,
   }
 }
 

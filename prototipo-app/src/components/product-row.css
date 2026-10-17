@@ -80,3 +80,9 @@
   bottom: 8px;
   right: -6px;
 }
+
+/* Con lo más pedido debajo, el "+" sigue en la esquina de la foto (no al fondo de la fila). */
+.product-row--top .add-button--row {
+  top: 73px;
+  bottom: auto;
+}

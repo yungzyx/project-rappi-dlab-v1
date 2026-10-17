@@ -106,6 +106,7 @@ function ResultGroup({ group, onOpenProduct }) {
             product={product}
             showStore
             onOpenStore={onOpenProduct && product.storeId != null ? () => onOpenProduct(product) : undefined}
+            onOpenDish={onOpenProduct}
           />
         ))}
       </ul>

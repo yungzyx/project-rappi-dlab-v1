@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import AddButton from '../AddButton'
 import HScroll from '../HScroll'
 import Img from '../Img'
+import TopDishes from '../TopDishes'
 import OfferWhy from './OfferWhy'
 import { useReducedMotion } from '../../hooks/useReducedMotion'
 import { useProductSheet } from '../../state/ProductSheetContext'
@@ -68,6 +69,7 @@ function ProductCards({ products, onOpenProduct, delay = 0 }) {
             <span className="agent-msg-product-store">{product.store}</span>
           </button>
           <AddButton product={product} className="add-button--agent" />
+          <TopDishes topDishes={product.topDishes} onOpenStore={onOpenProduct} compact />
         </div>
       ))}
     </HScroll>

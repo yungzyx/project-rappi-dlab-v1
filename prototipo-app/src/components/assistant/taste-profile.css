@@ -196,6 +196,7 @@
 
 .taste-product {
   display: flex;
+  flex-wrap: wrap; /* lo más pedido de un restaurante va en su propia línea */
   align-items: center;
   gap: 6px;
 }

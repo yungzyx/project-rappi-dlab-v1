@@ -6,6 +6,7 @@ import AddButton from '../AddButton'
 import { Dots } from '../Carousel'
 import HScroll from '../HScroll'
 import Img from '../Img'
+import TopDishes from '../TopDishes'
 import './taste-profile.css'
 
 // Las mismas ilustraciones de los accesos de la Home para cada vertical (RappiTravel tiene id propio en los accesos).
@@ -64,6 +65,7 @@ function StepProduct({ product, onOpenProduct }) {
         </span>
       </button>
       <AddButton product={product} className="add-button--taste" />
+      <TopDishes topDishes={product.topDishes} onOpenStore={onOpenProduct} />
     </li>
   )
 }
