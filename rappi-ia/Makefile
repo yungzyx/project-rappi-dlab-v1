@@ -1,4 +1,4 @@
-.PHONY: help install install-ml db-test migrate check-migrations verify-migrations deploy-migrate test lint format jev-categorias concepts embed eval synth analytics serve serve-lan warm warm-catalog probar-agente purge post-refresh layers layer-report motor contract
+.PHONY: help install install-ml db-test migrate check-migrations verify-migrations deploy-migrate test lint format jev-categorias concepts embed eval synth analytics serve serve-lan warm warm-catalog probar-agente purge post-refresh prune-embeddings layers layer-report motor contract
 
 PY := .venv/bin/python
 # Python ≥ 3.12 para crear el .venv. En un Mac nuevo `python3` es el 3.9 de macOS: se prefiere python3.13
@@ -56,6 +56,9 @@ concepts:  ## Capa 2: conceptos por producto y plato (con kNN si hay extra ml)
 
 embed:  ## Embeddings de texto (incrementales) + índices HNSW por vertical
 	$(PY) -m rappi_ia embed-text
+
+prune-embeddings:  ## Borra del caché de embeddings los vectores sin uso (de más de 7 días)
+	$(PY) -m rappi_ia prune-embeddings
 
 # La tarea semanal (rappi-scraper/scripts/refresh-semanal.sh) pasa EVAL_ARGS= para no tocar eval/thresholds.json
 EVAL_ARGS ?= --guardar-tau
@@ -156,6 +159,6 @@ verify-migrations:
 # para los eventos simulados que synth acaba de generar: también si falla un paso (p. ej. el motor, al final de
 # layers), y entonces post-refresh sale con error. En producción (API_ENV=production) no migra: solo revisa.
 post-refresh: $(if $(filter production,$(API_ENV)),verify-migrations,migrate) purge  ## Todo lo que sigue a un `rappi refresh` (sin imágenes)
-	$(MAKE) jev-categorias concepts embed eval synth layers || { $(MAKE) purge; exit 1; }
+	$(MAKE) jev-categorias concepts embed prune-embeddings eval synth layers || { $(MAKE) purge; exit 1; }
 	$(MAKE) purge
 	@echo "Listo: conceptos, embeddings, evaluación y datos simulados al día."
