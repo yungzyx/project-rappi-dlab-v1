@@ -3,6 +3,7 @@ que valida antes de pedir conexión."""
 
 import logging
 import threading
+import time
 import types
 from contextlib import contextmanager
 from types import SimpleNamespace
@@ -16,6 +17,7 @@ from owner_client import OwnerClient
 from rappi_ia import config
 from rappi_ia.agent import compose
 from rappi_ia.agent.compose import ClaudeComposer, DailyCallCap, Draft, TemplateComposer
+from rappi_ia.api import agent as agent_api
 from rappi_ia.api import app as api
 from rappi_ia.api import identity, limits, services
 
@@ -44,6 +46,8 @@ def client(opened, monkeypatch):
         yield SimpleNamespace(commit=lambda: None)
 
     agent = types.SimpleNamespace(reply=lambda *_: dict(ANSWER))
+    for cap in (api.ASK_CAP, agent_api.OFFER_CAP):  # su fila (API_CAP_WAIT_S), corta: un cupo lleno no alarga el test
+        monkeypatch.setattr(cap, "wait_s", 0.05)
     api.app.dependency_overrides[api.get_conn] = conn_override
     api.app.dependency_overrides[api.get_connector] = lambda: connection
     api.app.dependency_overrides[api.get_services] = lambda: types.SimpleNamespace(agent=agent, embedder=None)
@@ -100,8 +104,6 @@ def test_cap_resolves_before_connection(client, opened):
 
 
 def test_each_expensive_route_has_its_cap(client, opened):
-    from rappi_ia.api import agent as agent_api
-
     order = {"user_id": "u1", "session_id": "s", "cart_id": "c", "vertical": "licores", "lines": []}
     order["lines"] = [{"entity_type": "catalog_item", "entity_id": "1"}]
     requests = [
@@ -123,7 +125,6 @@ def test_the_panel_waits_its_turn_instead_of_failing(client, opened, monkeypatch
     """El panel pide ~16 métricas a la vez: con un cupo que rechaza al tiro, casi todas caerían a los datos guardados.
     Su cupo hace fila (hasta el tope del panel) en vez de responder 503."""
     assert api.ANALYTICS_CAP.wait_s == config.API_TIMEOUT_ANALYTICS_MS / 1000
-    assert api.ASK_CAP.wait_s == 0  # las rutas de la app sí rechazan al tiro
 
     monkeypatch.setitem(api.ANALYTICS, "kpis", lambda conn, source: {"usuarios": 0})
     in_line = threading.Event()
@@ -150,6 +151,63 @@ def test_the_panel_waits_its_turn_instead_of_failing(client, opened, monkeypatch
     assert opened == ["get_conn"]
 
 
+@contextmanager
+def waiting_in_line(monkeypatch, cap):
+    """Avisa cuando un request se pone en la fila de `cap`."""
+    in_line = threading.Event()
+    slots = cap.slots
+
+    class Watched:
+        def __getattr__(self, name):
+            return getattr(slots, name)
+
+        async def acquire(self):
+            in_line.set()
+            await slots.acquire()  # sin ceder el loop entre el aviso y quedar en la fila
+
+    monkeypatch.setattr(cap, "slots", Watched())
+    yield in_line
+
+
+@pytest.mark.parametrize("route", ["ask", "offer"])
+def test_mochi_waits_a_moment_for_a_free_slot(route, client, opened, monkeypatch):
+    """La Home pide dos ofertas por persona: con 3 personas a la vez, un cupo que rechazaba al tiro dejaba ofertas con
+    503 (y a Mochi callado). /agent/ask y /agent/offer hacen una fila corta: el que espera entra cuando se libera un
+    cupo."""
+    monkeypatch.setattr(agent_api, "make_offer", lambda *_: None)
+    cap, send = {
+        "ask": (api.ASK_CAP, lambda: client.post("/agent/ask", json={"message": "vino"})),
+        "offer": (agent_api.OFFER_CAP, lambda: client.post("/agent/offer", json={"moment": "recompra", "context": {}})),
+    }[route]
+    monkeypatch.setattr(cap, "wait_s", 5)
+    replies = []
+    with waiting_in_line(monkeypatch, cap) as in_line, full(client, cap):
+        waiting = threading.Thread(target=lambda: replies.append(send().status_code))
+        waiting.start()
+        assert in_line.wait(timeout=5)  # está esperando su turno, no rechazado
+        assert replies == []
+    waiting.join()  # se liberó un cupo: el que esperaba entra
+
+    assert replies == [200 if route == "ask" else 204]
+    assert opened == ["get_conn"]
+
+
+@pytest.mark.parametrize("route", ["ask", "offer"])
+def test_mochi_gives_up_after_its_short_wait(route, client, opened, monkeypatch):
+    cap, send = {
+        "ask": (api.ASK_CAP, lambda: client.post("/agent/ask", json={"message": "vino"})),
+        "offer": (agent_api.OFFER_CAP, lambda: client.post("/agent/offer", json={"moment": "recompra", "context": {}})),
+    }[route]
+    monkeypatch.setattr(cap, "wait_s", 0.3)
+    with full(client, cap):
+        start = time.monotonic()
+        reply = send()
+
+    assert reply.status_code == 503 and reply.headers["retry-after"] == "2"
+    assert time.monotonic() - start >= 0.3  # esperó su fila antes de rendirse
+    assert opened == []
+
+
 def test_a_waiting_cap_gives_up_after_its_wait(monkeypatch):
     cap = limits.concurrency_cap("lento", 1, wait_s=0.2)
     app = FastAPI()
@@ -171,6 +229,9 @@ def test_caps_take_their_size_from_config():
     assert api.SEARCH_CAP.limit == config.API_MAX_CONCURRENT_SEARCH == 8
     assert api.ORDERS_CAP.limit == config.API_MAX_CONCURRENT_ORDERS == 4
     assert api.ANALYTICS_CAP.limit == config.API_MAX_CONCURRENT_ANALYTICS == 2
+    # La fila de Mochi queda bajo el tope de la app para una oferta (5 s); la búsqueda y los pedidos rechazan al tiro.
+    assert api.ASK_CAP.wait_s == agent_api.OFFER_CAP.wait_s == config.API_CAP_WAIT_S == 2
+    assert api.SEARCH_CAP.wait_s == api.ORDERS_CAP.wait_s == 0
 
 
 def _echo_app(**rate) -> FastAPI:

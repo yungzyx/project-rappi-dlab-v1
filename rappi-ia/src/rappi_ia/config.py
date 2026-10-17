@@ -104,11 +104,15 @@ API_POOL_MIN = int(os.environ.get("API_POOL_MIN", "2"))
 API_POOL_MAX = int(os.environ.get("API_POOL_MAX", "10"))
 API_POOL_TIMEOUT_S = float(os.environ.get("API_POOL_TIMEOUT_S", "3"))
 
-# Cupos: cuántos requests de cada ruta cara se atienden a la vez en un proceso; el siguiente recibe 503 al tiro (con
-# Retry-After), sin ocupar una conexión ni un hilo mientras espera.
+# Cupos: cuántos requests de cada ruta cara se atienden a la vez en un proceso. Sin cupo, /agent/ask y /agent/offer
+# hacen fila hasta API_CAP_WAIT_S segundos (la Home pide dos ofertas por persona: con 3 personas a la vez, un cupo que
+# rechazaba al tiro dejaba a Mochi callado; una oferta tarda ~35 ms, la fila se vacía rápido); la búsqueda y los
+# pedidos reciben 503 al tiro. Pasada la espera, 503 con Retry-After. Esperar no ocupa una conexión ni un hilo. La
+# espera queda bajo el tope de la app para una oferta (5 s), contando la del pool (API_POOL_TIMEOUT_S).
 API_MAX_CONCURRENT_ASK = int(os.environ.get("API_MAX_CONCURRENT_ASK", "4"))
 API_MAX_CONCURRENT_SEARCH = int(os.environ.get("API_MAX_CONCURRENT_SEARCH", "8"))
 API_MAX_CONCURRENT_OFFER = int(os.environ.get("API_MAX_CONCURRENT_OFFER", "4"))
+API_CAP_WAIT_S = float(os.environ.get("API_CAP_WAIT_S", "2"))
 API_MAX_CONCURRENT_ORDERS = int(os.environ.get("API_MAX_CONCURRENT_ORDERS", "4"))
 API_MAX_CONCURRENT_ANALYTICS = int(os.environ.get("API_MAX_CONCURRENT_ANALYTICS", "2"))
 

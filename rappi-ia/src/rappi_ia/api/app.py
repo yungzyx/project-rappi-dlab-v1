@@ -203,9 +203,10 @@ EMPTY_VERTICAL_FALLBACK = {"turbo": "conveniencia"}  # mismo tipo de tienda (min
 MAX_BEACON_BYTES = 512_000  # 200 eventos caben de sobra
 MAX_EVENT_VALUE = 100_000_000  # un evento con valor (cart_add) es una línea del carro: el mismo tope que su precio
 
-# Cupos por ruta cara (config.API_MAX_CONCURRENT_*): el de /agent/offer vive en agent.py. Las de la app rechazan al
-# tiro; el panel pide ~16 métricas a la vez y hace fila hasta su tope (el mismo que su statement_timeout).
-ASK_CAP = concurrency_cap("ask", config.API_MAX_CONCURRENT_ASK)
+# Cupos por ruta cara (config.API_MAX_CONCURRENT_*): el de /agent/offer vive en agent.py. /agent/ask y /agent/offer
+# hacen una fila corta (API_CAP_WAIT_S); la búsqueda y los pedidos rechazan al tiro; el panel pide ~16 métricas a la
+# vez y hace fila hasta su tope (el mismo que su statement_timeout).
+ASK_CAP = concurrency_cap("ask", config.API_MAX_CONCURRENT_ASK, wait_s=config.API_CAP_WAIT_S)
 SEARCH_CAP = concurrency_cap("search", config.API_MAX_CONCURRENT_SEARCH)
 ORDERS_CAP = concurrency_cap("orders", config.API_MAX_CONCURRENT_ORDERS)
 ANALYTICS_CAP = concurrency_cap(

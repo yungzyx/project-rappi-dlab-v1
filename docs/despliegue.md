@@ -98,6 +98,7 @@ Todas van en `/etc/rappi/rappi.env`, salvo las que fija `docker-compose.yml` o l
 | `API_POOL_MIN` / `API_POOL_MAX` | api (conexiones por worker) | `2` / `10` | `2` / `10` | no |
 | `API_POOL_TIMEOUT_S` | api (espera por una conexión; luego 503) | `3` | `3` | no |
 | `API_MAX_CONCURRENT_ASK` / `_SEARCH` / `_OFFER` / `_ORDERS` / `_ANALYTICS` | api (cupos por ruta cara) | `4` / `8` / `4` / `4` / `2` | — | no |
+| `API_CAP_WAIT_S` | api (fila de `/agent/ask` y `/agent/offer` sin cupo; luego 503) | `2` | — | no |
 | `API_MAX_BODY_BYTES` | api (413 si se pasa) | `524288` | — | no |
 | `API_RATE_PER_MIN` / `API_RATE_WRITE_PER_MIN` | api (por IP; 429; `0` = sin tope) | `120` / `60` | — | no |
 | `API_NEW_USERS_PER_IP_DAY` | api (`POST /session`; `0` = sin tope) | `20` | `200` para un evento | no |
