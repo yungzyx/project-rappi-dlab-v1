@@ -35,6 +35,7 @@ OWN_SIGNALS_ONLY = frozenset({"farmacia", "licores"})  # sin transición ni popu
 # combinación no se mezcla nada.
 LEARNED_RETENTION_PRIOR = 100
 LEARNED_RETENTION_MIN_USERS = 30
+MAX_RETENTION = 1 - 1e-9  # la retención esperada nunca llega a 1
 
 
 @dataclass(frozen=True)
@@ -233,22 +234,35 @@ def fine_churn_factor(fine: str) -> float:
     return factor * (1 - dim.service) ** len(services)
 
 
+def _group_of(fine: str) -> str:
+    """La combinación gruesa de los verticales del catálogo de una fina («ninguna» si solo hay servicios)."""
+    return combo_of_verticals(m for m in _members(fine) if m not in SERVICES)
+
+
 def _fine_expectation(
     fine: str,
     learned_coarse: dict[str, tuple[int, float]] | None,
     learned_fine: dict[str, tuple[int, float]] | None,
 ) -> tuple[float | None, bool]:
-    """`(retención esperada, ¿pesó la reducción del supuesto?)` de una combinación fina."""
+    """`(retención esperada, ¿pesó la reducción del supuesto?)` de una combinación fina.
+
+    Lo aprendido fino solo corrige la diferencia dentro del grupo; el nivel lo pone la combinación gruesa. Con al menos
+    `LEARNED_RETENTION_MIN_USERS` personas en la fila fina y en la gruesa aprendida de su grupo, la estimación aprendida
+    es la gruesa mezclada más (fina aprendida − gruesa aprendida), y pesa n/(n + 100) frente a la esperada con el
+    supuesto. Mezclar la fina aprendida directo arrastraba el nivel (la retención simulada queda bajo la de Rappi) más
+    en las combinaciones con muchas personas que en las con pocas, y eso daba vuelta la escalera gruesa."""
     members = _members(fine)
     catalog = [m for m in members if m not in SERVICES]
+    group = combo_of_verticals(catalog) if catalog else None
     if catalog:
-        prior = expected_retention(combo_of_verticals(catalog), learned_coarse)
+        prior = expected_retention(group, learned_coarse)
     elif SERVICE_COMBO in members:
         prior = expected_retention(SERVICE_COMBO, learned_coarse)
     elif not members:
         prior = expected_retention(NONE_COMBO, learned_coarse)
     else:  # solo RappiTravel: no está en la tabla de Rappi
         prior = None
+    coarse_blended = prior
     used = False
     factor = fine_churn_factor(fine)
     if prior is not None and factor < 1:  # con factor 1 no se recalcula: la gruesa queda tal cual, sin redondeo
@@ -258,6 +272,12 @@ def _fine_expectation(
     n, ret = (learned_fine or {}).get(fine, (0, 0.0))
     if n < LEARNED_RETENTION_MIN_USERS:
         return prior, used
+    group_n, group_ret = (learned_coarse or {}).get(group, (0, 0.0)) if group else (0, 0.0)
+    if group_n >= LEARNED_RETENTION_MIN_USERS:  # solo la diferencia dentro del grupo: el nivel es el de la gruesa
+        learned_estimate = coarse_blended + (ret - group_ret)
+        weight = n / (n + LEARNED_RETENTION_PRIOR)
+        return min(max((1 - weight) * prior + weight * learned_estimate, 0.0), MAX_RETENTION), used
+    # Sin gruesa aprendida del grupo (o solo servicios): la fina aprendida se mezcla tal cual.
     if prior is None:
         return ret, False
     return (prior * LEARNED_RETENTION_PRIOR + ret * n) / (LEARNED_RETENTION_PRIOR + n), used
@@ -269,9 +289,11 @@ def expected_fine_retention(
     learned_fine: dict[str, tuple[int, float]] | None = None,
 ) -> float | None:
     """La retención M+1 esperada de una combinación fina: 1 − (1 − gruesa)·`fine_churn_factor`, con la gruesa de
-    `expected_retention` de sus grupos (y `learned_coarse`); mezclada con la fina aprendida `(personas, retención)` de
-    `learned_fine` si hay al menos `LEARNED_RETENTION_MIN_USERS`. Solo servicios: Favor parte de la fila «favor» de
-    Rappi; solo Travel no tiene base (`None`, salvo que haya suficiente aprendido)."""
+    `expected_retention` de sus grupos (y `learned_coarse`). La fina aprendida `(personas, retención)` de `learned_fine`
+    solo corrige la diferencia dentro del grupo (el nivel lo pone la gruesa), con al menos `LEARNED_RETENTION_MIN_USERS`
+    personas en la fila fina y en la gruesa aprendida del grupo; sin gruesa aprendida, se mezcla tal cual. Solo
+    servicios: Favor parte de la fila «favor» de Rappi; solo Travel no tiene base (`None`, salvo que haya suficiente
+    aprendido)."""
     return _fine_expectation(fine, learned_coarse, learned_fine)[0]
 
 
@@ -284,19 +306,30 @@ def next_fine_step(
     """La vertical (o servicio) de `candidates` que más retención esperada suma a la combinación fina. Los candidatos
     vienen en el orden de preferencia de la persona, que desempata. Una vertical del catálogo que suma algo va antes que
     cualquier servicio; Farmacia y Licores nunca son paso. `None` si la persona no tiene pedidos, si su combinación no
-    tiene retención esperada o si nada suma."""
+    tiene retención esperada o si nada suma.
+
+    Dentro del mismo grupo grueso, un objetivo sin fina aprendida suficiente parte de la retención de la combinación
+    actual (con lo que se aprendió de ella) y solo le aplica la reducción del supuesto: 1 − (1 − actual)·(factor del
+    objetivo / factor de la actual). Así una corrección aprendida de la actual no detiene la escalera; sin nada
+    aprendido da lo mismo que calcular el objetivo desde cero."""
     if fine == NONE_COMBO:
         return None
     current, current_used = _fine_expectation(fine, learned_coarse, learned_fine)
     if current is None:
         return None
     have = set(_members(fine))
+    group = _group_of(fine)
     best: dict[bool, Step] = {}  # ¿es servicio? → mejor paso
     for vertical in candidates:
         if vertical in have or vertical in OWN_SIGNALS_ONLY:
             continue
         target = fine_key([*have, vertical])
-        expected, target_used = _fine_expectation(target, learned_coarse, learned_fine)
+        learned_target = (learned_fine or {}).get(target, (0, 0.0))[0] >= LEARNED_RETENTION_MIN_USERS
+        if _group_of(target) == group and not learned_target:
+            ratio = fine_churn_factor(target) / fine_churn_factor(fine)
+            expected, target_used = 1 - (1 - current) * ratio, ratio < 1
+        else:
+            expected, target_used = _fine_expectation(target, learned_coarse, learned_fine)
         if expected is None or expected <= current:
             continue
         step = Step(vertical, fine, target, expected - current, current_used or target_used)

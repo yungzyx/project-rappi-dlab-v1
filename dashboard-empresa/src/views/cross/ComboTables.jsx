@@ -79,9 +79,9 @@ function FineCombos({ fino, supuesto, nota, source }) {
         Supuesto propio, no es dato de Rappi: dentro de un grupo, cada vertical extra reduce la parte que no vuelve (la
         2.ª un {share(base)}, la 3.ª un {share(base * decay)}, la 4.ª un {share(base * decay * decay)}…) y cada servicio
         usado (RappiFavor, RappiTravel), un {share(servicio)}. Parte de la retención de la tabla de Rappi de sus grupos
-        y nunca llega a 100%. Con al menos {MIN_RETENTION_MONTHS} meses aprendidos de una combinación, el motor la
-        mezcla con lo aprendido: (esperada × 100 + aprendida × n) / (100 + n). La escalera propone la vertical que más
-        sube esa retención; Farmacia y Licores nunca.
+        y nunca llega a 100%. Con al menos {MIN_RETENTION_MONTHS} meses aprendidos de una combinación, lo aprendido solo
+        corrige la diferencia dentro del grupo (pesa n / (n + 100)); el nivel lo pone la combinación gruesa. La escalera
+        propone la vertical que más sube esa retención; Farmacia y Licores nunca.
       </p>
       {fino.length ? (
         <>

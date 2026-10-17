@@ -206,3 +206,53 @@ def test_next_fine_step_uses_learned_values():
     learned_fine = {"restaurantes+turbo": (400, 0.40)}  # lo aprendido le baja la ganancia a Turbo
     step = next_fine_step("restaurantes", ["turbo", "supermercado"], learned_fine=learned_fine)
     assert step.vertical == "supermercado"
+
+
+def test_learned_fine_only_corrects_within_the_group_so_the_coarse_ladder_holds():
+    # Como en la población simulada: todo lo aprendido queda bajo la tabla de Rappi, y Restaurantes + Súper (pocas
+    # personas) aprendió más que su grupo. Mezclar la fina directo hundía más a Restaurantes + Turbo (muchas personas)
+    # y la escalera proponía Súper; corrigiendo solo dentro del grupo, Turbo sigue primero.
+    learned_coarse = {"rest": (1577, 0.378), "rest+turbo": (209, 0.699), "rest+retail": (203, 0.690)}
+    learned_fine = {
+        "restaurantes": (1577, 0.378),
+        "restaurantes+turbo": (209, 0.699),
+        "restaurantes+supermercado": (57, 0.737),
+        "restaurantes+conveniencia": (108, 0.611),
+    }
+    step = next_fine_step("restaurantes", ["supermercado", "conveniencia", "turbo"], learned_coarse, learned_fine)
+    assert step.vertical == "turbo"
+    rest_turbo = (0.82 * 100 + 0.699 * 209) / 309  # igual a su grupo: el nivel es el de la gruesa mezclada
+    assert expected_fine_retention("restaurantes+turbo", learned_coarse, learned_fine) == pytest.approx(rest_turbo)
+    rest_retail = (0.76 * 100 + 0.690 * 203) / 303
+    w = 57 / 157
+    assert expected_fine_retention("restaurantes+supermercado", learned_coarse, learned_fine) == pytest.approx(
+        rest_retail + w * (0.737 - 0.690)
+    )
+
+
+def test_a_fine_row_above_its_group_raises_it():
+    fine = "restaurantes+turbo+supermercado+conveniencia"
+    coarse = {"rest+turbo+retail": (100, 0.90)}
+    blended = (0.93 + 0.90) / 2
+    assumed = 1 - (1 - blended) * 0.90
+    above = expected_fine_retention(fine, coarse, {fine: (100, 0.95)})
+    assert above == pytest.approx(0.5 * assumed + 0.5 * (blended + 0.05))
+    assert above > expected_fine_retention(fine, coarse)
+    assert expected_fine_retention(fine, coarse, {fine: (100, 0.85)}) < expected_fine_retention(fine, coarse)
+    assert expected_fine_retention(fine, {"rest+turbo+retail": (10_000, 0.0)}, {fine: (10_000, 1.0)}) < 1
+
+
+def test_a_learned_correction_of_the_current_combo_does_not_stall_the_ladder():
+    # Restaurantes + Turbo + Súper aprendió más que su grupo; Express no tiene fina aprendida: parte de la actual y le
+    # aplica la reducción del supuesto (la 2.ª de Retail quita 10 % de lo que no vuelve).
+    fine = "restaurantes+turbo+supermercado"
+    learned_coarse = {"rest+turbo+retail": (116, 0.914)}
+    learned_fine = {fine: (37, 0.946)}
+    current = expected_fine_retention(fine, learned_coarse, learned_fine)
+    step = next_fine_step(fine, ["conveniencia", "mall"], learned_coarse, learned_fine)
+    assert (step.vertical, step.used_assumption) == ("conveniencia", True)
+    assert step.gain == pytest.approx((1 - current) * 0.10)
+    # Sin nada aprendido, partir de la actual o desde cero da lo mismo.
+    assert next_fine_step(fine, ["conveniencia"]).gain == pytest.approx(
+        expected_fine_retention(fine + "+conveniencia") - expected_fine_retention(fine)
+    )
