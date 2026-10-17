@@ -368,7 +368,11 @@ _COMBOS = load_combos()
 _SHARES = {combo: row.pct_users for combo, row in _COMBOS.rappi.items() if combo != SERVICE_COMBO}
 # Cuánto se corrige el sorteo de cada arquetipo al darse de alta para que la mezcla de personas-mes (la que mide el
 # motor) se parezca a la de la tabla: quien combina grupos vive más meses, pasa meses en un solo grupo y las sugerencias
-# aceptadas llevan a quien solo pide en Restaurantes a combinar. Ajustado con scripts/calibrar_simulados.py.
+# aceptadas llevan a quien solo pide en Restaurantes a combinar. Ajustado el 17-10-2026 con
+# `scripts/calibrar_simulados.py --base rappi_staging --ajustar --altas 12000 --hasta 2026-10-17` (semilla FIT_SEED =
+# 101) sobre el catálogo de rappi_staging de esa noche, mientras se reetiquetaban sus conceptos: la misma orden, más
+# tarde, dio factores algo distintos (rest+retail 0,15, turbo+retail 0,13), y con estos cada fila siguió a menos de
+# 1,2 puntos de la tabla (docs/resultados/simulados-2026-10-17.md).
 ARCHETYPE_CALIBRATION: dict[str, float] = {
     "rest": 1.15,
     "turbo": 0.87,
@@ -525,7 +529,8 @@ def _unofferable(conn: Connection, items: dict[tuple[str, str], list]) -> set[tu
 
 
 def draw_archetype(rng: random.Random) -> str:
-    """Una combinación de grupos sorteada con la mezcla de la tabla de Rappi."""
+    """Una combinación de grupos sorteada con la mezcla calibrada (ARCHETYPES): la de la tabla de Rappi por
+    ARCHETYPE_CALIBRATION."""
     return rng.choices(list(ARCHETYPES), weights=list(ARCHETYPES.values()))[0]
 
 

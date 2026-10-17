@@ -249,8 +249,9 @@ def _fine_expectation(
     Lo aprendido fino solo corrige la diferencia dentro del grupo; el nivel lo pone la combinación gruesa. Con al menos
     `LEARNED_RETENTION_MIN_USERS` personas en la fila fina y en la gruesa aprendida de su grupo, la estimación aprendida
     es la gruesa mezclada más (fina aprendida − gruesa aprendida), y pesa n/(n + 100) frente a la esperada con el
-    supuesto. Mezclar la fina aprendida directo arrastraba el nivel (la retención simulada queda bajo la de Rappi) más
-    en las combinaciones con muchas personas que en las con pocas, y eso daba vuelta la escalera gruesa."""
+    supuesto. Mezclar la fina aprendida directo arrastraba el nivel (la retención simulada queda bajo la de Rappi: desde
+    el 17-10, hasta 0,063 en 6 de las 7 filas; antes, hasta 0,097) más en las combinaciones con muchas personas que en
+    las con pocas, y eso daba vuelta la escalera gruesa."""
     members = _members(fine)
     catalog = [m for m in members if m not in SERVICES]
     group = combo_of_verticals(catalog) if catalog else None

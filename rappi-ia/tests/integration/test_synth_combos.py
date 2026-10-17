@@ -65,11 +65,14 @@ def test_activity_does_not_collapse_at_the_end(simulated):
 
 
 def test_the_mix_and_the_retention_track_the_rappi_table(simulated):
-    """Medido como el motor (personas-mes, nivel grueso): cada combinación queda a 4 puntos de su parte en la tabla de
-    Rappi sin Favor, Restaurantes es la mayor, rest+turbo+retail retiene más que todas y cada combinación de dos o más
-    grupos retiene más que cada una de un solo grupo; la retención de Restaurantes queda a 0,1 de la de Rappi. Con el
-    catálogo real (scripts/calibrar_simulados.py, 3.000 personas, 5 semillas) cada fila queda a menos de 2 puntos; el
-    de prueba es chico y muchas búsquedas no encuentran nada, así que aquí la tolerancia es más holgada."""
+    """Medido como el motor (personas-mes, nivel grueso), sobre el catálogo de prueba: la retención de Restaurantes
+    queda a 0,1 de la de Rappi, rest+turbo+retail retiene más que todas y cada combinación de dos o más grupos retiene
+    más que cada una de un solo grupo. Esta prueba cuida la retención y las regresiones gruesas de la mezcla, no la
+    calibración fina: el catálogo de prueba es chico, muchas búsquedas no encuentran nada y la mezcla queda a 3,7 puntos
+    en la peor fila (Restaurantes, 70,7 % contra 67,0 %); el generador anterior a la calibración quedaba a 3,3, así que
+    la mezcla (a 4 puntos, Restaurantes la mayor) no los distingue, y la retención sí (0,315 contra 0,47). La
+    calibración se revisa con el catálogo real: scripts/calibrar_simulados.py (3.000 personas, 5 semillas: cada fila a
+    menos de 2 puntos)."""
     stats = combo_stats(combo_months(load_orders(simulated, "synthetic")))
     rappi = {c: r for c, r in load_combos().rappi.items() if c != SERVICE_COMBO}
     total = sum(r.pct_users for r in rappi.values())

@@ -17,7 +17,15 @@ Lo demás queda igual: semilla y determinismo, 3.000 personas por defecto (el ge
 
 ### Factores ajustados
 
-| Arquetipo | Personas-mes por alta | Tabla sin Favor % | Alta ajustada % | Factor |
+Orden exacta (desde `rappi-ia/`, semilla de las altas `FIT_SEED = 101`; `--hasta` es obligatoria al ajustar):
+
+```
+.venv/bin/python scripts/calibrar_simulados.py --base rappi_staging --ajustar --altas 12000 --hasta 2026-10-17
+```
+
+Catálogo: el de `rappi_staging` en la noche del 17-10-2026, **mientras otro proceso reetiquetaba sus conceptos**, así que no se puede reconstruir tal cual. La misma orden, repetida más tarde esa noche, dio factores algo distintos (rest 1,16 · turbo 0,86 · rest+turbo 0,66 · retail 1,15 · rest+retail 0,15 · rest+turbo+retail 0,67 · turbo+retail 0,13). Con los factores guardados y ese catálogo posterior, cada fila siguió a menos de 1,2 puntos de la tabla en las cinco semillas (distancia 1,7 a 3,9): la tolerancia se cumple con los dos catálogos. Las cifras de abajo son del primero.
+
+| Arquetipo | Personas-mes por alta | Rappi sin Favor % (dato compartido por Rappi) | Alta ajustada % | Factor |
 |---|---:|---:|---:|---:|
 | rest | 1,35 | 67,0 | 77,2 | 1,15 |
 | turbo | 1,40 | 7,3 | 6,3 | 0,87 |
@@ -40,7 +48,7 @@ Se fijó antes de medir el resultado:
 
 Promedio de las semillas 7, 11, 23, 31 y 47, con el rango entre semillas.
 
-| Combinación | Rappi | Rappi sin Favor | Antes | Después |
+| Combinación | Rappi % (dato compartido por Rappi) | Rappi sin Favor % | Antes (simulado) | Después (simulado) |
 |---|---:|---:|---:|---:|
 | rest | 62,6 | 67,0 | 57,4 (56,4 a 58,5) | **66,9** (65,2 a 68,5) |
 | turbo | 6,8 | 7,3 | 9,4 (8,8 a 10,1) | **7,2** (6,1 a 8,6) |
@@ -60,7 +68,7 @@ Promedio de las semillas 7, 11, 23, 31 y 47, con el rango entre semillas.
 
 Retención de todas las semillas juntas (meses con el siguiente completo); entre paréntesis, el rango entre semillas.
 
-| Combinación | Rappi | Antes | Después |
+| Combinación | Rappi (dato compartido por Rappi) | Antes (simulado) | Después (simulado) |
 |---|---:|---:|---:|
 | rest+turbo+retail | 0,93 | 0,906 (0,870 a 0,926) | **0,901** (0,868 a 0,922) |
 | rest+turbo | 0,82 | 0,723 (0,675 a 0,753) | **0,779** (0,767 a 0,792) |
@@ -70,7 +78,7 @@ Retención de todas las semillas juntas (meses con el siguiente completo); entre
 | rest | 0,47 | 0,383 (0,365 a 0,397) | **0,460** (0,452 a 0,468) |
 | retail | 0,41 | 0,356 (0,339 a 0,372) | **0,421** (0,314 a 0,487) |
 
-**Cumple:** rest+turbo+retail es la más alta en las cinco semillas y cada combinación de dos o más grupos retiene más que cada una de un solo grupo en todas. El orden de Rappi se conserva en todos los pares que Rappi separa por 0,05 o más. Los dos pares más juntos en la tabla se dan vuelta en el total: turbo+retail y rest+retail (0,80 y 0,76 en Rappi; 0,737 y 0,741) y turbo y rest (0,50 y 0,47; 0,446 y 0,460). Están dentro del ruido: turbo+retail tiene 45 a 66 meses por semilla. En el total, cada fila queda a 0,063 o menos de la de Rappi (antes, hasta 0,097); todavía un poco bajo, por el riesgo extra de quien no encuentra lo que busca o abandona carros (`CHURN_*`).
+**Cumple:** rest+turbo+retail es la más alta en las cinco semillas y cada combinación de dos o más grupos retiene más que cada una de un solo grupo en todas. El orden de Rappi se conserva en todos los pares que Rappi separa por 0,05 o más. Los dos pares más juntos en la tabla se dan vuelta en el total: turbo+retail y rest+retail (0,80 y 0,76 en Rappi; 0,737 y 0,741) y turbo y rest (0,50 y 0,47; 0,446 y 0,460). Están dentro del ruido: turbo+retail tiene 45 a 66 meses por semilla. En el total, cada fila queda a 0,063 o menos de la de Rappi, bajo ella en 6 de las 7 (retail, 0,011 sobre; antes, hasta 0,097 bajo); todavía un poco bajo, por el riesgo extra de quien no encuentra lo que busca o abandona carros (`CHURN_*`).
 
 **Lo que no se calibró:** los pedidos por persona de las combinaciones de varios grupos quedan bajo la tabla (rest+turbo 3,9 contra 5,5; rest+turbo+retail 8,4 contra 10,5 en la semilla 7), porque los meses de alta y de salida son parciales.
 
@@ -115,4 +123,4 @@ La retención fina aprendida sigue siendo circular (el generador simula con la m
 
 ## La prueba que lo cuida
 
-`tests/integration/test_synth_combos.py::test_the_mix_and_the_retention_track_the_rappi_table` corre el generador con 1.800 personas (semilla 3) sobre el catálogo inventado de la demo y pide cada fila a 4 puntos de la tabla, Restaurantes la mayor, rest+turbo+retail la que más retiene, cada combinación de varios grupos sobre cada una de un solo grupo y la retención de Restaurantes a 0,1 de la de Rappi. Con el generador anterior falla en esta última (0,315 contra 0,47). El catálogo de prueba es chico y muchas búsquedas no encuentran nada, así que la tolerancia es más holgada que la del catálogo real; la de arriba se revisa con `scripts/calibrar_simulados.py`.
+`tests/integration/test_synth_combos.py::test_the_mix_and_the_retention_track_the_rappi_table` corre el generador con 1.800 personas (semilla 3) sobre el catálogo inventado de la demo. Cuida la **retención** (la de Restaurantes a 0,1 de la de Rappi, rest+turbo+retail la más alta, cada combinación de varios grupos sobre cada una de un solo grupo) y las **regresiones gruesas de la mezcla** (cada fila a 4 puntos, Restaurantes la mayor), no la calibración fina. Con el catálogo de prueba, chico y con muchas búsquedas sin resultado, la peor fila del generador nuevo queda a 3,7 puntos (Restaurantes) y la del anterior a 3,3: la mezcla no los distingue ahí, y no se puede ajustar más la tolerancia. La retención sí: con el generador anterior la de Restaurantes da 0,315 y la prueba falla. La calibración fina se revisa con el catálogo real y `scripts/calibrar_simulados.py`.

@@ -13,6 +13,7 @@ import pytest
 
 from rappi_ia.concepts.taxonomy import load_taxonomy
 from rappi_ia.events import synth
+from rappi_ia.motor.combos import SERVICE_COMBO, load_combos
 
 ASIAN_CONCEPTS = {"sushi", "asiatica", "despensa-asiatica", "bebidas-asiaticas", "snacks-asiaticos"}
 ASIAN_VERTICALS = {"restaurantes", "supermercado", "turbo", "conveniencia"}
@@ -108,24 +109,20 @@ def test_the_generator_is_deterministic_with_the_same_seed():
 
 
 def test_archetypes_follow_rappi_shares_with_the_calibration():
-    """El sorteo de las altas es la parte de cada combinación en la tabla de Rappi (sin Favor) por su factor de
-    calibración: la mezcla que se parece a la de Rappi es la de personas-mes, no la de altas."""
+    """El sorteo de las altas es la parte de cada combinación en la tabla de Rappi (combos.toml, sin Favor) por su
+    factor de calibración: la mezcla que se parece a la de Rappi es la de personas-mes, no la de altas. Restaurantes
+    sigue siendo la mayoría de las altas."""
+    shares = {c: r.pct_users for c, r in load_combos().rappi.items() if c != SERVICE_COMBO}
+    assert set(synth.ARCHETYPE_CALIBRATION) == set(shares)
+    weights = {c: share * synth.ARCHETYPE_CALIBRATION[c] for c, share in shares.items()}
+    expected = {c: w / sum(weights.values()) for c, w in weights.items()}
+    assert pytest.approx(expected) == synth.ARCHETYPES
+    assert max(synth.ARCHETYPES, key=synth.ARCHETYPES.get) == "rest"
     rng = random.Random(1)
     n = 20000
     counts = Counter(synth.draw_archetype(rng) for _ in range(n))
-    shares = {"rest": 62.6, "turbo": 6.8, "rest+turbo": 6.6, "retail": 5.6, "rest+retail": 5.4,
-              "rest+turbo+retail": 4.7, "turbo+retail": 1.7}  # fmt: skip
-    weights = {c: share * synth.ARCHETYPE_CALIBRATION[c] for c, share in shares.items()}
-    assert counts["rest"] / n == pytest.approx(weights["rest"] / sum(weights.values()), abs=0.015)
-    assert set(counts) == set(shares) == set(synth.ARCHETYPE_CALIBRATION)
-    assert sum(synth.ARCHETYPES.values()) == pytest.approx(1)
-
-
-def test_the_calibration_only_corrects_the_table():
-    """Los factores corrigen la tabla sin darla vuelta del todo: quien solo pide en Restaurantes sigue siendo la
-    mayoría de las altas y cada arquetipo de la tabla sigue apareciendo."""
-    assert max(synth.ARCHETYPES, key=synth.ARCHETYPES.get) == "rest"
-    assert all(0 < factor < 2 for factor in synth.ARCHETYPE_CALIBRATION.values())
+    assert set(counts) == set(shares)
+    assert counts["rest"] / n == pytest.approx(expected["rest"], abs=0.015)
 
 
 def test_effective_interests_stay_in_the_archetype_groups():

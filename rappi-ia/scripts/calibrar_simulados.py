@@ -4,7 +4,7 @@ escribir en la base.
 Corre `events.synth.generate` en memoria con el catálogo de la base (leído en una transacción de solo lectura) y una
 conexión falsa que guarda lo que se copiaría; mide como el motor (`combo_months` y `combo_stats`, nivel grueso).
 
-- Sin `--ajustar`: la parte de personas-mes, la retención M+1 y los pedidos por persona de cada combinación, por
+- Sin `--ajustar`: la parte de personas-mes y la retención M+1 de cada combinación, por
   semilla, junto a la tabla de Rappi sin Favor (renormalizada a 100, porque Favor no tiene catálogo).
 - Con `--ajustar`: simula `--altas` personas de cada arquetipo por separado (cada persona se simula sola, así que los
   meses que deja un alta de un arquetipo no dependen de la mezcla), arma la matriz arquetipo × combinación y busca los
@@ -13,7 +13,10 @@ conexión falsa que guarda lo que se copiaría; mide como el motor (`combo_month
 
 Uso (desde rappi-ia/):
     .venv/bin/python scripts/calibrar_simulados.py --base rappi_staging --semillas 7 11 23
-    .venv/bin/python scripts/calibrar_simulados.py --base rappi_staging --ajustar
+    .venv/bin/python scripts/calibrar_simulados.py --base rappi_staging --ajustar --altas 12000 --hasta 2026-10-17
+
+Con `--ajustar`, `--hasta` es obligatoria (el ajuste depende de la ventana) y la semilla es FIT_SEED: con el mismo
+catálogo, la misma orden da los mismos factores.
 
 Simulado: no es evidencia. No se importa desde el paquete.
 """
@@ -27,6 +30,8 @@ from rappi_ia.events import synth
 from rappi_ia.motor.combos import SERVICE_COMBO, load_combos
 from rappi_ia.motor.data import Order
 from rappi_ia.motor.model import combo_months, combo_stats
+
+FIT_SEED = 101  # semilla de las altas por arquetipo al ajustar
 
 
 class _CaptureConn:
@@ -96,7 +101,7 @@ def fit(catalog: synth.Catalog, users: int, until: date) -> None:
     combos = list(goal)
     months = np.zeros((len(combos), len(combos)))  # arquetipo × combinación: personas-mes por alta
     for i, archetype in enumerate(combos):
-        for m in combo_months(simulate(catalog, users, 101, until, archetype)):
+        for m in combo_months(simulate(catalog, users, FIT_SEED, until, archetype)):
             months[i, combos.index(m.combo)] += 1
     months /= users
     t = np.array([goal[c] for c in combos])
@@ -118,10 +123,12 @@ def main() -> None:
     parser.add_argument("--base", default="rappi_staging", help="base de la que se lee el catálogo")
     parser.add_argument("--semillas", type=int, nargs="+", default=[7, 11, 23])
     parser.add_argument("--usuarios", type=int, default=synth.DEFAULT_USERS, help="personas por semilla al medir")
-    parser.add_argument("--hasta", type=date.fromisoformat, default=date.today(), help="fecha final AAAA-MM-DD")
+    parser.add_argument("--hasta", type=date.fromisoformat, help="fecha final AAAA-MM-DD (al medir, por defecto hoy)")
     parser.add_argument("--ajustar", action="store_true", help="ajusta ARCHETYPE_CALIBRATION")
     parser.add_argument("--altas", type=int, default=12000, help="personas por arquetipo al ajustar")
     args = parser.parse_args()
+    if args.ajustar and args.hasta is None:
+        parser.error("--ajustar necesita --hasta: los factores dependen de la ventana simulada")
     with psycopg.connect(f"postgresql:///{args.base}") as conn:
         conn.read_only = True
         catalog = synth.load_catalog(conn)
@@ -129,7 +136,7 @@ def main() -> None:
     if args.ajustar:
         fit(catalog, args.altas, args.hasta)
     else:
-        measure(catalog, args.semillas, args.usuarios, args.hasta)
+        measure(catalog, args.semillas, args.usuarios, args.hasta or date.today())
 
 
 if __name__ == "__main__":
