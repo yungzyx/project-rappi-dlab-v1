@@ -1,6 +1,7 @@
-"""Los triggers de las migraciones 032 y 038 contra escrituras al azar (semilla fija): después de cada paso,
+"""Los triggers de las migraciones 032, 038 y 039 contra escrituras al azar (semilla fija): después de cada paso,
 latest_prices, latest_menu_prices y store_last_snapshot son exactamente el último snapshot de cada SKU, de cada plato y
-de cada tienda según el historial."""
+de cada tienda según el historial, y v_store_format_runs (la corrida de cada formato) da lo mismo que su definición
+original (migración 019), con tiendas que cambian de formato."""
 
 import random
 from datetime import UTC, datetime, timedelta
@@ -24,12 +25,25 @@ STORE_LAST = "SELECT store_id, run_id, scraped_at FROM store_last_snapshot"
 HISTORY_STORE = """
 SELECT DISTINCT ON (store_id) store_id, run_id, scraped_at
 FROM price_snapshots ORDER BY store_id, scraped_at DESC, run_id DESC"""
+# v_store_format_runs de la migración 019.
+HISTORY_FORMAT_RUNS = """
+WITH last AS (
+    SELECT s.store_id, COALESCE(s.store_type, 'id:' || s.store_id) AS format, l.run_id, l.scraped_at
+    FROM stores s
+    CROSS JOIN LATERAL (SELECT ps.run_id, ps.scraped_at FROM price_snapshots ps WHERE ps.store_id = s.store_id
+                        ORDER BY ps.scraped_at DESC, ps.run_id DESC LIMIT 1) l
+)
+SELECT store_id, format,
+       first_value(run_id) OVER (PARTITION BY format ORDER BY scraped_at DESC, run_id DESC) AS format_run_id
+FROM last"""
 
 
 def _assert_matches_history(db, step) -> None:
     assert set(db.execute(LATEST).fetchall()) == set(db.execute(HISTORY).fetchall()), step
     assert set(db.execute(LATEST_MENU).fetchall()) == set(db.execute(HISTORY_MENU).fetchall()), step
     assert set(db.execute(STORE_LAST).fetchall()) == set(db.execute(HISTORY_STORE).fetchall()), step
+    format_runs = "SELECT * FROM v_store_format_runs"
+    assert set(db.execute(format_runs).fetchall()) == set(db.execute(HISTORY_FORMAT_RUNS).fetchall()), step
 
 
 def test_latest_prices_always_match_the_history(db):
@@ -94,6 +108,10 @@ def test_latest_prices_always_match_the_history(db):
         else:  # borrar una corrida entera (en cascada) y abrir otra
             db.execute("DELETE FROM scrape_runs WHERE run_id = %s", (run,))
             runs[runs.index(run)] = repository.start_run(db, "stores", {})
+        if rnd.random() < 0.15:  # una tienda cambia de formato: sola, o junto a la otra
+            db.execute(
+                "UPDATE stores SET store_type = %s WHERE store_id = %s", (rnd.choice((None, "x", "y")), store_id)
+            )
         _assert_matches_history(db, step)
 
     assert db.execute("SELECT count(*) FROM latest_prices").fetchone()[0] > 0  # no es una comprobación vacía
