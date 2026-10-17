@@ -89,6 +89,8 @@ CONTRACT: tuple[Example, ...] = (
     Example("catalog-home", "GET", "/catalog/home"),
     Example("search-grouped", "GET", "/search?q=cerveza"),
     Example("search-grouped-unmet", "GET", "/search?q=xyzzy"),
+    # La pizzería tiene platos populares: el primero de sus platos trae lo más pedido según su menú (`top_dishes`).
+    Example("search-grouped-restaurantes", "GET", "/search?q=pizza"),
     Example(
         "agent-ask",
         "POST",

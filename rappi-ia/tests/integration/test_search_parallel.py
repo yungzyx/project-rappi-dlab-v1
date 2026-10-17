@@ -24,6 +24,7 @@ from rappi_ia.db import connect
 from rappi_ia.demo.seed import seed_demo
 from rappi_ia.embeddings.base import HashEmbedder
 from rappi_ia.embeddings.text_store import embed_search_documents
+from rappi_ia.offers.engine import with_top_dishes
 from rappi_ia.retrieval.hybrid import RetrievalResult
 
 # Con concepto (sus verticales típicas), con ocasión, sin ninguno (las 8 verticales) y sin resultado.
@@ -107,8 +108,13 @@ def spares(monkeypatch):
 
 
 def _serial(test_url, q: str) -> dict:
+    """Lo que responde /search buscando en serie: los grupos y, en restaurantes, lo más pedido (como la API)."""
     with connect(test_url) as conn:
-        return search_grouped(conn, q, HashEmbedder(), None, 6).to_dict()
+        grouped = search_grouped(conn, q, HashEmbedder(), None, 6).to_dict()
+        for group in grouped["groups"]:
+            if group["vertical"] == "restaurantes":
+                group["products"] = with_top_dishes(conn, group["products"])
+        return grouped
 
 
 def test_with_a_free_pool_the_groups_are_the_same_as_in_series(catalog, test_url, make_pool, client, spares):

@@ -35,8 +35,13 @@ producto es de una marca que la persona compra lo dice en el `text` y suma esa s
 (`offers/profiles.py`):
 la evidencia de sus segmentos (`source` «segmento:<id>», el peso de su nivel como `score`) y lo que pidió y buscó
 (`source` «pedidos» o «busquedas», cuántas veces como `score`).
+
+Bajo un restaurante que el agente propone (`vertical_por_probar` y el peldaño de restaurantes de `perfil`), el primer
+plato de cada local trae `top_dishes` si su menú en Rappi dice qué es lo más pedido (`with_top_dishes`); el buscador
+hace lo mismo con sus resultados de restaurantes.
 """
 
+import re
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 
@@ -274,7 +279,10 @@ def make_offer(
     if moment == "sin_resultado":
         return where_is_it(conn, embedder, context["query"])
     if moment == "vertical_por_probar":
-        return vertical_to_try(conn, embedder, tried_verticals(conn, user_id), user_interests(conn, user_id), user_id)
+        found = vertical_to_try(conn, embedder, tried_verticals(conn, user_id), user_interests(conn, user_id), user_id)
+        if found is not None and found.vertical == "restaurantes":  # un local nuevo: lo más pedido ayuda a elegir
+            found.products = with_top_dishes(conn, found.products)
+        return found
     if moment == "recompra":
         return repeat_offer(conn, embedder, user_id)
     if moment == "perfil":
@@ -866,10 +874,14 @@ def profile_offer(
         actions.append(
             {"label": OPEN_ACTION.format(vertical=travel.name), "route": [travel.route], "service": travel.id}
         )
+    shown_steps = [s.to_dict() for s in steps]
+    for step in shown_steps:  # los restaurantes de la escalera son locales que la persona no conoce
+        if step["vertical"] == "restaurantes":
+            step["products"] = with_top_dishes(conn, step["products"])
     return ProfileOffer(
         _profile_text(profile),
         shown,
-        [s.to_dict() for s in steps],
+        shown_steps,
         trip,
         _profile_reason(profile, active),
         actions,
@@ -992,6 +1004,96 @@ def _find_popular_dishes(conn: Connection) -> list[dict]:
         if len(products) >= SHOWN_PRODUCTS:
             break
     return products
+
+
+# ── lo más pedido de un restaurante ──────────────────────────────────────────
+# Lo que dice su propio menú público en Rappi: los platos que Rappi marca populares (`is_popular`) y los de una sección
+# del menú que se llama como lo más pedido («Más vendidos», «Los más pedidos», «Más populares», «Top 5»). No hay otro
+# dato honesto por restaurante: los pedidos simulados eligen casi siempre un solo plato por local (lo que hace el
+# generador, no la gente) y los del prototipo son unos pocos. En la base real del 17-10, 36 de 3.684 restaurantes
+# (1 %) tienen 2 platos o más así; a los demás no se les inventa una lista.
+TOP_DISHES = 3  # platos que se muestran bajo un restaurante
+TOP_DISHES_MIN = 2  # con menos, no hay lista
+TOP_DISHES_SOURCE = "menu_rappi"
+TOP_DISHES_LABEL = "Lo más pedido, según su menú en Rappi"
+# Sobre el nombre normalizado de la sección (`text.normalize`): «Màs Vendidos», «Los 15 más pedidos de la casa».
+_TOP_SECTION = re.compile(r"\bmas (pedid|vendid|popular)|^top \d+$|^(los )?populares$")
+# Las secciones candidatas (la búsqueda fina es `_TOP_SECTION`) y los platos populares, con su último precio.
+_TOP_DISH_ROWS = """
+WITH candidates AS (
+    SELECT mi.item_id FROM menu_sections ms
+    JOIN menu_items mi ON mi.store_id = ms.store_id AND mi.section_id = ms.section_id
+    WHERE ms.name ~* '(pedid|vendid|popular|top)'
+    UNION
+    SELECT item_id FROM menu_items WHERE is_popular
+)
+SELECT mi.store_id, mi.item_id::text, mi.name, mp.price, mp.real_price, s.name, NULLIF(mi.image_url, ''),
+       ic.concept_id, mi.is_popular, ms.name
+FROM candidates c
+JOIN menu_items mi ON mi.item_id = c.item_id
+JOIN stores s ON s.store_id = mi.store_id
+JOIN latest_menu_prices mp ON mp.item_id = mi.item_id
+LEFT JOIN menu_sections ms ON ms.store_id = mi.store_id AND ms.section_id = mi.section_id
+LEFT JOIN item_concepts ic ON ic.entity_type = 'menu_item' AND ic.entity_id = mi.item_id::text
+WHERE mp.price >= %(min_price)s
+ORDER BY mi.store_id, mi.is_popular DESC, ms.position, ms.section_id, mi.rappi_item_id, mi.item_id"""
+
+
+def with_top_dishes(conn: Connection, products: list[dict]) -> list[dict]:
+    """Los `products` (`Product.to_dict()`) con `top_dishes` en el primer plato de cada restaurante que tiene lo más
+    pedido según su menú (`top_dishes`): `{source, label, dishes}`, de 2 a `TOP_DISHES` platos sin el de la tarjeta.
+    No modifica los que recibe (pueden ser de la caché): devuelve copias de los que cambian."""
+    if not any(p.get("entity_type") == "menu_item" for p in products):
+        return products
+    known = top_dishes(conn)
+    seen: set[int] = set()
+    shown = []
+    for product in products:
+        store_id = product.get("store_id")
+        if product.get("entity_type") == "menu_item" and store_id in known and store_id not in seen:
+            seen.add(store_id)
+            dishes = [d for d in known[store_id] if d["id"] != product["id"]][:TOP_DISHES]
+            if len(dishes) >= TOP_DISHES_MIN:
+                product = {
+                    **product,
+                    "top_dishes": {"source": TOP_DISHES_SOURCE, "label": TOP_DISHES_LABEL, "dishes": dishes},
+                }
+        shown.append(product)
+    return shown
+
+
+def top_dishes(conn: Connection) -> dict[int, list[dict]]:
+    """store_id → lo más pedido de ese restaurante según su menú en Rappi (`_TOP_SECTION`, `is_popular`): hasta
+    `TOP_DISHES` + 1 platos con su último precio (`latest_menu_prices`), los populares primero y después en el orden del
+    menú, que pasan las guardias de las ofertas (ni un nombre que dice alcohol, ni de una sección de tragos, ni de un
+    concepto que el agente no propone, ni de una tienda que no se empuja). Solo los restaurantes con `TOP_DISHES_MIN` o
+    más. Es dato del catálogo: sale de su caché (catalog/cache.py)."""
+    return cached("top_dishes", conn, lambda: _find_top_dishes(conn))
+
+
+def _find_top_dishes(conn: Connection) -> dict[int, list[dict]]:
+    taxonomy = load_taxonomy()
+    found: dict[int, list[dict]] = {}
+    for store_id, *row, popular, section in conn.execute(_TOP_DISH_ROWS, {"min_price": MIN_PRICE}):
+        if not (popular or _TOP_SECTION.search(normalize(section or ""))) or alcohol_section(section):
+            continue
+        id_, name, price, real, store, image, concept = row
+        dish = product_card(
+            (id_, name, price, real, image, None, False, concept),
+            "restaurantes",
+            store,
+            store_id,
+            taxonomy,
+            "menu_item",
+        )
+        if dish.price_value is not None:
+            found.setdefault(store_id, []).append(dish.to_dict())
+    offerable = _offerable_products(conn, [d for dishes in found.values() for d in dishes])
+    kept: dict[int, list[dict]] = {}
+    for dish in offerable:
+        if len(kept.setdefault(dish["store_id"], [])) <= TOP_DISHES:
+            kept[dish["store_id"]].append(dish)
+    return {store_id: dishes for store_id, dishes in kept.items() if len(dishes) >= TOP_DISHES_MIN}
 
 
 def _context_signal(kind: str, signal_id: str) -> dict:
