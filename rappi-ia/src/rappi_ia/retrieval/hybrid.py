@@ -203,9 +203,9 @@ def _lexical(
     """Cualquier palabra de la consulta (OR), puntuada por IDF dentro del vertical: las palabras raras pesan más.
 
     Sin IDF, una unidad como "g" (presente en miles de productos) tapaba a "pañales" en "pañales talla g".
-    ts_rank_cd solo desempata (palabras más juntas, más arriba). Cada lexema ya normalizado entra al tsquery tal
-    cual (`::tsquery`): `to_tsquery` lo volvía a separar ("coca-col" → 'coca-col' <-> 'coca' <-> 'col', y 'coca'
-    no existe en el índice), así que las palabras con guion perdían su peso.
+    ts_rank_cd pesa poco (≈0,1 por aparición; palabras más juntas, más arriba). Cada lexema ya normalizado entra al
+    tsquery tal cual (`::tsquery`): `to_tsquery` lo volvía a separar ("coca-col" → 'coca-col' <-> 'coca' <-> 'col',
+    y 'coca' no existe en el índice), así que las palabras con guion perdían su peso.
 
     El df de cada lexema sale de la caché del catálogo (`_document_frequencies`): contarlo en cada búsqueda costaba
     tanto como puntuar con una palabra frecuente («sushi» en restaurantes, ~45 mil documentos).
@@ -222,8 +222,9 @@ def _lexical(
     Con más de una palabra, en dos etapas: primero ordena por la suma de IDF (barata) y se queda con los
     LEXICAL_RANK_POOL mejores más los que empatan con el último (`WITH TIES`: un empate no se corta al azar); recién
     ahí suma ts_rank_cd, lo caro (~2 µs por documento: «sushi roll wok chapsui» calza 49 mil platos). La segunda etapa
-    vuelve a leer cada documento por su `ctid` (la misma fila, en la misma consulta): arrastrar el tsvector en el orden
-    lo mandaba a disco. Como ts_rank_cd solo desempata, el orden es el mismo salvo que un documento con menos IDF lo
+    vuelve a leer cada documento por su `ctid` y su partición (`tableoid`: un ctid solo es único dentro de una), la
+    misma fila en la misma consulta: arrastrar el tsvector en el orden lo mandaba a disco. Como ts_rank_cd pesa poco
+    (≈0,1 por aparición, contra un IDF de 1,5 o más), el orden es el mismo salvo que un documento con menos IDF lo
     supere por ts_rank_cd desde fuera de los primeros mil. Con una sola palabra todos tienen el mismo IDF: una etapa.
     """
     lexemes = _lexemes(conn, query)
@@ -259,14 +260,14 @@ def _lexical(
     else:
         sql = f"""{weights},
             best AS MATERIALIZED (
-                SELECT d.ctid AS row_id, d.entity_type, d.entity_id, {idf} AS idf
+                SELECT d.tableoid AS tbl, d.ctid AS row_id, d.entity_type, d.entity_id, {idf} AS idf
                 {matching}
                 ORDER BY idf DESC
                 FETCH FIRST %(pool)s ROWS WITH TIES
             )
             SELECT b.entity_type, b.entity_id, b.idf + ts_rank_cd(d.tsv_unaccent, any_q.q) AS score
             FROM best b
-            JOIN search_documents d ON d.vertical = %(vertical)s AND d.ctid = b.row_id
+            JOIN search_documents d ON d.vertical = %(vertical)s AND d.tableoid = b.tbl AND d.ctid = b.row_id
             CROSS JOIN any_q
             ORDER BY score DESC, b.entity_id
             LIMIT %(k)s"""
@@ -354,14 +355,15 @@ def _vector(
             params,
         ).fetchall()
         return [((t, i), float(c)) for t, i, c in rows]
-    # SET LOCAL en una sola consulta: solo esta transacción (la conexión vuelve a un pool). random_page_cost, además,
-    # vuelve a su valor justo después: es para el plan de esta consulta, no para las que siguen en la transacción (si
-    # la consulta falla, la transacción queda abortada y el ROLLBACK lo devuelve igual).
-    page_cost = conn.execute(
-        f"SELECT current_setting('random_page_cost'), set_config('hnsw.ef_search', '{CANDIDATES}', true), "
+    # SET LOCAL de los tres en una sola consulta: solo esta transacción (la conexión vuelve a un pool). random_page_cost
+    # queda en 1.1 para lo que sigue en la transacción (precios con v_latest_offers, documentos, conceptos): en staging,
+    # las 165 consultas de eval (de /search y de oferta) y las escaleras dieron los mismos productos y precios, y esas
+    # consultas no tardaron más (4,9–5,0 s contra 5,0–5,1 s devolviéndolo enseguida).
+    conn.execute(
+        f"SELECT set_config('hnsw.ef_search', '{CANDIDATES}', true), "
         "set_config('hnsw.iterative_scan', 'relaxed_order', true), "
         f"set_config('random_page_cost', '{VECTOR_RANDOM_PAGE_COST}', true)"
-    ).fetchone()[0]
+    )
     rows = conn.execute(
         f"""SELECT entity_type, entity_id, 1 - ({distance}) AS cosine
             FROM search_documents
@@ -370,7 +372,6 @@ def _vector(
             LIMIT %(k)s""",
         params,
     ).fetchall()
-    conn.execute("SELECT set_config('random_page_cost', %s, true)", (page_cost,))
     return [((t, i), float(c)) for t, i, c in rows]
 
 

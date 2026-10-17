@@ -181,26 +181,26 @@ class PlannerSpy:
         return getattr(self._conn, name)
 
 
-def test_the_vector_search_plans_with_the_ssd_page_cost_and_restores_it_in_the_same_transaction(db):
+def test_the_vector_search_plans_with_the_ssd_page_cost_only_in_its_transaction(db):
     """La búsqueda vectorial se planifica con VECTOR_RANDOM_PAGE_COST (así las verticales de 5 a 8 mil documentos usan
-    su HNSW) y lo devuelve a su valor apenas termina: las consultas que siguen en la misma transacción (los precios,
-    los documentos) se planifican como antes. Con otro valor de sesión, vuelve a ese, no al de fábrica."""
+    su HNSW). Es local a la transacción: al confirmarla o deshacerla vuelve el valor de antes, también si la sesión
+    tenía otro."""
     _catalog(db)
     embedder = HashEmbedder()
     vector = embedder.embed_queries(["papas fritas"])[0]
-    for session_value in (None, "2.5"):
+    for session_value, end in ((None, db.commit), ("2.5", db.rollback)):
         if session_value:
             db.execute(f"SET random_page_cost = {session_value}")
             db.commit()  # de sesión: un SET dentro de una transacción deshecha se deshace con ella
         before = db.execute("SELECT current_setting('random_page_cost')").fetchone()[0]
+        assert before != str(VECTOR_RANDOM_PAGE_COST)
         spy = PlannerSpy(db)
 
         found = hybrid._vector(spy, "supermercado", vector, embedder, hybrid.Filters())
 
         assert found
         assert spy.page_costs == [str(VECTOR_RANDOM_PAGE_COST)]
-        assert db.execute("SELECT current_setting('random_page_cost')").fetchone()[0] == before
-        db.rollback()
+        end()
         assert db.execute("SELECT current_setting('random_page_cost')").fetchone()[0] == before
 
 

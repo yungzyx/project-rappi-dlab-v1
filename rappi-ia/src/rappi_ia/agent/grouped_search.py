@@ -101,16 +101,16 @@ def _verticals_to_search(
     return typical + [current] if current in VERTICALS and current not in typical else typical
 
 
-def _search_each[T, V](
+def search_each[T, V](
     conn: Connection,
     verticals: list[V],
     search: Callable[[Connection, V], T],
     spare: SpareConnector | None,
 ) -> list[T]:
     """`search(conn, vertical)` en cada vertical (o en cada peldaño de un perfil de gusto, `offers/profiles.ladder`),
-    con los resultados en el orden de `verticals`. Con `spare` (una
-    conexión extra del pool si sobra, o None), hasta PARALLEL_SEARCHES verticales más a la vez, cada una con su
-    conexión; las que no consiguen una se reparten entre las que hay. Sin ninguna, todo en serie con la conexión del
+    con los resultados en el orden de `verticals`. Con `spare` (una conexión extra del pool si sobra, o None), hasta
+    PARALLEL_SEARCHES verticales más a la vez, cada una con su conexión; las que no consiguen una se reparten entre las
+    que hay. Sin ninguna, todo en serie con la conexión del
     request: no hace fila por una conexión (cada extra espera a lo más SPARE_WAIT_S y unas idas y vueltas) ni pasa el
     tope del pool. En paralelo, cada vertical cierra su transacción al terminar (si no, una conexión que ya terminó
     queda «idle in transaction» hasta la vertical más lenta, y Postgres la corta a los 10 s) y corre con el contexto
@@ -171,7 +171,7 @@ def search_grouped(
     los dos, solo las verticales que calzan todas las palabras o, si ninguna, las muy cercanas (ALL_VERTICALS_TAU):
     primero las que calzan y luego por la cercanía vectorial. La pantalla actual (`current`), si trae productos, va
     siempre primero (el resto conserva su orden); sin productos, no aparece. `unmet` solo si ningún grupo trae
-    productos. Con `spare` (las conexiones extra de la API), las verticales se buscan a la vez (`_search_each`); el
+    productos. Con `spare` (las conexiones extra de la API), las verticales se buscan a la vez (`search_each`); el
     resultado es el mismo que en serie."""
     concepts = detect_concepts(q)
     occasion = None if concepts else _occasion(q)
@@ -187,7 +187,7 @@ def search_grouped(
     def search(connection: Connection, vertical: str):
         return search_products(connection, vertical, query, concepts, memo, price_max, k=limit, mode=mode, words=words)
 
-    searched = list(zip(verticals, _search_each(conn, verticals, search, spare), strict=True))
+    searched = list(zip(verticals, search_each(conn, verticals, search, spare), strict=True))
     outcomes = searched if concepts else _related(searched)
     if not concepts:  # sorted es estable: a igual relevancia queda el orden de VERTICALS
         outcomes.sort(key=lambda o: (o[1].result.strict_lexical_matches == 0, -(o[1].result.max_cosine or 0.0)))

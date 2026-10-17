@@ -25,7 +25,7 @@ from psycopg import Connection
 from rappi_scraper.storage.search import VERTICALS
 
 from .. import config
-from ..agent.grouped_search import SCREEN_VERTICALS, SpareConnector, _search_each
+from ..agent.grouped_search import SCREEN_VERTICALS, SpareConnector, search_each
 from ..agent.tools import Product, search_products
 from ..concepts.taxonomy import load_taxonomy
 from ..embeddings.base import MemoizedQueryEmbedder, TextEmbedder
@@ -425,7 +425,7 @@ def ladder(
     cadena. `city` (`person_city`; sin ella, `config.PROFILE_CITY`): los restaurantes son de sus comunas. Una búsqueda
     de oferta por peldaño (y una consulta por sus tiendas); cada consulta se embebe una vez, en un solo lote. Con
     `spare` (las conexiones extra de la API), los peldaños se buscan a la vez, como las verticales de `/search`
-    (`grouped_search._search_each`, con su tope y sin tomar la reserva del pool); después se eligen sus productos en
+    (`grouped_search.search_each`, con su tope y sin tomar la reserva del pool); después se eligen sus productos en
     orden, así que la escalera es la misma que en serie."""
     queries = [_step_query(step) for step in profile.ladder]
     if embedder is not None:
@@ -438,7 +438,7 @@ def ladder(
     def search(connection: Connection, index: int) -> tuple[list[Product], StoreInfo]:
         return _step_search(connection, embedder, profile.ladder[index], queries[index], known[index])
 
-    found = _search_each(conn, list(range(len(profile.ladder))), search, spare)
+    found = search_each(conn, list(range(len(profile.ladder))), search, spare)
     steps: list[LadderStep] = []
     shown: set[str] = set()
     for step, stores_known, (products, stores) in zip(profile.ladder, known, found, strict=True):
