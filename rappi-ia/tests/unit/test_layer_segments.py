@@ -253,6 +253,19 @@ def test_query_words_match_whole_words_and_plurals():
     assert search("galletas SIN gluten por favor") and not search("singluten") and not search("gluten sin")
 
 
+def test_query_words_are_normalized_once_per_text():
+    """Una corrida compara cada consulta con cada frase de cada regla: cada texto se normaliza una vez (con memoria) y
+    calza igual con tildes, mayúsculas y plurales."""
+    from rappi_ia.layers import segments
+
+    segments._words.cache_clear()
+    for _ in range(3):
+        assert segments._has_phrase("Pañales MUJERES talla G", "panal mujer")
+        assert not segments._has_phrase("pañales", "panal mujer")
+    info = segments._words.cache_info()
+    assert info.misses == 3 and info.hits == 9  # «pañales mujeres talla g», «panal mujer» y «pañales»
+
+
 def test_a_relationship_metric_decides_by_its_range():
     rules = [BY_ID[i] for i in ("activo", "en-riesgo", "dormido")]
     ids = lambda days: [m.segment_id for m in score_user([], {"dias_sin_pedido": days}, rules, NOW)]  # noqa: E731

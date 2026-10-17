@@ -26,7 +26,6 @@ from psycopg.types.json import Jsonb
 from rappi_scraper.storage.search import VERTICALS
 
 from ..concepts.taxonomy import load_taxonomy
-from ..text import normalize
 from .attributes import load_attribute_rules, phrase_key
 from .runs import finish_layer_run, rules_version, start_layer_run
 
@@ -389,8 +388,16 @@ def _content_hit(signal: Signal, key: str, wanted: list[str], taxonomy) -> bool:
 
 
 def _has_phrase(text: str, phrase: str) -> bool:
-    words, target = [phrase_key(w)[0] for w in normalize(text).split()], phrase_key(phrase)
-    return any(tuple(words[i : i + len(target)]) == target for i in range(len(words) - len(target) + 1))
+    words, target = _words(text), _words(phrase)
+    return any(words[i : i + len(target)] == target for i in range(len(words) - len(target) + 1))
+
+
+@lru_cache(maxsize=100_000)
+def _words(text: str) -> tuple[str, ...]:
+    """Las palabras normalizadas y sin plural de una consulta o de una frase de regla (`phrase_key`), con memoria: una
+    corrida compara cada consulta con cada frase de cada regla (millones de veces los mismos textos) y normalizarlos
+    era el 94 % de su tiempo."""
+    return phrase_key(text)
 
 
 def _context_hit(signal: Signal, key: str, wanted) -> bool:
