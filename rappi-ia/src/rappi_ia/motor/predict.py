@@ -100,18 +100,6 @@ def next_verticals(
     return out
 
 
-def current_combo(conn: Connection, user_id: str, now: datetime | None = None) -> str:
-    """La combinación de grupos de los pedidos `propuesta` de la persona en los últimos 30 días («ninguna» sin
-    pedidos)."""
-    now = now or datetime.now(UTC)
-    rows = conn.execute(
-        """SELECT DISTINCT vertical FROM app_orders
-           WHERE user_id = %s AND mode = 'propuesta' AND ts > %s AND ts <= %s""",
-        (user_id, now - timedelta(days=CURRENT_COMBO_DAYS), now),
-    ).fetchall()
-    return combo_of_verticals(r[0] for r in rows)
-
-
 def current_fine(conn: Connection, user_id: str, now: datetime | None = None) -> str:
     """La combinación fina de la persona: las verticales de sus pedidos `propuesta` de los últimos 30 días y los
     servicios que abrió en ese tiempo (`service_opened`, salvo en «Rappi hoy»). Sin pedidos en 30 días, los de 90

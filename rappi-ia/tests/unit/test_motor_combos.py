@@ -16,7 +16,6 @@ from rappi_ia.motor.combos import (
     group_counts,
     load_combos,
     next_fine_step,
-    next_step,
 )
 
 
@@ -54,32 +53,12 @@ def test_rappi_table_is_loaded_verbatim():
     assert "correlación, no un efecto" in c.source_note
 
 
-def test_next_step_follows_the_retention_ladder():
-    assert next_step("rest")[:2] == ("turbo", "rest+turbo")  # 0.82 > 0.76
-    assert next_step("rest+turbo")[:2] == ("retail", "rest+turbo+retail")
-    assert next_step("retail")[:2] == ("turbo", "turbo+retail")  # 0.80 > 0.76
-    assert next_step("turbo")[:2] == ("rest", "rest+turbo")  # 0.82 > 0.80
-    assert next_step("rest")[2] == pytest.approx(0.82 - 0.47)
-    assert next_step("rest+turbo+retail") is None and next_step("ninguna") is None
-
-
 def test_learned_retention_needs_enough_people_and_blends():
     assert expected_retention("rest", {"rest": (10, 0.9)}) == 0.47
     assert expected_retention("rest", {"rest": (100, 0.67)}) == pytest.approx((0.47 * 100 + 0.67 * 100) / 200)
     assert expected_retention("ninguna") is None
     assert expected_retention("ninguna", {"ninguna": (50, 0.3)}) == 0.3  # Rappi no tiene la fila: solo la aprendida
     assert expected_retention("ninguna", {"ninguna": (5, 0.3)}) is None
-
-
-def test_next_step_uses_learned_retention():
-    learned = {"rest+turbo": (400, 0.40), "rest+retail": (400, 0.95)}  # lo aprendido invierte el orden
-    assert next_step("rest", learned)[:2] == ("retail", "rest+retail")
-
-
-def test_next_step_skips_combos_not_built_from_the_groups():
-    """Favor tiene fila en la tabla de Rappi pero no es un grupo: no hay paso siguiente (antes lanzaba ValueError)."""
-    assert next_step("favor") is None
-    assert next_step("otra+rest") is None
 
 
 def test_combo_of_verticals_accepts_a_generator():

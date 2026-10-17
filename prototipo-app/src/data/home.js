@@ -28,7 +28,8 @@ export const MAIN_TILES = [
 
 // RappiFavor aparece deshabilitado como en la app (la imagen trae el sello "Unavailable"); en el prototipo final se habilita
 // con su pantalla (`proposalRoute`).
-// `route` dice a qué pantalla lleva cada acceso (ver HomeFeed).
+// `route` dice a qué pantalla lleva cada acceso (ver HomeFeed); `service`, el servicio sin catálogo que abre
+// (`payload.servicio` de `service_opened`).
 export const SHORTCUTS = [
   {
     id: 'grocery',
@@ -60,7 +61,7 @@ export const SHORTCUTS = [
     vertical: 'chocolateria',
     route: ['vertical', { id: 'chocolates' }],
   },
-  { id: 'rappitravel', label: 'RappiTravel', img: chipRappiTravel, route: ['travel'] },
+  { id: 'rappitravel', label: 'RappiTravel', img: chipRappiTravel, route: ['travel'], service: 'rappitravel' },
   { id: 'loyalty', label: 'Loyalty', img: chipLoyalty, route: ['loyalty'] },
   { id: 'benefitspro', label: 'Benefits Pro', img: chipBenefitsPro },
   {
@@ -69,6 +70,7 @@ export const SHORTCUTS = [
     img: chipRappiFavorOff,
     unavailable: true,
     proposalRoute: ['favor'],
+    service: 'rappifavor',
     emoji: '🛵',
   },
 ]

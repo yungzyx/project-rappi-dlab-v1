@@ -13,7 +13,6 @@ from rappi_ia.motor.model import DEFAULT_ORDER, DEFAULT_WEIGHTS
 from rappi_ia.motor.predict import (
     _learned_fine_retention,
     _learned_retention,
-    current_combo,
     current_fine,
     latest_weights,
     next_verticals,
@@ -72,16 +71,6 @@ def test_next_verticals_uses_the_population_tables(db):
 def test_next_verticals_without_history_is_the_default_order(db):
     assert [s.vertical for s in next_verticals(db, "nadie", now=NOW)] == list(DEFAULT_ORDER)
     assert [s.vertical for s in next_verticals(db, None, now=NOW)] == list(DEFAULT_ORDER)
-
-
-def test_current_combo_counts_the_last_30_days(db):
-    _order(db, "u1", "restaurantes", 3)
-    _order(db, "u1", "supermercado", 10)
-    _order(db, "u1", "turbo", 45)  # fuera de la ventana
-    db.commit()
-
-    assert current_combo(db, "u1", now=NOW) == "rest+retail"
-    assert current_combo(db, "nadie", now=NOW) == "ninguna"
 
 
 def _opened(db, user, service, days_ago, now=NOW, mode=None):

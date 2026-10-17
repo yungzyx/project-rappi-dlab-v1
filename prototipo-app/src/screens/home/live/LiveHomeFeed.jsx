@@ -445,6 +445,8 @@ export default function LiveHomeFeed({ push, active = true }) {
 
   /** Cada toque a un vertical de la Home le enseña al motor qué abre la persona. */
   const openVertical = (vertical) => events.track('vertical_open', { vertical })
+  /** Abrir RappiFavor o RappiTravel desde la Home cuenta como usarlo, igual que desde la oferta de Mochi. */
+  const openService = (servicio) => events.track('service_opened', { payload: { servicio } })
 
   const blocks = {
     essentials: (
@@ -456,6 +458,7 @@ export default function LiveHomeFeed({ push, active = true }) {
           order={verticalOrder.order}
           caption={verticalOrder.personalized ? 'Ordenadas según lo que más usas' : null}
           onOpen={openVertical}
+          onService={openService}
         />
       </>
     ),

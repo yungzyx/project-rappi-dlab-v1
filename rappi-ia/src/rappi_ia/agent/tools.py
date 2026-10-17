@@ -325,7 +325,7 @@ def suggest_complement(
                 usual = searched[best.concept] = search(best, verticals_of(best))
                 if usual is not None and usual[2] is not None:
                     return suggestion(best, usual, [])
-            # Primero en las verticales del grupo; si ahí no hay productos, vuelve a su lugar de siempre.
+            # Primero en la vertical del paso; si ahí no hay productos, vuelve a su lugar de siempre.
             if result := search(candidate, completing):
                 return suggestion(candidate, result, [step_signal(conn, step, population)])
 

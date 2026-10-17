@@ -807,7 +807,7 @@ describe('Home del prototipo final', () => {
       }
     })
 
-    test('tocar un vertical manda vertical_open con su código; Loyalty, RappiTravel y RappiFavor no mandan nada', async () => {
+    test('tocar un vertical manda vertical_open con su código; RappiTravel y RappiFavor, service_opened una vez; Loyalty nada', async () => {
       stubAgent({ 'GET /profile/*': fixture('profile-verticales') })
       const push = vi.fn()
       await renderHome({ push })
@@ -820,6 +820,9 @@ describe('Home del prototipo final', () => {
       for (const name of ['Loyalty', 'RappiTravel', 'RappiFavor', 'Benefits Pro'])
         fireEvent.click(screen.getByText(name))
       expect(opened()).toHaveLength(3)
+      // Abrir un servicio desde la Home cuenta igual que desde Mochi: así la escalera no lo vuelve a ofrecer.
+      const services = events.track.mock.calls.filter(([type]) => type === 'service_opened').map(([, fields]) => fields)
+      expect(services).toEqual([{ payload: { servicio: 'rappitravel' } }, { payload: { servicio: 'rappifavor' } }])
     })
   })
 })

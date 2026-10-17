@@ -181,30 +181,6 @@ def expected_retention(combo: str, learned: dict[str, tuple[int, float]] | None 
     return (row.retention_m1 * LEARNED_RETENTION_PRIOR + ret * n) / (LEARNED_RETENTION_PRIOR + n)
 
 
-def next_step(combo: str, learned: dict[str, tuple[int, float]] | None = None) -> tuple[str, str, float] | None:
-    """El grupo que más retención gana al sumarlo: `(grupo_a_sumar, combinación_objetivo, ganancia)`. `None` si la
-    persona no tiene pedidos, ya usa los tres grupos, ningún grupo suma retención o la combinación no se arma con los
-    grupos (Favor)."""
-    have = combo.split("+")
-    if not set(have) <= set(GROUP_ORDER):  # también `ninguna`
-        return None
-    current = expected_retention(combo, learned)
-    if current is None:
-        return None
-    best: tuple[str, str, float] | None = None
-    for group in GROUP_ORDER:
-        if group in have:
-            continue
-        target = combo_key([*have, group])
-        expected = expected_retention(target, learned)
-        if expected is None:
-            continue
-        gain = expected - current
-        if gain > 0 and (best is None or gain > best[2]):
-            best = (group, target, gain)
-    return best
-
-
 def fine_key(members: Iterable[str]) -> str:
     """El nombre canónico de una combinación fina: verticales y servicios en el orden `FINE_ORDER`, unidos por «+»."""
     present = set(members)
