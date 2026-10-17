@@ -29,7 +29,8 @@ from rappi_ia.db import connect
 from rappi_ia.embeddings.base import HashEmbedder
 from rappi_ia.embeddings.text_store import embed_search_documents
 from rappi_ia.events import store as events
-from rappi_ia.retrieval.hybrid import CANDIDATES
+from rappi_ia.retrieval import hybrid
+from rappi_ia.retrieval.hybrid import CANDIDATES, VECTOR_RANDOM_PAGE_COST
 
 POOL_MAX = 3
 
@@ -148,9 +149,11 @@ def test_a_burst_does_not_starve_the_threadpool(test_url, make_pool, live_client
 
 
 def test_set_local_does_not_leak_to_next_request(db, test_url, make_pool, client):
-    """La búsqueda vectorial sube `hnsw.ef_search` solo en su transacción: con una sola conexión en el pool, el request
-    siguiente la recibe con el valor normal."""
+    """La búsqueda vectorial sube `hnsw.ef_search` y baja `random_page_cost` solo en su transacción: con una sola
+    conexión en el pool, el request siguiente la recibe con los valores normales."""
     _catalog(db)
+    default_page_cost = db.execute("SELECT current_setting('random_page_cost')").fetchone()[0]
+    assert default_page_cost != str(VECTOR_RANDOM_PAGE_COST)  # si no, la prueba no prueba nada
     pool = make_pool(test_url, max_size=1)
 
     reply = client.get("/search", params={"q": "papas fritas", "vertical": "supermercado", "mode": "vector"})
@@ -159,6 +162,46 @@ def test_set_local_does_not_leak_to_next_request(db, test_url, make_pool, client
     with pool.connection() as conn:
         assert conn.execute("SELECT current_setting('hnsw.ef_search', true)").fetchone()[0] != str(CANDIDATES)
         assert conn.execute("SELECT current_setting('hnsw.iterative_scan', true)").fetchone()[0] != "relaxed_order"
+        assert conn.execute("SELECT current_setting('random_page_cost')").fetchone()[0] == default_page_cost
+
+
+class PlannerSpy:
+    """La conexión del test que anota el `random_page_cost` con que se planifica cada búsqueda vectorial."""
+
+    def __init__(self, conn):
+        self._conn = conn
+        self.page_costs: list[str] = []
+
+    def execute(self, query, *args, **kwargs):
+        if "<=>" in str(query):
+            self.page_costs.append(self._conn.execute("SELECT current_setting('random_page_cost')").fetchone()[0])
+        return self._conn.execute(query, *args, **kwargs)
+
+    def __getattr__(self, name):
+        return getattr(self._conn, name)
+
+
+def test_the_vector_search_plans_with_the_ssd_page_cost_and_restores_it_in_the_same_transaction(db):
+    """La búsqueda vectorial se planifica con VECTOR_RANDOM_PAGE_COST (así las verticales de 5 a 8 mil documentos usan
+    su HNSW) y lo devuelve a su valor apenas termina: las consultas que siguen en la misma transacción (los precios,
+    los documentos) se planifican como antes. Con otro valor de sesión, vuelve a ese, no al de fábrica."""
+    _catalog(db)
+    embedder = HashEmbedder()
+    vector = embedder.embed_queries(["papas fritas"])[0]
+    for session_value in (None, "2.5"):
+        if session_value:
+            db.execute(f"SET random_page_cost = {session_value}")
+            db.commit()  # de sesión: un SET dentro de una transacción deshecha se deshace con ella
+        before = db.execute("SELECT current_setting('random_page_cost')").fetchone()[0]
+        spy = PlannerSpy(db)
+
+        found = hybrid._vector(spy, "supermercado", vector, embedder, hybrid.Filters())
+
+        assert found
+        assert spy.page_costs == [str(VECTOR_RANDOM_PAGE_COST)]
+        assert db.execute("SELECT current_setting('random_page_cost')").fetchone()[0] == before
+        db.rollback()
+        assert db.execute("SELECT current_setting('random_page_cost')").fetchone()[0] == before
 
 
 def test_pool_timeout_is_503(test_url, make_pool, client):

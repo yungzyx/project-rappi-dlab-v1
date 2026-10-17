@@ -185,6 +185,11 @@ _PRICE = "price_min"  # columna generada desde metadata (migración 013), con í
 # Con tope de precio, si califican hasta esta cantidad de documentos se revisan todos (búsqueda exacta): el HNSW
 # filtrado corta en hnsw.max_scan_tuples y con un tope muy bajo en un vertical grande devolvería de menos.
 EXACT_SEARCH_MAX = 5000
+# random_page_cost del plan de la búsqueda vectorial (el de un SSD; Postgres trae 4, el de un disco giratorio). Con 4,
+# en las verticales de 5 a 8 mil documentos (conveniencia, farmacia, licores) el planificador prefería recorrerlas
+# enteras (10–16 ms) al HNSW (2–2,5 ms); con 1.1 lo usa. En staging, recall@10 contra la búsqueda exacta de 0,994–0,996
+# en las consultas de eval/queries.json de esas verticales; las grandes ya usaban el índice y no cambian.
+VECTOR_RANDOM_PAGE_COST = 1.1
 
 
 def _lexical(
@@ -321,10 +326,14 @@ def _vector(
             params,
         ).fetchall()
         return [((t, i), float(c)) for t, i, c in rows]
-    conn.execute(  # SET LOCAL de los dos en una sola consulta: solo esta transacción (la conexión vuelve a un pool)
-        f"SELECT set_config('hnsw.ef_search', '{CANDIDATES}', true), "
-        "set_config('hnsw.iterative_scan', 'relaxed_order', true)"
-    )
+    # SET LOCAL en una sola consulta: solo esta transacción (la conexión vuelve a un pool). random_page_cost, además,
+    # vuelve a su valor justo después: es para el plan de esta consulta, no para las que siguen en la transacción (si
+    # la consulta falla, la transacción queda abortada y el ROLLBACK lo devuelve igual).
+    page_cost = conn.execute(
+        f"SELECT current_setting('random_page_cost'), set_config('hnsw.ef_search', '{CANDIDATES}', true), "
+        "set_config('hnsw.iterative_scan', 'relaxed_order', true), "
+        f"set_config('random_page_cost', '{VECTOR_RANDOM_PAGE_COST}', true)"
+    ).fetchone()[0]
     rows = conn.execute(
         f"""SELECT entity_type, entity_id, 1 - ({distance}) AS cosine
             FROM search_documents
@@ -333,6 +342,7 @@ def _vector(
             LIMIT %(k)s""",
         params,
     ).fetchall()
+    conn.execute("SELECT set_config('random_page_cost', %s, true)", (page_cost,))
     return [((t, i), float(c)) for t, i, c in rows]
 
 

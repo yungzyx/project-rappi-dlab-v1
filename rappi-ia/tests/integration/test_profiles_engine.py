@@ -449,9 +449,9 @@ def test_no_ladder_offers_adult_products_or_products_from_blocked_stores(catalog
     assert not {"Soju uva verde 360 ml (prueba)", "Globos de colores x 10 (prueba)"} & {p.name for p in offered}
 
 
-# Con la caché del catálogo caliente, un peldaño cuesta unas 10 consultas: su búsqueda de oferta y una por sus tiendas
-# (50 en los cinco del asiático).
-LADDER_QUERY_BUDGET = 10 * 5
+# Con la caché del catálogo caliente, un peldaño cuesta unas 11 consultas: su búsqueda de oferta (con la vuelta de
+# random_page_cost después de la vectorial) y una por sus tiendas (55 en los cinco del asiático).
+LADDER_QUERY_BUDGET = 11 * 5
 
 
 def test_a_ladder_costs_a_bounded_number_of_queries(catalog, db):
