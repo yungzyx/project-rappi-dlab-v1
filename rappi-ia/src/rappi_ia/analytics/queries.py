@@ -11,7 +11,7 @@ from psycopg.rows import dict_row
 
 from ..agent.verticals import MIN_ITEMS_ELSEWHERE, SHARES
 from ..concepts.taxonomy import load_taxonomy
-from ..motor.combos import load_combos
+from ..motor.combos import OWN_SIGNALS_ONLY, expected_fine_retention, load_combos
 
 SOURCES = ("synthetic", "prototype")
 ACTIVE_DAYS = 30
@@ -21,6 +21,7 @@ MIN_SUPPORT = 30  # usuarios mínimos para aprender una arista por co-ocurrencia
 MIN_GROUP_USERS = 20  # agregados con menos usuarios no se muestran (privacidad)
 # Meses con el siguiente completo que pide la retención de una combinación propia para mostrarse.
 MIN_COMBO_RETENTION_N = 30
+FINE_COMBO_ROWS = 15  # las combinaciones finas más frecuentes que muestra el panel
 COMBO_NOTES = {
     "synthetic": "Simulado: no es evidencia",
     "prototype": "uso del MVP, pocas personas: no es evidencia",
@@ -428,13 +429,19 @@ def suggestions(conn: Connection, source: str = "synthetic") -> list[dict]:
 
 
 def services(conn: Connection, source: str = "synthetic") -> list[dict]:
-    """Servicios sin catálogo (RappiTravel, RappiFavor): cuántas veces el agente los ofreció, cuántas se abrieron y los
-    ganchos del catálogo (sugerencias con su origen) mostrados y aceptados. Una fila por servicio de la taxonomía."""
+    """Servicios sin catálogo (RappiTravel, RappiFavor): cuántas veces el agente los ofreció, cuántas se abrieron
+    (`abierto`) y cuántas desde los accesos de la Home (`desde_home`, `payload.desde = 'home'`: no mide al agente), y
+    los ganchos del catálogo (sugerencias con su origen) mostrados y aceptados. Una fila por servicio de la taxonomía.
+    """
     _check(source)
     counts = {
         (service, kind): n
         for service, kind, n in conn.execute(
-            """SELECT coalesce(payload ->> 'servicio', payload ->> 'origen'), type, count(*) FROM app_events
+            """SELECT coalesce(payload ->> 'servicio', payload ->> 'origen'),
+                      CASE WHEN type = 'service_opened' AND payload ->> 'desde' = 'home'
+                           THEN 'service_opened_home' ELSE type END,
+                      count(*)
+               FROM app_events
                WHERE source = %(source)s AND (type IN ('service_shown', 'service_opened')
                      OR (type IN ('suggestion_shown', 'suggestion_accepted') AND payload ->> 'origen' = ANY(%(ids)s)))
                GROUP BY 1, 2""",
@@ -447,6 +454,7 @@ def services(conn: Connection, source: str = "synthetic") -> list[dict]:
             "nombre": s.label,
             "ofrecido": counts.get((s.id, "service_shown"), 0),
             "abierto": counts.get((s.id, "service_opened"), 0),
+            "desde_home": counts.get((s.id, "service_opened_home"), 0),
             "ganchos_mostrados": counts.get((s.id, "suggestion_shown"), 0),
             "ganchos_aceptados": counts.get((s.id, "suggestion_accepted"), 0),
         }
@@ -561,7 +569,13 @@ def combos(conn: Connection, source: str = "synthetic") -> dict:
     """La tabla de Rappi («verticales usados juntos», `motor/combos.toml`) junto a la misma tabla medida con los datos
     de la fuente (`combo_stats`, de la última corrida del motor). La de Rappi es un dato compartido por su equipo y no
     depende de la fuente; la propia sí, y lleva su rótulo en `nota`. La retención propia solo se entrega con
-    `MIN_COMBO_RETENTION_N` meses que tengan el siguiente completo. Es una correlación, no un efecto."""
+    `MIN_COMBO_RETENTION_N` meses que tengan el siguiente completo. Es una correlación, no un efecto.
+
+    `fino`: las `FINE_COMBO_ROWS` combinaciones finas (verticales una por una) más frecuentes de la fuente, con su
+    retención aprendida (con la misma regla) y la `esperada` de la tabla de Rappi con el supuesto propio del
+    rendimiento decreciente, sin lo aprendido; `supuesto`, los valores de ese supuesto (`[rendimiento_decreciente]`).
+    Con pocas personas (`prototype`) la tabla fina no señala a nadie: sin las combinaciones que incluyen Farmacia o
+    Licores (solo suben por señales propias) y solo las de al menos `MIN_GROUP_USERS` personas-mes."""
     _check(source)
     table = load_combos()
     own = _rows(
@@ -570,10 +584,30 @@ def combos(conn: Connection, source: str = "synthetic") -> dict:
                   orders_per_user AS pedidos_por_usuario,
                   CASE WHEN retention_n >= %(min_n)s THEN retention_m1 END AS retencion_m1,
                   retention_n AS retencion_n, spend_per_user AS gasto_por_usuario
-           FROM combo_stats WHERE data_source = %(source)s
+           FROM combo_stats WHERE data_source = %(source)s AND nivel = 'grueso'
            ORDER BY user_months DESC, combo COLLATE "C" """,
         {"source": source, "min_n": MIN_COMBO_RETENTION_N},
     )
+    fine = _rows(
+        conn,
+        """SELECT combo, user_months AS meses_usuario,
+                  CASE WHEN retention_n >= %(min_n)s THEN retention_m1 END AS retencion_m1,
+                  retention_n AS retencion_n
+           FROM combo_stats WHERE data_source = %(source)s AND nivel = 'fino'
+             AND (%(source)s <> 'prototype' OR (user_months >= %(min_group)s AND combo !~ %(own_only)s))
+           ORDER BY user_months DESC, combo COLLATE "C" LIMIT %(limit)s""",
+        {
+            "source": source,
+            "min_n": MIN_COMBO_RETENTION_N,
+            "limit": FINE_COMBO_ROWS,
+            "min_group": MIN_GROUP_USERS,
+            "own_only": r"(^|\+)(" + "|".join(sorted(OWN_SIGNALS_ONLY)) + r")(\+|$)",
+        },
+    )
+    for row in fine:
+        expected = expected_fine_retention(row["combo"])
+        row["esperada"] = None if expected is None else round(expected, 4)
+    dim = table.diminishing
     return {
         "rappi": {
             "filas": [_rappi_row(row) for row in table.rappi.values()],
@@ -581,6 +615,13 @@ def combos(conn: Connection, source: str = "synthetic") -> dict:
             "nota": table.source_note,
         },
         "propio": own,
+        "fino": fine,
+        "supuesto": {
+            "reduccion_base": dim.reduction_base,
+            "decaimiento": dim.decay,
+            "servicio": dim.service,
+            "nota": dim.note,
+        },
         "nota": COMBO_NOTES[source],
     }
 

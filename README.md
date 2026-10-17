@@ -99,7 +99,7 @@ Cada cifra dice qué tipo de dato es: real, evaluación automática, estimación
 
 ### Motor multivertical (datos simulados: prueban la mecánica, no el efecto)
 
-Corrida del 16-10-2026 (`rappi-ia motor`) sobre una copia del catálogo real y **3.000 personas simuladas**, con tramos por fecha: entrenar, validar y probar (28 días cada uno de los dos últimos). Son las cifras vigentes, después de los ajustes del 16-10. Informe completo, intentos descartados y ruido entre semillas: [docs/resultados/motor-2026-10-16.md](docs/resultados/motor-2026-10-16.md#resultado-final-código-de-esta-etapa-semilla-7-rappi-ia-motor).
+Corrida del 16-10-2026 (`rappi-ia motor`) sobre una copia del catálogo real y **3.000 personas simuladas**, con tramos por fecha: entrenar, validar y probar (28 días cada uno de los dos últimos). Son las cifras de la etapa 5, después de los ajustes del 16-10 (la escalera fina de la etapa 7 va en su fila y en el detalle de abajo). Informe completo, intentos descartados y ruido entre semillas: [docs/resultados/motor-2026-10-16.md](docs/resultados/motor-2026-10-16.md#resultado-final-código-de-esta-etapa-semilla-7-rappi-ia-motor).
 
 | Qué | Métrica (tramo de prueba) | Valor | Tipo de dato |
 |---|---|---|---|
@@ -107,8 +107,9 @@ Corrida del 16-10-2026 (`rappi-ia motor`) sobre una copia del catálogo real y *
 | Compra cruzada | precisión@3 | mezcla 0,128 · lo más pedido 0,128. En validación λ quedó en 0, así que hoy las reglas no cambian lo que se ofrece. Entre las 47 personas con alguna regla: reglas 0,128 frente a 0,106 de lo más pedido (pocas personas) | Simulado |
 | Recompra | acierto ±7 días | 0,114 (9 de 79 predicciones), error mediano de 9 días | Simulado |
 | Generador simulado | distancia a la tabla de Rappi | 23,3 → 18,2 (se acercó al sumar Turbo a las sugerencias simuladas) | Simulado, comparado con el dato compartido por Rappi |
+| Paso de la escalera fina (etapa 7) | acierto@1 entre quienes suman una vertical | paso 0,466 · la vertical que más se suma 0,638 (58 personas). El paso busca retención, no adivinar qué se suma solo: perder aquí es esperable | Simulado: no es evidencia |
 
-Cómo leerlo: la ventaja del combinado viene casi entera de la afinidad de cada persona, y el generador hace que cada persona repita sus verticales, así que en parte acierta por construcción. El generador se calibró con la tabla de Rappi y la trata como efecto, así que sus cifras no prueban que sumar verticales retenga. La agrupación de verticales en `rest`, `turbo` y `retail` es un supuesto propio. Detalle: [docs/capa-de-datos.md](docs/capa-de-datos.md#motor-multivertical).
+Las cuatro primeras filas son del generador de la etapa 5; la escalera fina se midió con el generador que simula su supuesto, que mueve todas las cifras simuladas ([detalle](docs/resultados/motor-2026-10-16.md#escalera-fina-etapa-7-datos-simulados)). Cómo leerlo: la ventaja del combinado viene casi entera de la afinidad de cada persona, y el generador hace que cada persona repita sus verticales, así que en parte acierta por construcción. El generador se calibró con la tabla de Rappi y la trata como efecto, así que sus cifras no prueban que sumar verticales retenga. La agrupación de verticales en `rest`, `turbo` y `retail` es un supuesto propio. Detalle: [docs/capa-de-datos.md](docs/capa-de-datos.md#motor-multivertical).
 
 **Revisión sobre el catálogo real** ([QA del 16-10-2026](docs/resultados/qa-motor-2026-10-16.md), en solo lectura, con 200 personas simuladas y las 44 del prototipo, medida antes de los ajustes de la etapa 5, con λ > 0): las guardias (Farmacia, Licores, bebé, salud, conceptos sensibles, alcohol) dieron **0 casos en 2.851 productos ofrecidos**, y la ruta más lenta (`/recommendations`) respondió con p95 de 222 ms con el modelo de texto.
 

@@ -20,6 +20,11 @@ const CROSS_SELL_METHODS = [
   ['mezcla', 'Mezcla'],
 ]
 
+const STEP_METHODS = [
+  ['escalera', 'Paso de la escalera'],
+  ['mas_sumada', 'La vertical que más se suma'],
+]
+
 const fraction = (value) => formatPct(value === null ? null : value * 100)
 
 const NEXT_VERTICAL_COLUMNS = [
@@ -52,6 +57,11 @@ const REPEAT_COLUMNS = [
   { key: 'acierto', header: 'Acierto ±7 días', numeric: true, render: (row) => fraction(row.acierto_7_dias) },
 ]
 
+const STEP_COLUMNS = [
+  { key: 'metodo', header: 'Método', primary: true, render: (row) => row.label },
+  { key: 'hit1', header: 'Acierto@1', numeric: true, render: (row) => fraction(row.hit1) },
+]
+
 // Los pesos y el λ son valores de una grilla (1, 0,5, 0,05…): se muestran tal cual, sin ceros de relleno.
 const plain = (value) => String(value).replace('.', ',')
 
@@ -61,6 +71,7 @@ const weightsText = ({ afinidad, transicion, popularidad }) =>
 function Evaluation({ evaluation }) {
   const next = evaluation.proximo_vertical
   const cross = evaluation.compra_cruzada
+  const step = evaluation.paso // las corridas anteriores a la escalera fina no lo tienen
   const warning = evaluation.validacion.aviso
   return (
     <>
@@ -99,6 +110,24 @@ function Evaluation({ evaluation }) {
         «Compraron»: la parte en que la persona volvió a comprar el concepto en la prueba. El error mediano es solo
         sobre esas; el acierto ±7 días cuenta como fallo a quien no volvió a comprar.
       </p>
+      {step && (
+        <>
+          <h3 className="motor-title">Paso de la escalera</h3>
+          <DataTable
+            caption="Paso de la escalera"
+            columns={STEP_COLUMNS}
+            rows={STEP_METHODS.map(([key, label]) => ({ hit1: step[key], label }))}
+            rowKey={(row) => row.label}
+          />
+          <p className="card-note">
+            {formatNumber(step.personas)} {plural(step.personas, 'persona')} que en la prueba suman una vertical que no
+            estaba en su combinación (30 días; sin pedidos, 90), sin contar Farmacia ni Licores. Acierto@1: la vertical
+            del paso, calculado antes de la prueba, es una de las que sumó; {formatNumber(step.con_paso)} tienen paso y,
+            sin paso, cuenta como fallo. La línea base propone la vertical que más personas sumaron en los 28 días
+            anteriores.
+          </p>
+        </>
+      )}
     </>
   )
 }

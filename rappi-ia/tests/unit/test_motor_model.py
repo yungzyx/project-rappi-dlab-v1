@@ -151,6 +151,36 @@ def test_combo_stats_reproduce_shares_and_retention():
     }
 
 
+def test_fine_combos_count_each_vertical_and_keep_the_coarse_retention():
+    """El nivel fino separa los verticales dentro de un grupo (supermercado y mall son «retail» en el grueso); la
+    retención se mide igual."""
+    orders = [
+        order("a", at(2026, 8, 3), "supermercado"),
+        order("a", at(2026, 8, 9), "mall"),
+        order("a", at(2026, 9, 3), "turbo"),
+        order("b", at(2026, 8, 4), "supermercado"),
+        order("b", at(2026, 8, 5), "supermercado"),
+        order("c", at(2026, 8, 6), "restaurantes"),
+        order("c", at(2026, 8, 7), "supermercado"),
+        order("c", at(2026, 10, 2), "turbo"),
+    ]
+    coarse, fine = combo_months(orders), combo_months(orders, fine=True)
+
+    assert {m.combo for m in coarse if m.user_id in "ab" and m.month == date(2026, 8, 1)} == {"retail"}
+    assert {(m.user_id, m.combo) for m in fine if m.month == date(2026, 8, 1)} == {
+        ("a", "supermercado+mall"),
+        ("b", "supermercado"),
+        ("c", "restaurantes+supermercado"),
+    }
+    assert [(m.retained, m.orders) for m in coarse] == [(m.retained, m.orders) for m in fine]
+    stats = combo_stats(fine)
+    assert stats["supermercado+mall"]["retention_m1"] == pytest.approx(1.0)  # «a» pidió en septiembre
+    assert stats["supermercado"]["retention_m1"] == pytest.approx(0.0)  # «b» no volvió
+    assert stats["supermercado"]["pct_users"] == pytest.approx(100 / 5)
+    assert combo_steps(fine)[("supermercado+mall", "turbo")] == (1, 1.0)
+    assert combo_steps(fine)[("supermercado", "ninguna")] == (1, 1.0)
+
+
 # Compra cruzada
 
 

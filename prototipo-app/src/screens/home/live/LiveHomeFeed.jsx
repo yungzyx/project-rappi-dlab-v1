@@ -406,6 +406,9 @@ export default function LiveHomeFeed({ push, active = true }) {
     if (mine !== run.current || !made) return
     noteShown(events.track, made.products, { origin: `agent-${made.moment}`, generation: profile.resets })
     const open = made.actions.find((action) => action.route)
+    // Si el paso es un servicio sin catálogo (RappiFavor, RappiTravel), se anota ofrecido y, al abrirlo, abierto: así
+    // la escalera sigue.
+    if (open?.service) events.track('service_shown', { payload: { servicio: open.service } })
     // La burbuja no lleva productos: no promete «mira estas ofertas» (eso lo dice el texto de la API, que sí los muestra).
     const name = VERTICAL_NAMES[screenForBackend(made.backendVertical)]
     speak(
@@ -415,7 +418,17 @@ export default function LiveHomeFeed({ push, active = true }) {
         mood: 'wave',
         gesture: 'hop',
         actions: [
-          ...(open ? [{ label: open.label, onClick: () => visit(made.vertical, open.route) }] : []),
+          ...(open
+            ? [
+                {
+                  label: open.label,
+                  onClick: () => {
+                    if (open.service) events.track('service_opened', { payload: { servicio: open.service } })
+                    visit(made.vertical, open.route)
+                  },
+                },
+              ]
+            : []),
           {
             label: 'Después',
             onClick: () => {
@@ -432,6 +445,8 @@ export default function LiveHomeFeed({ push, active = true }) {
 
   /** Cada toque a un vertical de la Home le enseña al motor qué abre la persona. */
   const openVertical = (vertical) => events.track('vertical_open', { vertical })
+  /** Abrir RappiFavor o RappiTravel desde la Home cuenta como usarlo, igual que desde la oferta de Mochi. */
+  const openService = (servicio) => events.track('service_opened', { payload: { servicio, desde: 'home' } })
 
   const blocks = {
     essentials: (
@@ -443,6 +458,7 @@ export default function LiveHomeFeed({ push, active = true }) {
           order={verticalOrder.order}
           caption={verticalOrder.personalized ? 'Ordenadas según lo que más usas' : null}
           onOpen={openVertical}
+          onService={openService}
         />
       </>
     ),

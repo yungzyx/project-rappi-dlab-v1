@@ -13,7 +13,7 @@ from datetime import date, datetime, timedelta
 from itertools import pairwise
 from zoneinfo import ZoneInfo
 
-from rappi_ia.motor.combos import NONE_COMBO, combo_of_verticals
+from rappi_ia.motor.combos import NONE_COMBO, OWN_SIGNALS_ONLY, combo_of_verticals, fine_of
 from rappi_ia.motor.data import Order, Signal
 
 TZ = ZoneInfo("America/Santiago")
@@ -47,7 +47,6 @@ REPLENISH_MAX_CV = 0.6
 
 DEFAULT_ORDER = ("restaurantes", "turbo", "supermercado", "farmacia", "mall", "licores", "conveniencia", "chocolateria")
 DEFAULT_WEIGHTS = {"afinidad": 1.0, "transicion": 0.3, "popularidad": 0.1}
-OWN_SIGNALS_ONLY = frozenset({"farmacia", "licores"})  # sin transición ni popularidad: nunca los empujan otros
 
 
 def local_day(ts: datetime) -> date:
@@ -125,9 +124,10 @@ class ComboMonth:
     retained: bool | None  # algún pedido en M+1; None si los datos no cubren M+1 completo
 
 
-def combo_months(orders: Iterable[Order]) -> list[ComboMonth]:
-    """Una fila por persona y mes calendario con pedidos: la combinación de grupos usada, pedidos, gasto y si volvió
-    a pedir el mes siguiente."""
+def combo_months(orders: Iterable[Order], fine: bool = False) -> list[ComboMonth]:
+    """Una fila por persona y mes calendario con pedidos: la combinación usada, pedidos, gasto y si volvió a pedir el
+    mes siguiente. La combinación es de grupos (`rest+turbo`); con `fine`, de verticales una por una
+    (`restaurantes+turbo+mall`). Solo cuentan los verticales de los pedidos: los servicios no tienen pedidos."""
     orders = list(orders)
     if not orders:
         return []
@@ -144,7 +144,7 @@ def combo_months(orders: Iterable[Order]) -> list[ComboMonth]:
             ComboMonth(
                 user_id=user,
                 month=month,
-                combo=combo_of_verticals(o.vertical for o in month_orders),
+                combo=(fine_of if fine else combo_of_verticals)(o.vertical for o in month_orders),
                 orders=len(month_orders),
                 spend=sum(o.total for o in month_orders),
                 retained=retained,

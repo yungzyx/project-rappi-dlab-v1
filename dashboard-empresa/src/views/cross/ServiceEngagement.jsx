@@ -15,6 +15,12 @@ const COLUMNS = [
         : formatNumber(row.abierto),
   },
   {
+    key: 'desde_home',
+    header: 'Abierto desde la Home',
+    numeric: true,
+    render: (row) => formatNumber(row.desde_home ?? 0),
+  },
+  {
     key: 'ganchos',
     header: 'Gancho del catálogo aceptado',
     numeric: true,
@@ -25,7 +31,8 @@ const COLUMNS = [
   },
 ]
 
-/** Servicios sin catálogo (RappiTravel, RappiFavor): ofrecidos por el agente, abiertos y ganchos del catálogo aceptados. */
+/** Servicios sin catálogo (RappiTravel, RappiFavor): ofrecidos por el agente, abiertos (de lo que ofreció), abiertos
+ * desde los accesos de la Home (aparte: no miden al agente) y ganchos del catálogo aceptados. */
 export function ServiceEngagement({ rows }) {
   if (!rows.some((row) => row.ofrecido)) {
     return (

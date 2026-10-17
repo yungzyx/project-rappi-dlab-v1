@@ -155,7 +155,8 @@ def cmd_motor(conn, args) -> None:
         counts = build_motor(conn, source, evaluate=not args.sin_evaluar)
         print(
             f"Motor ({source}): {counts['transiciones']} transiciones, {counts['combinaciones']} combinaciones "
-            f"({counts['pasos']} pasos), {counts['reglas']} reglas de compra cruzada, {counts['tendencias']} "
+            f"({counts['pasos']} pasos), {counts['combinaciones_finas']} combinaciones finas "
+            f"({counts['pasos_finos']} pasos), {counts['reglas']} reglas de compra cruzada, {counts['tendencias']} "
             f"tendencias, {counts['afinidad']} filas de afinidad y {counts['recompra']} de recompra"
         )
         weights = counts["pesos"]

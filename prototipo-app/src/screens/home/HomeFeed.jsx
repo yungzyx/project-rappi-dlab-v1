@@ -21,6 +21,7 @@ export default function HomeFeed({ push }) {
   const catalog = useHomeCatalog()
   const events = useEvents()
   const openVertical = (vertical) => events.track('vertical_open', { vertical })
+  const openService = (servicio) => events.track('service_opened', { payload: { servicio, desde: 'home' } })
   const openSearch = () => push('search')
   const screenRef = useRef(null)
   const [{ collapsed: isCollapsed, showBackToTop }, onScroll] = useScrollState({
@@ -59,7 +60,7 @@ export default function HomeFeed({ push }) {
         <DemoDisclaimer />
 
         <MainTiles push={push} onOpen={openVertical} />
-        <Shortcuts push={push} onOpen={openVertical} />
+        <Shortcuts push={push} onOpen={openVertical} onService={openService} />
         <Promos push={push} />
         <FastRestaurants stores={catalog.fastRestaurants} push={push} />
         <NearbyStores stores={catalog.nearbyStores} push={push} />

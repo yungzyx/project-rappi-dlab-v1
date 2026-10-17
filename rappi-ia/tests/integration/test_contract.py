@@ -157,6 +157,13 @@ CONTRACT: tuple[Example, ...] = (
         "/agent/offer",
         {"moment": "vertical_por_probar", "user_id": "u-gustos", "context": {}},
     ),
+    # Ya pide en todas las verticales que se ofrecen (u-servicios): el paso es RappiFavor, una oferta sin productos.
+    Example(
+        "agent-offer-vertical-por-probar-servicio",
+        "POST",
+        "/agent/offer",
+        {"moment": "vertical_por_probar", "user_id": "u-servicios", "context": {}},
+    ),
     # Pide café en el súper cada 7 días y el último fue hace 7 (u-recompra): le toca hoy.
     Example(
         "agent-offer-recompra",
@@ -214,9 +221,9 @@ def client(db):
         for c in ("chocolates", "carnes")
     ]
     assert test_client.post("/events", json={"user_id": "u-afin", "events": liked}).status_code == 200
-    # Ya pidió en el súper, en restaurantes y en Turbo (unas papas, sin concepto, así no cambian sus gustos): con la
-    # combinación completa el motor no tiene un paso que sugerir, y la vertical por probar es la que más le gusta de
-    # las que no ha probado (no el súper).
+    # Ya pidió en el súper, en restaurantes y en Turbo (unas papas, sin concepto, así no cambian sus gustos): con los
+    # tres grupos el motor sigue dentro de Retail. Las verticales que le faltan suman lo mismo y desempata su predicción
+    # (`next_verticals`, que no ve sus gustos: sus `cart_add` no traen vertical), así que el paso es el Mall.
     chips = {"entity_type": "catalog_item", "entity_id": "91001"}
     for vertical in ("supermercado", "restaurants", "turbo"):
         afin_order = {"user_id": "u-afin", "session_id": "s-afin", "cart_id": f"c-afin-{vertical}", "lines": [chips]}
@@ -253,6 +260,11 @@ def client(db):
                VALUES ('synthetic', 'producto', 'supermercado', %s, 'catalog_item', %s, %s, %s)""",
             (f"catalog_item:{product}", product, 100 - rank, rank),
         )
+    # Una persona que ya pide en todas las verticales que el agente ofrece, para el ejemplo
+    # `agent-offer-vertical-por-probar-servicio`: el paso de la escalera es RappiFavor, sin productos.
+    for vertical in ("restaurantes", "turbo", "supermercado", "conveniencia", "mall", "chocolateria"):
+        line = {"entity_type": "catalog_item", "entity_id": "91001", "concept_id": None, "unit_price": 1990}
+        events.record_order(db, "u-servicios", f"s-servicios-{vertical}", f"c-servicios-{vertical}", vertical, [line])
     # Una persona de antes de la identidad firmada, para el ejemplo de `/session`.
     db.execute("INSERT INTO app_users (user_id, source) VALUES ('proto-0123456789abcdef', 'prototype')")
     db.commit()

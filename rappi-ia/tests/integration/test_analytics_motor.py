@@ -40,8 +40,8 @@ def _tap(user, vertical, mode=None, kind="vertical_open"):
 def test_combos_without_own_data_still_carry_the_rappi_table(db):
     data = queries.combos(db, "prototype")
 
-    assert list(data) == ["rappi", "propio", "nota"]
-    assert data["propio"] == []
+    assert list(data) == ["rappi", "propio", "fino", "supuesto", "nota"]
+    assert data["propio"] == [] and data["fino"] == []
     assert [row["combo"] for row in data["rappi"]["filas"]] == RAPPI_ORDER
     rest_turbo = data["rappi"]["filas"][2]
     assert rest_turbo == {
@@ -202,3 +202,73 @@ def test_the_three_metrics_are_served_by_the_panel_api(db):
         assert client.get("/analytics/combos", params={"source": "prototype"}).json()["data"]["propio"] == []
     finally:
         api.app.dependency_overrides.clear()
+
+
+def test_combos_own_table_ignores_the_fine_level(db):
+    _combo(db, "synthetic", "rest", 100, 80)
+    db.execute(
+        """INSERT INTO combo_stats (data_source, nivel, combo, user_months, retention_n)
+           VALUES ('synthetic', 'fino', 'restaurantes+mall', 40, 40)"""
+    )
+
+    assert [row["combo"] for row in queries.combos(db, "synthetic")["propio"]] == ["rest"]
+
+
+def _fine(db, source, combo, months, retention_n, retention=0.9):
+    db.execute(
+        """INSERT INTO combo_stats (data_source, nivel, combo, user_months, retention_m1, retention_n)
+           VALUES (%s, 'fino', %s, %s, %s, %s)""",
+        (source, combo, months, retention, retention_n),
+    )
+
+
+def test_combos_fine_table_with_learned_and_expected_retention(db):
+    _fine(db, "synthetic", "restaurantes+turbo+supermercado+mall", 40, 30, retention=0.95)
+    _fine(db, "synthetic", "restaurantes", 90, 29)
+    _fine(db, "prototype", "turbo", 25, 0)
+
+    data = queries.combos(db, "synthetic")
+
+    assert [row["combo"] for row in data["fino"]] == ["restaurantes", "restaurantes+turbo+supermercado+mall"]
+    rest, four = data["fino"]
+    assert rest["retencion_m1"] is None  # 29 meses con el siguiente completo: no se muestra
+    assert rest["esperada"] == pytest.approx(0.47)  # una sola vertical: la de Rappi, sin supuesto
+    assert four == {
+        "combo": "restaurantes+turbo+supermercado+mall",
+        "meses_usuario": 40,
+        "retencion_m1": pytest.approx(0.95),
+        "retencion_n": 30,
+        "esperada": pytest.approx(1 - (1 - 0.93) * 0.9, abs=1e-4),  # la 2.ª de Retail quita 10 % de lo que no vuelve
+    }
+    assert data["supuesto"] == {
+        "reduccion_base": 0.1,
+        "decaimiento": 0.5,
+        "servicio": 0.05,
+        "nota": load_combos().diminishing.note,
+    }
+    assert data["nota"] == "Simulado: no es evidencia"
+    assert [row["combo"] for row in queries.combos(db, "prototype")["fino"]] == ["turbo"]
+
+
+def test_combos_fine_table_of_few_people_does_not_single_anyone_out(db):
+    _fine(db, "prototype", "turbo", queries.MIN_GROUP_USERS, 0)
+    _fine(db, "prototype", "restaurantes", queries.MIN_GROUP_USERS - 1, 0)  # pocas personas: no se muestra
+    for combo in ("restaurantes+farmacia", "licores", "restaurantes+turbo+licores+favor", "farmacia+licores"):
+        _fine(db, "prototype", combo, 50, 0)  # Farmacia y Licores solo suben por señales propias
+    _fine(db, "synthetic", "restaurantes+farmacia", 5, 0)  # en lo simulado no hay a quién señalar
+
+    assert [row["combo"] for row in queries.combos(db, "prototype")["fino"]] == ["turbo"]
+    assert [row["combo"] for row in queries.combos(db, "synthetic")["fino"]] == ["restaurantes+farmacia"]
+
+
+def test_combos_fine_table_keeps_the_most_frequent(db):
+    verticals = ("turbo", "supermercado", "conveniencia", "mall", "chocolateria")
+    combos = [f"restaurantes+{a}+{b}" for i, a in enumerate(verticals) for b in verticals[i + 1 :]]
+    combos += [f"restaurantes+{v}" for v in verticals] + ["restaurantes", "turbo"]
+    for months, combo in enumerate(combos, start=1):
+        _fine(db, "synthetic", combo, months, 0)
+
+    rows = queries.combos(db, "synthetic")["fino"]
+
+    assert len(rows) == queries.FINE_COMBO_ROWS
+    assert rows[0]["combo"] == "turbo" and rows[0]["meses_usuario"] == len(combos)

@@ -34,6 +34,7 @@ export const evaluation = {
     },
   },
   recompra: { n: 64, compraron: 0.4, error_mediano_dias: 3, acierto_7_dias: 0.31 },
+  paso: { personas: 120, con_paso: 110, escalera: 0.35, mas_sumada: 0.25 },
 }
 
 export const motorBody = (source, overrides = {}) => ({

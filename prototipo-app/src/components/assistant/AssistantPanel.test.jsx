@@ -836,6 +836,21 @@ describe('«¿Qué puedo probar?» (una oferta pedida desde fuera)', () => {
     expect(push).toHaveBeenCalledWith(...routeForScreen(made.actions[0].route[0]))
   })
 
+  test('el paso a RappiFavor no trae productos: su texto, su acción a su pantalla y el servicio ofrecido y abierto', async () => {
+    const push = vi.fn()
+    const made = fixture('agent-offer-vertical-por-probar-servicio')
+    stubCatalog({ 'POST /agent/offer': made })
+    await renderPanel({ push })
+    await askToTry()
+
+    expect(made.products).toEqual([])
+    expect(bubbles()).toContain(made.text)
+    expect(tracked('service_shown')).toEqual([{ payload: { servicio: 'rappifavor' } }])
+    fireEvent.click(screen.getByRole('button', { name: /^Abrir RappiFavor/ }))
+    expect(tracked('service_opened')).toEqual([{ payload: { servicio: 'rappifavor' } }])
+    expect(push).toHaveBeenCalledWith('favor', undefined)
+  })
+
   test('sin una oferta (204) lo dice, y si la API no contesta, Sin conexión y Reintentar', async () => {
     let online = false
     stubCatalog({

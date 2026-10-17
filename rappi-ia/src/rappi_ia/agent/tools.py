@@ -11,7 +11,7 @@ from rappi_scraper.storage.search import MIN_PRICE
 from .. import config
 from ..concepts.taxonomy import load_taxonomy
 from ..embeddings.base import TextEmbedder
-from ..motor.combos import load_combos
+from ..motor.combos import SERVICES
 from ..motor.predict import step_signal, target_step
 from ..motor.recommend import RECENT_DAYS, CrossPick, cross_picks, latest_lambda
 from ..offers.guards import (
@@ -221,10 +221,10 @@ def suggest_complement(
     hace poco alguno de los `source_concepts`) que salen de uno de ellos que el agente puede nombrar, con peso
     min(1, (lift − 1) / CROSS_LIFT_SPAN), y que se buscan solo en la vertical de la regla; de un mismo concepto vale el
     mayor peso. Van de mayor a menor peso (a igual peso, por id), salvo que, con `user_id` y un paso del motor
-    (`target_step`), entre los que pesan menos de `SIMILAR_MARGIN` por debajo del primero haya uno que se vende en una
-    vertical del grupo que completa su combinación (sin contar la actual) y el primero no: ese va primero y busca antes
-    en esas verticales. La marca de la persona gana a ese desempate: si el primero trae un producto de una marca que
-    compra (`prefer_brands`), queda el orden de siempre. La `basis` de la sugerencia dice `combinacion` si el desempate
+    (`target_step`), entre los que pesan menos de `SIMILAR_MARGIN` por debajo del primero haya uno que se vende en la
+    vertical del paso (si no es la actual) y el primero no: ese va primero y busca antes ahí. La marca de la persona
+    gana a ese desempate: si el primero trae un producto de una marca que compra (`prefer_brands`), queda el orden de
+    siempre. La `basis` de la sugerencia dice `combinacion` si el desempate
     la eligió y `compra_cruzada` («<A>→<B>@<vertical>» de la regla) si la trajo una compra cruzada. Una compra cruzada
     se busca solo en la vertical de su regla; si ahí no hay productos, el mismo concepto se prueba por su arista curada
     (o aprendida) en las verticales de siempre, y la sugerencia sale sin esa `basis`.
@@ -315,7 +315,8 @@ def suggest_complement(
     similar = [c for c in candidates[1:] if round(best.weight - c.weight, 6) < SIMILAR_MARGIN]
     step = target_step(conn, user_id, population) if user_id is not None and similar else None
     if step is not None:
-        group = {v for v in load_combos().groups[step[0]] if offerable_vertical(v)}
+        # Un servicio no tiene productos.
+        group = {step.vertical} if step.vertical not in SERVICES and offerable_vertical(step.vertical) else set()
         for candidate in (best, *similar):
             if completing := [v for v in verticals_of(candidate) if v in group and v != current_vertical]:
                 break
@@ -326,7 +327,7 @@ def suggest_complement(
                 usual = searched[best.concept] = search(best, verticals_of(best))
                 if usual is not None and usual[2] is not None:
                     return suggestion(best, usual, [])
-            # Primero en las verticales del grupo; si ahí no hay productos, vuelve a su lugar de siempre.
+            # Primero en la vertical del paso; si ahí no hay productos, vuelve a su lugar de siempre.
             if result := search(candidate, completing):
                 return suggestion(candidate, result, [step_signal(conn, step, population)])
 

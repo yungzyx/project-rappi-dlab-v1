@@ -189,6 +189,22 @@ def test_the_combination_of_the_last_30_days_sets_the_retention():
     assert synth._stay_probability(moved, now, 15) == pytest.approx(0.76**0.5)
 
 
+def test_each_extra_vertical_inside_a_group_adds_retention_with_diminishing_returns():
+    """El supuesto propio de la escalera fina: dentro de «retail», Súper + Express rinde más que solo Súper, y el
+    tercero menos; nunca llega a 1."""
+    now = END - timedelta(days=1)
+    recent = [now - timedelta(days=3)]
+    one = _state("rest+retail", {"restaurantes": recent, "supermercado": recent})
+    two = _state("rest+retail", {**one.orders_by_vertical, "conveniencia": recent})
+    three = _state("rest+retail", {**two.orders_by_vertical, "mall": recent})
+    p1, p2, p3 = (synth._stay_probability(x, now, 30) for x in (one, two, three))
+
+    assert p1 == pytest.approx(0.76)
+    assert p2 == pytest.approx(1 - 0.24 * 0.9)
+    assert p3 == pytest.approx(1 - 0.24 * 0.9 * 0.95)
+    assert p1 < p2 < p3 < 1
+
+
 def test_without_recent_orders_the_retention_is_the_archetype_one():
     now = END - timedelta(days=1)
     assert synth._stay_probability(_state("rest", {}), now, 30) == pytest.approx(0.47)

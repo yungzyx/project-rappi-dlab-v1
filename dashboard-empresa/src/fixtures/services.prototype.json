@@ -6,6 +6,7 @@
       "nombre": "✈️ RappiTravel",
       "ofrecido": 0,
       "abierto": 0,
+      "desde_home": 0,
       "ganchos_mostrados": 0,
       "ganchos_aceptados": 0
     },
@@ -14,6 +15,7 @@
       "nombre": "🛵 RappiFavor",
       "ofrecido": 0,
       "abierto": 0,
+      "desde_home": 0,
       "ganchos_mostrados": 0,
       "ganchos_aceptados": 0
     }

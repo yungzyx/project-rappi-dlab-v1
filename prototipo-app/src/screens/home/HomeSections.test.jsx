@@ -98,6 +98,20 @@ test('un acceso con vertical llama a onOpen con su cÃ³digo del backend; los demÃ
   expect(onOpen).not.toHaveBeenCalled()
 })
 
+test('abrir RappiTravel o RappiFavor llama a onService una vez con su servicio; si no abre, no', () => {
+  const onService = vi.fn()
+  const { unmount } = render(<Shortcuts push={vi.fn()} onService={onService} />, { wrapper: ToastProvider })
+  fireEvent.click(screen.getByLabelText('RappiFavor (no disponible)'))
+  expect(onService).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByText('RappiTravel'))
+  expect(onService).toHaveBeenCalledExactlyOnceWith('rappitravel')
+  unmount()
+  onService.mockClear()
+  render(<Shortcuts push={vi.fn()} proposal onService={onService} />, { wrapper: ToastProvider })
+  for (const name of ['RappiFavor', 'RappiTravel', 'Pharmacy', 'Loyalty']) fireEvent.click(screen.getByText(name))
+  expect(onService.mock.calls).toEqual([['rappifavor'], ['rappitravel']])
+})
+
 test('los dos accesos grandes llaman a onOpen con restaurantes y turbo', () => {
   const onOpen = vi.fn()
   const push = vi.fn()

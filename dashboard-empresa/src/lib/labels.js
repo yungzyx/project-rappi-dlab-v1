@@ -21,6 +21,17 @@ export const comboLabel = (combo) =>
     .map((group) => COMBO_GROUPS[group] ?? group)
     .join(' + ')
 
+const SERVICES = { favor: 'RappiFavor', travel: 'RappiTravel' }
+
+/** "restaurantes+turbo+mall" → "Restaurantes + Turbo + Rappi Mall": una combinación fina, vertical por vertical. */
+export const fineComboLabel = (combo) =>
+  combo === 'ninguna'
+    ? 'Ninguna'
+    : combo
+        .split('+')
+        .map((member) => SERVICES[member] ?? verticalLabel(member))
+        .join(' + ')
+
 export const SOURCE_LABELS = { synthetic: 'Simulados', prototype: 'Prototipo' }
 
 /** Nombre de una demanda no satisfecha: el concepto (con emoji) o, si no hay concepto, la consulta literal. */

@@ -387,6 +387,22 @@ describe('Home del prototipo final', () => {
       expect(push).toHaveBeenLastCalledWith(...routeForScreen(made.actions[0].route[0]))
     })
 
+    test('si el paso es RappiFavor, Mochi lo presenta y su botón abre su pantalla y lo registra', async () => {
+      const push = vi.fn()
+      const made = fixture('agent-offer-vertical-por-probar-servicio')
+      stubAgent({ 'POST /agent/offer': (req) => (req.body.moment === 'vertical_por_probar' ? made : 204) })
+      const { container } = await renderHome({ push })
+      await advance(900 + 3400)
+      fireEvent.click(screen.getByRole('button', { name: /^Mochi:/ }))
+      await advance(3000)
+      expect(container.querySelector('.live-bubble p').textContent).toBe(made.text)
+      const service = (type) => events.track.mock.calls.filter(([name]) => name === type).map(([, fields]) => fields)
+      expect(service('service_shown')).toEqual([{ payload: { servicio: 'rappifavor' } }])
+      fireEvent.click(screen.getByRole('button', { name: 'Abrir RappiFavor' }))
+      expect(service('service_opened')).toEqual([{ payload: { servicio: 'rappifavor' } }])
+      expect(push).toHaveBeenLastCalledWith('favor')
+    })
+
     test('tocar a Mochi sin nada que ofrecer (204) calla', async () => {
       stubAgent({ 'POST /agent/offer': 204 })
       const { container } = await renderHome()
@@ -791,7 +807,7 @@ describe('Home del prototipo final', () => {
       }
     })
 
-    test('tocar un vertical manda vertical_open con su código; Loyalty, RappiTravel y RappiFavor no mandan nada', async () => {
+    test('tocar un vertical manda vertical_open con su código; RappiTravel y RappiFavor, service_opened una vez; Loyalty nada', async () => {
       stubAgent({ 'GET /profile/*': fixture('profile-verticales') })
       const push = vi.fn()
       await renderHome({ push })
@@ -804,6 +820,13 @@ describe('Home del prototipo final', () => {
       for (const name of ['Loyalty', 'RappiTravel', 'RappiFavor', 'Benefits Pro'])
         fireEvent.click(screen.getByText(name))
       expect(opened()).toHaveLength(3)
+      // Abrir un servicio desde la Home cuenta igual que desde Mochi: así la escalera no lo vuelve a ofrecer.
+      const services = events.track.mock.calls.filter(([type]) => type === 'service_opened').map(([, fields]) => fields)
+      // Con `desde: 'home'` el panel no los cuenta como aperturas de lo que ofreció Mochi.
+      expect(services).toEqual([
+        { payload: { servicio: 'rappitravel', desde: 'home' } },
+        { payload: { servicio: 'rappifavor', desde: 'home' } },
+      ])
     })
   })
 })

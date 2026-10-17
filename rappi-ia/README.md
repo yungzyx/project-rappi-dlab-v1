@@ -220,5 +220,6 @@ rappi-ia/
 | `034_prewarm.sql` | Extensión `pg_prewarm`: al arrancar, la API lee en segundo plano los índices HNSW y de texto de la búsqueda (`API_PREWARM`). Si el rol no puede crearla (en producción la crea `init-roles.sh`), solo avisa |
 | `035_sin_juego.sql` | El pasaporte y el juego salen del proyecto: borra `knowledge_cards`, `knowledge_card_concepts`, `game_state` y los eventos del juego |
 | `036_motor.sql` | Motor multivertical: 7 tablas (`user_vertical_affinity`, `vertical_transitions`, `combo_stats`, `combo_steps`, `cross_sell_rules`, `trends`, `replenishment`) con sus vistas en `capa`, el evento `vertical_open` y la capa `motor` en `layer_runs`. Las de población llevan `data_source`; las de cada persona se borran con ella |
+| `037_combos_finos.sql` | Escalera fina: `combo_stats` y `combo_steps` guardan dos niveles (`nivel`: `grueso`, los grupos de la tabla de Rappi, y `fino`, las verticales una por una más RappiFavor y RappiTravel) y sus vistas en `capa` lo exponen |
 
 `014`–`015` (limpieza del HTML de los documentos de búsqueda), `017`–`019` y `021` (formatos de tienda, Turbo, vigencia y platos por local) y `032` (`latest_prices` y `latest_menu_prices`, el último precio mantenido por triggers, y la vista `v_latest_offers`, la definición única de oferta vigente, que esta capa también lee) son del scraper.

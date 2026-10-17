@@ -476,6 +476,11 @@ def test_services_count_offers_openings_and_accepted_hooks(db):
                 payload={"origen": "rappitravel"},
             ),
             events.Event("u3", "s3", "service_shown", ts=SERVICE_TS, payload={"servicio": "rappifavor"}),
+            # Abrirlo desde un acceso de la Home no mide al agente: se cuenta aparte.
+            events.Event("u4", "s4", "service_opened", ts=SERVICE_TS, payload={**travel, "desde": "home"}),
+            events.Event(
+                "u3", "s3", "service_opened", ts=SERVICE_TS, payload={"servicio": "rappifavor", "desde": "home"}
+            ),
         ],
         source="prototype",
     )
@@ -485,10 +490,12 @@ def test_services_count_offers_openings_and_accepted_hooks(db):
         "nombre": "✈️ RappiTravel",
         "ofrecido": 2,
         "abierto": 1,
+        "desde_home": 1,
         "ganchos_mostrados": 1,
         "ganchos_aceptados": 1,
     }
-    assert (rows["rappifavor"]["ofrecido"], rows["rappifavor"]["abierto"]) == (1, 0)
+    favor = rows["rappifavor"]
+    assert (favor["ofrecido"], favor["abierto"], favor["desde_home"]) == (1, 0, 1)
 
 
 def test_synthetic_sessions_also_use_the_services(simulated):

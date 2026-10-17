@@ -3,7 +3,8 @@ persona pidió después, frente a líneas base. Usa las mismas funciones de `mod
 
 Tres tramos: entrenar (todo hasta 56 días antes del final), validar (28 días) y probar (los últimos 28). Los pesos del
 próximo vertical se eligen en validación (a = 1; b y c en una grilla, por nDCG) y las cifras que se informan son las de
-prueba. Sobre datos simulados esto prueba la mecánica del motor, no su efecto.
+prueba. El paso de la escalera fina (`combos.next_fine_step`) se mide contra la vertical que más se suma en la
+población. Sobre datos simulados esto prueba la mecánica del motor, no su efecto.
 """
 
 import math
@@ -13,11 +14,15 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
+from ..offers.guards import offerable_vertical
+from .combos import OWN_SIGNALS_ONLY, fine_of, next_fine_step
 from .data import Order, Signal
 from .model import (
     DEFAULT_ORDER,
     DEFAULT_WEIGHTS,
     affinity,
+    combo_months,
+    combo_stats,
     cross_sell,
     local_day,
     order_concepts,
@@ -26,6 +31,7 @@ from .model import (
     replenishment,
     transitions,
 )
+from .predict import CURRENT_COMBO_DAYS, LAPSED_COMBO_DAYS
 from .recommend import CROSS_SELL_LAMBDA, mix_scores
 
 WINDOW_DAYS = 28
@@ -51,6 +57,8 @@ LABELS = {
     "reglas": "Reglas aprendidas",
     "lo_mas_pedido": "Lo más pedido",
     "mezcla": "Mezcla",
+    "escalera": "Paso de la escalera",
+    "mas_sumada": "La vertical que más se suma",
 }
 
 
@@ -392,6 +400,86 @@ def _replenishment(history: _History, sensitive: frozenset[str], cut: datetime, 
     }
 
 
+# Paso de la escalera fina
+
+
+def _additions(history: _History, cut: datetime, end: datetime) -> dict[str, tuple[frozenset[str], frozenset[str]]]:
+    """`persona → (verticales de su combinación en el corte, verticales que suma en [cut, end))` para quien suma alguna.
+    La combinación es la de `predict.current_fine` en el corte, pero armada solo con los pedidos (sin servicios): los
+    últimos 30 días y, sin pedidos, los últimos 90; sin pedidos en 90 días no hay combinación (la oferta es la de
+    siempre). Solo cuentan las verticales que
+    la escalera puede proponer: Farmacia y Licores no son paso, así que sumarlas no cuenta."""
+    out = {}
+    for user in sorted(history.by_user):
+        recent = history.user_orders(user, cut - timedelta(days=CURRENT_COMBO_DAYS), cut) or history.user_orders(
+            user, cut - timedelta(days=LAPSED_COMBO_DAYS), cut
+        )
+        if not recent:
+            continue
+        have = frozenset(o.vertical for o in recent)
+        added = frozenset(
+            o.vertical
+            for o in history.user_orders(user, cut, end)
+            if o.vertical not in have and _proposable(o.vertical)
+        )
+        if added:
+            out[user] = (have, added)
+    return out
+
+
+def _proposable(vertical: str) -> bool:
+    return offerable_vertical(vertical) and vertical not in OWN_SIGNALS_ONLY
+
+
+def _learned(orders: list[Order], fine: bool) -> dict[str, tuple[int, float]]:
+    """La retención aprendida `combinación → (personas, retención)` con los pedidos dados, como la guarda el motor."""
+    return {
+        combo: (s["retention_n"], s["retention_m1"])
+        for combo, s in combo_stats(combo_months(orders, fine=fine)).items()
+        if s["retention_m1"] is not None
+    }
+
+
+def evaluate_step(
+    orders: list[Order], signals: list[Signal], cut: datetime, end: datetime, weights: dict[str, float]
+) -> dict:
+    """El paso de la escalera fina calculado en `cut` contra lo que la persona sumó en `[cut, end)`. Entran quienes
+    tienen combinación en el corte y suman alguna vertical nueva que la escalera puede proponer (ni Farmacia ni
+    Licores). `escalera`: acierto@1 de `next_fine_step` (con la retención de Rappi, el supuesto y lo aprendido de los
+    pedidos anteriores al corte; candidatos del catálogo en el orden de `rank_verticals` con `weights`); sin paso
+    cuenta como fallo y `con_paso` dice cuántas lo tienen. `mas_sumada`: la vertical que más personas sumaron en un
+    tramo igual de largo antes del corte, entre las que la persona no tiene."""
+    return _step(_History(orders, signals), cut, end, weights)
+
+
+def _step(history: _History, cut: datetime, end: datetime, weights: dict[str, float]) -> dict:
+    before = history.orders_before(cut)
+    learned_coarse, learned_fine = _learned(before, fine=False), _learned(before, fine=True)
+    aff = affinity(history.signals_before(cut), cut)
+    trans, pop = transitions(before), popularity(before, cut)
+    # La línea base: cuántas personas sumaron cada vertical en el tramo anterior (de igual largo que la prueba).
+    added_before = Counter(v for _have, added in _additions(history, cut - (end - cut), cut).values() for v in added)
+    most_added = sorted(DEFAULT_ORDER, key=lambda v: (-added_before[v], DEFAULT_ORDER.index(v)))
+    cases = _additions(history, cut, end)
+    ladder_hits = baseline_hits = with_step = 0
+    for user, (have, added) in cases.items():
+        last = history.user_orders(user, None, cut)[-1].vertical
+        ranked = rank_verticals(aff.get(user, {}), last, trans, pop, weights)
+        candidates = [v for v, _score in ranked if _proposable(v)]
+        step = next_fine_step(fine_of(have), candidates, learned_coarse, learned_fine)
+        with_step += step is not None
+        ladder_hits += step is not None and step.vertical in added
+        baseline = next((v for v in most_added if v not in have and _proposable(v)), None)
+        baseline_hits += baseline in added
+    people = len(cases)
+    return {
+        "personas": people,
+        "con_paso": with_step,
+        "escalera": ladder_hits / people if people else 0.0,
+        "mas_sumada": baseline_hits / people if people else 0.0,
+    }
+
+
 # Todo junto
 
 
@@ -410,10 +498,10 @@ def evaluate(
     previous_weights: dict[str, float] | None = None,
     previous_lambda: float | None = None,
 ) -> dict | None:
-    """Elige los pesos y el λ de la mezcla en validación y mide en prueba el próximo vertical, la compra cruzada y la
-    recompra. `None` si no hay 84 días de datos. Si nadie se puede validar, quedan `previous_weights` (por defecto
-    `DEFAULT_WEIGHTS`) y `previous_lambda` (por defecto `CROSS_SELL_LAMBDA`), y `validacion.aviso` lo dice. Un
-    diccionario serializable a JSON (fechas ISO, cifras con 4 decimales)."""
+    """Elige los pesos y el λ de la mezcla en validación y mide en prueba el próximo vertical, la compra cruzada, la
+    recompra y el paso de la escalera fina. `None` si no hay 84 días de datos. Si nadie se puede validar, quedan
+    `previous_weights` (por defecto `DEFAULT_WEIGHTS`) y `previous_lambda` (por defecto `CROSS_SELL_LAMBDA`), y
+    `validacion.aviso` lo dice. Un diccionario serializable a JSON (fechas ISO, cifras con 4 decimales)."""
     split = make_split(orders)
     if split is None:
         return None
@@ -441,6 +529,7 @@ def evaluate(
             "proximo_vertical": _next_vertical(test, weights),
             "compra_cruzada": _cross_sell(_cross_sell_window(history, sensitive, split.valid_end, split.test_end), lam),
             "recompra": _replenishment(history, sensitive, split.valid_end, split.test_end),
+            "paso": _step(history, split.valid_end, split.test_end, weights),
         }
     )
 
@@ -533,6 +622,22 @@ def report(results: dict, source: str) -> str:
         f"| {rp['n']} | {_fmt(rp['compraron'])} | {_fmt(rp['error_mediano_dias'])} | {_fmt(rp['acierto_7_dias'])} |",
         "",
     ]
+    step = results.get("paso")  # las corridas anteriores a la escalera fina no lo tienen
+    if step is not None:
+        lines += [
+            f"## Paso de la escalera (prueba, {step['personas']} personas)",
+            "",
+            "Personas con pedidos en los 90 días antes de la prueba que suman en ella una vertical que no estaba en su",
+            "combinación (30 días; sin pedidos, 90). Farmacia y Licores no cuentan: la escalera nunca las propone.",
+            "Acierto@1: la vertical propuesta es una de las que sumó. El paso se calcula con lo anterior a la prueba",
+            f"(tabla de Rappi, supuesto propio y retención aprendida); {step['con_paso']} personas tienen paso y, sin",
+            "paso, es un fallo. La línea base propone la vertical que más personas sumaron en los 28 días anteriores.",
+            "",
+            "| Método | Acierto@1 |",
+            "|---|---:|",
+            *(f"| {LABELS[key]} | {_fmt(step[key])} |" for key in ("escalera", "mas_sumada")),
+            "",
+        ]
     return "\n".join(lines)
 
 

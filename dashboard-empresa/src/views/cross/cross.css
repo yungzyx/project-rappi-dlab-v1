@@ -177,6 +177,10 @@
   white-space: normal;
 }
 
+.combos-fine {
+  grid-column: 1 / -1;
+}
+
 .combos-label {
   padding-top: 0;
   border-top: 0;

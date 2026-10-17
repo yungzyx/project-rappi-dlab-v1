@@ -13,8 +13,13 @@ SUPUESTOS (editables aquí):
   queda con lo que ese vertical vende.
 - El ritmo sale de los pedidos por persona de su arquetipo: una sesión cada 30 / (pedidos × SESSIONS_PER_ORDER) días,
   porque no toda sesión termina en pedido. Ya no lo fija el perfil.
-- La retención es la M+1 de la tabla de Rappi para la combinación de sus pedidos de los últimos 30 días (la de su
-  arquetipo si no tiene pedidos): en cada sesión sigue activa con probabilidad retención^(días desde la anterior / 30).
+- La retención es la M+1 de la tabla de Rappi para la combinación de grupos de sus pedidos de los últimos 30 días (la
+  de su arquetipo si no tiene pedidos), con el rendimiento decreciente de la escalera fina (motor/combos.toml,
+  `[rendimiento_decreciente]`; supuesto propio, no viene de Rappi): cada vertical extra dentro de un grupo reduce la
+  parte que no vuelve (10 %, 5 %, 2,5 %…), así que usar Súper y Express rinde más que solo Súper. Farmacia y Licores
+  cuentan como cualquier otra vertical del grupo: son uso propio de la persona (Mochi igual nunca las propone). En cada
+  sesión sigue activa con probabilidad retención^(días desde la anterior / 30). Los servicios (RappiFavor, RappiTravel)
+  no suman: la persona simulada los abre de pasada, no con regularidad.
   Es la supervivencia del estado activo, no «pide el mes siguiente»: quien sigue activa puede saltarse un mes, así que
   la retención M+1 medida en los simulados queda bajo la de Rappi. No es una falla de calibración.
 - SUPUESTO EXPLÍCITO: la tabla es una correlación (quien pide mucho usa más grupos y además vuelve más), pero aquí se
@@ -60,7 +65,15 @@ from psycopg import Connection
 
 from ..agent.verticals import ranked_verticals
 from ..concepts.taxonomy import load_taxonomy
-from ..motor.combos import GROUP_ORDER, NONE_COMBO, SERVICE_COMBO, combo_of_verticals, expected_retention, load_combos
+from ..motor.combos import (
+    GROUP_ORDER,
+    NONE_COMBO,
+    SERVICE_COMBO,
+    expected_fine_retention,
+    expected_retention,
+    fine_of,
+    load_combos,
+)
 from ..offers.guards import baby_in_name, is_offerable, offerable_vertical, unofferable_subverticals
 
 log = logging.getLogger(__name__)
@@ -751,15 +764,15 @@ def _session(rng, catalog: Catalog, s: UserState, ts: datetime, start: datetime,
 
 
 def _stay_probability(s: UserState, now: datetime, gap: float) -> float:
-    """Probabilidad de seguir activa después de una sesión: la retención M+1 de Rappi de su combinación de los últimos
-    30 días (la del arquetipo si no pidió), llevada a los días desde la sesión anterior. Las búsquedas sin resultado y
-    los carros abandonados de las últimas 4 semanas multiplican el riesgo (el exponente)."""
+    """Probabilidad de seguir activa después de una sesión: la retención M+1 esperada de su combinación fina de los
+    últimos 30 días (la de Rappi del arquetipo si no pidió), llevada a los días desde la sesión anterior. Las
+    búsquedas sin resultado y los carros abandonados de las últimas 4 semanas multiplican el riesgo (el exponente)."""
     window = now - timedelta(days=28)
     unmet = sum(1 for t in s.recent_unmet if t >= window)
     abandon = sum(1 for t in s.recent_abandon if t >= window)
     since = now - timedelta(days=COMBO_WINDOW_DAYS)
-    combo = combo_of_verticals(v for v, ts in s.orders_by_vertical.items() if any(t >= since for t in ts))
-    retention = expected_retention(s.archetype if combo == NONE_COMBO else combo)
+    fine = fine_of(v for v, ts in s.orders_by_vertical.items() if any(t >= since for t in ts))
+    retention = expected_retention(s.archetype) if fine == NONE_COMBO else expected_fine_retention(fine)
     risk = (1 + CHURN_UNMET * unmet) * (1 + CHURN_ABANDON * abandon)
     return retention ** (gap / 30 * risk)
 

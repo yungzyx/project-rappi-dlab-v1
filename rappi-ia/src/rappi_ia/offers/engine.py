@@ -3,8 +3,9 @@ con su precio vigente) y pasando por las guardias de `offers/guards.py`.
 
 Momentos (`POST /agent/offer`): `plan` (el kit de una ocasión que la persona eligió), `carrito` (un complemento de
 otra tienda), `checkout`, `proximo_pedido`, `sin_resultado` (dónde sí está lo que buscó), `vertical_por_probar` (la
-vertical del grupo que completa la combinación de verticales que más retiene, según el motor; sin ese paso, la vertical
-donde la persona aún no ha pedido y más le gusta, y sin historia, la primera), `recompra` («¿Repetimos?»: lo que la
+vertical que más sube la retención esperada de su combinación, según el motor, o RappiFavor o RappiTravel si ya pide en
+todas las que se ofrecen; sin ese paso, la vertical donde la persona aún no ha pedido y más le gusta, y sin historia, la
+primera), `recompra` («¿Repetimos?»: lo que la
 persona pide con ritmo y está por tocarle, según la tabla `replenishment` del motor) y `perfil` (la escalera de
 un perfil de gusto, `offers/profiles.py`, con su forma propia: `ProfileOffer`). Si no hay una buena oferta, no hay
 oferta (`None`: 204): el agente no dice nada.
@@ -18,11 +19,13 @@ sin_pedidos o perfil, este último en el momento `perfil` sin persona; e `id`; `
 de las señales de una persona en `offers/personal.py`). Lo que el agente no propone no entra a la base. Cuando la oferta
 se ordena por lo que le gusta a la persona (`vertical_por_probar` y las ocasiones de la Home), la `basis` son sus
 señales (`kind` concepto, con `score` y `source`) de los conceptos que más aportan. Cuando `vertical_por_probar` sigue
-el paso del motor, la `basis` parte con `combinacion` («<actual>→<objetivo>», `source` «rappi»: la tabla de Rappi, o
-«rappi+poblacion:<fuente>» si pesó la retención aprendida) y suma de dónde salen los productos: `compra_cruzada`
+el paso del motor, la `basis` parte con `combinacion` («<actual>→<objetivo>», con las combinaciones finas; `source`
+«rappi»: la tabla de Rappi, con «+supuesto» si pesó el supuesto del rendimiento decreciente y «+poblacion:<fuente>» si
+pesó la retención aprendida) y suma de dónde salen los productos: `compra_cruzada`
 («<A>→<B>@<vertical>»; si A no se nombra, «<B>@<vertical>» junto a `lo_mas_pedido`) o `lo_mas_pedido`
 («<vertical>»), con `source` «poblacion:<fuente>», y `vuelta` («<vertical>», `source` «pedidos») si la persona ya pidió
-ahí hace más de un mes; el texto habla de la persona, nunca de cifras de retención ni de lo que hace la población. La
+ahí hace más de un mes; el texto habla de la persona, nunca de cifras de retención ni de lo que hace la población. Si
+el paso es un servicio sin catálogo, la oferta no trae productos: lo presenta y su acción abre su pantalla. La
 `recompra` lleva su señal `recompra` («<concepto>», `source` «pedidos»: sale de los pedidos de la persona). Un
 complemento de una persona (`carrito`, `checkout`,
 `proximo_pedido`) suma `combinacion` si entre dos parecidos ganó el de la vertical que completa su combinación, y
@@ -48,9 +51,9 @@ from ..catalog.deals import deals
 from ..catalog.stores import BIGINT_MAX, product_card, product_detail
 from ..concepts.taxonomy import Concept, Service, load_taxonomy
 from ..embeddings.base import MemoizedQueryEmbedder, TextEmbedder
-from ..motor.combos import load_combos
+from ..motor.combos import SERVICES, Step, load_combos
 from ..motor.model import TZ
-from ..motor.predict import next_verticals, step_signal, target_step
+from ..motor.predict import step_signal, target_step
 from ..motor.recommend import CrossPick, cross_picks, latest_lambda
 from ..retrieval.hybrid import concepts_of, detect_concepts
 from ..text import contract_articles, normalize, tokens
@@ -149,6 +152,13 @@ BACK_TEXT = "Vuelve a {vertical}: mira {what}."
 BACK_TOP = "lo más pedido"
 BACK_RULE = "estos productos"
 REASON_BACK = "Porque hace más de un mes que no pides en {vertical}."
+# El paso es un servicio sin catálogo (la persona ya pide en todas las verticales que se ofrecen): {servicio} es su
+# nombre, {beneficio} su `pitch` de la taxonomía y {n} cuántas verticales del catálogo usa.
+SERVICE_TEXT = "¿Conoces {servicio}? {beneficio}"
+REASON_SERVICE = {
+    "favor": "Porque ya pides en {n} verticales: {servicio} te ayuda con lo que no está en la app.",
+    "travel": "Porque ya pides en {n} verticales: con {servicio} planeas el viaje.",
+}
 # La recompra: {destino} es el concepto, {cada} cada cuánto lo pide («cada día» o «cada N días», `_every`) y {hace}
 # «hoy», «ayer» o «hace N días».
 REPEAT_TEXT = "¿Repetimos {destino}? Pides {cada}."
@@ -480,14 +490,30 @@ def vertical_to_try(
     interests: Interests,
     user_id: str | None = None,
 ) -> Offer | None:
-    """La vertical por probar. Si el motor tiene un paso para la persona (`motor.predict.target_step`: el grupo que
-    más retención suma a su combinación de los últimos 30 días), una vertical de ese grupo (`_combo_offer`); si no lo
-    tiene (sin pedidos, o ya usa los tres grupos) o el grupo no tiene nada que mostrar, la de siempre
-    (`_usual_to_try`). `tried`: verticales del backend con algún pedido suyo (`tried_verticals`)."""
+    """La vertical por probar. Si el motor tiene un paso para la persona (`motor.predict.target_step`: la vertical que
+    más retención suma a su combinación de los últimos 30 días, o de 90 si no pidió en 30), esa vertical
+    (`_combo_offer`), o el servicio si el paso es RappiFavor o RappiTravel (`_service_offer`); si no lo tiene (sin
+    pedidos en 90 días, o ya usa todo) o la vertical no tiene nada que mostrar, la de siempre (`_usual_to_try`).
+    `tried`: verticales del backend con algún pedido suyo (`tried_verticals`)."""
     step = target_step(conn, user_id) if user_id is not None else None
+    if step is not None and step.vertical in SERVICES:
+        return _service_offer(conn, step)
     if step is not None and (offer := _combo_offer(conn, embedder, tried, interests, user_id, step)):
         return offer
     return _usual_to_try(conn, tried, interests)
+
+
+def _service_offer(conn: Connection, step: Step) -> Offer:
+    """«¿Conoces RappiFavor?»: el paso es un servicio sin catálogo, así que la oferta no trae productos; su acción abre
+    su pantalla (y la app anota `service_opened`, con lo que la escalera sigue)."""
+    service = load_taxonomy().services[load_combos().services[step.vertical]]
+    pitch = service.pitch.strip().rstrip(".")
+    text = SERVICE_TEXT.format(servicio=service.name, beneficio=f"{pitch[:1].upper()}{pitch[1:]}.")
+    used = [m for m in step.current.split("+") if m not in SERVICES]
+    why = REASON_SERVICE[step.vertical].format(n=len(used), servicio=service.name)
+    reason = _reason(why, [step_signal(conn, step, config.MOTOR_POBLACION)])
+    action = {"label": OPEN_ACTION.format(vertical=service.name), "route": [service.route], "service": service.id}
+    return Offer("vertical_por_probar", text, [], None, reason, [action])
 
 
 def _usual_to_try(conn: Connection, tried: set[str], interests: Interests) -> Offer | None:
@@ -546,21 +572,17 @@ def _combo_offer(
     tried: set[str],
     interests: Interests,
     user_id: str,
-    step: tuple[str, str, float],
+    step: Step,
 ) -> Offer | None:
-    """Una vertical del grupo que completa la combinación: las que se pueden ofrecer, primero las que la persona no ha
-    probado y, entre ellas, en el orden de `next_verticals`. Para la primera con algo que mostrar: los productos de su
-    mejor compra cruzada (`cross_picks`) si una regla la empujó, o los productos más pedidos ahí por la población
-    (`trends`, `most_ordered`), o los del concepto más pedido ahí (la compra cruzada sin empuje), o sus ofertas o
-    platos de siempre. La `basis` parte con el paso (`combinacion`). Si ya pidió en esa vertical (hace más de un mes),
-    lo más pedido y lo de siempre dicen «Vuelve a…»; la compra cruzada sigue siendo cierta y no cambia."""
-    group = step[0]
+    """La vertical del paso (`target_step` ya la eligió entre las que se pueden ofrecer, en el orden de
+    `next_verticals`), si tiene algo que mostrar: los productos de su mejor compra cruzada (`cross_picks`) si una regla
+    la empujó, o los productos más pedidos ahí por la población (`trends`, `most_ordered`), o los del concepto más
+    pedido ahí (la compra cruzada sin empuje), o sus ofertas o platos de siempre. La `basis` parte con el paso
+    (`combinacion`). Si ya pidió en esa vertical (hace más de un mes), lo más pedido y lo de siempre dicen «Vuelve
+    a…»; la compra cruzada sigue siendo cierta y no cambia."""
     population = config.MOTOR_POBLACION
     combo = step_signal(conn, step, population)
-    candidates = [v for v in load_combos().groups[group] if offerable_vertical(v)]
-    if len(candidates) > 1:
-        order = [s.vertical for s in next_verticals(conn, user_id, population)]
-        candidates.sort(key=lambda v: (v in tried, order.index(v)))
+    candidates = [step.vertical] if offerable_vertical(step.vertical) else []  # la guardia, aunque el paso ya la cumple
     if not candidates:
         return None
     lam = latest_lambda(conn, population)

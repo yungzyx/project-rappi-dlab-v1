@@ -39,7 +39,7 @@ export function MainTiles({ push, onOpen }) {
  * en el prototipo final su línea queda reservada (vacía si no hay leyenda) para que la fila no se mueva al aparecer.
  * `onOpen(vertical)` avisa qué vertical se tocó (código del backend); los accesos sin vertical no avisan.
  */
-export function Shortcuts({ push, proposal = false, order = null, caption = null, onOpen }) {
+export function Shortcuts({ push, proposal = false, order = null, caption = null, onOpen, onService }) {
   const toast = useToast()
   return (
     <>
@@ -57,8 +57,10 @@ export function Shortcuts({ push, proposal = false, order = null, caption = null
               onClick={() => {
                 if (item.vertical) onOpen?.(item.vertical)
                 if (unavailable) toast(`${item.label} no está disponible`)
-                else if (route) push(...route)
-                else toast()
+                else if (route) {
+                  if (item.service) onService?.(item.service) // abrir RappiFavor o RappiTravel: `service_opened`
+                  push(...route)
+                } else toast()
               }}
             >
               {enabled ? (
