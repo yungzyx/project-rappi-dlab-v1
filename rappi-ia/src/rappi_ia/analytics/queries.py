@@ -11,7 +11,7 @@ from psycopg.rows import dict_row
 
 from ..agent.verticals import MIN_ITEMS_ELSEWHERE, SHARES
 from ..concepts.taxonomy import load_taxonomy
-from ..motor.combos import load_combos
+from ..motor.combos import expected_fine_retention, load_combos
 
 SOURCES = ("synthetic", "prototype")
 ACTIVE_DAYS = 30
@@ -21,6 +21,7 @@ MIN_SUPPORT = 30  # usuarios mínimos para aprender una arista por co-ocurrencia
 MIN_GROUP_USERS = 20  # agregados con menos usuarios no se muestran (privacidad)
 # Meses con el siguiente completo que pide la retención de una combinación propia para mostrarse.
 MIN_COMBO_RETENTION_N = 30
+FINE_COMBO_ROWS = 15  # las combinaciones finas más frecuentes que muestra el panel
 COMBO_NOTES = {
     "synthetic": "Simulado: no es evidencia",
     "prototype": "uso del MVP, pocas personas: no es evidencia",
@@ -561,7 +562,11 @@ def combos(conn: Connection, source: str = "synthetic") -> dict:
     """La tabla de Rappi («verticales usados juntos», `motor/combos.toml`) junto a la misma tabla medida con los datos
     de la fuente (`combo_stats`, de la última corrida del motor). La de Rappi es un dato compartido por su equipo y no
     depende de la fuente; la propia sí, y lleva su rótulo en `nota`. La retención propia solo se entrega con
-    `MIN_COMBO_RETENTION_N` meses que tengan el siguiente completo. Es una correlación, no un efecto."""
+    `MIN_COMBO_RETENTION_N` meses que tengan el siguiente completo. Es una correlación, no un efecto.
+
+    `fino`: las `FINE_COMBO_ROWS` combinaciones finas (verticales una por una) más frecuentes de la fuente, con su
+    retención aprendida (con la misma regla) y la `esperada` de la tabla de Rappi con el supuesto propio del
+    rendimiento decreciente, sin lo aprendido; `supuesto`, los valores de ese supuesto (`[rendimiento_decreciente]`)."""
     _check(source)
     table = load_combos()
     own = _rows(
@@ -574,6 +579,19 @@ def combos(conn: Connection, source: str = "synthetic") -> dict:
            ORDER BY user_months DESC, combo COLLATE "C" """,
         {"source": source, "min_n": MIN_COMBO_RETENTION_N},
     )
+    fine = _rows(
+        conn,
+        """SELECT combo, user_months AS meses_usuario,
+                  CASE WHEN retention_n >= %(min_n)s THEN retention_m1 END AS retencion_m1,
+                  retention_n AS retencion_n
+           FROM combo_stats WHERE data_source = %(source)s AND nivel = 'fino'
+           ORDER BY user_months DESC, combo COLLATE "C" LIMIT %(limit)s""",
+        {"source": source, "min_n": MIN_COMBO_RETENTION_N, "limit": FINE_COMBO_ROWS},
+    )
+    for row in fine:
+        expected = expected_fine_retention(row["combo"])
+        row["esperada"] = None if expected is None else round(expected, 4)
+    dim = table.diminishing
     return {
         "rappi": {
             "filas": [_rappi_row(row) for row in table.rappi.values()],
@@ -581,6 +599,13 @@ def combos(conn: Connection, source: str = "synthetic") -> dict:
             "nota": table.source_note,
         },
         "propio": own,
+        "fino": fine,
+        "supuesto": {
+            "reduccion_base": dim.reduction_base,
+            "decaimiento": dim.decay,
+            "servicio": dim.service,
+            "nota": dim.note,
+        },
         "nota": COMBO_NOTES[source],
     }
 

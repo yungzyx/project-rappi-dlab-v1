@@ -104,7 +104,7 @@ function MultiVertical({ source }) {
 }
 
 function Combos({ source }) {
-  return <ComboTables data={useAnalytics('combos', source)} />
+  return <ComboTables data={useAnalytics('combos', source)} source={source} />
 }
 
 function Motor({ source }) {
@@ -206,7 +206,8 @@ export function CrossVerticalView({ source }) {
             vuelve a pedir al mes siguiente. «Retail» agrupa todo el comercio que no es restaurante ni Turbo. A la
             izquierda, la tabla que compartió Rappi; a la derecha, la misma tabla medida con los datos de esta fuente.
             Es una correlación, no un efecto: quien pide mucho usa más verticales y además vuelve más. El motor la toma
-            como punto de partida, no como promesa.
+            como punto de partida, no como promesa. Debajo, las combinaciones finas (vertical por vertical) con las que
+            la escalera sigue sumando verticales dentro de cada grupo.
           </p>
           <ProvenanceBadge kind={source} />
         </div>

@@ -14,6 +14,7 @@ from rappi_ia.motor.evaluate import (
     evaluate_cross_sell,
     evaluate_next_vertical,
     evaluate_replenishment,
+    evaluate_step,
     make_split,
     not_evaluated,
     rank_metrics,
@@ -237,3 +238,61 @@ def test_not_evaluated_stub_says_so():
 def test_evaluate_without_enough_data_is_none():
     orders = [order("u1", 0, "turbo"), order("u1", 10, "turbo")]
     assert evaluate(orders, signals_of(orders), frozenset()) is None
+
+
+def test_step_follows_the_ladder_and_beats_the_most_added():
+    cut = T0 + timedelta(days=100)
+    end = cut + timedelta(days=28)
+    weights = {"afinidad": 1.0, "transicion": 0.3, "popularidad": 0.1}
+    orders = []
+    # Antes de la prueba, 10 personas de Supermercado suman Mall: la línea base propone Mall.
+    for i in range(10):
+        orders += [order(f"b{i}", 60, "supermercado"), order(f"b{i}", 90, "mall")]
+    # 5 personas de Restaurantes suman Turbo en la prueba: la escalera gruesa propone Turbo (0,82 contra 0,76).
+    for i in range(5):
+        orders += [order(f"r{i}", 95, "restaurantes"), order(f"r{i}", 105, "turbo")]
+    # Sin pedidos en 30 días pero sí en 90: entra con su combinación de 90 días.
+    orders += [order("lapsed", 40, "restaurantes"), order("lapsed", 103, "turbo")]
+    # Solo suma Farmacia (la escalera nunca la propone) o no tiene pedidos en 90 días: no cuentan.
+    orders += [order("f", 95, "restaurantes"), order("f", 104, "farmacia")]
+    orders += [order("old", 5, "restaurantes"), order("old", 106, "turbo")]
+    orders.sort(key=lambda o: o.ts)
+
+    out = evaluate_step(orders, signals_of(orders), cut, end, weights)
+    assert out["personas"] == 6
+    assert out["con_paso"] == 6
+    assert out["escalera"] == 1.0
+    assert out["mas_sumada"] == 0.0  # Mall: nadie de Restaurantes lo sumó
+
+
+def test_step_inside_retail_never_farmacia():
+    cut = T0 + timedelta(days=100)
+    end = cut + timedelta(days=28)
+    weights = {"afinidad": 1.0, "transicion": 0.0, "popularidad": 0.0}
+    # Rest + Turbo + Supermercado con mucha afinidad por Farmacia: el paso sigue dentro de Retail (Mall, primero entre
+    # los que le faltan en el orden fijo) y nunca es Farmacia.
+    base = [order("u", 90, v) for v in ("restaurantes", "turbo", "supermercado")]
+    base += [order("u", 91, "farmacia"), order("u", 92, "farmacia")]
+    adds_mall = sorted([*base, order("u", 101, "farmacia"), order("u", 102, "mall")], key=lambda o: o.ts)
+    out = evaluate_step(adds_mall, signals_of(adds_mall), cut, end, weights)
+    assert (out["personas"], out["con_paso"], out["escalera"]) == (1, 1, 1.0)
+
+    adds_chocolate = sorted([*base, order("u", 102, "chocolateria")], key=lambda o: o.ts)
+    out = evaluate_step(adds_chocolate, signals_of(adds_chocolate), cut, end, weights)
+    assert (out["personas"], out["escalera"]) == (1, 0.0)
+
+    # Mall ya estaba en su combinación de 30 días: no suma nada nuevo y no cuenta.
+    had_mall = sorted([*base, order("u", 93, "mall"), order("u", 102, "mall")], key=lambda o: o.ts)
+    assert evaluate_step(had_mall, signals_of(had_mall), cut, end, weights)["personas"] == 0
+
+
+def test_evaluate_reports_the_step():
+    orders = _graduates()
+    results = evaluate(orders, signals_of(orders), frozenset())
+
+    step = results["paso"]
+    assert set(step) == {"personas", "con_paso", "escalera", "mas_sumada"}
+    text = report(results, "synthetic")
+    assert "## Paso de la escalera" in text
+    assert "| Paso de la escalera |" in text and "| La vertical que más se suma |" in text
+    assert "## Paso de la escalera" not in report({**results, "paso": None}, "synthetic")

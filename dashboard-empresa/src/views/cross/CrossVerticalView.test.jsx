@@ -80,7 +80,8 @@ describe('CrossVerticalView', () => {
     expect(screen.getByText('Dato compartido por Rappi (cohortes ene–jun 2026)')).toBeTruthy()
     expect(screen.getByText(combos.data.rappi.nota)).toBeTruthy()
     expect(combos.data.rappi.nota).toMatch(/Es una correlación, no un efecto/)
-    expect(screen.getByText('Simulado: no es evidencia')).toBeTruthy()
+    // La tabla propia y la fina llevan el rótulo.
+    expect(screen.getAllByText('Simulado: no es evidencia')).toHaveLength(2)
     expect(screen.queryByText('uso del MVP, pocas personas: no es evidencia')).toBeNull()
 
     const rows = (table) =>
@@ -143,11 +144,46 @@ describe('CrossVerticalView', () => {
     await renderWithData(<CrossVerticalView source="prototype" />)
 
     expect(await screen.findByRole('table', { name: 'Combinaciones de verticales de Rappi' })).toBeTruthy()
-    // La tabla propia y el motor (que también corrió con pedidos del prototipo) llevan el rótulo.
-    expect(screen.getAllByText('uso del MVP, pocas personas: no es evidencia')).toHaveLength(2)
+    // La tabla propia, la fina y el motor (que también corrió con pedidos del prototipo) llevan el rótulo.
+    expect(screen.getAllByText('uso del MVP, pocas personas: no es evidencia')).toHaveLength(3)
     expect(screen.queryByText('Simulado: no es evidencia')).toBeNull()
     expect(screen.queryByRole('table', { name: 'Combinaciones de verticales con datos propios' })).toBeNull()
     expect(screen.getByText('Sin pedidos propios todavía')).toBeTruthy()
+    expect(screen.getByText('Sin combinaciones finas todavía')).toBeTruthy()
+    expect(screen.queryByText(/coinciden por construcción/)).toBeNull()
+  })
+
+  test('las combinaciones finas muestran la retención aprendida, la esperada y el supuesto propio explicado', async () => {
+    const fino = [
+      {
+        combo: 'restaurantes+turbo+supermercado+mall',
+        meses_usuario: 140,
+        retencion_m1: 0.951,
+        retencion_n: 90,
+        esperada: 0.937,
+      },
+      { combo: 'restaurantes+chocolateria', meses_usuario: 12, retencion_m1: null, retencion_n: 8, esperada: 0.76 },
+    ]
+    serveFixturesWith({ combos: { source: 'synthetic', data: { ...combos.data, fino } } })
+    await renderWithData(<CrossVerticalView source="synthetic" />)
+
+    const table = await screen.findByRole('table', { name: 'Combinaciones finas con datos propios' })
+    const rows = within(table)
+      .getAllByRole('row')
+      .slice(1)
+      .map((row) =>
+        within(row)
+          .getAllByRole('cell')
+          .map((cell) => cell.textContent),
+      )
+    expect(rows).toEqual([
+      ['Restaurantes + Turbo + Supermercado + Rappi Mall', '140', '95,1%', '93,7%'],
+      ['Restaurantes + Chocolatería', '12', '—', '76,0%'],
+    ])
+    expect(screen.getByText(/Supuesto propio, no es dato de Rappi/).textContent).toMatch(
+      /la 2\.ª un 10%, la 3\.ª un 5%, la 4\.ª un 2,5%…\) y cada servicio usado \(RappiFavor, RappiTravel\), un 5%/,
+    )
+    expect(screen.getByText(/coinciden por construcción/)).toBeTruthy()
   })
 
   test('«Motor» sin evaluación muestra pesos, λ y la fecha, y dice por qué no hay métricas', async () => {
@@ -196,10 +232,27 @@ describe('CrossVerticalView', () => {
     ])
     const repeat = screen.getByRole('table', { name: 'Recompra' })
     expect(cells(repeat)).toEqual([['64', '40,0%', '3', '31,0%']])
+    const step = screen.getByRole('table', { name: 'Paso de la escalera' })
+    expect(cells(step)).toEqual([
+      ['Paso de la escalera', '35,0%'],
+      ['La vertical que más se suma', '25,0%'],
+    ])
+    expect(screen.getByText(/120 personas que en la prueba suman una vertical/)).toBeTruthy()
     expect(screen.getByText('Afinidad 1 · Transición 0,5 · Popularidad 0,1')).toBeTruthy()
     expect(screen.getByText('λ = 2')).toBeTruthy()
     expect(screen.getByText(/prueba la mecánica del motor, no el efecto/)).toBeTruthy()
     expect(screen.getByText('Datos simulados:')).toBeTruthy()
+  })
+
+  test('«Motor» de una corrida sin el paso de la escalera no muestra su tabla', async () => {
+    const body = motorBody('synthetic')
+    const { paso: _paso, ...older } = body.data.evaluacion
+    body.data.evaluacion = older
+    serveFixturesWith({ motor: body })
+    await renderWithData(<CrossVerticalView source="synthetic" />)
+
+    expect(await screen.findByRole('table', { name: 'Recompra' })).toBeTruthy()
+    expect(screen.queryByRole('table', { name: 'Paso de la escalera' })).toBeNull()
   })
 
   test('«Motor» con aviso de validación lo muestra', async () => {

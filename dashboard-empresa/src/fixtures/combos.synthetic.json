@@ -1,5 +1,49 @@
 {
   "data": {
+    "fino": [
+      {
+        "combo": "restaurantes",
+        "esperada": 0.47,
+        "meses_usuario": 17,
+        "retencion_m1": null,
+        "retencion_n": 3
+      },
+      {
+        "combo": "restaurantes+conveniencia",
+        "esperada": 0.76,
+        "meses_usuario": 2,
+        "retencion_m1": null,
+        "retencion_n": 0
+      },
+      {
+        "combo": "restaurantes+chocolateria",
+        "esperada": 0.76,
+        "meses_usuario": 1,
+        "retencion_m1": null,
+        "retencion_n": 0
+      },
+      {
+        "combo": "restaurantes+supermercado",
+        "esperada": 0.76,
+        "meses_usuario": 1,
+        "retencion_m1": null,
+        "retencion_n": 0
+      },
+      {
+        "combo": "restaurantes+turbo",
+        "esperada": 0.82,
+        "meses_usuario": 1,
+        "retencion_m1": null,
+        "retencion_n": 0
+      },
+      {
+        "combo": "turbo+farmacia",
+        "esperada": 0.8,
+        "meses_usuario": 1,
+        "retencion_m1": null,
+        "retencion_n": 0
+      }
+    ],
     "nota": "Simulado: no es evidencia",
     "propio": [
       {
@@ -128,6 +172,12 @@
         "retencion_m1": 0.55,
         "usuarios": 1180000
       }
+    },
+    "supuesto": {
+      "decaimiento": 0.5,
+      "nota": "supuesto propio: cada vertical extra dentro de un grupo reduce la parte que no vuelve: 10 %, 5 %, 2,5 %…; cada servicio, 5 %; nunca llega a 100 %. Con datos reales se reemplaza por lo aprendido",
+      "reduccion_base": 0.1,
+      "servicio": 0.05
     }
   },
   "guardado": {

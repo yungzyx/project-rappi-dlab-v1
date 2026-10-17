@@ -16,9 +16,10 @@ SUPUESTOS (editables aquí):
 - La retención es la M+1 de la tabla de Rappi para la combinación de grupos de sus pedidos de los últimos 30 días (la
   de su arquetipo si no tiene pedidos), con el rendimiento decreciente de la escalera fina (motor/combos.toml,
   `[rendimiento_decreciente]`; supuesto propio, no viene de Rappi): cada vertical extra dentro de un grupo reduce la
-  parte que no vuelve (10 %, 5 %, 2,5 %…), así que usar Súper y Express rinde más que solo Súper. En cada sesión sigue
-  activa con probabilidad retención^(días desde la anterior / 30). Los servicios (RappiFavor, RappiTravel) no suman: la
-  persona simulada los abre de pasada, no con regularidad.
+  parte que no vuelve (10 %, 5 %, 2,5 %…), así que usar Súper y Express rinde más que solo Súper. Farmacia y Licores
+  cuentan como cualquier otra vertical del grupo: son uso propio de la persona (Mochi igual nunca las propone). En cada
+  sesión sigue activa con probabilidad retención^(días desde la anterior / 30). Los servicios (RappiFavor, RappiTravel)
+  no suman: la persona simulada los abre de pasada, no con regularidad.
   Es la supervivencia del estado activo, no «pide el mes siguiente»: quien sigue activa puede saltarse un mes, así que
   la retención M+1 medida en los simulados queda bajo la de Rappi. No es una falla de calibración.
 - SUPUESTO EXPLÍCITO: la tabla es una correlación (quien pide mucho usa más grupos y además vuelve más), pero aquí se

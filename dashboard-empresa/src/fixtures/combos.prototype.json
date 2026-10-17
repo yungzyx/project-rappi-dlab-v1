@@ -1,5 +1,6 @@
 {
   "data": {
+    "fino": [],
     "nota": "uso del MVP, pocas personas: no es evidencia",
     "propio": [],
     "rappi": {
@@ -87,6 +88,12 @@
         "retencion_m1": 0.55,
         "usuarios": 1180000
       }
+    },
+    "supuesto": {
+      "decaimiento": 0.5,
+      "nota": "supuesto propio: cada vertical extra dentro de un grupo reduce la parte que no vuelve: 10 %, 5 %, 2,5 %…; cada servicio, 5 %; nunca llega a 100 %. Con datos reales se reemplaza por lo aprendido",
+      "reduccion_base": 0.1,
+      "servicio": 0.05
     }
   },
   "guardado": {
