@@ -10,7 +10,7 @@ from rappi_ia.motor.combos import (
     combo_of_verticals,
     expected_fine_retention,
     expected_retention,
-    fine_bonus,
+    fine_churn_factor,
     fine_key,
     fine_of,
     group_counts,
@@ -115,8 +115,8 @@ def test_services_and_assumption_come_from_the_toml():
     c = load_combos()
     assert c.services == {"favor": "rappifavor", "travel": "rappitravel"}
     a = c.diminishing
-    assert (a.base, a.decay, a.service, a.cap) == (0.04, 0.5, 0.02, 0.97)
-    assert "supuesto propio" in a.note
+    assert (a.reduction_base, a.decay, a.service) == (0.10, 0.5, 0.05)
+    assert "supuesto propio" in a.note and "nunca llega a 100 %" in a.note
 
 
 def test_group_counts_count_catalog_verticals_only():
@@ -125,53 +125,55 @@ def test_group_counts_count_catalog_verticals_only():
     assert group_counts("ninguna") == {}
 
 
-def test_bonus_diminishes_within_a_group():
-    assert fine_bonus("restaurantes+supermercado") == 0
-    assert fine_bonus("restaurantes+supermercado+conveniencia") == pytest.approx(0.04)
-    assert fine_bonus("restaurantes+supermercado+conveniencia+mall") == pytest.approx(0.04 + 0.02)
-    assert fine_bonus("supermercado+conveniencia+mall+chocolateria") == pytest.approx(0.04 + 0.02 + 0.01)
-    assert fine_bonus("restaurantes+favor") == pytest.approx(0.02)  # cada servicio usado suma 0,02
-    assert fine_bonus("restaurantes+favor+travel") == pytest.approx(0.04)
-    assert fine_bonus("favor") == 0  # solo Favor: es la base (la fila «favor» de Rappi), no un bono
-    assert fine_bonus("favor+travel") == pytest.approx(0.02)
+def test_churn_reduction_diminishes_within_a_group():
+    assert fine_churn_factor("restaurantes+supermercado") == 1
+    assert fine_churn_factor("restaurantes+supermercado+conveniencia") == pytest.approx(0.90)  # 2.ª: −10 %
+    assert fine_churn_factor("restaurantes+supermercado+conveniencia+mall") == pytest.approx(0.90 * 0.95)  # 3.ª: −5 %
+    assert fine_churn_factor("supermercado+conveniencia+mall+chocolateria") == pytest.approx(0.90 * 0.95 * 0.975)
+    assert fine_churn_factor("restaurantes+favor") == pytest.approx(0.95)  # cada servicio usado: −5 %
+    assert fine_churn_factor("restaurantes+favor+travel") == pytest.approx(0.95 * 0.95)
+    assert fine_churn_factor("favor") == 1  # solo Favor: es la base (la fila «favor» de Rappi), no reduce
+    assert fine_churn_factor("favor+travel") == pytest.approx(0.95)
 
 
-def test_expected_fine_retention_adds_the_bonus_to_the_coarse_one():
+def test_expected_fine_retention_reduces_what_does_not_come_back():
     assert expected_fine_retention("restaurantes") == 0.47
-    assert expected_fine_retention("restaurantes+supermercado+conveniencia") == pytest.approx(0.76 + 0.04)
-    assert expected_fine_retention("restaurantes+favor") == pytest.approx(0.47 + 0.02)
+    assert expected_fine_retention("restaurantes+supermercado+conveniencia") == pytest.approx(1 - 0.24 * 0.90)
+    assert expected_fine_retention("restaurantes+favor") == pytest.approx(1 - 0.53 * 0.95)
     assert expected_fine_retention("ninguna") is None
 
 
 def test_expected_fine_retention_of_services_only():
     assert expected_fine_retention("favor") == 0.44
-    assert expected_fine_retention("favor+travel") == pytest.approx(0.44 + 0.02)
+    assert expected_fine_retention("favor+travel") == pytest.approx(1 - 0.56 * 0.95)
     assert expected_fine_retention("travel") is None
     assert expected_fine_retention("favor", {"favor": (100, 0.64)}) == pytest.approx(0.54)
 
 
-def test_cap_holds_for_every_fine_combo():
-    assert expected_fine_retention("restaurantes+turbo+supermercado+conveniencia+mall") == 0.97
+def test_expected_fine_retention_never_reaches_one_and_grows_inside_the_groups():
+    """Nunca llega a 1, y sumar un servicio o una vertical de un grupo que ya se usa siempre sube la retención (un
+    grupo nuevo cambia la base de Rappi, que no siempre sube: «favor» 0,44 contra «retail» 0,41)."""
+    group_of = load_combos().group_of
     for k in range(1, len(FINE_ORDER) + 1):
         for members in combinations(FINE_ORDER, k):
-            value = expected_fine_retention(fine_key(members))
-            assert value is None or value <= 0.97, members
-
-
-def test_cap_never_lowers_a_learned_coarse_retention():
-    learned = {"rest+turbo+retail": (900, 0.99)}  # (0,93·100 + 0,99·900) / 1000 = 0,984
-    assert expected_fine_retention(REST_TURBO_SUPER, learned) == pytest.approx(0.984)
-    assert expected_fine_retention(REST_TURBO_SUPER + "+conveniencia", learned) == pytest.approx(0.984)
+            fine = fine_key(members)
+            value = expected_fine_retention(fine)
+            assert value is None or value < 1, members
+            groups = {group_of[m] for m in members if m in group_of}
+            if not groups:
+                continue
+            for extra in FINE_ORDER:
+                if extra not in members and group_of.get(extra, "servicio") in {*groups, "servicio"}:
+                    assert expected_fine_retention(fine_key([*members, extra])) > value, (members, extra)
 
 
 def test_expected_fine_retention_blends_learned_values():
     fine = "restaurantes+supermercado+conveniencia"
-    assert expected_fine_retention(fine, learned_fine={fine: (10, 0.6)}) == pytest.approx(0.80)
-    assert expected_fine_retention(fine, learned_fine={fine: (100, 0.6)}) == pytest.approx(
-        (0.80 * 100 + 0.6 * 100) / 200
-    )
-    # La gruesa aprendida mueve la base: (0,76·100 + 0,56·100) / 200 = 0,66, más el bono
-    assert expected_fine_retention(fine, {"rest+retail": (100, 0.56)}) == pytest.approx(0.66 + 0.04)
+    assumed = 1 - 0.24 * 0.90
+    assert expected_fine_retention(fine, learned_fine={fine: (10, 0.6)}) == pytest.approx(assumed)
+    assert expected_fine_retention(fine, learned_fine={fine: (100, 0.6)}) == pytest.approx((assumed + 0.6) / 2)
+    # La gruesa aprendida mueve la base: (0,76·100 + 0,56·100) / 200 = 0,66, y después la reducción
+    assert expected_fine_retention(fine, {"rest+retail": (100, 0.56)}) == pytest.approx(1 - 0.34 * 0.90)
     assert expected_fine_retention("travel", learned_fine={"travel": (40, 0.5)}) == 0.5  # sin base: solo lo aprendido
 
 
@@ -184,33 +186,28 @@ def test_review_retail_continues_inside_retail_never_pharmacy_or_liquor():
         vertical="conveniencia",
         current=REST_TURBO_SUPER,
         target=REST_TURBO_SUPER.replace("supermercado", "supermercado+conveniencia"),
-        gain=pytest.approx(0.04),
+        gain=pytest.approx(0.07 * 0.10),
         used_assumption=True,
     )
     assert next_fine_step(REST_TURBO_SUPER, ["farmacia", "licores"]) is None
-    assert (
-        next_fine_step(REST_TURBO_SUPER, ["mall", "conveniencia"]).vertical == "mall"
-    )  # empate: el orden de la persona
+    assert next_fine_step(REST_TURBO_SUPER, ["mall", "conveniencia"]).vertical == "mall"  # empate: orden de la persona
 
 
-def test_review_services_come_after_the_catalog():
-    # Ya no queda ninguna vertical del catálogo que se le pueda ofrecer: el paso es un servicio.
-    step = next_fine_step(REST_TURBO_SUPER, ["farmacia", "favor", "travel"])
-    assert (step.vertical, step.target, step.used_assumption) == ("favor", REST_TURBO_SUPER + "+favor", True)
-    assert step.gain == pytest.approx(0.02)
-    assert next_fine_step(REST_TURBO_SUPER, ["travel", "favor"]).vertical == "travel"
-    assert next_fine_step(REST_TURBO_SUPER + "+favor+travel", ["favor", "travel"]) is None
-    # Una vertical del catálogo que gana algo, aunque sea menos que un servicio, va primero.
+def test_review_everything_offerable_steps_to_a_service():
+    step = next_fine_step(ALL_OFFERABLE, EVERY_CANDIDATE)
+    churn = 0.07 * 0.90 * 0.95 * 0.975
+    assert (step.vertical, step.target, step.used_assumption) == ("favor", ALL_OFFERABLE + "+favor", True)
+    assert step.gain == pytest.approx(churn * 0.05)
+    assert next_fine_step(ALL_OFFERABLE, ["travel", "favor"]).vertical == "travel"  # empate: el orden de la persona
+    assert next_fine_step(ALL_OFFERABLE + "+favor", EVERY_CANDIDATE).vertical == "travel"
+    assert next_fine_step(ALL_OFFERABLE + "+favor+travel", EVERY_CANDIDATE) is None
+
+
+def test_review_catalog_goes_before_services():
+    # Chocolatería (4.ª de Retail) quita 2,5 % y Favor 5 %: igual va primero la vertical del catálogo.
     fine = "turbo+supermercado+conveniencia+mall"
     step = next_fine_step(fine, ["favor", "chocolateria"])
-    assert (step.vertical, step.gain) == ("chocolateria", pytest.approx(0.01))
-
-
-def test_review_everything_offerable_saturates_at_the_cap():
-    """Con las retenciones de Rappi, quien usa todo lo que se puede ofrecer ya está en el tope (0,93 + 0,07 → 0,97):
-    un servicio no suma nada y no hay paso."""
-    assert expected_fine_retention(ALL_OFFERABLE) == 0.97
-    assert next_fine_step(ALL_OFFERABLE, EVERY_CANDIDATE) is None
+    assert (step.vertical, step.gain) == ("chocolateria", pytest.approx(0.20 * 0.90 * 0.95 * 0.025))
 
 
 def test_review_no_orders_means_no_step():
@@ -221,6 +218,9 @@ def test_review_no_orders_means_no_step():
 def test_review_coarse_ladder_still_leads():
     step = next_fine_step("restaurantes", ["supermercado", "conveniencia", "turbo", "favor"])
     assert step == Step("turbo", "restaurantes", "restaurantes+turbo", pytest.approx(0.82 - 0.47), False)
+    # Un grupo nuevo suma más que cualquier vertical extra dentro de un grupo.
+    step = next_fine_step("restaurantes+supermercado", ["conveniencia", "mall", "turbo"])
+    assert (step.vertical, step.gain) == ("turbo", pytest.approx(0.93 - 0.76))
 
 
 def test_next_fine_step_uses_learned_values():

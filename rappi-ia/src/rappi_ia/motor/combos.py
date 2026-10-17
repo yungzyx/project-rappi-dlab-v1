@@ -5,9 +5,10 @@ una correlación (quien pide mucho usa más verticales y además vuelve más), a
 partida: `expected_retention` la mezcla con lo que se aprende de las personas del prototipo cuando hay suficientes.
 
 La combinación fina (`fine_key`) es el conjunto de verticales del catálogo, uno por uno, más los servicios RappiFavor y
-RappiTravel. Su retención esperada (`expected_fine_retention`) parte de la gruesa y suma un bono por cada vertical extra
-dentro de un grupo, cada vez menor, y por cada servicio: un supuesto propio (`[rendimiento_decreciente]` en
-`combos.toml`) que lo aprendido reemplaza cuando hay suficientes personas. `next_fine_step` elige el paso con eso.
+RappiTravel. Su retención esperada (`expected_fine_retention`) parte de la gruesa y reduce la parte que no vuelve por
+cada vertical extra dentro de un grupo, cada vez menos, y por cada servicio: un supuesto propio
+(`[rendimiento_decreciente]` en `combos.toml`) que lo aprendido reemplaza cuando hay suficientes personas.
+`next_fine_step` elige el paso con eso.
 """
 
 import tomllib
@@ -51,10 +52,9 @@ class ComboRow:
 class Diminishing:
     """El supuesto propio de la escalera fina (`[rendimiento_decreciente]`)."""
 
-    base: float  # lo que suma la 2.ª vertical de un grupo
-    decay: float  # cada vertical siguiente suma esto veces la anterior
-    service: float  # lo que suma cada servicio usado
-    cap: float  # la retención esperada con el bono no pasa de esto
+    reduction_base: float  # fracción de la parte que no vuelve que quita la 2.ª vertical de un grupo
+    decay: float  # cada vertical siguiente quita esto veces lo que quitó la anterior
+    service: float  # fracción que quita cada servicio usado
     note: str
 
 
@@ -72,8 +72,8 @@ class Combos:
 
 @dataclass(frozen=True)
 class Step:
-    """El paso fino: la vertical (o el servicio) que más retención esperada suma. `used_assumption` dice si el bono del
-    supuesto propio pesó en la retención de la combinación actual o en la del objetivo."""
+    """El paso fino: la vertical (o el servicio) que más retención esperada suma. `used_assumption` dice si la reducción
+    del supuesto propio pesó en la retención de la combinación actual o en la del objetivo."""
 
     vertical: str
     current: str
@@ -126,15 +126,14 @@ def load_combos() -> Combos:
         raise ValueError("combos.py: FINE_ORDER debe tener todos los verticales del catálogo")
     dim = data["rendimiento_decreciente"]
     diminishing = Diminishing(
-        base=float(dim["base"]),
+        reduction_base=float(dim["reduccion_base"]),
         decay=float(dim["decaimiento"]),
         service=float(dim["servicio"]),
-        cap=float(dim["tope"]),
         note=dim["nota"],
     )
     d = diminishing
-    if min(d.base, d.decay, d.service) < 0 or d.decay > 1 or d.cap > 1:
-        raise ValueError("combos.toml: el rendimiento decreciente debe tener bonos ≥ 0, decaimiento ≤ 1 y tope ≤ 1")
+    if not (0 <= d.reduction_base < 1 and 0 <= d.service < 1 and 0 <= d.decay <= 1):
+        raise ValueError("combos.toml: las reducciones deben estar entre 0 y 1 (sin 1) y el decaimiento entre 0 y 1")
     services = dict(data["servicios"])
     if tuple(services) != SERVICES:
         raise ValueError(f"combos.toml: los servicios deben ser {', '.join(SERVICES)}")
@@ -241,17 +240,21 @@ def group_counts(fine: str) -> dict[str, int]:
     return {g: counts[g] for g in GROUP_ORDER if counts[g]}
 
 
-def fine_bonus(fine: str) -> float:
-    """El bono del supuesto propio: en cada grupo con k verticales, Σ_{j=2..k} base·decaimiento^(j−2), más `servicio`
-    por cada servicio usado. Si la combinación es solo de servicios con Favor, Favor es la base (la fila «favor» de
-    Rappi) y no suma bono."""
+def fine_churn_factor(fine: str) -> float:
+    """Qué fracción de la parte que no vuelve queda con el supuesto propio: Π (1 − f). La j-ésima vertical de un grupo
+    (j ≥ 2) tiene f = reduccion_base·decaimiento^(j−2) y cada servicio usado, f = `servicio`. Si la combinación es solo
+    de servicios con Favor, Favor es la base (la fila «favor» de Rappi) y no reduce nada. Siempre es mayor que 0: la
+    retención esperada nunca llega a 1."""
     dim = load_combos().diminishing
     members = _members(fine)
-    bonus = sum(dim.base * dim.decay ** (j - 2) for k in group_counts(fine).values() for j in range(2, k + 1))
+    factor = 1.0
+    for k in group_counts(fine).values():
+        for j in range(2, k + 1):
+            factor *= 1 - dim.reduction_base * dim.decay ** (j - 2)
     services = [m for m in members if m in SERVICES]
     if len(services) == len(members) and SERVICE_COMBO in services:
         services.remove(SERVICE_COMBO)
-    return bonus + dim.service * len(services)
+    return factor * (1 - dim.service) ** len(services)
 
 
 def _fine_expectation(
@@ -259,7 +262,7 @@ def _fine_expectation(
     learned_coarse: dict[str, tuple[int, float]] | None,
     learned_fine: dict[str, tuple[int, float]] | None,
 ) -> tuple[float | None, bool]:
-    """`(retención esperada, ¿pesó el bono?)` de una combinación fina."""
+    """`(retención esperada, ¿pesó la reducción del supuesto?)` de una combinación fina."""
     members = _members(fine)
     catalog = [m for m in members if m not in SERVICES]
     if catalog:
@@ -271,11 +274,11 @@ def _fine_expectation(
     else:  # solo RappiTravel: no está en la tabla de Rappi
         prior = None
     used = False
-    if prior is not None:
-        # El tope frena al bono; no baja una retención aprendida que ya esté sobre él.
-        with_bonus = max(prior, min(prior + fine_bonus(fine), load_combos().diminishing.cap))
-        used = with_bonus > prior
-        prior = with_bonus
+    factor = fine_churn_factor(fine)
+    if prior is not None and factor < 1:  # con factor 1 no se recalcula: la gruesa queda tal cual, sin redondeo
+        reduced = 1 - (1 - prior) * factor
+        used = reduced > prior
+        prior = reduced
     n, ret = (learned_fine or {}).get(fine, (0, 0.0))
     if n < LEARNED_RETENTION_MIN_USERS:
         return prior, used
@@ -289,8 +292,8 @@ def expected_fine_retention(
     learned_coarse: dict[str, tuple[int, float]] | None = None,
     learned_fine: dict[str, tuple[int, float]] | None = None,
 ) -> float | None:
-    """La retención M+1 esperada de una combinación fina: la gruesa (`expected_retention` de sus grupos, con
-    `learned_coarse`) más `fine_bonus`, con tope; mezclada con la fina aprendida `(personas, retención)` de
+    """La retención M+1 esperada de una combinación fina: 1 − (1 − gruesa)·`fine_churn_factor`, con la gruesa de
+    `expected_retention` de sus grupos (y `learned_coarse`); mezclada con la fina aprendida `(personas, retención)` de
     `learned_fine` si hay al menos `LEARNED_RETENTION_MIN_USERS`. Solo servicios: Favor parte de la fila «favor» de
     Rappi; solo Travel no tiene base (`None`, salvo que haya suficiente aprendido)."""
     return _fine_expectation(fine, learned_coarse, learned_fine)[0]
