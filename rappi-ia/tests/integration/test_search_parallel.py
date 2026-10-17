@@ -24,6 +24,7 @@ from rappi_ia.db import connect
 from rappi_ia.demo.seed import seed_demo
 from rappi_ia.embeddings.base import HashEmbedder
 from rappi_ia.embeddings.text_store import embed_search_documents
+from rappi_ia.offers.engine import make_offer
 from rappi_ia.retrieval.hybrid import RetrievalResult
 
 # Con concepto (sus verticales típicas), con ocasión, sin ninguno (las 8 verticales) y sin resultado.
@@ -120,6 +121,22 @@ def test_with_a_free_pool_the_groups_are_the_same_as_in_series(catalog, test_url
         assert reply.json() == _serial(test_url, q), q
 
     assert spares["given"] > 0  # sí buscó en paralelo
+    assert spares["max_out"] <= PARALLEL_SEARCHES
+
+
+def test_the_profile_offer_searches_its_steps_with_spare_connections(catalog, test_url, make_pool, client, spares):
+    """El momento `perfil` de `/agent/offer` busca los peldaños de la escalera a la vez con las mismas conexiones extra
+    (y el mismo tope) que `/search`, y responde lo mismo que en serie."""
+    make_pool(test_url, max_size=10)
+
+    for profile_id in ("asiatico", "carrete"):
+        reply = client.post("/agent/offer", json={"moment": "perfil", "context": {"perfil": profile_id}})
+        with connect(test_url) as conn:
+            serial = make_offer(conn, HashEmbedder(), "perfil", {"perfil": profile_id})
+        assert serial is not None, profile_id  # una escalera de verdad, no dos 204
+        assert (reply.status_code, reply.json()) == (200, serial.to_dict()), profile_id
+
+    assert spares["given"] > 0
     assert spares["max_out"] <= PARALLEL_SEARCHES
 
 

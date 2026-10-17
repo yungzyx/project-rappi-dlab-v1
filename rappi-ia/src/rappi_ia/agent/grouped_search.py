@@ -101,13 +101,14 @@ def _verticals_to_search(
     return typical + [current] if current in VERTICALS and current not in typical else typical
 
 
-def _search_each[T](
+def _search_each[T, V](
     conn: Connection,
-    verticals: list[str],
-    search: Callable[[Connection, str], T],
+    verticals: list[V],
+    search: Callable[[Connection, V], T],
     spare: SpareConnector | None,
 ) -> list[T]:
-    """`search(conn, vertical)` en cada vertical, con los resultados en el orden de `verticals`. Con `spare` (una
+    """`search(conn, vertical)` en cada vertical (o en cada peldaño de un perfil de gusto, `offers/profiles.ladder`),
+    con los resultados en el orden de `verticals`. Con `spare` (una
     conexión extra del pool si sobra, o None), hasta PARALLEL_SEARCHES verticales más a la vez, cada una con su
     conexión; las que no consiguen una se reparten entre las que hay. Sin ninguna, todo en serie con la conexión del
     request: no hace fila por una conexión (cada extra espera a lo más SPARE_WAIT_S y unas idas y vueltas) ni pasa el
@@ -130,7 +131,7 @@ def _search_each[T](
         for connection in (conn, *extra):
             free.put(connection)
 
-        def run(vertical: str) -> T:
+        def run(vertical: V) -> T:
             connection = free.get()  # hay tantos hilos como conexiones: siempre hay una
             try:
                 result = search(connection, vertical)
