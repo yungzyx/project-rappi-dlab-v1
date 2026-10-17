@@ -18,8 +18,9 @@ LAST_MONTH = date(2026, 10, 1)  # `until` cae en octubre: septiembre no tiene su
 @pytest.fixture
 def simulated(db):
     seed_demo(db)
-    # Con 1.200, rest+turbo+retail quedaba en 19 al llevar la mitad de los complementos a Turbo (TURBO_SUGGESTION).
-    generate(db, users=1500, weeks=26, seed=3, until=date(2026, 10, 4))
+    # Con 1.200, rest+turbo+retail quedaba en 19 al llevar la mitad de los complementos a Turbo (TURBO_SUGGESTION); con
+    # 1.500, en 18 al pasar el sushi a las bebidas asiáticas (cambian los complementos que acepta el agente simulado).
+    generate(db, users=1800, weeks=26, seed=3, until=date(2026, 10, 4))
     return db
 
 

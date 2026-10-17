@@ -1,0 +1,167 @@
+"""Complementos más variados: el sushi abre con las bebidas asiáticas y un complemento que Mochi ya ofreció a la persona
+en los últimos `COMPLEMENT_REPEAT_DAYS` días cede su lugar al siguiente mejor. Sobre el catálogo de prueba."""
+
+from datetime import UTC, datetime, timedelta
+
+import pytest
+
+from owner_client import OwnerClient
+from rappi_ia.agent.compose import TemplateComposer
+from rappi_ia.agent.rappi_agent import RappiAgent
+from rappi_ia.agent.tools import COMPLEMENT_REPEAT_DAYS, suggest_complement
+from rappi_ia.api import app as api
+from rappi_ia.api.services import Services
+from rappi_ia.demo.seed import seed_demo
+from rappi_ia.embeddings.base import HashEmbedder
+from rappi_ia.embeddings.text_store import embed_search_documents
+from rappi_ia.events import store as events
+
+NOW = datetime.now(UTC)
+SUSHI_ROLL = {"entity_type": "menu_item", "entity_id": "98005"}  # un plato de sushi del restaurante de prueba
+SUSHI_COMPLEMENTS = ["bebidas-asiaticas", "postres", "despensa-asiatica", "gaseosas"]  # 0,5 · 0,4 · 0,3 · 0,3 (por id)
+PERSON = "u-variada"
+
+
+@pytest.fixture
+def demo(db):
+    seed_demo(db)
+    embedder = HashEmbedder()
+    embed_search_documents(db, embedder)
+    events.ensure_user(db, PERSON)
+    events.ensure_user(db, "u-otra")
+    db.commit()
+    return db, embedder
+
+
+@pytest.fixture
+def client(demo):
+    db, embedder = demo
+
+    def conn_override():
+        yield db
+
+    api.app.dependency_overrides[api.get_conn] = conn_override
+    api.app.dependency_overrides[api.get_services] = lambda: Services(
+        RappiAgent(embedder, TemplateComposer()), embedder
+    )
+    yield OwnerClient(api.app)
+    api.app.dependency_overrides.clear()
+
+
+def offered(db, concept, days_ago, user=PERSON, origin="agent-carrito", **extra):
+    """Mochi le mostró `concept` a la persona hace `days_ago` días (el `suggestion_shown` que registra la app)."""
+    payload = {"origen": origin, **extra.pop("payload", {})}
+    event = events.Event(
+        user, "s-1", "suggestion_shown", ts=NOW - timedelta(days=days_ago), concept_id=concept, payload=payload, **extra
+    )
+    events.record(db, [event])
+    db.commit()
+
+
+def first(db, embedder, user=PERSON):
+    return suggest_complement(db, ["sushi"], "restaurantes", embedder, user_id=user)
+
+
+def test_the_window_is_a_week():
+    assert COMPLEMENT_REPEAT_DAYS == 7
+
+
+def test_the_first_complement_of_sushi_is_asian_drinks(demo):
+    db, embedder = demo
+
+    chosen = suggest_complement(db, ["sushi"], "restaurantes", embedder)
+
+    assert chosen.concept == "bebidas-asiaticas"
+    assert chosen.vertical in ("conveniencia", "supermercado")  # donde el catálogo de prueba las vende
+
+
+def test_a_complement_offered_three_days_ago_is_skipped_for_the_next_best(demo):
+    db, embedder = demo
+    offered(db, "bebidas-asiaticas", 3)
+
+    chosen = first(db, embedder)
+
+    assert chosen.concept == "postres"
+    assert chosen.reason == "Porque llevas 🍣 sushi"  # la razón sigue siendo cierta
+    assert chosen.basis == []
+
+
+def test_the_skipping_goes_on_down_the_list(demo):
+    db, embedder = demo
+    offered(db, "bebidas-asiaticas", 1)
+    offered(db, "postres", 2)
+
+    assert first(db, embedder).concept == "despensa-asiatica"  # a igual peso que las gaseosas, por id
+    offered(db, "despensa-asiatica", 2)
+    assert first(db, embedder).concept == "gaseosas"
+
+
+def test_a_complement_offered_eight_days_ago_is_not_skipped(demo):
+    db, embedder = demo
+    offered(db, "bebidas-asiaticas", 8)
+
+    assert first(db, embedder).concept == "bebidas-asiaticas"
+
+
+def test_rappi_hoy_events_do_not_count(demo):
+    db, embedder = demo
+    # En «Rappi hoy» el evento va sin concepto y marcado `payload.mode = 'actual'`; con concepto tampoco cuenta.
+    offered(db, None, 1, payload={"mode": "actual"})
+    offered(db, "bebidas-asiaticas", 1, payload={"mode": "actual"})
+
+    assert first(db, embedder).concept == "bebidas-asiaticas"
+
+
+def test_if_every_candidate_was_offered_the_best_is_still_offered(demo):
+    db, embedder = demo
+    for concept in SUSHI_COMPLEMENTS:
+        offered(db, concept, 1)
+
+    assert first(db, embedder).concept == "bebidas-asiaticas"
+
+
+def test_if_the_rest_have_no_products_the_best_recent_one_is_still_offered(demo):
+    db, embedder = demo
+    db.execute("DELETE FROM concept_edges WHERE from_concept = 'sushi' AND to_concept <> 'bebidas-asiaticas'")
+    db.commit()
+    offered(db, "bebidas-asiaticas", 1)
+
+    assert first(db, embedder).concept == "bebidas-asiaticas"
+
+
+def test_only_what_was_offered_to_this_person_as_a_complement_counts(demo):
+    db, embedder = demo
+    offered(db, "bebidas-asiaticas", 1, user="u-otra")  # otra persona
+    offered(db, "bebidas-asiaticas", 1, origin="agent-recompra")  # no era un complemento
+    offered(db, "bebidas-asiaticas", 1, origin="para-ti")
+
+    assert first(db, embedder).concept == "bebidas-asiaticas"
+
+
+@pytest.mark.parametrize("origin", ["agent-carrito", "agent-checkout", "agent-proximo_pedido", "agent-ask"])
+def test_any_moment_that_offers_complements_counts(demo, origin):
+    db, embedder = demo
+    offered(db, "bebidas-asiaticas", 1, origin=origin)
+
+    assert first(db, embedder).concept == "postres"
+
+
+def test_without_a_person_the_order_never_changes(demo):
+    db, embedder = demo
+    offered(db, "bebidas-asiaticas", 1)
+
+    assert suggest_complement(db, ["sushi"], "restaurantes", embedder).concept == "bebidas-asiaticas"
+
+
+def test_the_cart_and_the_checkout_do_not_repeat_what_the_person_just_saw(client, demo):
+    db, _ = demo
+    cart = {"moment": "carrito", "context": {"product": SUSHI_ROLL}, "user_id": PERSON}
+    assert client.post("/agent/offer", json=cart).json()["reason"]["concept"] == "bebidas-asiaticas"
+
+    offered(db, "bebidas-asiaticas", 0)  # la app registra lo que mostró
+    checkout = client.post(
+        "/agent/offer", json={"moment": "checkout", "context": {"cart": [SUSHI_ROLL]}, "user_id": PERSON}
+    ).json()
+
+    assert checkout["reason"]["concept"] == "postres"
+    assert checkout["reason"]["from_concept"] == "sushi"

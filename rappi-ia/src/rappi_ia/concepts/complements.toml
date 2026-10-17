@@ -76,10 +76,12 @@ edges = [
   ["hamburguesa", "cerveza", 0.6],
   ["hamburguesa", "helados", 0.5],
   ["sushi", "despensa-asiatica", 0.3],  # sushi en casa: arroz, soya y nori (después de los postres)
-  ["sushi", "bebidas-asiaticas", 0.3],
+  # Lo asiático va primero y las gaseosas al final: con 0,4 empataban postres, vino y gaseosas y ganaba la gaseosa por
+  # orden alfabético (en la QA, 88 de 149 ofertas eran gaseosas). El vino (alcohol) nunca se ofrece: se queda como estaba.
+  ["sushi", "bebidas-asiaticas", 0.5],
   ["sushi", "postres", 0.4],
   ["sushi", "vino", 0.4],
-  ["sushi", "gaseosas", 0.4],
+  ["sushi", "gaseosas", 0.3],
   ["sandwiches", "gaseosas", 0.6],
   ["sandwiches", "cerveza", 0.5],
   ["empanadas", "vino", 0.6],

@@ -199,14 +199,14 @@ def test_a_cross_sell_rule_from_the_source_is_a_candidate_and_says_so(demo):
 def test_a_cross_sell_rule_is_only_searched_in_the_vertical_of_the_rule(demo):
     db, embedder = demo
     # El hielo solo se vende en Turbo y la regla es de Express, donde no hay: la sushi no tiene arista al hielo, así que
-    # se ofrece la primera curada de siempre (a igual peso, por id), sin compra cruzada.
+    # se ofrece la primera curada de siempre (las bebidas asiáticas, la de mayor peso), sin compra cruzada.
     rule(db, "sushi", "hielo", "conveniencia", 4.0)
 
     chosen = suggest_complement(db, ["sushi"], "restaurantes", embedder, user_id="u-sushi")
 
     usual = suggest_complement(db, ["sushi"], "restaurantes", embedder)
     assert (chosen.concept, chosen.vertical, chosen.basis) == (usual.concept, usual.vertical, [])
-    assert chosen.concept == "gaseosas"
+    assert chosen.concept == "bebidas-asiaticas"
 
 
 def test_if_the_rule_finds_nothing_the_curated_edge_of_the_same_concept_is_tried_in_its_verticals(demo):
