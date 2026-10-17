@@ -121,6 +121,7 @@ En el prototipo final la barra de la Home («¿Qué se te antoja hoy?») abre el
 - **Toca y te armo algo:** botones con ideas fijas («¿Qué almuerzo hoy?», «Arma un carrete», «Algo dulce»). Al tocar uno, Mochi responde con productos y tiendas; si abres una tienda desde ahí y vuelves, la búsqueda sigue donde estaba.
 - **El campo de búsqueda** consulta la API y muestra los productos en un grupo por vertical, con la de la pantalla primero y «Ver más» en cada uno; sin resultados, Mochi dice dónde sí hay lo buscado. Debajo siguen «Search ideas», que son ideas fijas y no un historial, y «Popular stores», como en la app.
 - **Descubre con Mochi:** complementos de lo que le gusta a la persona, de `/recommendations`, cada uno con su vertical para abrirla.
+- **Tu perfil:** si la persona tiene un perfil de gusto (`GET /profile/{id}/gustos`: asiático, café, italiano, mascotero o carrete, de `rappi-ia/src/rappi_ia/offers/perfiles.toml`), Mochi lo muestra con su nivel y su porqué, y debajo «Para ti en otras verticales»: la escalera del perfil (el momento `perfil` de `/agent/offer`), un peldaño por vertical con sus productos, de lo más cercano a lo más lejano, y al final una idea para RappiTravel con dos datos y su fuente. Sin perfil, el panel queda como siempre.
 
 <img src="docs/screenshots/20-asistente.jpg" width="300" alt="Buscador con Mochi tras tocar «Arma un carrete»">
 
