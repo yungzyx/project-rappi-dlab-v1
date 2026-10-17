@@ -2,6 +2,7 @@
 escalera de cada uno (`ladder`), sobre el catálogo de prueba (`seed_demo`) más unos productos de estas pruebas: lo que
 una escalera nunca debe mostrar."""
 
+from contextlib import contextmanager
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
@@ -13,6 +14,7 @@ from rappi_ia import config
 from rappi_ia.agent.tools import search_products
 from rappi_ia.concepts.store import refresh_assortment
 from rappi_ia.concepts.taxonomy import load_taxonomy
+from rappi_ia.db import connect
 from rappi_ia.demo import seed
 from rappi_ia.embeddings.base import HashEmbedder
 from rappi_ia.embeddings.text_store import embed_search_documents
@@ -362,6 +364,38 @@ def test_the_restaurants_step_leaves_out_places_already_ordered_from(catalog, db
     assert steps[0].step.vertical == "restaurantes"
     assert [p.store_id for p in steps[0].products] == [OTHER_SUSHI]
     assert len(steps) >= MIN_STEPS
+
+
+def test_the_ladder_searched_in_parallel_is_the_same_as_in_series(catalog, db, test_url):
+    """Con conexiones extra (`spare`, las del pool en `/agent/offer`), los peldaños se buscan a la vez, cada uno en su
+    conexión, y la escalera es la misma que en serie: los mismos peldaños, productos y orden, también sin repetir un
+    nombre entre peldaños y sin los locales donde la persona ya pidió (eso se decide después, en orden). Si no sobra
+    ninguna (None), en serie con la del request."""
+    user = _sushi_lover(db)
+    db.commit()
+    lent = []
+
+    @contextmanager
+    def spare():
+        with connect(test_url) as conn:
+            lent.append(conn)
+            yield conn
+
+    @contextmanager
+    def none_free():
+        yield None
+
+    cases = [(profile, {}) for profile in load_profiles().values()]
+    cases.append((load_profiles()["asiatico"], {"exclude_stores": ordered_restaurants(db, user)}))
+    with_steps = 0
+    for profile, options in cases:
+        serial = [step.to_dict() for step in ladder(db, catalog, profile, **options)]
+        for connector in (spare, none_free):
+            parallel = ladder(db, catalog, profile, **options, spare=connector)
+            assert [step.to_dict() for step in parallel] == serial, (profile.id, options, connector.__name__)
+        with_steps += bool(serial)
+    assert with_steps >= 4  # no se comparan escaleras vacías
+    assert lent  # sí buscó en otras conexiones
 
 
 def test_the_restaurants_step_only_shows_places_in_the_city(catalog, db, monkeypatch):

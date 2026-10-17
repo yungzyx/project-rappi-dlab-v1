@@ -1,4 +1,4 @@
-"""La búsqueda de la app en varias verticales a la vez (`grouped_search._search_each`), con conexiones falsas: el orden
+"""La búsqueda de la app en varias verticales a la vez (`grouped_search.search_each`), con conexiones falsas: el orden
 de los resultados es el de las verticales, nunca usa más conexiones extra que el tope, sin una libre busca en serie con
 la de la petición, cada vertical cierra su transacción, los hilos llevan el id del request y un error de una vertical
 llega a quien llamó después de devolver todas."""
@@ -12,7 +12,7 @@ import numpy as np
 import pytest
 
 from rappi_ia.agent import grouped_search
-from rappi_ia.agent.grouped_search import PARALLEL_SEARCHES, _search_each
+from rappi_ia.agent.grouped_search import PARALLEL_SEARCHES, search_each
 from rappi_ia.api import logs
 from rappi_ia.embeddings.base import MemoizedQueryEmbedder
 
@@ -75,7 +75,7 @@ def test_results_keep_the_order_of_the_verticals():
     seen = []
     spares = Spares(available=10)
 
-    results = _search_each(FakeConn("peticion"), VERTICALS, slow_search(seen), spares)
+    results = search_each(FakeConn("peticion"), VERTICALS, slow_search(seen), spares)
 
     assert results == [f"{v}@resultado" for v in VERTICALS]
     assert {conn for conn, _, _ in seen} - {"peticion"}  # también usó conexiones extra
@@ -86,7 +86,7 @@ def test_never_more_spare_connections_than_the_cap():
     seen = []
     spares = Spares(available=10)
 
-    _search_each(FakeConn("peticion"), VERTICALS, slow_search(seen), spares)
+    search_each(FakeConn("peticion"), VERTICALS, slow_search(seen), spares)
 
     assert spares.max_out <= PARALLEL_SEARCHES
     assert len({conn for conn, _, _ in seen}) <= PARALLEL_SEARCHES + 1  # las extra y la de la petición
@@ -95,7 +95,7 @@ def test_never_more_spare_connections_than_the_cap():
 def test_without_a_free_connection_it_searches_in_series_with_the_request_connection():
     seen = []
 
-    results = _search_each(FakeConn("peticion"), VERTICALS, slow_search(seen), Spares(available=0))
+    results = search_each(FakeConn("peticion"), VERTICALS, slow_search(seen), Spares(available=0))
 
     assert results == [f"{v}@resultado" for v in VERTICALS]
     assert [(conn, vertical) for conn, vertical, _ in seen] == [("peticion", v) for v in VERTICALS]
@@ -106,7 +106,7 @@ def test_with_some_free_connections_it_uses_only_those():
     seen = []
     spares = Spares(available=1)
 
-    results = _search_each(FakeConn("peticion"), VERTICALS, slow_search(seen), spares)
+    results = search_each(FakeConn("peticion"), VERTICALS, slow_search(seen), spares)
 
     assert results == [f"{v}@resultado" for v in VERTICALS]
     assert {conn for conn, _, _ in seen} <= {"peticion", "extra-1"}
@@ -114,8 +114,8 @@ def test_with_some_free_connections_it_uses_only_those():
 
 def test_one_vertical_or_no_spare_factory_searches_in_series():
     seen = []
-    assert _search_each(FakeConn("peticion"), ["turbo"], slow_search(seen), Spares(available=10)) == ["turbo@resultado"]
-    assert _search_each(FakeConn("peticion"), VERTICALS[:2], slow_search(seen), None) == [
+    assert search_each(FakeConn("peticion"), ["turbo"], slow_search(seen), Spares(available=10)) == ["turbo@resultado"]
+    assert search_each(FakeConn("peticion"), VERTICALS[:2], slow_search(seen), None) == [
         f"{v}@resultado" for v in VERTICALS[:2]
     ]
     assert {conn for conn, _, _ in seen} == {"peticion"}
@@ -131,7 +131,7 @@ def test_an_error_in_one_vertical_reaches_the_caller_after_returning_every_conne
         return vertical
 
     with pytest.raises(RuntimeError, match="tardó demasiado"):
-        _search_each(FakeConn("peticion"), VERTICALS, search, spares)
+        search_each(FakeConn("peticion"), VERTICALS, search, spares)
 
     assert spares.out == 0
 
@@ -174,7 +174,7 @@ def test_each_vertical_in_parallel_ends_its_transaction():
         used.append(conn)
         return vertical
 
-    _search_each(request, VERTICALS, search, spares)
+    search_each(request, VERTICALS, search, spares)
 
     assert sum(conn.done.count("commit") for conn in set(used)) == len(VERTICALS)
     assert all(conn.done[-1] == "commit" for conn in set(used))
@@ -191,7 +191,7 @@ def test_a_failed_vertical_rolls_back_its_connection_for_the_next_one():
         return vertical
 
     with pytest.raises(RuntimeError, match="falló turbo"):
-        _search_each(request, VERTICALS, search, Spares(available=10))
+        search_each(request, VERTICALS, search, Spares(available=10))
 
     assert "rollback" in [step for conn in set(used) for step in conn.done]
 
@@ -207,7 +207,7 @@ def test_the_worker_threads_keep_the_request_id():
 
     token = logs.request_id.set("req-123")
     try:
-        _search_each(FakeConn("peticion"), VERTICALS, search, Spares(available=10))
+        search_each(FakeConn("peticion"), VERTICALS, search, Spares(available=10))
     finally:
         logs.request_id.reset(token)
 

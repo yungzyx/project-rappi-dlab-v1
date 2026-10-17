@@ -11,9 +11,10 @@ from psycopg import Connection
 from pydantic import ConfigDict, Field
 
 from .. import config
+from ..agent.grouped_search import SpareConnector
 from ..offers.engine import OfferError, home_occasions, make_offer
 from ..offers.personal import user_interests
-from .deps import Clean, get_conn, get_services
+from .deps import Clean, get_conn, get_services, get_spare_connector
 from .identity import owner_in_query, owner_of_body
 from .limits import concurrency_cap
 from .services import Services
@@ -123,15 +124,22 @@ OfferIn = Annotated[
     responses={204: {"description": "Sin una buena oferta para este momento"}},
     dependencies=[Depends(OFFER_CAP)],
 )
-def offer(body: OfferIn, request: Request, conn: Connection = Depends(get_conn), svc: Services = Depends(get_services)):
+def offer(
+    body: OfferIn,
+    request: Request,
+    conn: Connection = Depends(get_conn),
+    svc: Services = Depends(get_services),
+    spare: SpareConnector = Depends(get_spare_connector),
+):
     """La oferta de un momento: `{ moment, text, products, vertical, prototype_vertical, reason, actions }`, o 204.
     El momento `perfil` tiene su forma: `{ moment, text, perfil, escalera, viaje, reason, actions }` (la escalera de
-    un perfil de gusto: `offers/profiles.py`). Una ocasión o un perfil que no existe, o una ocasión que el agente no
-    arma (guagua, enfermo), es un 422."""
+    un perfil de gusto: `offers/profiles.py`; sus peldaños se buscan a la vez con las conexiones del pool que sobran,
+    `spare`, como `/search`). Una ocasión o un perfil que no existe, o una ocasión que el agente no arma (guagua,
+    enfermo), es un 422."""
     owner_of_body(request, body.user_id)
     context = body.context.model_dump()
     try:
-        found = make_offer(conn, svc.embedder, body.moment, context, body.user_id)
+        found = make_offer(conn, svc.embedder, body.moment, context, body.user_id, spare)
     except OfferError as exc:
         raise HTTPException(422, str(exc)) from exc
     return Response(status_code=204) if found is None else found.to_dict()

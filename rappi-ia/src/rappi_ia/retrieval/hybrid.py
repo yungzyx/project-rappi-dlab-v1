@@ -185,6 +185,16 @@ _PRICE = "price_min"  # columna generada desde metadata (migración 013), con í
 # Con tope de precio, si califican hasta esta cantidad de documentos se revisan todos (búsqueda exacta): el HNSW
 # filtrado corta en hnsw.max_scan_tuples y con un tope muy bajo en un vertical grande devolvería de menos.
 EXACT_SEARCH_MAX = 5000
+# random_page_cost del plan de la búsqueda vectorial (el de un SSD; Postgres trae 4, el de un disco giratorio). Con 4,
+# en las verticales de 5 a 8 mil documentos (conveniencia, farmacia, licores) el planificador prefería recorrerlas
+# enteras (10–16 ms) al HNSW (2–2,5 ms); con 1.1 lo usa. En staging, recall@10 contra la búsqueda exacta de 0,994–0,996
+# en las consultas de eval/queries.json de esas verticales; las grandes ya usaban el índice y no cambian.
+VECTOR_RANDOM_PAGE_COST = 1.1
+# La léxica con más de una palabra puntúa en dos etapas (`_lexical`): ts_rank_cd solo en los documentos con la mayor
+# suma de IDF, estos y los que empatan con el último. Con 1000, en staging el top-200 quedó igual en 196 de 198
+# consultas (las otras dos, con el mismo top-10) y las listas léxicas de `make eval` no cambiaron; con 500 cambiaba un
+# top-10, y con 2000 se ganaba menos.
+LEXICAL_RANK_POOL = 1000
 
 
 def _lexical(
@@ -193,9 +203,9 @@ def _lexical(
     """Cualquier palabra de la consulta (OR), puntuada por IDF dentro del vertical: las palabras raras pesan más.
 
     Sin IDF, una unidad como "g" (presente en miles de productos) tapaba a "pañales" en "pañales talla g".
-    ts_rank_cd solo desempata (palabras más juntas, más arriba). Cada lexema ya normalizado entra al tsquery tal
-    cual (`::tsquery`): `to_tsquery` lo volvía a separar ("coca-col" → 'coca-col' <-> 'coca' <-> 'col', y 'coca'
-    no existe en el índice), así que las palabras con guion perdían su peso.
+    ts_rank_cd pesa poco (≈0,1 por aparición; palabras más juntas, más arriba). Cada lexema ya normalizado entra al
+    tsquery tal cual (`::tsquery`): `to_tsquery` lo volvía a separar ("coca-col" → 'coca-col' <-> 'coca' <-> 'col',
+    y 'coca' no existe en el índice), así que las palabras con guion perdían su peso.
 
     El df de cada lexema sale de la caché del catálogo (`_document_frequencies`): contarlo en cada búsqueda costaba
     tanto como puntuar con una palabra frecuente («sushi» en restaurantes, ~45 mil documentos).
@@ -208,36 +218,60 @@ def _lexical(
     ORDER BY. En la base real el orden cambió solo entre documentos empatados (87 de 3.552 listas) y la evaluación de
     búsqueda dio el mismo reporte. (`search_documents` es única por vertical, tipo e id: sin GROUP BY no hay filas
     repetidas.) tests/integration/test_lexical_df_cache.py lo compara con el SQL anterior.
+
+    Con más de una palabra, en dos etapas: primero ordena por la suma de IDF (barata) y se queda con los
+    LEXICAL_RANK_POOL mejores más los que empatan con el último (`WITH TIES`: un empate no se corta al azar); recién
+    ahí suma ts_rank_cd, lo caro (~2 µs por documento: «sushi roll wok chapsui» calza 49 mil platos). La segunda etapa
+    vuelve a leer cada documento por su `ctid` y su partición (`tableoid`: un ctid solo es único dentro de una), la
+    misma fila en la misma consulta: arrastrar el tsvector en el orden lo mandaba a disco. Como ts_rank_cd pesa poco
+    (≈0,1 por aparición, contra un IDF de 1,5 o más), el orden es el mismo salvo que un documento con menos IDF lo
+    supere por ts_rank_cd desde fuera de los primeros mil. Con una sola palabra todos tienen el mismo IDF: una etapa.
     """
     lexemes = _lexemes(conn, query)
     if not lexemes:  # solo stopwords («té»): nada que calzar
         return []
-    rows = conn.execute(
-        f"""WITH weights AS MATERIALIZED (
+    params = {
+        "lexemes": lexemes,
+        "dfs": _document_frequencies(conn, vertical, lexemes, doc_count),
+        "vertical": vertical,
+        "n": doc_count,
+        "types": list(filters.entity_types),
+        "price_max": filters.price_max,
+        "k": CANDIDATES,
+        "pool": LEXICAL_RANK_POOL,
+    }
+    weights = """WITH weights AS MATERIALIZED (
                 SELECT quote_literal(w.lexeme)::tsquery AS q, ln(1 + %(n)s::float / (1 + w.df)) AS idf
                 FROM unnest(%(lexemes)s::text[], %(dfs)s::bigint[]) AS w(lexeme, df)
             ),
-            any_q AS (SELECT string_agg(quote_literal(l), ' | ')::tsquery AS q FROM unnest(%(lexemes)s::text[]) AS l)
-            SELECT d.entity_type, d.entity_id,
-                   (SELECT sum(w.idf) FROM weights w WHERE d.tsv_unaccent @@ w.q)
-                   + ts_rank_cd(d.tsv_unaccent, any_q.q) AS score
-            FROM search_documents d
+            any_q AS (SELECT string_agg(quote_literal(l), ' | ')::tsquery AS q FROM unnest(%(lexemes)s::text[]) AS l)"""
+    idf = "(SELECT sum(w.idf) FROM weights w WHERE d.tsv_unaccent @@ w.q)"
+    matching = f"""FROM search_documents d
             CROSS JOIN any_q
             WHERE d.vertical = %(vertical)s AND d.entity_type = ANY(%(types)s)
               AND d.tsv_unaccent @@ any_q.q
-              AND (%(price_max)s::numeric IS NULL OR {_PRICE} <= %(price_max)s::numeric)
+              AND (%(price_max)s::numeric IS NULL OR {_PRICE} <= %(price_max)s::numeric)"""
+    if len(lexemes) == 1:  # todos los que calzan tienen el mismo IDF: ts_rank_cd ordena solo
+        sql = f"""{weights}
+            SELECT d.entity_type, d.entity_id, {idf} + ts_rank_cd(d.tsv_unaccent, any_q.q) AS score
+            {matching}
             ORDER BY score DESC, d.entity_id
-            LIMIT %(k)s""",
-        {
-            "lexemes": lexemes,
-            "dfs": _document_frequencies(conn, vertical, lexemes, doc_count),
-            "vertical": vertical,
-            "n": doc_count,
-            "types": list(filters.entity_types),
-            "price_max": filters.price_max,
-            "k": CANDIDATES,
-        },
-    ).fetchall()
+            LIMIT %(k)s"""
+    else:
+        sql = f"""{weights},
+            best AS MATERIALIZED (
+                SELECT d.tableoid AS tbl, d.ctid AS row_id, d.entity_type, d.entity_id, {idf} AS idf
+                {matching}
+                ORDER BY idf DESC
+                FETCH FIRST %(pool)s ROWS WITH TIES
+            )
+            SELECT b.entity_type, b.entity_id, b.idf + ts_rank_cd(d.tsv_unaccent, any_q.q) AS score
+            FROM best b
+            JOIN search_documents d ON d.vertical = %(vertical)s AND d.tableoid = b.tbl AND d.ctid = b.row_id
+            CROSS JOIN any_q
+            ORDER BY score DESC, b.entity_id
+            LIMIT %(k)s"""
+    rows = conn.execute(sql, params).fetchall()
     return [((t, i), r) for t, i, r in rows]
 
 
@@ -321,9 +355,14 @@ def _vector(
             params,
         ).fetchall()
         return [((t, i), float(c)) for t, i, c in rows]
-    conn.execute(  # SET LOCAL de los dos en una sola consulta: solo esta transacción (la conexión vuelve a un pool)
+    # SET LOCAL de los tres en una sola consulta: solo esta transacción (la conexión vuelve a un pool). random_page_cost
+    # queda en 1.1 para lo que sigue en la transacción (precios con v_latest_offers, documentos, conceptos): en staging,
+    # las 165 consultas de eval (de /search y de oferta) y las escaleras dieron los mismos productos y precios, y esas
+    # consultas no tardaron más (4,9–5,0 s contra 5,0–5,1 s devolviéndolo enseguida).
+    conn.execute(
         f"SELECT set_config('hnsw.ef_search', '{CANDIDATES}', true), "
-        "set_config('hnsw.iterative_scan', 'relaxed_order', true)"
+        "set_config('hnsw.iterative_scan', 'relaxed_order', true), "
+        f"set_config('random_page_cost', '{VECTOR_RANDOM_PAGE_COST}', true)"
     )
     rows = conn.execute(
         f"""SELECT entity_type, entity_id, 1 - ({distance}) AS cosine
