@@ -99,7 +99,7 @@ Cada cifra dice qué tipo de dato es: real, evaluación automática, estimación
 
 ### Motor multivertical (datos simulados: prueban la mecánica, no el efecto)
 
-Corrida del 16-10-2026 (`rappi-ia motor`) sobre una copia del catálogo real y **3.000 personas simuladas**, con tramos por fecha: entrenar, validar y probar (28 días cada uno de los dos últimos). Son las cifras vigentes, después de los ajustes del 16-10. Informe completo, intentos descartados y ruido entre semillas: [docs/resultados/motor-2026-10-16.md](docs/resultados/motor-2026-10-16.md#resultado-final-código-de-esta-etapa-semilla-7-rappi-ia-motor).
+Corrida del 16-10-2026 (`rappi-ia motor`) sobre una copia del catálogo real y **3.000 personas simuladas**, con tramos por fecha: entrenar, validar y probar (28 días cada uno de los dos últimos). Son las cifras de la etapa 5, después de los ajustes del 16-10 (la escalera fina de la etapa 7 va en su fila y en el detalle de abajo). Informe completo, intentos descartados y ruido entre semillas: [docs/resultados/motor-2026-10-16.md](docs/resultados/motor-2026-10-16.md#resultado-final-código-de-esta-etapa-semilla-7-rappi-ia-motor).
 
 | Qué | Métrica (tramo de prueba) | Valor | Tipo de dato |
 |---|---|---|---|

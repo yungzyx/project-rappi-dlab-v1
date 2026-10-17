@@ -822,7 +822,11 @@ describe('Home del prototipo final', () => {
       expect(opened()).toHaveLength(3)
       // Abrir un servicio desde la Home cuenta igual que desde Mochi: así la escalera no lo vuelve a ofrecer.
       const services = events.track.mock.calls.filter(([type]) => type === 'service_opened').map(([, fields]) => fields)
-      expect(services).toEqual([{ payload: { servicio: 'rappitravel' } }, { payload: { servicio: 'rappifavor' } }])
+      // Con `desde: 'home'` el panel no los cuenta como aperturas de lo que ofreció Mochi.
+      expect(services).toEqual([
+        { payload: { servicio: 'rappitravel', desde: 'home' } },
+        { payload: { servicio: 'rappifavor', desde: 'home' } },
+      ])
     })
   })
 })

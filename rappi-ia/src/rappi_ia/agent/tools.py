@@ -11,6 +11,7 @@ from rappi_scraper.storage.search import MIN_PRICE
 from .. import config
 from ..concepts.taxonomy import load_taxonomy
 from ..embeddings.base import TextEmbedder
+from ..motor.combos import SERVICES
 from ..motor.predict import step_signal, target_step
 from ..motor.recommend import RECENT_DAYS, CrossPick, cross_picks, latest_lambda
 from ..offers.guards import (
@@ -314,7 +315,8 @@ def suggest_complement(
     similar = [c for c in candidates[1:] if round(best.weight - c.weight, 6) < SIMILAR_MARGIN]
     step = target_step(conn, user_id, population) if user_id is not None and similar else None
     if step is not None:
-        group = {step.vertical} if offerable_vertical(step.vertical) else set()  # un servicio no tiene productos
+        # Un servicio no tiene productos.
+        group = {step.vertical} if step.vertical not in SERVICES and offerable_vertical(step.vertical) else set()
         for candidate in (best, *similar):
             if completing := [v for v in verticals_of(candidate) if v in group and v != current_vertical]:
                 break

@@ -31,6 +31,7 @@ describe('CrossVerticalView', () => {
         `${formatNumber(travel.ganchos_aceptados)} de ${formatNumber(travel.ganchos_mostrados)}`,
       ),
     ).toBeTruthy()
+    expect(within(servicesTable).getByText('Abierto desde la Home')).toBeTruthy()
   })
 
   test('en una demo en vivo el titular cuenta las sugerencias sin inventar un porcentaje', async () => {
@@ -150,7 +151,7 @@ describe('CrossVerticalView', () => {
     expect(screen.queryByRole('table', { name: 'Combinaciones de verticales con datos propios' })).toBeNull()
     expect(screen.getByText('Sin pedidos propios todavía')).toBeTruthy()
     expect(screen.getByText('Sin combinaciones finas todavía')).toBeTruthy()
-    expect(screen.queryByText(/coinciden por construcción/)).toBeNull()
+    expect(screen.queryByText(/repite el supuesto con ruido: no es confirmación/)).toBeNull()
   })
 
   test('las combinaciones finas muestran la retención aprendida, la esperada y el supuesto propio explicado', async () => {
@@ -183,7 +184,16 @@ describe('CrossVerticalView', () => {
     expect(screen.getByText(/Supuesto propio, no es dato de Rappi/).textContent).toMatch(
       /la 2\.ª un 10%, la 3\.ª un 5%, la 4\.ª un 2,5%…\) y cada servicio usado \(RappiFavor, RappiTravel\), un 5%/,
     )
-    expect(screen.getByText(/coinciden por construcción/)).toBeTruthy()
+    expect(screen.getByText(/repite el supuesto con ruido: no es confirmación/)).toBeTruthy()
+  })
+
+  test('con una API anterior, sin combinaciones finas ni supuesto, la tabla gruesa se ve igual', async () => {
+    const { fino: _fino, supuesto: _supuesto, ...old } = combos.data
+    serveFixturesWith({ combos: { source: 'synthetic', data: old } })
+    await renderWithData(<CrossVerticalView source="synthetic" />)
+
+    expect(await screen.findByRole('table', { name: 'Combinaciones de verticales de Rappi' })).toBeTruthy()
+    expect(screen.queryByText('Combinaciones finas: vertical por vertical')).toBeNull()
   })
 
   test('«Motor» sin evaluación muestra pesos, λ y la fecha, y dice por qué no hay métricas', async () => {

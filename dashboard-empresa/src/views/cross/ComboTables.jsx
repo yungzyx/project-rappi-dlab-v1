@@ -80,8 +80,9 @@ function FineCombos({ fino, supuesto, nota, source }) {
         2.ª un {share(base)}, la 3.ª un {share(base * decay)}, la 4.ª un {share(base * decay * decay)}…) y cada servicio
         usado (RappiFavor, RappiTravel), un {share(servicio)}. Parte de la retención de la tabla de Rappi de sus grupos
         y nunca llega a 100%. Con al menos {MIN_RETENTION_MONTHS} meses aprendidos de una combinación, lo aprendido solo
-        corrige la diferencia dentro del grupo (pesa n / (n + 100)); el nivel lo pone la combinación gruesa. La escalera
-        propone la vertical que más sube esa retención; Farmacia y Licores nunca.
+        corrige la diferencia dentro del grupo (pesa n / (n + 100)); el nivel lo pone la combinación gruesa (sin gruesa
+        aprendida, se mezcla tal cual). La escalera propone la vertical que más sube esa retención; Farmacia y Licores
+        nunca.
       </p>
       {fino.length ? (
         <>
@@ -95,7 +96,7 @@ function FineCombos({ fino, supuesto, nota, source }) {
             Las {fino.length} combinaciones finas más frecuentes. La aprendida aparece desde {MIN_RETENTION_MONTHS}{' '}
             meses con el siguiente completo; antes, —. La esperada no usa lo aprendido.
             {source === 'synthetic' &&
-              ' En los simulados la aprendida sale del mismo supuesto con que se simulan: coinciden por construcción.'}
+              ' En los simulados la aprendida sale del mismo supuesto con que se simulan; repite el supuesto con ruido: no es confirmación.'}
           </p>
         </>
       ) : (
@@ -152,7 +153,7 @@ export function ComboTables({ data, source }) {
           </EmptyState>
         )}
       </div>
-      <FineCombos fino={fino} supuesto={supuesto} nota={nota} source={source} />
+      {fino && supuesto && <FineCombos fino={fino} supuesto={supuesto} nota={nota} source={source} />}
     </div>
   )
 }

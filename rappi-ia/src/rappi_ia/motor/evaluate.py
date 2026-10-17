@@ -405,9 +405,10 @@ def _replenishment(history: _History, sensitive: frozenset[str], cut: datetime, 
 
 def _additions(history: _History, cut: datetime, end: datetime) -> dict[str, tuple[frozenset[str], frozenset[str]]]:
     """`persona → (verticales de su combinación en el corte, verticales que suma en [cut, end))` para quien suma alguna.
-    La combinación es la de `predict.current_fine` en el corte: los últimos 30 días y, sin pedidos, los últimos 90;
-    sin pedidos en 90 días no hay combinación (la oferta es la de siempre). Solo cuentan las verticales que la escalera
-    puede proponer: Farmacia y Licores no son paso, así que sumarlas no cuenta."""
+    La combinación es la de `predict.current_fine` en el corte, pero armada solo con los pedidos (sin servicios): los
+    últimos 30 días y, sin pedidos, los últimos 90; sin pedidos en 90 días no hay combinación (la oferta es la de
+    siempre). Solo cuentan las verticales que
+    la escalera puede proponer: Farmacia y Licores no son paso, así que sumarlas no cuenta."""
     out = {}
     for user in sorted(history.by_user):
         recent = history.user_orders(user, cut - timedelta(days=CURRENT_COMBO_DAYS), cut) or history.user_orders(

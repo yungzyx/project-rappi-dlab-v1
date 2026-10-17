@@ -145,9 +145,10 @@ def target_step(conn: Connection, user_id: str, population: str | None = None) -
 
 def step_signal(conn: Connection, step: Step, population: str | None = None) -> dict:
     """La señal `combinacion` de un paso (`target_step`) para la `basis` de una oferta: «<actual>→<objetivo>», con sus
-    combinaciones finas. Su fuente parte de la tabla de Rappi («rappi»), suma «+supuesto» si pesó el supuesto propio
-    del rendimiento decreciente y «+poblacion:<fuente>» si pesó la retención aprendida de la población (gruesa o fina,
-    con al menos `LEARNED_RETENTION_MIN_USERS` personas) en la combinación actual o en la objetivo."""
+    combinaciones finas sin Farmacia ni Licores (cuentan en el paso, pero la base no los nombra). Su fuente parte de la
+    tabla de Rappi («rappi»), suma «+supuesto» si pesó el supuesto propio del rendimiento decreciente y
+    «+poblacion:<fuente>» si pesó la retención aprendida de la población (gruesa o fina, con al menos
+    `LEARNED_RETENTION_MIN_USERS` personas) en la combinación actual o en la objetivo."""
     population = population or config.MOTOR_POBLACION
     coarse = _learned_retention(conn, population)
     fine = _learned_fine_retention(conn, population)
@@ -157,7 +158,15 @@ def step_signal(conn: Connection, step: Step, population: str | None = None) -> 
         for combo in (step.current, step.target)
     )
     source = "rappi" + ("+supuesto" if step.used_assumption else "") + (f"+poblacion:{population}" if weighed else "")
-    return {"kind": "combinacion", "id": f"{step.current}→{step.target}", "source": source}
+    return {"kind": "combinacion", "id": f"{_nameable(step.current)}→{_nameable(step.target)}", "source": source}
+
+
+def _nameable(fine: str) -> str:
+    """La combinación fina sin las verticales que el agente no propone por su cuenta (`OWN_SIGNALS_ONLY`: Farmacia y
+    Licores): la `basis` de una oferta no las nombra, aunque la persona haya pedido ahí y cuenten en su combinación."""
+    if fine == NONE_COMBO:
+        return fine
+    return "+".join(m for m in fine.split("+") if m not in OWN_SIGNALS_ONLY) or NONE_COMBO
 
 
 def _coarse_of(fine: str) -> str | None:

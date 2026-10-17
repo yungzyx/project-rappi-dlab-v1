@@ -225,7 +225,7 @@ def _fine(db, source, combo, months, retention_n, retention=0.9):
 def test_combos_fine_table_with_learned_and_expected_retention(db):
     _fine(db, "synthetic", "restaurantes+turbo+supermercado+mall", 40, 30, retention=0.95)
     _fine(db, "synthetic", "restaurantes", 90, 29)
-    _fine(db, "prototype", "turbo", 2, 0)
+    _fine(db, "prototype", "turbo", 25, 0)
 
     data = queries.combos(db, "synthetic")
 
@@ -248,6 +248,17 @@ def test_combos_fine_table_with_learned_and_expected_retention(db):
     }
     assert data["nota"] == "Simulado: no es evidencia"
     assert [row["combo"] for row in queries.combos(db, "prototype")["fino"]] == ["turbo"]
+
+
+def test_combos_fine_table_of_few_people_does_not_single_anyone_out(db):
+    _fine(db, "prototype", "turbo", queries.MIN_GROUP_USERS, 0)
+    _fine(db, "prototype", "restaurantes", queries.MIN_GROUP_USERS - 1, 0)  # pocas personas: no se muestra
+    for combo in ("restaurantes+farmacia", "licores", "restaurantes+turbo+licores+favor", "farmacia+licores"):
+        _fine(db, "prototype", combo, 50, 0)  # Farmacia y Licores solo suben por señales propias
+    _fine(db, "synthetic", "restaurantes+farmacia", 5, 0)  # en lo simulado no hay a quién señalar
+
+    assert [row["combo"] for row in queries.combos(db, "prototype")["fino"]] == ["turbo"]
+    assert [row["combo"] for row in queries.combos(db, "synthetic")["fino"]] == ["restaurantes+farmacia"]
 
 
 def test_combos_fine_table_keeps_the_most_frequent(db):

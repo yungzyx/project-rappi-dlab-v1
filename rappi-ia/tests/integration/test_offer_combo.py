@@ -180,6 +180,20 @@ def test_after_rappifavor_it_offers_rappitravel_and_then_the_usual(client, db):
     assert reply.status_code == 204
 
 
+@pytest.mark.parametrize("own_only", ["farmacia", "licores"])
+def test_the_basis_never_names_pharmacy_or_liquor_even_when_the_person_ordered_there(client, db, own_only):
+    """Lo que el agente no propone no entra a la base: Farmacia y Licores cuentan en la combinación de la persona
+    (y en el paso), pero el id de la `combinacion` no los nombra."""
+    sushi_lover(db)
+    order(db, "u-sushi", own_only)
+
+    body = to_try(client, "u-sushi")
+
+    step = next(s for s in body["reason"]["basis"] if s["kind"] == "combinacion")
+    assert step["id"] == "restaurantes→restaurantes+turbo"
+    assert "farmacia" not in step["id"] and "licores" not in step["id"]
+
+
 def test_a_lapsed_person_climbs_from_the_combination_of_90_days(client, db):
     order(db, "u-vuelve", "restaurantes", "sushi", days_ago=60, entity=("menu_item", SUSHI_ROLL))
     order(db, "u-lejos", "restaurantes", "sushi", days_ago=120, entity=("menu_item", SUSHI_ROLL))
