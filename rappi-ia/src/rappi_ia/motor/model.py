@@ -13,7 +13,7 @@ from datetime import date, datetime, timedelta
 from itertools import pairwise
 from zoneinfo import ZoneInfo
 
-from rappi_ia.motor.combos import NONE_COMBO, combo_of_verticals
+from rappi_ia.motor.combos import NONE_COMBO, OWN_SIGNALS_ONLY, combo_of_verticals
 from rappi_ia.motor.data import Order, Signal
 
 TZ = ZoneInfo("America/Santiago")
@@ -47,7 +47,6 @@ REPLENISH_MAX_CV = 0.6
 
 DEFAULT_ORDER = ("restaurantes", "turbo", "supermercado", "farmacia", "mall", "licores", "conveniencia", "chocolateria")
 DEFAULT_WEIGHTS = {"afinidad": 1.0, "transicion": 0.3, "popularidad": 0.1}
-OWN_SIGNALS_ONLY = frozenset({"farmacia", "licores"})  # sin transición ni popularidad: nunca los empujan otros
 
 
 def local_day(ts: datetime) -> date:

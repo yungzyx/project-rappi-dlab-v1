@@ -82,3 +82,20 @@ pct_pedidos = 100.0
 pedidos_por_usuario = 3.0
 retencion_m1 = 0.55
 gasto_por_usuario = 68
+
+# Escalera fina (docs/superpowers/plans/2026-10-16-etapa-7-escalera-fina.md). Supuesto propio, no viene de Rappi: la
+# tabla de arriba solo distingue grupos. En un grupo con k verticales, la 2.ª suma `base`, la 3.ª base·decaimiento, la
+# 4.ª base·decaimiento², …; cada servicio usado (RappiFavor, RappiTravel) suma `servicio`. La retención esperada con el
+# bono no pasa de `tope` (el bono no baja una retención aprendida que ya esté sobre el tope).
+[rendimiento_decreciente]
+nota = "supuesto propio: cada vertical extra dentro de un grupo suma algo de retención, cada vez menos; con datos reales se reemplaza por lo aprendido"
+base = 0.04
+decaimiento = 0.5
+servicio = 0.02
+tope = 0.97
+
+# Servicios sin catálogo que también cuentan en la combinación fina: su clave y el `payload.servicio` del evento
+# `service_opened` con que la persona los usa.
+[servicios]
+favor = "rappifavor"
+travel = "rappitravel"

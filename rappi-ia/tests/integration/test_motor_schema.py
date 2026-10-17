@@ -87,3 +87,27 @@ def test_population_tables_keep_synthetic_and_prototype_apart(db):
         db.execute(STEP, ("mezcla",))
     db.execute(STEP, ("synthetic",))
     db.execute(STEP, ("prototype",))
+
+
+def test_combo_tables_keep_coarse_and_fine_apart(db):
+    """Migración 037: la misma combinación puede estar en los dos niveles; sin nivel, la fila es gruesa."""
+    stats = "INSERT INTO combo_stats (data_source, nivel, combo, user_months) VALUES ('synthetic', %s, 'turbo', 1)"
+    db.execute(stats, ("grueso",))
+    db.execute(stats, ("fino",))
+    with pytest.raises(psycopg.errors.CheckViolation), db.transaction():
+        db.execute(stats, ("medio",))
+    with pytest.raises(psycopg.errors.UniqueViolation), db.transaction():
+        db.execute(stats, ("fino",))
+    db.execute(STEP, ("synthetic",))
+    db.execute(
+        "INSERT INTO combo_steps (data_source, nivel, from_combo, to_combo, users, prob)"
+        " VALUES ('synthetic', 'fino', 'rest', 'rest+turbo', 1, 0.5)"
+    )
+    assert db.execute("SELECT nivel FROM combo_steps ORDER BY nivel").fetchall() == [("fino",), ("grueso",)]
+    for view in ("combo_stats", "combo_steps"):
+        assert db.execute(f"SELECT count(*) FROM capa.{view} WHERE nivel = 'fino'").fetchone()[0] == 1
+        comment = db.execute(
+            f"""SELECT col_description('capa.{view}'::regclass, attnum) FROM pg_attribute
+                WHERE attrelid = 'capa.{view}'::regclass AND attname = 'nivel'"""
+        ).fetchone()[0]
+        assert comment and "fino" in comment, f"capa.{view}.nivel sin comentario"
