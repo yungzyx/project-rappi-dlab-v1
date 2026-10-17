@@ -198,3 +198,22 @@ def test_new_snapshot_updates_the_store_row(db):
     run_id, scraped_at = last()
     assert run_id == r2 and scraped_at > T0 + timedelta(days=7)  # sin fecha, el snapshot queda con la hora actual
     assert db.execute("SELECT format_run_id FROM v_store_format_runs WHERE store_id = 1").fetchone()[0] == r2
+
+
+def test_moving_a_snapshot_to_another_store_updates_both_rows(db):
+    """Un UPDATE que cambia la tienda de un snapshot vuelve a leer la tienda que lo pierde y pone el snapshot en la que
+    lo gana."""
+    r1, r2 = (repository.start_run(db, "stores", {}) for _ in range(2))
+    for store_id in (1, 2):
+        _store(db, store_id, "lider")
+        _product(db, store_id, "a")
+    _download(db, r1, 1, "a", 0)
+    _download(db, r2, 1, "a", 7)
+    _download(db, r1, 2, "a", 3)
+    assert set(db.execute("SELECT * FROM store_last_snapshot").fetchall()) == set(db.execute(HISTORY_STORE).fetchall())
+
+    db.execute("DELETE FROM price_snapshots WHERE run_id = %s AND store_id = 2", (r1,))
+    db.execute("UPDATE price_snapshots SET store_id = 2 WHERE run_id = %s AND store_id = 1", (r2,))
+    rows = dict((s, (r, t)) for s, r, t in db.execute("SELECT * FROM store_last_snapshot").fetchall())
+    assert rows == {1: (r1, T0), 2: (r2, T0 + timedelta(days=7))}
+    _assert_same_as_before(db)

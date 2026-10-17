@@ -17,7 +17,9 @@ COMMENT ON COLUMN store_last_snapshot.store_id IS 'Tienda (sucursal) con precios
 COMMENT ON COLUMN store_last_snapshot.run_id IS 'Corrida de su último snapshot de precios.';
 COMMENT ON COLUMN store_last_snapshot.scraped_at IS 'Cuándo se bajó su último snapshot de precios.';
 
--- El último snapshot de una tienda, leído del historial por price_snapshots_store_latest_idx (019).
+-- El último snapshot de una tienda, leído del historial por price_snapshots_store_latest_idx (019). El INSERT es un
+-- upsert: si otra transacción vuelve a poner la fila de la misma tienda entre el DELETE y el INSERT, no hay choque de
+-- llave.
 CREATE FUNCTION store_last_snapshot_refresh(p_store_id bigint) RETURNS void LANGUAGE sql AS $$
     DELETE FROM store_last_snapshot WHERE store_id = p_store_id;
     INSERT INTO store_last_snapshot (store_id, run_id, scraped_at)
@@ -25,7 +27,8 @@ CREATE FUNCTION store_last_snapshot_refresh(p_store_id bigint) RETURNS void LANG
     FROM price_snapshots
     WHERE store_id = p_store_id
     ORDER BY scraped_at DESC, run_id DESC
-    LIMIT 1;
+    LIMIT 1
+    ON CONFLICT (store_id) DO UPDATE SET run_id = EXCLUDED.run_id, scraped_at = EXCLUDED.scraped_at;
 $$;
 
 -- Un snapshot nuevo reemplaza al último de su tienda si es más nuevo (por scraped_at y, con el mismo, por corrida).
@@ -73,6 +76,7 @@ SELECT s.store_id, l.run_id, l.scraped_at
 FROM stores s
 CROSS JOIN LATERAL (SELECT ps.run_id, ps.scraped_at FROM price_snapshots ps WHERE ps.store_id = s.store_id
                     ORDER BY ps.scraped_at DESC, ps.run_id DESC LIMIT 1) l;
+ANALYZE store_last_snapshot;
 
 -- La misma vista (mismas columnas y el mismo desempate), ahora con el último snapshot de store_last_snapshot. La ventana
 -- por formato sigue recorriendo las tiendas con precios (unas mil), pero sin leer price_snapshots. Agrupa por el
