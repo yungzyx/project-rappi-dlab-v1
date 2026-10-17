@@ -1,4 +1,4 @@
-.PHONY: help install install-ml db-test migrate check-migrations verify-migrations deploy-migrate test lint format jev-categorias concepts embed eval synth analytics serve serve-lan warm probar-agente purge post-refresh layers layer-report motor contract
+.PHONY: help install install-ml db-test migrate check-migrations verify-migrations deploy-migrate test lint format jev-categorias concepts embed eval synth analytics serve serve-lan warm warm-catalog probar-agente purge post-refresh layers layer-report motor contract
 
 PY := .venv/bin/python
 # Python ≥ 3.12 para crear el .venv. En un Mac nuevo `python3` es el 3.9 de macOS: se prefiere python3.13
@@ -102,18 +102,23 @@ ANALYTICS := kpis weekly opportunities trends funnel cohorts rhythm at-risk sugg
 # tardaba 4 a 5 s (el tope de la app para una oferta es 5 s); caliente, unos 0,2 a 0,3 s.
 PROFILES := $(shell sed -n 's/^id = "\(.*\)"$$/\1/p' src/rappi_ia/offers/perfiles.toml)
 # Las listas del catálogo viven en la caché de la API (catalog/cache.py): en frío, /catalog/home tardaba 2,7 s y las
-# tiendas de una vertical, 0,5 a 0,7 s; calientes, 1 a 2 ms. Los restaurantes, con el orden y largo que pide la Home.
-CATALOG_LISTS := /catalog/home /catalog/deals "/catalog/restaurants?sort=rating&limit=6"
+# tiendas de una vertical, 0,5 a 0,8 s; calientes, 1 a 2 ms. Los restaurantes, con el orden y largo que piden la Home
+# (6) y Favoritos (4).
+CATALOG_LISTS := /catalog/home /catalog/deals "/catalog/restaurants?sort=rating&limit=6" \
+	"/catalog/restaurants?sort=rating&limit=4"
 
-warm:  ## Calienta la API antes de una demo (con la API ya corriendo; repetirlo tras un rato sin uso)
+# Sin Claude ni registros: solo lee el catálogo. `make mvp` lo corre en segundo plano cuando la API responde.
+warm-catalog:  ## Calienta solo las listas del catálogo de la API (Home, ofertas, restaurantes y tiendas de cada vertical)
 	@for path in $(CATALOG_LISTS) $$($(PY) -c 'from rappi_scraper.storage.search import VERTICALS; \
 	  print(" ".join(f"/catalog/verticals/{v}/stores" for v in VERTICALS))'); do \
-	  curl -s -o /dev/null -w "  %{time_total}s  $$path\n" "$(API)$$path" || exit 1; done
+	  curl -s -o /dev/null -w "  %{http_code}  %{time_total}s  $$path\n" "$(API)$$path" || exit 1; done
+
+warm: warm-catalog  ## Calienta la API antes de una demo (con la API ya corriendo; repetirlo tras un rato sin uso)
 	@for q in $(DEMO_PHRASES); do \
-	  curl -s -o /dev/null -w "  %{time_total}s  $$q\n" -X POST $(API)/agent/ask -H 'Content-Type: application/json' \
+	  curl -s -o /dev/null -w "  %{http_code}  %{time_total}s  $$q\n" -X POST $(API)/agent/ask -H 'Content-Type: application/json' \
 	    -d "{\"message\": \"$$q\"}" || exit 1; done
 	@for p in $(PROFILES); do \
-	  curl -s -o /dev/null -w "  %{time_total}s  perfil $$p\n" -X POST $(API)/agent/offer \
+	  curl -s -o /dev/null -w "  %{http_code}  %{time_total}s  perfil $$p\n" -X POST $(API)/agent/offer \
 	    -H 'Content-Type: application/json' -d "{\"moment\": \"perfil\", \"context\": {\"perfil\": \"$$p\"}}" \
 	    || exit 1; done
 	@for m in $(ANALYTICS); do for s in synthetic prototype; do \
