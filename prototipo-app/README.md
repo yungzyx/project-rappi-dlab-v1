@@ -71,6 +71,12 @@ Un solo HTML que abre con doble clic (`file://`), sin la API ni el MVP corriendo
 
 Cómo funciona: el build de la demo (`vite build --mode demo`; sus variables están en `vite.config.js`) instala una API simulada en el navegador (`src/api/offline/`) que responde los mismos formatos que la real. Lee una muestra del catálogo grabada de la API real (`src/api/offline/snapshot.json`: listas, tiendas, menús, búsquedas, preguntas a Mochi, kits, complementos y la oferta real de cada paso de la escalera) y guarda lo que hace la persona en `localStorage` («Empezar de cero», bajo el aviso de la Home, lo borra). El orden de la Home, la escalera y las guardias de las ofertas son una copia simplificada del backend (los archivos que replica están al inicio de `src/api/offline/index.js`): sin población que aprenda, sin búsqueda semántica (las búsquedas y preguntas no grabadas se buscan por palabras en la muestra) y con una recompra sin ritmo (basta pedir algo dos veces). Los builds normales no la llevan: Vite pliega `VITE_OFFLINE_DEMO` y `src/api/offline/` no entra a `dist/`.
 
+**Panel de la demo** (solo en este HTML, junto al interruptor de modo):
+
+- **Persona:** borra lo de ahora y siembra un historial en la API simulada, de un clic: «Nueva (sin historial)», «Solo Restaurantes», «Restaurantes + Turbo», «Restaurantes + Turbo + Súper», «Todo el catálogo» (Mochi ofrece RappiFavor y, abierto RappiFavor, RappiTravel), «Usa mucho Farmacia» (Farmacia sube primera en la Home y Mochi igual nunca la ofrece) y los cinco perfiles de gusto (asiático, café, italiano, mascotero y carrete sin alcohol: tres pedidos de un concepto del perfil lo activan, y el buscador con Mochi muestra su perfil y su escalera, grabados de la API real).
+- **Mover la Home:** «+1 visita a Súper», Farmacia, Retail, Licores, Express o Chocolates registra un toque a ese acceso en el prototipo (no en «Rappi hoy») y la Home se reordena en vivo; «Borrar historial» la deja en su orden fijo.
+- Una línea con la combinación de la persona y el paso que Mochi propondría («Hoy: restaurantes+turbo → siguiente: supermercado»).
+
 La muestra son datos descargados del catálogo, así que no va a git (`.gitignore`). Para regenerarla y armar el HTML:
 
 ```bash

@@ -21,7 +21,8 @@ function OfflineNote() {
         // Sin almacenamiento no hay nada que borrar.
       }
     }
-    window.location.replace(`${window.location.pathname}#/home`)
+    // Sin el estado de la pantalla en que estaba (useNavigation lo lee antes que el hash): vuelve a la Home.
+    window.history.replaceState(null, '', `${window.location.pathname}#/home`)
     window.location.reload()
   }
   return (

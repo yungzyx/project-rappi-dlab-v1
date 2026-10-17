@@ -34,6 +34,15 @@ export function useVerticalOrder(active = true) {
     }
   }, [active, events])
 
+  // Demo sin conexión: el «Panel de la demo» cambia el historial y la Home vuelve a pedir su orden (en los demás builds
+  // la condición se pliega y esto no existe).
+  useEffect(() => {
+    if (import.meta.env.VITE_OFFLINE_DEMO !== '1') return undefined
+    const again = () => setReturns((n) => n + 1)
+    window.addEventListener('rappi-demo-history', again)
+    return () => window.removeEventListener('rappi-demo-history', again)
+  }, [])
+
   const { data } = useApi(async () => ({ resets, reply: await homeVerticals(userId()) }), [resets, returns], {
     keepPrevious: true,
   })

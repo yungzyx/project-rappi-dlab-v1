@@ -22,6 +22,11 @@ import { OrdersProvider } from './state/OrdersContext'
 import { ProductSheetProvider } from './state/ProductSheetContext'
 import { ProfileProvider } from './state/ProfileContext'
 
+// «Panel de la demo»: solo en «Prototipo MVP.html» (build sin conexión); en los demás builds la condición se pliega y
+// el panel no entra al bundle.
+const OfflineDemoPanel =
+  import.meta.env.VITE_OFFLINE_DEMO === '1' ? lazy(() => import('./components/demo/OfflineDemoPanel')) : null
+
 // La Home va en el paquete principal (es la primera); el resto se baja al abrirse por primera vez.
 const SCREENS = {
   home: HomeScreen,
@@ -82,6 +87,11 @@ export default function App() {
       <EventsProvider>
         <main className="stage">
           <DemoToggle />
+          {OfflineDemoPanel && (
+            <Suspense fallback={null}>
+              <OfflineDemoPanel />
+            </Suspense>
+          )}
           <div className="phone">
             <ProfileProvider>
               <AssistantProvider>

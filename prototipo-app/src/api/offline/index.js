@@ -13,6 +13,7 @@
 // - rappi-ia/src/rappi_ia/offers/engine.py ......... vertical por probar, recompra, complementos (offers.js)
 // - rappi-ia/src/rappi_ia/offers/guards.py ......... lo que el agente nunca ofrece (offers.js: offerableProduct)
 // - rappi-ia/src/rappi_ia/events/store.py .......... el perfil de intereses (index.js: interests)
+// - rappi-ia/src/rappi_ia/offers/profiles.py ....... los perfiles de gusto activos (tastes.js)
 // - rappi-ia/src/rappi_ia/api/app.py y api/catalog.py ... las rutas (index.js, catalog.js, search.js)
 // No hay población que aprenda (transiciones, popularidad, retención aprendida), ni búsqueda semántica, ni ritmo real
 // de recompra: es una demo, no evidencia.
@@ -22,6 +23,7 @@ import { makeOffer } from './offers'
 import { ask, backendVertical, search } from './search'
 import { loadSnapshot } from './snapshot'
 import { addEvents, addOrder, clearState, readState, updateState } from './state'
+import { profileOffer, tastesReply } from './tastes'
 
 const DAY_MS = 86_400_000
 // events/store.py: WEIGHTS y HALF_LIFE_DAYS del perfil de intereses.
@@ -138,7 +140,10 @@ export function route(snapshot, { method, path, query, body }, now = Date.now())
   if (key === 'POST /agent/ask') return { body: ask(snapshot, body) }
   if (key === 'GET /agent/plans') return { body: snapshot.plans }
   if (key === 'POST /agent/offer') {
-    const offer = makeOffer(snapshot, state, now, body ?? {})
+    const offer =
+      body?.moment === 'perfil'
+        ? profileOffer(snapshot, state, body.context?.perfil)
+        : makeOffer(snapshot, state, now, body ?? {})
     return offer ? { body: offer } : { status: 204, body: null }
   }
   if (key === 'GET /recommendations') return { body: recommendations(snapshot, state, now, query) }
@@ -162,7 +167,7 @@ export function route(snapshot, { method, path, query, body }, now = Date.now())
       return { body: { user_id: userId, concept: null, eventos_borrados: clearState() } }
     if (method === 'GET' && profile[2] === '/verticales')
       return { body: homeVerticals(state, now, snapshot.meta.vertical_labels) }
-    if (method === 'GET' && profile[2] === '/gustos') return { body: { perfiles: [] } }
+    if (method === 'GET' && profile[2] === '/gustos') return { body: tastesReply(snapshot, state) }
     if (method === 'GET' && !profile[2]) {
       const { concepts } = snapshot.meta
       const list = interests(snapshot, state, now).map((i) => ({

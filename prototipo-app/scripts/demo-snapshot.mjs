@@ -221,7 +221,7 @@ async function ladder(snapshot) {
           token,
           body: {
             user_id: userId,
-            session_id: 's-demo-snapshot',
+            session_id: `s-demo-${vertical}`,
             cart_id: `c-${vertical}`,
             vertical,
             mode: 'propuesta',
@@ -237,6 +237,62 @@ async function ladder(snapshot) {
       })
       if (reply?.vertical) out[reply.vertical] = reply
       console.log(`  escalera: ${verticals.join('+')} → ${reply?.vertical ?? 'nada'} (esperado ${target})`)
+    } finally {
+      await call(`/profile/${userId}`, { method: 'DELETE', token })
+    }
+  }
+  return out
+}
+
+/**
+ * Los perfiles de gusto (offers/perfiles.toml): una persona de prueba pide tres veces algo de un concepto que activa el
+ * perfil (sus segmentos los recalcula la API después de cada pedido) y se graban sus gustos y la escalera del perfil
+ * (el momento `perfil`); después se la olvida. `seed` son los productos pedidos: el panel de la demo los vuelve a pedir.
+ */
+async function tastes(snapshot) {
+  const pool = productsIn(snapshot)
+  const out = {}
+  for (const [id, profile] of Object.entries(snapshot.meta.profiles)) {
+    const concept = profile.concepts.find((c) => pool.some((p) => p.concept === c && !p.age_restricted))
+    const found = pool.filter((p) => p.concept === concept && !p.age_restricted)
+    const seed = [0, 1, 2].map((i) => found[i % found.length]).filter(Boolean)
+    if (!seed.length) {
+      console.log(`  perfil ${id}: sin productos de ${profile.concepts.join(', ')} en la muestra`)
+      continue
+    }
+    const { user_id: userId, token } = await session()
+    try {
+      for (const [i, p] of seed.entries())
+        await call('/orders', {
+          method: 'POST',
+          token,
+          body: {
+            user_id: userId,
+            session_id: `s-demo-${id}-${i}`, // una sesión por pedido: los segmentos cuentan sesiones, no líneas
+            cart_id: `c-${id}-${i}`,
+            vertical: p.vertical,
+            mode: 'propuesta',
+            lines: [
+              {
+                entity_type: p.entity_type,
+                entity_id: p.entity_id,
+                concept_id: p.concept,
+                store_id: p.store_id,
+                qty: 1,
+              },
+            ],
+          },
+        })
+      await new Promise((resolve) => setTimeout(resolve, 2500)) // los segmentos se recalculan después de responder
+      const { perfiles } = await call(`/profile/${userId}/gustos`, { token })
+      const mine = perfiles.find((p) => p.id === id)
+      const ladderReply = await call('/agent/offer', {
+        method: 'POST',
+        token,
+        body: { moment: 'perfil', user_id: userId, context: { perfil: id } },
+      })
+      console.log(`  perfil ${id}: ${mine ? `activo (${mine.nivel})` : 'no se activó'} con ${concept}`)
+      if (mine && ladderReply) out[id] = { gustos: mine, ladder: ladderReply, seed }
     } finally {
       await call(`/profile/${userId}`, { method: 'DELETE', token })
     }
@@ -294,6 +350,8 @@ async function main() {
     snapshot.complements = await complements(token, productsIn(snapshot))
     console.log('  escalera…')
     Object.assign(snapshot.toTry, await ladder(snapshot))
+    console.log('  perfiles de gusto…')
+    snapshot.tastes = await tastes(snapshot)
     const out = intern(snapshot)
     // Una fila por producto: el archivo queda legible en un diff sin ser una sola línea gigante.
     const { products, ...rest } = out
