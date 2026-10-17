@@ -22,7 +22,7 @@
 - Supuesto en `combos.toml` (sección `[rendimiento_decreciente]`): `reduccion_base = 0.10`, `decaimiento = 0.5`, `servicio = 0.05`. El supuesto reduce la parte que no vuelve: la j-ésima vertical del catálogo dentro de un grupo (j ≥ 2) tiene f = reduccion_base·decaimiento^(j−2) (2.ª −10 %, 3.ª −5 %, 4.ª −2,5 %…) y cada servicio usado, f = `servicio`. La retención fina esperada = 1 − (1 − gruesa)·Π(1 − f), donde «gruesa» es la retención gruesa esperada (la de hoy, `expected_retention`) de los grupos presentes (sin servicios; si solo hay servicios: `favor` → la fila «favor» de Rappi, que no reduce nada, y `travel` reduce con `servicio`; `travel` solo → `None`); nunca llega a 1 y no hay tope fijo. Si hay retención fina aprendida con n ≥ 30, se mezcla: `(esperada·100 + aprendida·n)/(100 + n)`.
 - Farmacia y Licores nunca son un paso (`OWN_SIGNALS_ONLY`); un servicio solo es paso si no queda ninguna vertical del catálogo con ganancia > 0.
 - Ventanas: combinación actual = últimos 30 días; si está vacía, los últimos 90 (`LAPSED_COMBO_DAYS = 90`).
-- El texto que ve la persona no cita retenciones; la `basis` declara la fuente: `combinacion` con id `<actual fina>→<objetivo fina>` y fuente `rappi`, `rappi+supuesto` (si pesó el bono) o `rappi+supuesto+poblacion:<fuente>` (si pesó lo aprendido).
+- El texto que ve la persona no cita retenciones; la `basis` declara la fuente: `combinacion` con id `<actual fina>→<objetivo fina>` y fuente `rappi`, `rappi+supuesto` (si pesó el supuesto) o `rappi+supuesto+poblacion:<fuente>` (si pesó lo aprendido).
 - Código en inglés; textos en español; `make test`/`make lint`; `make contract`; `npm test` del panel; migración `037_*.sql` nueva (no editar la 036).
 
 ## Review Focus
@@ -31,7 +31,7 @@
 - Persona que usa todas las verticales del catálogo que se pueden ofrecer: el paso es RappiFavor o RappiTravel; si también los usó, `None`.
 - Persona sin pedidos en 30 días pero con pedidos en 90: entra a la escalera con su combinación de 90 días; sin pedidos en 90, `None` (oferta de siempre).
 - La escalera gruesa sigue mandando: a quien solo pide en Restaurantes se le propone Turbo (un grupo nuevo suma mucho más que una vertical extra dentro de un grupo).
-- El supuesto nunca hace que la retención esperada pase de 0,97.
+- El supuesto nunca lleva la retención esperada a 1 y, dentro de un grupo ya usado o con un servicio, siempre la sube.
 
 ---
 
@@ -42,7 +42,7 @@
 - Migración 037: `combo_stats` y `combo_steps` ganan `nivel text NOT NULL DEFAULT 'grueso' CHECK (nivel IN ('grueso', 'fino'))`; la llave primaria pasa a incluir `nivel` (`(data_source, nivel, combo)` y `(data_source, nivel, from_combo, to_combo)`); las vistas `capa.combo_stats` y `capa.combo_steps` se recrean con la columna y su comentario en español.
 - `combos.toml`: sección `[rendimiento_decreciente]` con los valores de Global Constraints y su nota («supuesto propio: cada vertical extra dentro de un grupo suma algo de retención, cada vez menos; con datos reales se reemplaza por lo aprendido»); `[servicios]` con `favor = "rappifavor"` y `travel = "rappitravel"`.
 - `combos.py` produce: `FINE_ORDER`; `fine_key(members) -> str`; `fine_of(verticals, services=()) -> str`; `group_counts(fine) -> dict[str, int]`; `fine_bonus(fine) -> float`; `expected_fine_retention(fine, learned_coarse=None, learned_fine=None) -> float | None`; `@dataclass(frozen=True) Step(vertical: str, current: str, target: str, gain: float, used_assumption: bool)`; `next_fine_step(fine, candidates: Sequence[str], learned_coarse=None, learned_fine=None) -> Step | None` (candidatos en el orden de preferencia de la persona; desempate por ese orden; servicios solo si ninguna vertical del catálogo gana > 0).
-- Tests: claves y orden; bono 0,04/0,02/0,01; tope 0,97; servicios; mezcla con lo aprendido; los cinco casos de la Review Focus con candidatos armados a mano; `next_step` grueso de hoy sin cambios.
+- Tests: claves y orden; reducciones 10 %/5 %/2,5 % y 5 % por servicio; nunca llega a 1; servicios; mezcla con lo aprendido; los cinco casos de la Review Focus con candidatos armados a mano; `next_step` grueso de hoy sin cambios.
 - [ ] Tests → implementar → `make lint && make test` → commit `feat(motor): combinaciones finas con rendimiento decreciente por vertical (migración 037)`.
 
 ### Task 2: Aprender y simular a nivel fino
