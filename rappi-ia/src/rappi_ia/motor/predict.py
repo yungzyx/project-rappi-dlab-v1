@@ -120,12 +120,12 @@ def step_signal(conn: Connection, step: tuple[str, str, float], population: str 
 
 
 def _learned_retention(conn: Connection, population: str) -> dict[str, tuple[int, float]]:
-    """combinación → (personas, retención M+1) aprendidas en `combo_stats` de la población."""
+    """combinación → (personas, retención M+1) aprendidas en `combo_stats` (nivel grueso) de la población."""
     return {
         combo: (n, float(retention))
         for combo, n, retention in conn.execute(
             """SELECT combo, retention_n, retention_m1 FROM combo_stats
-               WHERE data_source = %s AND retention_m1 IS NOT NULL""",
+               WHERE data_source = %s AND nivel = 'grueso' AND retention_m1 IS NOT NULL""",
             (population,),
         )
     }

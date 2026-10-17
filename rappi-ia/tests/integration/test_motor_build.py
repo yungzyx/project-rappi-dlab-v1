@@ -35,6 +35,7 @@ COUNT_OF_TABLE = {
     "cross_sell_rules": "reglas",
     "trends": "tendencias",
 }
+FINE_COUNT_OF_TABLE = {"combo_stats": "combinaciones_finas", "combo_steps": "pasos_finos"}  # la misma tabla, otro nivel
 
 
 @pytest.fixture
@@ -68,7 +69,7 @@ def test_build_motor_fills_every_table_and_records_the_run(simulated):
             assert _rows(db, table) == counts["reglas"]
             continue
         assert _rows(db, table) > 0, table
-        assert _rows(db, table) == counts[COUNT_OF_TABLE[table]], table
+        assert _rows(db, table) == counts[COUNT_OF_TABLE[table]] + counts.get(FINE_COUNT_OF_TABLE.get(table), 0), table
     assert counts["afinidad"] == _personal(db, "user_vertical_affinity") > 0
     assert counts["recompra"] == _personal(db, "replenishment") > 0
     assert set(counts["pesos"]) == set(DEFAULT_WEIGHTS)
@@ -97,6 +98,24 @@ def test_build_motor_fills_every_table_and_records_the_run(simulated):
     assert all(abs(total - 1) < 1e-4 for _v, total in sums)
 
 
+def test_build_motor_writes_both_combo_levels(simulated):
+    db = simulated
+    counts = build_motor(db, "synthetic")
+
+    for table, key in (("combo_stats", "combinaciones"), ("combo_steps", "pasos")):
+        for nivel, name in (("grueso", key), ("fino", f"{key}_finas" if key == "combinaciones" else "pasos_finos")):
+            n = db.execute(
+                f"SELECT count(*) FROM {table} WHERE data_source = 'synthetic' AND nivel = %s", (nivel,)
+            ).fetchone()[0]
+            assert n == counts[name] > 0, (table, nivel)
+    coarse = {c for (c,) in db.execute("SELECT combo FROM combo_stats WHERE nivel = 'grueso'")}
+    fine = {c for (c,) in db.execute("SELECT combo FROM combo_stats WHERE nivel = 'fino'")}
+    assert coarse <= {"rest", "turbo", "retail", "rest+turbo", "rest+retail", "turbo+retail", "rest+turbo+retail"}
+    assert fine and all(not set(c.split("+")) & {"rest", "retail"} for c in fine)  # verticales, no grupos
+    assert not {"favor", "travel"} & {m for c in fine for m in c.split("+")}  # los servicios no tienen pedidos
+    assert coarse.isdisjoint(fine - {"turbo"}) and "ninguna" not in fine
+
+
 def test_build_motor_twice_replaces_rows(simulated):
     db = simulated
     first = build_motor(db, "synthetic")
@@ -104,7 +123,7 @@ def test_build_motor_twice_replaces_rows(simulated):
 
     assert first == second
     for table in POPULATION_TABLES:
-        assert _rows(db, table) == second[COUNT_OF_TABLE[table]], table
+        assert _rows(db, table) == second[COUNT_OF_TABLE[table]] + second.get(FINE_COUNT_OF_TABLE.get(table), 0), table
     assert _personal(db, "user_vertical_affinity") == second["afinidad"]
     assert _personal(db, "replenishment") == second["recompra"]
     last_run = db.execute("SELECT max(run_id) FROM layer_runs WHERE layer = 'motor'").fetchone()[0]

@@ -570,7 +570,7 @@ def combos(conn: Connection, source: str = "synthetic") -> dict:
                   orders_per_user AS pedidos_por_usuario,
                   CASE WHEN retention_n >= %(min_n)s THEN retention_m1 END AS retencion_m1,
                   retention_n AS retencion_n, spend_per_user AS gasto_por_usuario
-           FROM combo_stats WHERE data_source = %(source)s
+           FROM combo_stats WHERE data_source = %(source)s AND nivel = 'grueso'
            ORDER BY user_months DESC, combo COLLATE "C" """,
         {"source": source, "min_n": MIN_COMBO_RETENTION_N},
     )

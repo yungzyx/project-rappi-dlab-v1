@@ -86,6 +86,8 @@ def _build(conn: Connection, source: str, run: int, evaluate: bool) -> dict:
         "transiciones": 0,
         "combinaciones": 0,
         "pasos": 0,
+        "combinaciones_finas": 0,
+        "pasos_finos": 0,
         "reglas": 0,
         "tendencias": 0,
         "afinidad": 0,
@@ -123,21 +125,26 @@ def _build(conn: Connection, source: str, run: int, evaluate: bool) -> dict:
         conn, "vertical_transitions", "data_source, from_vertical, to_vertical, n, prob, run_id", rows
     )
 
-    months = combo_months(orders)
-    rows = [
-        (source, combo, s["user_months"], s["pct_users"], s["pct_orders"], s["orders_per_user"], s["retention_m1"],
-         s["retention_n"], s["spend_per_user"], run)
-        for combo, s in combo_stats(months).items()
-    ]  # fmt: skip
-    counts["combinaciones"] = _copy(
-        conn,
-        "combo_stats",
-        "data_source, combo, user_months, pct_users, pct_orders, orders_per_user, retention_m1, retention_n, "
-        "spend_per_user, run_id",
-        rows,
-    )
-    rows = [(source, a, b, users, prob, run) for (a, b), (users, prob) in combo_steps(months).items()]
-    counts["pasos"] = _copy(conn, "combo_steps", "data_source, from_combo, to_combo, users, prob, run_id", rows)
+    # Dos niveles en las mismas tablas: el grueso (grupos de la tabla de Rappi) y el fino (verticales una por una).
+    levels = (("grueso", False, "combinaciones", "pasos"), ("fino", True, "combinaciones_finas", "pasos_finos"))
+    for nivel, fine, combos_key, steps_key in levels:
+        months = combo_months(orders, fine=fine)
+        rows = [
+            (source, nivel, combo, s["user_months"], s["pct_users"], s["pct_orders"], s["orders_per_user"],
+             s["retention_m1"], s["retention_n"], s["spend_per_user"], run)
+            for combo, s in combo_stats(months).items()
+        ]  # fmt: skip
+        counts[combos_key] = _copy(
+            conn,
+            "combo_stats",
+            "data_source, nivel, combo, user_months, pct_users, pct_orders, orders_per_user, retention_m1, "
+            "retention_n, spend_per_user, run_id",
+            rows,
+        )
+        rows = [(source, nivel, a, b, users, prob, run) for (a, b), (users, prob) in combo_steps(months).items()]
+        counts[steps_key] = _copy(
+            conn, "combo_steps", "data_source, nivel, from_combo, to_combo, users, prob, run_id", rows
+        )
 
     rows = [
         (source, r.from_concept, r.from_vertical, r.to_concept, r.to_vertical, r.users_from, r.users_both,

@@ -202,3 +202,13 @@ def test_the_three_metrics_are_served_by_the_panel_api(db):
         assert client.get("/analytics/combos", params={"source": "prototype"}).json()["data"]["propio"] == []
     finally:
         api.app.dependency_overrides.clear()
+
+
+def test_combos_own_table_ignores_the_fine_level(db):
+    _combo(db, "synthetic", "rest", 100, 80)
+    db.execute(
+        """INSERT INTO combo_stats (data_source, nivel, combo, user_months, retention_n)
+           VALUES ('synthetic', 'fino', 'restaurantes+mall', 40, 40)"""
+    )
+
+    assert [row["combo"] for row in queries.combos(db, "synthetic")["propio"]] == ["rest"]

@@ -10,7 +10,14 @@ from rappi_ia.events import store as events
 from rappi_ia.layers.runs import finish_layer_run, start_layer_run
 from rappi_ia.motor.combos import LEARNED_RETENTION_MIN_USERS
 from rappi_ia.motor.model import DEFAULT_ORDER, DEFAULT_WEIGHTS
-from rappi_ia.motor.predict import current_combo, latest_weights, next_verticals, step_signal, target_step
+from rappi_ia.motor.predict import (
+    _learned_retention,
+    current_combo,
+    latest_weights,
+    next_verticals,
+    step_signal,
+    target_step,
+)
 
 NOW = datetime(2026, 10, 10, 15, tzinfo=UTC)
 
@@ -110,6 +117,22 @@ def test_the_step_signal_names_the_population_only_when_its_retention_weighed_in
     db.execute("DELETE FROM combo_stats WHERE data_source = 'synthetic' AND combo = 'rest+turbo'")
     db.execute("UPDATE combo_stats SET retention_n = %s WHERE combo = 'rest'", (LEARNED_RETENTION_MIN_USERS,))
     assert step_signal(db, step, "synthetic")["source"] == "rappi+poblacion:synthetic"  # o la actual
+
+
+def test_a_fine_row_does_not_leak_into_the_coarse_readers(db):
+    """`combo_stats` guarda dos niveles: la retención aprendida de la escalera gruesa solo lee el grueso."""
+    step = ("turbo", "rest+turbo", 0.1)
+    for nivel, combo in (("fino", "rest+turbo"), ("fino", "rest")):  # un nombre fino que coincide con uno grueso
+        db.execute(
+            """INSERT INTO combo_stats (data_source, nivel, combo, user_months, retention_m1, retention_n)
+               VALUES ('synthetic', %s, %s, 500, 0.9, 500)""",
+            (nivel, combo),
+        )
+    assert _learned_retention(db, "synthetic") == {}
+    assert step_signal(db, step, "synthetic")["source"] == "rappi"
+
+    _learned(db, "rest", 500)  # la misma combinación, a nivel grueso
+    assert _learned_retention(db, "synthetic") == {"rest": (500, 0.5)}
 
 
 def test_latest_weights_default_without_runs(db):
