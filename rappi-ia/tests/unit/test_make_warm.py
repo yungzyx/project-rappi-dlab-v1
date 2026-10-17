@@ -2,6 +2,7 @@
 arrancar, la primera escalera tardaba 4 a 5 s."""
 
 import subprocess
+import sys
 
 from rappi_ia.config import PROJECT_ROOT
 from rappi_ia.offers.profiles import load_profiles
@@ -22,8 +23,12 @@ def test_warm_reads_the_catalog_lists_of_the_home():
     """Las listas del catálogo viven en la caché de la API: en frío, /catalog/home tardaba 2,7 s."""
     from rappi_scraper.storage.search import VERTICALS
 
+    # Con el Python de los tests: en el CI no hay `.venv/bin/python`.
     warm = subprocess.run(
-        ["make", "-n", "-C", str(PROJECT_ROOT), "warm"], capture_output=True, text=True, check=True
+        ["make", "-n", "-C", str(PROJECT_ROOT), "warm", f"PY={sys.executable}"],
+        capture_output=True,
+        text=True,
+        check=True,
     ).stdout
     for path in ("/catalog/home", "/catalog/deals", "/catalog/restaurants?sort=rating&limit=6"):
         assert path in warm, path
