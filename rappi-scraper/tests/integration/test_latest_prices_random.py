@@ -9,7 +9,7 @@ from datetime import UTC, datetime, timedelta
 from rappi_scraper.storage import repository
 
 T0 = datetime(2026, 9, 1, tzinfo=UTC)
-STORES, SKUS, DISHES = (1, 2), "abcd", (1, 2)
+STORES, SKUS, DISHES = (1, 2, 3), "abcd", (1, 2)
 
 LATEST = "SELECT store_id, sku, price, real_price, discount_pct, pum, in_stock, run_id, scraped_at FROM latest_prices"
 HISTORY = """

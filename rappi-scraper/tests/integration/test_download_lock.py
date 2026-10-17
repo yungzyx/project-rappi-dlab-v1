@@ -83,3 +83,19 @@ def test_database_lock_warning_reaches_the_command_log(tmp_path, monkeypatch):
 
     (log_file,) = (tmp_path / "logs").glob("backup_*.log")
     assert "solo con el candado de este equipo" in log_file.read_text(encoding="utf-8")
+
+
+def test_import_csv_waits_for_no_download(tmp_path, monkeypatch):
+    """Importar CSVs escribe precios como una descarga: con otra en curso no importa nada y lo dice (los triggers de la
+    migración 039 suponen un solo escritor de precios por formato a la vez)."""
+    monkeypatch.setattr(lock, "LOCK_FILE", tmp_path / "scraper.lock")
+    monkeypatch.setattr(cli, "connect", lambda: nullcontext(None))
+    imported = []
+    monkeypatch.setattr(cli, "import_legacy_csv", lambda conn, folder: imported.append(folder))
+
+    with lock.file_lock(), pytest.raises(SystemExit, match="Ya hay una descarga en curso"):
+        cli.main(["import-csv", str(tmp_path)])
+    assert imported == []
+
+    cli.main(["import-csv", str(tmp_path)])  # sin otra descarga, importa
+    assert imported == [tmp_path]

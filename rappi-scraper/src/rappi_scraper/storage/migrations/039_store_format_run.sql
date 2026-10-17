@@ -6,9 +6,16 @@
 -- filas con llave store_id: el planificador la estima bien, la puede leer entera para un hash o buscar por llave, y
 -- ninguno de los dos planes degenera así.
 -- store_last_snapshot guarda además el formato de la tienda (format) y la última corrida de ese formato
--- (format_run_id). Los mantienen triggers: cuando cambia el último snapshot de una tienda se recalcula su formato (las
--- tiendas del formato son pocas, por el índice de abajo), y cuando una tienda cambia de formato en stores, su fila se
--- mueve de formato. Borrar una tienda borra su fila en cascada (por sus snapshots), y eso también recalcula su formato.
+-- (format_run_id). Los mantienen triggers: cuando cambia el último snapshot de una tienda se recalcula su formato, y
+-- cuando una tienda cambia de formato en stores, su fila se mueve de formato. Borrar una tienda borra su fila en cascada
+-- (por sus snapshots), y eso también recalcula su formato.
+-- Costo: cada snapshot que se guarda lee su tienda en stores (el BEFORE INSERT de store_last_snapshot, por su llave). La
+-- fila de una tienda cambia solo con el primer snapshot de cada transacción de precios (los demás traen la misma fecha y
+-- corrida), y las filas de su formato se reescriben solo si cambia la corrida del formato (en rappi, a lo más 8 tiendas
+-- por formato, por el índice de abajo).
+-- Supone un solo escritor de precios por formato a la vez: dos transacciones que guardan precios de tiendas del mismo
+-- formato en paralelo recalculan el formato cada una sin ver lo que la otra no ha confirmado. Lo garantiza el candado
+-- de descargas (lock.py), que toman todos los comandos que escriben precios, también `rappi import-csv`.
 -- La vigencia no cambia: v_latest_offers sigue siendo la única definición de oferta vigente.
 
 ALTER TABLE store_last_snapshot ADD COLUMN format text, ADD COLUMN format_run_id bigint;
