@@ -209,9 +209,12 @@ def test_no_good_offer_is_204(client):
         assert reply.status_code == 204 and not reply.content, (moment, context)
 
 
-def test_vertical_to_try_is_204_when_every_offerable_vertical_has_orders(client, db):
+def test_vertical_to_try_is_204_when_every_offerable_vertical_and_service_is_used(client, db):
     for vertical in ("supermercado", "conveniencia", "turbo", "chocolateria", "restaurantes", "mall"):
         order(db, "u1", vertical)
+    assert offer(client, "vertical_por_probar", {}, "u1").json()["products"] == []  # el paso es un servicio
+    opened = [{"servicio": "rappifavor"}, {"servicio": "rappitravel"}]  # ya usa los dos (test_offer_combo.py)
+    events.record(db, [events.Event("u1", "s1", "service_opened", payload=payload) for payload in opened])
 
     reply = offer(client, "vertical_por_probar", {}, "u1")
 
@@ -280,7 +283,7 @@ def test_vertical_to_try_reason_says_no_orders(client, db):
     assert body["vertical"] == "turbo"  # lo que más retiene sumarle al súper (sin población: sus ofertas de siempre)
     assert body["reason"]["text"] == "Porque aún no pides en Turbo."
     assert body["reason"]["basis"] == [
-        {"kind": "combinacion", "id": "retail→turbo+retail", "source": "rappi"},
+        {"kind": "combinacion", "id": "supermercado→turbo+supermercado", "source": "rappi"},
         {"kind": "sin_pedidos", "id": "turbo", "source": "contexto"},
     ]
 

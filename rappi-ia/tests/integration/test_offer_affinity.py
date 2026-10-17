@@ -135,34 +135,43 @@ def test_vertical_to_try_basis_has_the_three_concepts_that_contribute_most(clien
     _like(db, "u1", "chocolates", "helados", "golosinas", "galletas", "pasteleria")
     _like(db, "u1", "chocolates")  # otra vez: chocolate pesa más
 
-    _order(db, "u1", "supermercado", "conveniencia", "turbo", "restaurantes")  # la combinación completa
+    # Solo le falta la chocolatería: es el paso del motor, sin datos de la población (sus ofertas de siempre).
+    _order(db, "u1", "supermercado", "conveniencia", "mall", "turbo", "restaurantes")
 
     body = to_try(client, "u1")
 
     assert body["vertical"] == "chocolateria"
     assert body["reason"]["text"] == "Por tu interés en 🍫 chocolates: en chocolaterías hay más."
-    assert [s["id"] for s in body["reason"]["basis"]] == ["chocolates", "galletas", "helados"]
+    step, *likes = body["reason"]["basis"]
+    assert step["kind"] == "combinacion" and step["id"].endswith(
+        "→restaurantes+turbo+supermercado+conveniencia+mall+chocolateria"
+    )
+    assert [s["id"] for s in likes] == ["chocolates", "galletas", "helados"]
     # NOW se toma al importar el módulo: con unos minutos de tests encima el decaimiento resta milésimas
-    assert [s["score"] for s in body["reason"]["basis"]] == pytest.approx([6.0, 3.0, 3.0], abs=0.05)
+    assert [s["score"] for s in likes] == pytest.approx([6.0, 3.0, 3.0], abs=0.05)
 
 
 def test_vertical_to_try_reason_names_the_concept_of_the_offered_vertical_not_the_global_top(client, db):
-    # Lo que más le gusta (chocolate) es de la chocolatería, donde ya pidió: se ofrece el súper, y el porqué nombra
-    # lo que le gusta del súper (pastas, y después café), no el chocolate.
+    # Lo que más le gusta (chocolate) es de la chocolatería, donde ya pidió: el paso del motor es el súper (le falta
+    # Retail), y el porqué nombra lo que le gusta del súper (pastas, y después café), no el chocolate.
     _like(db, "u1", "chocolates")
     _like(db, "u1", "chocolates", "pastas")
     events.record(
         db, [events.Event("u1", "s1", "search", ts=NOW, concept_id="cafe", query="cafe")], source="prototype"
     )  # café pesa menos que pastas
 
-    _order(db, "u1", "chocolateria", "restaurantes", "turbo")  # la combinación completa: la vertical de siempre
+    _order(db, "u1", "chocolateria", "restaurantes", "turbo")
 
     body = to_try(client, "u1")
 
     pastas = load_taxonomy().concepts["pastas"]
     assert body["vertical"] == "supermercado"
     assert body["reason"]["text"] == f"Por tu interés en {pastas.emoji} {pastas.name.lower()}: en el súper hay más."
-    assert [s["id"] for s in body["reason"]["basis"]] == ["pastas", "cafe"]
+    assert [s["id"] for s in body["reason"]["basis"]] == [
+        "restaurantes+turbo+chocolateria→restaurantes+turbo+supermercado+chocolateria",
+        "pastas",
+        "cafe",
+    ]
 
 
 def test_plans_order_by_interest(client, db):

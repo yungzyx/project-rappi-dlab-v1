@@ -24,7 +24,7 @@ from rappi_ia.offers.guards import is_offerable
 
 NOW = datetime.now(UTC)
 SUSHI_ROLL = "98005"  # un plato de sushi del restaurante de prueba
-REST_TO_TURBO = {"kind": "combinacion", "id": "rest→rest+turbo", "source": "rappi"}
+REST_TO_TURBO = {"kind": "combinacion", "id": "restaurantes→restaurantes+turbo", "source": "rappi"}
 
 
 @pytest.fixture
@@ -102,14 +102,95 @@ def test_without_orders_it_is_the_usual_offer(client, db):
         assert body["reason"]["basis"] == [{"kind": "sin_pedidos", "id": "supermercado", "source": "contexto"}]
 
 
-def test_with_the_full_combination_it_is_the_usual_offer(client, db):
+def test_with_rest_turbo_and_the_supermarket_it_is_another_retail_vertical(client, db):
+    """La escalera sigue dentro de Retail: Express, Mall o Chocolatería, con el supuesto declarado en la `basis`."""
     for vertical in ("restaurantes", "turbo", "supermercado"):
         order(db, "u1", vertical)
+    for vertical in ("farmacia", "licores"):  # lo que más abre: aun así, nunca se le ofrece
+        events.record(db, [events.Event("u1", "s1", "vertical_open", ts=NOW, vertical=vertical) for _ in range(9)])
 
     body = to_try(client, "u1")
 
-    assert body["vertical"] == "conveniencia"  # la primera sin probar de siempre
-    assert body["reason"]["basis"] == [{"kind": "sin_pedidos", "id": "conveniencia", "source": "contexto"}]
+    assert body["vertical"] in ("conveniencia", "mall", "chocolateria")
+    current = "restaurantes+turbo+supermercado"
+    assert body["reason"]["basis"][0] == {
+        "kind": "combinacion",
+        "id": f"{current}→{current}+{body['vertical']}",  # las tres van después del súper en el orden fino
+        "source": "rappi+supuesto",
+    }
+    assert body["products"] and all(p["vertical"] == body["vertical"] for p in body["products"])
+    assert "retención" not in body["text"] + body["reason"]["text"]
+
+
+def every_offerable_vertical(db, user="u1"):
+    for vertical in ("restaurantes", "turbo", "supermercado", "conveniencia", "mall", "chocolateria"):
+        order(db, user, vertical)
+
+
+def opened(db, user, service, mode=None):
+    payload = {"servicio": service, **({"mode": mode} if mode else {})}
+    events.record(db, [events.Event(user, "s1", "service_opened", ts=NOW, payload=payload)])
+
+
+ALL_SIX = "restaurantes+turbo+supermercado+conveniencia+mall+chocolateria"
+
+
+def test_with_every_offerable_vertical_it_offers_rappifavor_without_products(client, db):
+    every_offerable_vertical(db)
+
+    body = to_try(client, "u1")
+
+    assert body["moment"] == "vertical_por_probar"
+    assert body["text"] == (
+        "¿Conoces RappiFavor? Un Rappitendero lleva lo que necesites de un punto a otro, te compra en cualquier"
+        " tienda o hace tu trámite."
+    )
+    assert body["products"] == [] and body["vertical"] is None and body["prototype_vertical"] is None
+    assert (
+        body["reason"]["text"] == "Porque ya pides en 6 verticales: RappiFavor te ayuda con lo que no está en la app."
+    )
+    assert body["reason"]["basis"] == [
+        {"kind": "combinacion", "id": f"{ALL_SIX}→{ALL_SIX}+favor", "source": "rappi+supuesto"}
+    ]
+    assert body["actions"] == [{"label": "Abrir RappiFavor", "route": ["favor"], "service": "rappifavor"}]
+
+
+def test_after_rappifavor_it_offers_rappitravel_and_then_the_usual(client, db):
+    every_offerable_vertical(db)
+    opened(db, "u1", "rappifavor")
+
+    body = to_try(client, "u1")
+
+    assert body["text"] == (
+        "¿Conoces RappiTravel? Vuelos, hoteles, autos, seguros y paquetes, pagando con tus RappiCréditos y con"
+        " cashback."
+    )
+    assert body["products"] == [] and body["vertical"] is None
+    assert body["reason"]["text"] == "Porque ya pides en 6 verticales: con RappiTravel planeas el viaje."
+    assert body["reason"]["basis"] == [
+        {"kind": "combinacion", "id": f"{ALL_SIX}+favor→{ALL_SIX}+favor+travel", "source": "rappi+supuesto"}
+    ]
+    assert body["actions"] == [{"label": "Abrir RappiTravel", "route": ["travel"], "service": "rappitravel"}]
+
+    opened(db, "u1", "rappitravel", mode="actual")  # en «Rappi hoy» no cuenta
+    assert to_try(client, "u1")["actions"][0]["service"] == "rappitravel"
+
+    opened(db, "u1", "rappitravel")  # ya usa todo: sin paso, la de siempre (y ya pidió en todas las que se ofrecen)
+    reply = client.post("/agent/offer", json={"moment": "vertical_por_probar", "user_id": "u1", "context": {}})
+    assert reply.status_code == 204
+
+
+def test_a_lapsed_person_climbs_from_the_combination_of_90_days(client, db):
+    order(db, "u-vuelve", "restaurantes", "sushi", days_ago=60, entity=("menu_item", SUSHI_ROLL))
+    order(db, "u-lejos", "restaurantes", "sushi", days_ago=120, entity=("menu_item", SUSHI_ROLL))
+
+    lapsed = to_try(client, "u-vuelve")
+    assert lapsed["vertical"] == "turbo"
+    assert lapsed["reason"]["basis"][0] == REST_TO_TURBO
+
+    gone = to_try(client, "u-lejos")  # sin pedidos en 90 días: la de siempre
+    assert not any(s["kind"] == "combinacion" for s in gone["reason"]["basis"])
+    assert gone["vertical"] == "supermercado"
 
 
 def test_only_restaurants_goes_for_turbo_with_the_combination_as_basis(client, db):
@@ -260,7 +341,7 @@ def mall_browser(db, user="u1"):
     )
 
 
-def test_the_group_skips_pharmacy_and_liquor_and_follows_the_prediction(client, db):
+def test_the_step_skips_pharmacy_and_liquor_and_follows_the_prediction(client, db):
     mall_browser(db)
 
     body = to_try(client, "u1")
@@ -268,7 +349,7 @@ def test_the_group_skips_pharmacy_and_liquor_and_follows_the_prediction(client, 
     assert body["vertical"] == "mall"  # Farmacia y Licores predicen más, pero no se ofrecen; sin el mall, el súper
     assert body["reason"]["basis"][0] == {
         "kind": "combinacion",
-        "id": "rest+turbo→rest+turbo+retail",
+        "id": "restaurantes+turbo→restaurantes+turbo+mall",
         "source": "rappi",
     }
     assert all(p["vertical"] == "mall" for p in body["products"])
@@ -357,7 +438,7 @@ def _assert_reads_well(texts, name):
 def test_cross_texts_read_well_with_any_concept_as_origin_and_destination(origin_id):
     concepts = load_taxonomy().concepts
     origin = concepts[origin_id]
-    combo = {"kind": "combinacion", "id": "rest→rest+turbo", "source": "rappi"}
+    combo = REST_TO_TURBO
     for destination_id in (origin_id, "frutas", "sandwiches"):
         assert destination_id in concepts
         pick = CrossPick(destination_id, "turbo", 1.0, origin_id, 5.0)
@@ -370,7 +451,7 @@ def test_cross_texts_read_well_with_any_concept_as_origin_and_destination(origin
 
 @pytest.mark.parametrize("vertical", ["turbo", "supermercado", "mall"])
 def test_a_rule_without_a_nameable_origin_never_claims_the_most_ordered(vertical):
-    combo = {"kind": "combinacion", "id": "rest→rest+turbo", "source": "rappi"}
+    combo = REST_TO_TURBO
     rule = {"kind": "compra_cruzada", "id": f"helados@{vertical}", "source": "poblacion:synthetic"}
 
     new = _top_offer(vertical, [], combo, "synthetic", False, rule)

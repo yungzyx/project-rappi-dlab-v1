@@ -406,6 +406,9 @@ export default function LiveHomeFeed({ push, active = true }) {
     if (mine !== run.current || !made) return
     noteShown(events.track, made.products, { origin: `agent-${made.moment}`, generation: profile.resets })
     const open = made.actions.find((action) => action.route)
+    // Si el paso es un servicio sin catálogo (RappiFavor, RappiTravel), se anota ofrecido y, al abrirlo, abierto: así
+    // la escalera sigue.
+    if (open?.service) events.track('service_shown', { payload: { servicio: open.service } })
     // La burbuja no lleva productos: no promete «mira estas ofertas» (eso lo dice el texto de la API, que sí los muestra).
     const name = VERTICAL_NAMES[screenForBackend(made.backendVertical)]
     speak(
@@ -415,7 +418,17 @@ export default function LiveHomeFeed({ push, active = true }) {
         mood: 'wave',
         gesture: 'hop',
         actions: [
-          ...(open ? [{ label: open.label, onClick: () => visit(made.vertical, open.route) }] : []),
+          ...(open
+            ? [
+                {
+                  label: open.label,
+                  onClick: () => {
+                    if (open.service) events.track('service_opened', { payload: { servicio: open.service } })
+                    visit(made.vertical, open.route)
+                  },
+                },
+              ]
+            : []),
           {
             label: 'Después',
             onClick: () => {

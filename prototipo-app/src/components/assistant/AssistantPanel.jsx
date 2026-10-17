@@ -191,6 +191,9 @@ export default function AssistantPanel({ push, vertical, depth = 1 }) {
         concept: made.reason?.concept,
         generation: profile.resets,
       })
+      // Un servicio sin catálogo ofrecido (el paso de la escalera puede ser RappiFavor o RappiTravel, sin productos).
+      for (const action of made.actions)
+        if (action.service) events.track('service_shown', { payload: { servicio: action.service } })
       return { text: made.text, products: made.products, actions: made.actions, offerReason: made.reason }
     } catch {
       return offline(() => offered(moment, context, nothing))

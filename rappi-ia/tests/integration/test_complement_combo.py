@@ -21,7 +21,7 @@ from rappi_ia.layers.runs import finish_layer_run, start_layer_run
 NOW = datetime.now(UTC)
 SUSHI_ROLL = "98005"  # un plato de sushi del restaurante de prueba
 PIZZA = {"entity_type": "menu_item", "entity_id": "98001"}  # una pizza del restaurante de prueba
-REST_TO_TURBO = {"kind": "combinacion", "id": "rest→rest+turbo", "source": "rappi"}
+REST_TO_TURBO = {"kind": "combinacion", "id": "restaurantes→restaurantes+turbo", "source": "rappi"}
 
 
 @pytest.fixture
@@ -89,6 +89,27 @@ def test_with_two_similar_complements_the_one_of_the_target_vertical_wins(demo):
     assert (chosen.concept, chosen.vertical) == ("hielo", "turbo")
     assert chosen.basis == [REST_TO_TURBO]
     assert chosen.reason == "Porque llevas 🍕 pizza"  # la razón sigue hablando de lo que lleva la persona
+
+
+def test_with_the_three_groups_the_tie_goes_to_the_vertical_of_the_fine_step(demo):
+    """Quien ya pide en los tres grupos sigue subiendo dentro de Retail: el complemento de la vertical del paso fino
+    (aquí la chocolatería, la que más abre) gana el desempate."""
+    db, embedder = demo
+    pizza_goes_with(db, {"cafe": 0.6, "chocolates": 0.55})  # el café solo está en el súper, que ya pide
+    line = {"entity_type": "catalog_item", "entity_id": "91001", "concept_id": None, "unit_price": 1990}
+    for vertical in ("restaurantes", "turbo", "supermercado"):
+        events.record_order(db, "u-tres", f"s-{vertical}", f"c-{vertical}", vertical, [line], ts=NOW)
+    opens = [events.Event("u-tres", "s1", "vertical_open", ts=NOW, vertical="chocolateria") for _ in range(5)]
+    events.record(db, opens)
+    db.commit()
+
+    chosen = suggest_complement(db, ["pizza"], "restaurantes", embedder, user_id="u-tres")
+
+    assert (chosen.concept, chosen.vertical) == ("chocolates", "chocolateria")
+    current = "restaurantes+turbo+supermercado"
+    assert chosen.basis == [
+        {"kind": "combinacion", "id": f"{current}→{current}+chocolateria", "source": "rappi+supuesto"}
+    ]
 
 
 def coffee_brand(db):

@@ -76,8 +76,9 @@ def test_two_users_with_different_histories_get_different_offers(people, db):
         offered = to_try_offers[user]
         ordered = {v for (v,) in db.execute("SELECT vertical FROM app_orders WHERE user_id = %s", (user,))}
         assert offered["vertical"] == "turbo" and offered["vertical"] not in ordered
+        [vertical] = ordered
         assert offered["reason"]["basis"] == [
-            {"kind": "combinacion", "id": "retail→turbo+retail", "source": "rappi"},
+            {"kind": "combinacion", "id": f"{vertical}→turbo+{vertical}", "source": "rappi"},
             {"kind": "sin_pedidos", "id": "turbo", "source": "contexto"},
         ]
     assert first_plans[SWEET]["id"] != first_plans[GRILL]["id"]
@@ -112,4 +113,5 @@ def test_complement_puts_the_brand_you_buy_first(people, db):
     # su combinación (solo pide en Retail: el té helado de Turbo), y la base lo dice.
     assert not any(s["kind"] == "marca" for s in grill["reason"]["basis"])
     assert "la marca que compras" not in grill["reason"]["text"]
-    assert {"kind": "combinacion", "id": "retail→turbo+retail", "source": "rappi"} in grill["reason"]["basis"]
+    step = {"kind": "combinacion", "id": "supermercado→turbo+supermercado", "source": "rappi"}
+    assert step in grill["reason"]["basis"]
