@@ -606,7 +606,7 @@ categoria,Cargadores de Pilas,computacion,0.6,llm,acuerdo,Ejemplos mayormente mo
 categoria,Sillas para carro,articulos-bebe,0.9,llm,acuerdo,Sillas de auto infantiles y mecedora,3
 categoria,Sobres,utiles,0.93,llm,acuerdo,Sobres de papelería,3
 categoria,Suplementos y vitaminas,vitaminas,0.6,llm,acuerdo,Mezcla humanos y mascotas; nombre indica suplementos,3
-categoria,Tapetes y Alfombras,articulos-bebe,0.6,llm,acuerdo,Playmats y alfombras de goma eva infantiles,3
+categoria,Tapetes y Alfombras,textil-hogar,0.8,curado,curado 17-10 (son sobre todo alfombras de baño y de living),"Alfombras, pisos de baño y limpiapiés; algunos playmats",21
 categoria,Autoayuda y superación,libros,0.88,llm,acuerdo,Libros,3
 categoria,Antipulgas y Antigarrapatas,accesorios-mascota,0.75,llm,acuerdo,Antiparasitarios para mascotas; falta salud-mascota,3
 categoria,Alimento para aves,accesorios-mascota,0.55,llm,acuerdo,Alimento aves; falta concepto otras mascotas,3
@@ -745,7 +745,7 @@ categoria,Medicamentos para mascotas,accesorios-mascota,0.7,llm,acuerdo,Antipara
 categoria,Sistemas de monitoreo,computacion,0.6,llm,acuerdo,Cámaras IP de seguridad,1
 categoria,Otros Ropa Interior,ropa-interior,0.7,llm,juez,Otros X mapea a X; ejemplo aros mal asignado,1
 categoria,Otros remedios digestivos,medicamentos,0.85,llm,acuerdo,Remedios digestivos,1
-categoria,Hilos,utiles,0.55,llm,acuerdo,Manualidades/costura; faltaría mercería,1
+categoria,Hilos,manualidades,0.85,curado,curado 17-10 (colores como «Verde Pistacho» o «Mostaza» la llevaban a comida),"Lanas e hilos de tejer, como «Polos»",508
 categoria,Otros Paseo con el bebé,articulos-bebe,0.8,llm,juez,Otros X mapea a X: artículos de paseo bebé,1
 categoria,Muebles de exterior,muebles,0.8,llm,juez,Muebles de terraza; ejemplo SuperGreens mal asignado,1
 categoria,Otros Pañales y toallitas,panales,0.95,llm,acuerdo,Toallitas húmedas,1

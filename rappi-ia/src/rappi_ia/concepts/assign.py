@@ -7,17 +7,21 @@ Prioridad (la primera que responda gana):
 En los platos manda el nombre porque las secciones suelen ser genéricas ("Promociones", "Combos"), salvo que la
 regla caiga fuera de lo que vende un restaurante ("Perro caliente" no es alimento para perros): ahí gana la sección
 o la cocina mapeada. En los productos manda la categoría porque el nombre trae marcas y ruido ("Fanta Naranja 1,5 L"),
-salvo que el nombre calce un concepto sensible y la categoría no (un lubricante en "Agua saborizada"), fuera de
-mascotas y juguetes (un analgésico veterinario sigue en mascotas), o que calce un concepto de especialidad que afina
-una categoría de comida («Kikkoman Salsa de Soya» en "Otras salsas" es despensa asiática).
+salvo que el nombre calce un concepto sensible o de bebé y la categoría no (un lubricante en "Agua saborizada", una
+mamadera en "Frutos secos y semillas"), fuera de mascotas y juguetes (un analgésico veterinario sigue en mascotas), que
+calce un concepto de especialidad que afina una categoría de comida («Kikkoman Salsa de Soya» en "Otras salsas" es
+despensa asiática, en cualquier parte del nombre), o que diga alcohol en una categoría de bebidas sin alcohol
+(«Mistral Ice Energy» en "Energizantes"). Una categoría dudosa de suplementos o de bebé no le cede el producto a una
+regla de comida («Oregano Oil 60 Softgels» en "Productos naturales").
 """
 
+import re
 from dataclasses import dataclass, replace
 from functools import cache
 
 from ..text import FILLER_WORDS, tokens
 from .matcher import KeywordMatcher, Match
-from .taxonomy import Concept, Taxonomy, keeps_sensitive, load_taxonomy
+from .taxonomy import Concept, Taxonomy, guarded_concepts, keeps_sensitive, load_taxonomy
 
 MIN_MAP_CONFIDENCE = 0.6  # bajo esto, el mapeo de categoría se considera dudoso y se prueban las reglas
 RULE_CONFIDENCE = 0.7  # confianza de una regla por palabra clave sobre el nombre
@@ -34,6 +38,13 @@ PROTEIN_CONCEPTS = frozenset({"pollo", "pescados-mariscos"})
 # Grupos cuya categoría manda aunque el nombre calce un sensible: ahí la palabra tiene otro sentido (un analgésico
 # veterinario, un insecto vibrador de juguete) y el concepto sensible los ocultaría.
 CATEGORY_WINS_GROUPS = frozenset({"mascotas", "juguetes"})
+# Conceptos cuya categoría, aunque sea dudosa, no le cede el producto a una regla de comida (`_category_keeps`): los
+# suplementos y lo de bebé. No toda salud: en «Otros cuidado corporal» (higiene, 0,45) los colorantes de repostería sí
+# son comida.
+CATEGORY_KEEPS_FROM_FOOD = frozenset({"vitaminas", "panales", "alimentacion-bebe", "articulos-bebe"})
+# Bebidas cuyo nombre trae sabores de trago («Café Amaretto Almond», «Dosha Caramel & Whisky»): ahí solo la graduación
+# dice alcohol (`_alcohol_by_name`).
+FLAVOURED_DRINKS = frozenset({"cafe", "te"})
 # Conceptos de especialidad que el nombre reconoce mejor que la categoría: Rappi pone «Kikkoman Salsa de Soya» en
 # «Otras salsas» y «Pepero» en «Galletas», y con la categoría mandando quedaban casi vacíos. Solo afinan una categoría
 # de comida o bebida sin alcohol (`NAME_REFINES_GROUPS`): un shampoo de wasabi, un tazón para matcha o un licor siguen
@@ -146,25 +157,97 @@ def assign_catalog_item(
 ) -> Assignment | None:
     mapped = category_map.get(_key(category)) if category else None
     rule = _from_rule("catalog_item", item_id, name, matcher)
-    if rule and rule.concept_id in NAME_REFINES_CONCEPTS and mapped and mapped.concept_id in refinable_by_name():
-        return replace(rule, refines=mapped.concept_id)
-    # Guardia simétrica: un nombre sensible manda sobre una categoría común (un lubricante en «Agua saborizada»).
-    sensitive_name = (
+    if (
+        mapped
+        and mapped.concept_id in _drink_concepts()
+        and (alcohol := _alcohol_by_name(item_id, name, mapped, matcher))
+    ):
+        return alcohol
+    refine = _refining_rule(item_id, name, matcher, rule)
+    if refine and mapped and mapped.concept_id in refinable_by_name():
+        return replace(refine, refines=mapped.concept_id)
+    # Guardia simétrica: un nombre sensible o de bebé manda sobre una categoría común (un lubricante en «Agua
+    # saborizada», una mamadera en «Frutos secos y semillas»).
+    guarded_name = (
         rule is not None
         and mapped is not None
-        and keeps_sensitive(rule.concept_id, mapped.concept_id)
+        and (keeps_sensitive(rule.concept_id, mapped.concept_id) or _baby_over(rule.concept_id, mapped.concept_id))
         and mapped.concept_id not in _category_always_wins()
     )
-    if mapped and mapped.confidence >= MIN_MAP_CONFIDENCE and not sensitive_name:
+    if mapped and mapped.confidence >= MIN_MAP_CONFIDENCE and not guarded_name:
         split = TOBACCONIST.best(name) if mapped.concept_id == "cigarrillos" else None
         if split:
             return Assignment(
                 "catalog_item", item_id, split.target, "regla", RULE_CONFIDENCE, None, f"nombre:{split.keyword}"
             )
         return _from_map("catalog_item", item_id, mapped, f"categoria:{category}")
-    if rule and not (mapped and keeps_sensitive(mapped.concept_id, rule.concept_id)):
+    if rule and not (mapped and _category_keeps(mapped.concept_id, rule.concept_id)):
         return rule
     return _from_map("catalog_item", item_id, mapped, f"categoria:{category}") if mapped else None
+
+
+def _refining_rule(item_id: str, name: str, matcher: KeywordMatcher, rule: Assignment | None) -> Assignment | None:
+    """El concepto de especialidad que nombra el producto, aunque otra regla calce antes en el nombre: en «Ramen Muy
+    Picante Buldak Original» (categoría «Otras salsas») «ramen» es comida asiática y «buldak», el ramen instantáneo.
+    Con la mejor regla a secas ganaba «ramen», que no afina, y el producto quedaba en salsas. Un nombre que dice algo
+    sensible, alcohol o bebé en cualquier parte no se afina («Soju Salsa Gochujang», «Salsa Wasabi Sabor Whisky»): no
+    pasa a un concepto que el agente ofrece."""
+    if rule is None or matcher.best(name, exclude=_not_guarded()) is not None:
+        return None
+    if rule.concept_id in NAME_REFINES_CONCEPTS:
+        return rule
+    return _from_rule("catalog_item", item_id, name, matcher, exclude=_not_refining())
+
+
+# Graduación alcohólica en el nombre («Bauza 35º 750cc + Bebida», «Coc Vin Export Selecto Tropical 8°», «Mistral Ice
+# 2.5°», «7°G»). No una temperatura («4°C», «4 ° Celsius»), los grados Brix de un jugo («12° Brix»), un ordinal («2°
+# Edición», «1° Básico») ni un número de pieza («N°5»).
+ALCOHOL_STRENGTH = re.compile(
+    r"(?<![\w.,-])[1-9]\d?(?:[.,]\d+)?\s*[°º]"
+    r"(?!\s*(?:c\b|celsius|f\b|fahrenheit|brix|edici|b[aá]sico|medio|semestre|piso|lugar))",
+    re.IGNORECASE,
+)
+# Lo que dice «sin alcohol» en el nombre: ahí una graduación no cuenta («Cerveza 0.0°», «Espumante Sin Alcohol 5°»).
+_NO_ALCOHOL = re.compile(r"sin\s+alcohol|(?<![\d.,])0[.,]0(?![\d])", re.IGNORECASE)
+
+
+def alcohol_strength(name: str) -> str | None:
+    """La graduación alcohólica que trae el nombre (`ALCOHOL_STRENGTH`), salvo que diga sin alcohol o 0,0."""
+    if _NO_ALCOHOL.search(name):
+        return None
+    found = ALCOHOL_STRENGTH.search(name)
+    return found[0] if found else None
+
+
+def _alcohol_by_name(item_id: str, name: str, mapped: MappedName, matcher: KeywordMatcher) -> Assignment | None:
+    """Un trago en una categoría de bebidas sin alcohol: el nombre manda. En la base real del 14-10-2026 «Mistral Ice
+    Energy» estaba en Energizantes, «Johnnie Red 700 Cc Con Bebida» y «Campanario Mango Sour» en Jugos y «Coc Vin 8°»
+    en Té listo, sin marca de alcohol de la tienda: el agente los ofrecía como bebida. Por una regla de alcohol en
+    cualquier parte del nombre o, sin ella, por su graduación (va a `licores`). En café y té, solo por la graduación."""
+    match = None if mapped.concept_id in FLAVOURED_DRINKS else matcher.best(name, exclude=_not_alcohol())
+    if match:
+        return Assignment(
+            "catalog_item", item_id, match.target, "regla", RULE_CONFIDENCE, None, f"nombre:{match.keyword}"
+        )
+    strength = alcohol_strength(name)
+    if strength:
+        return Assignment("catalog_item", item_id, "licores", "regla", RULE_CONFIDENCE, None, f"nombre:{strength}")
+    return None
+
+
+def _baby_over(name_concept: str, category_concept: str) -> bool:
+    """Si el nombre dice bebé y la categoría, algo que el agente ofrece."""
+    concepts = load_taxonomy().concepts
+    return concepts[name_concept].parent == "bebe" and category_concept not in guarded_concepts()
+
+
+def _category_keeps(category_concept: str, name_concept: str) -> bool:
+    """Si una categoría dudosa conserva su concepto ante la regla del nombre: la de un sensible ante algo común y la de
+    suplementos o bebé ante comida. Un suplemento nombra lo que trae («Oregano Oil 60 Softgels», «Cola De Pavo 500mg 120
+    Caps», «Propóleo Miel Spray»): en «Productos naturales» (vitaminas, 0,5) pasaban a condimentos, pollo o untables."""
+    return keeps_sensitive(category_concept, name_concept) or (
+        category_concept in CATEGORY_KEEPS_FROM_FOOD and name_concept in _food_concepts()
+    )
 
 
 def assign_menu_item(
@@ -215,6 +298,26 @@ def refinable_by_name() -> frozenset[str]:
 @cache
 def _category_always_wins() -> frozenset[str]:
     return frozenset(c.id for c in load_taxonomy().concepts.values() if c.parent in CATEGORY_WINS_GROUPS)
+
+
+@cache
+def _drink_concepts() -> frozenset[str]:
+    return frozenset(c.id for c in load_taxonomy().concepts.values() if c.parent == "bebidas")
+
+
+@cache
+def _not_refining() -> frozenset[str]:
+    return frozenset(load_taxonomy().concepts) - NAME_REFINES_CONCEPTS
+
+
+@cache
+def _not_guarded() -> frozenset[str]:
+    return frozenset(load_taxonomy().concepts) - guarded_concepts()
+
+
+@cache
+def _not_alcohol() -> frozenset[str]:
+    return frozenset(c.id for c in load_taxonomy().concepts.values() if c.parent != "alcohol")
 
 
 @cache

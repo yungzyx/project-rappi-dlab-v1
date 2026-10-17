@@ -129,3 +129,22 @@ def test_an_asian_name_without_a_food_category_is_an_ordinary_rule():
     rule = Assignment("catalog_item", "1", "bebidas-asiaticas", "regla", 0.7, None, "nombre:bubble tea")
     assert _decide(rule, item, *_neighbors(["juguetes-infantiles"] * 15), MODEL).concept_id == "juguetes-infantiles"
     assert _decide(rule, item, *_neighbors(["te"] * 15), MODEL).concept_id == "te"
+
+
+@pytest.mark.parametrize(("current", "voted"), [("cocteles", "cafe"), ("alimentacion-bebe", "lacteos")])
+def test_neighbors_never_take_a_product_out_of_alcohol_or_baby(current, voted):
+    """En la base real del 14-10-2026 un «Espresso Martini» listo pasaba a café y una fórmula Similac a lácteos."""
+    category = _current(current, "llm", 0.9)
+    assert _decide(category, ITEM, *_neighbors([voted] * 15), MODEL) == category
+
+
+def test_neighbors_still_move_a_product_between_alcohol_concepts():
+    assert _decide(_current("cocteles", "llm", 0.9), ITEM, *_neighbors(["pisco"] * 15), MODEL).concept_id == "pisco"
+
+
+def test_neighbors_still_fix_a_dish_that_only_names_a_drink():
+    """«Pizza Margarita» calza la regla de cócteles; en los platos los vecinos la devuelven a pizza (y las ofertas
+    bloquean el alcohol de un menú por el nombre y la sección)."""
+    dish = ItemText("menu_item", "1", "Margarita Familiar")
+    rule = Assignment("menu_item", "1", "cocteles", "regla", 0.7, None, "nombre:margarita")
+    assert _decide(rule, dish, *_neighbors(["pizza"] * 15), MODEL).concept_id == "pizza"
