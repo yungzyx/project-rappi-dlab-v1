@@ -56,17 +56,37 @@ def _current_version(conn: Connection) -> int:
 
 def cached[T](name: str, conn: Connection, fn: Callable[[], T], ttl_s: float = DEFAULT_TTL_S) -> T:
     """`fn()` guardado por `name` mientras la versión del catálogo sea la misma y no pasen `ttl_s` segundos. `name`
-    lleva los parámetros que cambian el resultado («deals:licores:24»)."""
+    lleva los parámetros que cambian el resultado («deals:licores:24»). Si falta, lo calcula uno solo: los demás que
+    lo piden a la vez esperan su resultado (en frío, seis personas abriendo la Home recorrían el catálogo seis
+    veces). Si el cálculo falla, el siguiente que espera lo intenta."""
     version = _current_version(conn)
-    now = _now()
+    if (value := _fresh(name, version, ttl_s)) is not _MISSING:
+        return value
+    with _loading_lock(name):
+        if (value := _fresh(name, version, ttl_s)) is not _MISSING:  # otro lo calculó mientras esperaba
+            return value
+        now = _now()
+        value = fn()
+        with _lock:
+            _values[name] = (version, now, value)
+    return value
+
+
+_MISSING = object()
+_loading: dict[str, threading.Lock] = {}  # un candado por nombre de `cached` (pocos: las claves son acotadas)
+
+
+def _fresh(name: str, version: int, ttl_s: float):
     with _lock:
         entry = _values.get(name)
-    if entry is not None and entry[0] == version and now - entry[1] < ttl_s:
+    if entry is not None and entry[0] == version and _now() - entry[1] < ttl_s:
         return entry[2]
-    value = fn()
+    return _MISSING
+
+
+def _loading_lock(name: str) -> threading.Lock:
     with _lock:
-        _values[name] = (version, now, value)
-    return value
+        return _loading.setdefault(name, threading.Lock())
 
 
 def cached_many[T](

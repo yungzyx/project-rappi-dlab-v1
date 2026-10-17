@@ -21,7 +21,7 @@ from .services import Services
 router = APIRouter(prefix="/agent", tags=["agent"])
 
 MAX_LINES = 100  # como un pedido (OrderIn)
-OFFER_CAP = concurrency_cap("offer", config.API_MAX_CONCURRENT_OFFER)
+OFFER_CAP = concurrency_cap("offer", config.API_MAX_CONCURRENT_OFFER, wait_s=config.API_CAP_WAIT_S)
 
 
 class EntityIn(Clean):

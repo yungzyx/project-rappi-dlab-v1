@@ -4,6 +4,7 @@ inactivos)."""
 
 import logging
 import threading
+import time
 from argparse import Namespace
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
@@ -225,6 +226,29 @@ def test_a_broken_connection_is_replaced_before_use(db, test_url, make_pool, liv
     )
     db.commit()
 
+    assert live_client.get("/profile/u1").status_code == 200
+
+
+def test_after_a_postgres_restart_the_next_request_gets_a_healthy_connection(db, test_url, make_pool, live_client):
+    """Un reinicio de Postgres corta todas las conexiones del pool. Antes, el pool las encontraba una a una, esperando
+    1 s y 2 s entre cada una: con todas muertas, el request salía con 503 a los 3 s (y el siguiente también). Ahora la
+    primera muerta hace revisar todo el pool en otro hilo y el request recibe una nueva."""
+    pool = make_pool(test_url, max_size=POOL_MAX)
+    held = [pool.getconn() for _ in range(POOL_MAX)]  # las tres abiertas y libres
+    for conn in held:
+        pool.putconn(conn)
+    killed = db.execute(
+        """SELECT count(pg_terminate_backend(pid)) FROM pg_stat_activity
+           WHERE application_name = 'rappi-ia-api' AND datname = current_database()"""
+    ).fetchone()[0]
+    db.commit()
+    assert killed == POOL_MAX
+
+    start = time.monotonic()
+    reply = live_client.get("/profile/u1")
+
+    assert reply.status_code == 200
+    assert time.monotonic() - start < 1.5  # lo que la app espera a /health antes de decir «Sin conexión»
     assert live_client.get("/profile/u1").status_code == 200
 
 

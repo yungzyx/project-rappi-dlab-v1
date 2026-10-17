@@ -46,6 +46,9 @@ start panel npm --prefix dashboard-empresa run dev -- --port 5175 --strictPort $
 # viva, avisando cada 15 s. Espera /live y no /health: con la base vacía o sin preparar /health da 503 y la espera no terminaría.
 # La app y el panel responden en un par de segundos.
 wait_for_url "La API" http://localhost:8000/live 0 api "cargando modelos"
+# Las listas del catálogo de la Home, en segundo plano y sin importar si falla (en frío, /catalog/home tarda ~3 s). No
+# es `make warm` entero: ese pregunta al agente, que puede llamar a Claude.
+make -s --no-print-directory -C rappi-ia warm-catalog >/dev/null 2>&1 &
 wait_for_url "La app" http://localhost:5174 30 app
 wait_for_url "El panel" http://localhost:5175 30 panel
 echo "MVP listo: app http://localhost:5174 · panel http://localhost:5175 · API http://localhost:8000/docs"

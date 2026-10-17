@@ -1,5 +1,9 @@
 """La caché del catálogo: un valor se reutiliza mientras no haya una corrida nueva ni pase su TTL."""
 
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
+
 import pytest
 
 from rappi_ia.catalog import cache
@@ -81,6 +85,41 @@ def test_value_expires_after_its_ttl(clock):
     assert cache.cached("home", conn, compute, ttl_s=60) == {"vez": 1}
     clock.now += 2
     assert cache.cached("home", conn, compute, ttl_s=60) == {"vez": 2}
+
+
+def test_concurrent_misses_compute_once(clock):
+    """En frío, seis personas abren la Home a la vez: el catálogo se recorre una vez y los demás esperan ese valor."""
+    conn, calls = FakeConn(), []
+    started, barrier = threading.Event(), threading.Barrier(6)
+
+    def slow():
+        calls.append(1)
+        started.set()
+        time.sleep(0.2)  # los otros cinco llegan mientras tanto
+        return {"vez": len(calls)}
+
+    def ask(_):
+        barrier.wait()
+        return cache.cached("home", conn, slow)
+
+    with ThreadPoolExecutor(6) as executor:
+        values = list(executor.map(ask, range(6)))
+
+    assert calls == [1]
+    assert all(value is values[0] for value in values)
+    assert cache.cached("otra", conn, slow) == {"vez": 2}  # otro nombre no espera a «home»
+
+
+def test_a_failed_load_is_retried_by_the_next_caller(clock):
+    conn, (compute, calls) = FakeConn(), _counter()
+
+    def broken():
+        raise RuntimeError("la consulta se cortó")
+
+    with pytest.raises(RuntimeError):
+        cache.cached("home", conn, broken)
+
+    assert cache.cached("home", conn, compute) == {"vez": 1} and calls == [1]
 
 
 def test_version_is_asked_at_most_once_per_window(clock):

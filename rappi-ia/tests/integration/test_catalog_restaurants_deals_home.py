@@ -24,6 +24,7 @@ import types
 
 import pytest
 from fastapi.testclient import TestClient
+from test_query_budget import CountingConnection
 
 from rappi_ia import config
 from rappi_ia.agent.tools import _with_prices, clp
@@ -149,6 +150,32 @@ def test_restaurants_filter_by_cuisine_and_limit(seeded):
     assert restaurants(seeded, limit=0) == []
 
 
+def test_restaurants_come_from_the_catalog_cache_until_a_new_run(seeded, monkeypatch):
+    """La lista recorre todos los platos: se guarda por orden y largo hasta una corrida nueva (o su TTL). Con cocina
+    (texto libre) se consulta siempre."""
+    now = [1000.0]
+    monkeypatch.setattr(cache, "_now", lambda: now[0])
+    counting = CountingConnection(seeded)
+    first = restaurants(counting, sort="eta", limit=5)
+
+    counting.statements.clear()
+    assert restaurants(counting, sort="eta", limit=5) == first
+    assert not any("menu_items" in s for s in counting.statements)  # de la caché
+    assert restaurants(counting, sort="fee", limit=5) != first  # cada orden es su propia entrada
+    assert ids(restaurants(counting, sort="eta", limit=2)) == ids(first)[:2]  # y cada largo
+    counting.statements.clear()
+    restaurants(counting, cuisine="Sushi")
+    restaurants(counting, cuisine="Sushi")
+    assert sum("menu_items" in s for s in counting.statements) == 2
+
+    seeded.execute("UPDATE restaurant_details SET eta = '5 min' WHERE store_id = %s", (CAFE,))
+    assert restaurants(counting, sort="eta", limit=5) == first  # sin corrida nueva sigue la guardada
+    seeded.execute("INSERT INTO scrape_runs (kind, status) VALUES ('restaurants', 'done')")
+    now[0] += cache.VERSION_TTL_S + 1  # la versión se vuelve a preguntar
+
+    assert ids(restaurants(counting, sort="eta", limit=5))[0] == CAFE
+
+
 def test_only_restaurants_with_a_priced_dish_are_listed(seeded):
     # 9808 es la mejor nota, la más rápida y la de envío gratis, pero sus dos platos no tienen precio real
     # (uno sin precio y otro de $5, bajo MIN_PRICE).
@@ -158,6 +185,7 @@ def test_only_restaurants_with_a_priced_dish_are_listed(seeded):
 
     run_id = seeded.execute("SELECT max(run_id) FROM scrape_runs").fetchone()[0]
     seeded.execute("UPDATE menu_price_snapshots SET price = 2500 WHERE item_id = 98022 AND run_id = %s", (run_id,))
+    cache.clear()  # sin corrida nueva: como si la caché del catálogo hubiera vencido
 
     assert ICE_CREAM in ids(restaurants(seeded, limit=100))
     assert restaurant_menu(seeded, ICE_CREAM) is not None
@@ -181,12 +209,14 @@ def test_a_restaurant_uses_the_last_price_of_its_dishes(seeded):
         "INSERT INTO menu_price_snapshots (run_id, item_id, price, is_available) VALUES (%s, 98017, 5990, true)",
         (new_run,),
     )
+    cache.clear()  # la misma corrida: como si la caché del catálogo hubiera vencido
 
     assert CAFE in ids(restaurants(seeded, limit=100))
 
 
 def test_a_store_that_is_not_a_restaurant_is_never_listed(seeded):
     seeded.execute("DELETE FROM store_verticals WHERE store_id = %s", (PIZZERIA,))
+    cache.clear()  # sin corrida nueva: como si la caché del catálogo hubiera vencido
 
     assert PIZZERIA not in ids(restaurants(seeded, limit=100))
     assert restaurant_menu(seeded, PIZZERIA) is None
