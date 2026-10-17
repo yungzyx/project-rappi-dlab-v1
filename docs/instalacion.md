@@ -73,7 +73,7 @@ No cambia la configuración de Postgres. Si el equipo tiene poca memoria, usa un
 cd rappi-ia
 make install install-ml db-test migrate   # .venv, paquetes de los modelos (~1 GB), base de tests
 make test
-caffeinate -i make post-refresh           # purga, categorías nuevas con Jev (si está adoptado), conceptos, embeddings, evaluación, datos simulados y capa de datos al día con la base, y otra purga
+caffeinate -i make post-refresh           # purga, categorías nuevas con Jev (si está adoptado), conceptos, embeddings (y limpieza de los que ya no se usan), evaluación, datos simulados y capa de datos al día con la base, y otra purga
 ```
 
 - **τ:** `make post-refresh` también recalibra τ en `src/rappi_ia/eval/thresholds.json` (solo en verticales con negativas que dependen de τ; los demás conservan el suyo). Si cambia, revisar y hacer commit.
@@ -139,7 +139,7 @@ make schedule-status   # ¿está activa? ¿cómo terminó la última vez?
 
 - **Qué corre:** `rappi-scraper/scripts/refresh-semanal.sh`.
   - Primero `rappi migrate` (las migraciones que haya traído un `git pull`) y `rappi refresh`: tiendas, restaurantes, búsqueda, reportes y respaldo en `data/backups/` (quedan los últimos 4).
-  - Si termina bien (o solo fallaron el respaldo o los restaurantes: códigos 3, 5 y 6 de `rappi refresh`, ver [rappi-scraper/README.md](../rappi-scraper/README.md)), `make post-refresh` de rappi-ia: purga (primero, para cumplir la retención aunque falle otro paso), categorías nuevas con Jev (solo con clave y adopción), conceptos, embeddings, evaluación (con Jev como juez si está adoptado), datos simulados, capa de datos (`make layers`) y otra purga.
+  - Si termina bien (o solo fallaron el respaldo o los restaurantes: códigos 3, 5 y 6 de `rappi refresh`, ver [rappi-scraper/README.md](../rappi-scraper/README.md)), `make post-refresh` de rappi-ia: purga (primero, para cumplir la retención aunque falle otro paso), categorías nuevas con Jev (solo con clave y adopción), conceptos, embeddings (y limpieza de los que ya no se usan, `make prune-embeddings`), evaluación (con Jev como juez si está adoptado), datos simulados, capa de datos (`make layers`) y otra purga.
   - Nunca corren dos descargas a la vez: los comandos que descargan comparten el candado `rappi-scraper/data/scraper.lock`, que el sistema suelta aunque el proceso muera. Además, la tarea semanal tiene su propio candado, que se borra aunque la corten con una señal (Ctrl-C, cerrar la terminal).
 - **τ:** la evaluación semanal no guarda τ, porque `thresholds.json` está en el repositorio. Para recalibrar: `make eval` a mano en `rappi-ia/` y commit.
 - **Dormido o apagado:** si a esa hora el equipo estaba **dormido**, la tarea corre al despertar; si estaba **apagado**, esa semana se salta. Por eso conviene:

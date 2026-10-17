@@ -39,7 +39,7 @@ Las versiones de las librerías están fijadas en `requirements.lock.txt` (las d
 Después de cada `rappi refresh` del scraper:
 
 ```bash
-make post-refresh                 # migrate + purge + jev-categorias + concepts + embed + eval + synth + layers + purge
+make post-refresh                 # migrate + purge + jev-categorias + concepts + embed + eval + synth + layers + prune-embeddings + purge
 ./scripts/despues-del-refresh.sh  # lo mismo, pero espera a que termine un `rappi refresh` lanzado a mano
 ```
 
@@ -50,6 +50,7 @@ La tarea semanal del scraper (`make schedule` en `rappi-scraper/`) ya lo hace so
 | `make jev-categorias` | Jev etiqueta las categorías nuevas (`map-categories --jev --solo-nuevas`). Opcional: sin `TYPESAFE_API_KEY` o sin `eval/jev-adopcion.json` no hace nada y termina bien. Va antes de `concepts` en `post-refresh` (guía en [docs/jev.md](../docs/jev.md)) |
 | `make concepts` | Capa 2: conceptos por producto y plato (con kNN si está el extra `ml`) |
 | `make embed` | Embeddings de texto (incrementales) + índices HNSW por vertical. No corre si hay una descarga del scraper en curso |
+| `make prune-embeddings` | Borra del caché `text_embeddings` los vectores de más de 7 días que no usa ningún documento de búsqueda ni el kNN de conceptos (los nombres de productos y platos). Un hash en uso conserva sus vectores de todos los modelos, también los de un modelo viejo. Va al final de `post-refresh` (después de `layers`: si falla, lo demás ya quedó al día). Corre `ANALYZE`; el espacio lo reusa autovacuum, y para devolverlo al disco hay que correr `VACUUM FULL text_embeddings` a mano (la salida lo sugiere desde 10.000 borrados) |
 | `make eval` | Evalúa la búsqueda (léxico, vectorial, híbrido y ablación sin refuerzo), guarda τ en `src/rappi_ia/eval/thresholds.json` (solo en verticales con negativas que dependen de τ; los demás conservan el suyo; `make eval EVAL_ARGS=` no guarda) y deja el reporte en `data/eval/busqueda.md`. Con `--jev-auto` (lo que usa `make eval`) suma a Jev como tercer juez solo si hay clave y adopción |
 | `make synth` | Usuarios y eventos **simulados** para métricas y segmentos (3.000 usuarios × 26 semanas, semilla 7; reemplaza los anteriores) |
 | `make purge` | Borra el texto de las consultas con más de 90 días y a las personas del prototipo sin actividad en 180 (`PROTOTYPE_USER_RETENTION_DAYS`) |

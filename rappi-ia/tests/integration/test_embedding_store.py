@@ -3,12 +3,14 @@
 import tracemalloc
 
 import numpy as np
-from rappi_scraper.storage.search import VERTICALS, build_search_documents
+import pytest
+from rappi_scraper.storage.search import SEARCH_DOCUMENTS_LOCK, VERTICALS, build_search_documents
 
 from conftest import add_product, add_store
 from rappi_ia import config
 from rappi_ia.concepts import knn
-from rappi_ia.concepts.knn import ItemText, embed_texts
+from rappi_ia.concepts.knn import ItemText, embed_texts, item_texts
+from rappi_ia.db import connect, database_url
 from rappi_ia.embeddings import text_store
 from rappi_ia.embeddings.base import HashEmbedder
 
@@ -172,3 +174,71 @@ def test_cached_item_vectors_are_not_kept_as_text(db):
     assert vectors.shape == (10000, 256)
     assert np.allclose(vectors, _vectors_as_before(db, embedder.model_name, items), atol=1e-6)
     assert peak < 2 * vectors.nbytes, f"pico de {peak / 1e6:.1f} MB para una matriz de {vectors.nbytes / 1e6:.1f} MB"
+
+
+def _add_vector(db, content_hash: str, model: str, days_old: int) -> None:
+    db.execute(
+        """INSERT INTO text_embeddings (content_hash, embedding_model, embedding, created_at)
+           VALUES (%s, %s, '[1,0,0]', now() - make_interval(days => %s))""",
+        (content_hash, model, days_old),
+    )
+
+
+def _cache_with_documents_and_names(db) -> tuple[set[str], set[str]]:
+    """Catálogo chico con sus vectores de documentos y de nombres (kNN), todos de hace 30 días."""
+    add_store(db, 1, "supermercado", "Súper")
+    for pid, name in enumerate(NAMES[:4], start=100):
+        add_product(db, pid, name, 1)
+    db.commit()
+    build_search_documents(db)
+    embedder = HashEmbedder()
+    text_store.embed_pending(db, embedder)
+    embed_texts(db, embedder, item_texts(db))
+    db.execute("UPDATE text_embeddings SET created_at = now() - interval '30 days'")
+    db.commit()
+    documents = {h for (h,) in db.execute("SELECT content_hash FROM search_documents").fetchall()}
+    names = {item.content_hash for item in item_texts(db)}
+    return documents, names
+
+
+def _cached(db) -> set[tuple[str, str]]:
+    return set(db.execute("SELECT content_hash, embedding_model FROM text_embeddings").fetchall())
+
+
+def test_prune_deletes_only_old_vectors_that_nothing_uses(db):
+    documents, names = _cache_with_documents_and_names(db)
+    assert documents and names and not documents & names  # el kNN usa hashes que no están en search_documents
+    model = HashEmbedder().model_name
+    _add_vector(db, "huerfano-viejo", model, 8)
+    _add_vector(db, "huerfano-otro-modelo", "modelo-viejo", 60)
+    _add_vector(db, "huerfano-reciente", model, 6)
+    _add_vector(db, next(iter(documents)), "modelo-viejo", 60)  # un hash en uso se conserva con cualquier modelo
+    db.commit()
+    before = _cached(db)
+
+    result = text_store.prune_orphan_embeddings(db)
+
+    after = _cached(db)
+    assert before - after == {("huerfano-viejo", model), ("huerfano-otro-modelo", "modelo-viejo")}
+    assert result == {"vectores_borrados": 2, "vectores_que_quedan": len(after)}
+    assert {(h, model) for h in documents | names} | {("huerfano-reciente", model)} <= after
+    assert text_store.prune_orphan_embeddings(db)["vectores_borrados"] == 0
+    # Ningún documento quedó sin su vector en el caché.
+    assert text_store.embed_pending(db, HashEmbedder()) == 0
+
+
+def test_prune_waits_for_the_scraper(db):
+    _cache_with_documents_and_names(db)
+    _add_vector(db, "huerfano-viejo", "modelo-test", 30)
+    db.execute("INSERT INTO scrape_runs (kind, status) VALUES ('stores', 'running')")
+    db.commit()
+    with pytest.raises(text_store.ScrapeRunning):
+        text_store.prune_orphan_embeddings(db)
+    db.execute("UPDATE scrape_runs SET status = 'done'")
+    db.commit()
+    with connect(database_url("DATABASE_URL_TEST")) as scraper:
+        scraper.execute("SELECT pg_advisory_xact_lock(%s)", (SEARCH_DOCUMENTS_LOCK,))  # reescritura en curso
+        with pytest.raises(text_store.ScrapeRunning):
+            text_store.prune_orphan_embeddings(db)
+        scraper.rollback()
+    assert text_store.prune_orphan_embeddings(db)["vectores_borrados"] == 1
