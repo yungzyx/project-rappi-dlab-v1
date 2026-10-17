@@ -4,6 +4,7 @@ Sin base de datos: el catálogo se arma a mano con los ítems que cada persona p
 """
 
 import io
+import math
 import random
 from collections import Counter
 from datetime import datetime, timedelta
@@ -12,6 +13,7 @@ import pytest
 
 from rappi_ia.concepts.taxonomy import load_taxonomy
 from rappi_ia.events import synth
+from rappi_ia.motor.combos import SERVICE_COMBO, load_combos
 
 ASIAN_CONCEPTS = {"sushi", "asiatica", "despensa-asiatica", "bebidas-asiaticas", "snacks-asiaticos"}
 ASIAN_VERTICALS = {"restaurantes", "supermercado", "turbo", "conveniencia"}
@@ -106,13 +108,21 @@ def test_the_generator_is_deterministic_with_the_same_seed():
     assert _simulate(persona, seed=11) != _simulate(persona, seed=12)
 
 
-def test_archetypes_follow_rappi_shares():
+def test_archetypes_follow_rappi_shares_with_the_calibration():
+    """El sorteo de las altas es la parte de cada combinación en la tabla de Rappi (combos.toml, sin Favor) por su
+    factor de calibración: la mezcla que se parece a la de Rappi es la de personas-mes, no la de altas. Restaurantes
+    sigue siendo la mayoría de las altas."""
+    shares = {c: r.pct_users for c, r in load_combos().rappi.items() if c != SERVICE_COMBO}
+    assert set(synth.ARCHETYPE_CALIBRATION) == set(shares)
+    weights = {c: share * synth.ARCHETYPE_CALIBRATION[c] for c, share in shares.items()}
+    expected = {c: w / sum(weights.values()) for c, w in weights.items()}
+    assert pytest.approx(expected) == synth.ARCHETYPES
+    assert max(synth.ARCHETYPES, key=synth.ARCHETYPES.get) == "rest"
     rng = random.Random(1)
     n = 20000
     counts = Counter(synth.draw_archetype(rng) for _ in range(n))
-    assert counts["rest"] / n == pytest.approx(62.6 / 93.4, abs=0.015)  # 93.4 = suma de las 7 filas sin favor
-    assert set(counts) == {"rest", "turbo", "rest+turbo", "retail", "rest+retail", "rest+turbo+retail", "turbo+retail"}
-    assert sum(synth.ARCHETYPES.values()) == pytest.approx(1)
+    assert set(counts) == set(shares)
+    assert counts["rest"] / n == pytest.approx(expected["rest"], abs=0.015)
 
 
 def test_effective_interests_stay_in_the_archetype_groups():
@@ -161,9 +171,16 @@ def test_fallback_concepts_prefer_what_the_catalog_has():
 
 
 def test_cadence_follows_orders_per_user():
-    assert synth.archetype_cadence("rest+turbo+retail") < synth.archetype_cadence("rest+turbo")
-    assert synth.archetype_cadence("rest+turbo") < synth.archetype_cadence("rest")
-    assert synth.archetype_cadence("rest") == pytest.approx(30 / (1.9 * synth.SESSIONS_PER_ORDER))
+    """El ritmo da, entre los meses con algún pedido, los pedidos por persona de la tabla: λ / (1 − e^−λ) = 1,9 en
+    «rest». Quien abandona más carros necesita más sesiones para los mismos pedidos."""
+    familia = _persona("familia")
+    assert synth.archetype_cadence("rest+turbo+retail", familia) < synth.archetype_cadence("rest+turbo", familia)
+    assert synth.archetype_cadence("rest+turbo", familia) < synth.archetype_cadence("rest", familia)
+    rate = synth.monthly_order_rate("rest")
+    assert rate / (1 - math.exp(-rate)) == pytest.approx(1.9)
+    share = (1 - synth.TRIP) * (1 - synth.BROWSE_ONLY) * (1 - familia.abandon)
+    assert synth.archetype_cadence("rest", familia) == pytest.approx(30 * share / rate)
+    assert synth.archetype_cadence("rest", _persona("hogar")) < synth.archetype_cadence("rest", familia)
 
 
 def _state(archetype: str, orders_by_vertical: dict) -> synth.UserState:
@@ -182,11 +199,15 @@ def _state(archetype: str, orders_by_vertical: dict) -> synth.UserState:
 
 def test_the_combination_of_the_last_30_days_sets_the_retention():
     """El supuesto explícito: pedir en otro grupo cambia la combinación y con ella la retención (0,76 de rest+retail
-    en vez de 0,47 de rest, su arquetipo)."""
+    en vez de 0,47 de rest, su arquetipo). La supervivencia es esa retención dividida por la probabilidad de pedir en
+    un mes con el ritmo del arquetipo (así la retención M+1 medida se parece a la de Rappi), con tope."""
     now = END - timedelta(days=1)
-    moved = _state("rest", {"restaurantes": [now - timedelta(days=5)], "supermercado": [now - timedelta(days=3)]})
-    assert synth._stay_probability(moved, now, 30) == pytest.approx(0.76)
-    assert synth._stay_probability(moved, now, 15) == pytest.approx(0.76**0.5)
+    moved = _state("rest+turbo", {"restaurantes": [now - timedelta(days=5)], "supermercado": [now - timedelta(days=3)]})
+    survival = 0.76 / synth.month_order_probability("rest+turbo")
+    assert synth._stay_probability(moved, now, 30) == pytest.approx(survival)
+    assert synth._stay_probability(moved, now, 15) == pytest.approx(survival**0.5)
+    slow = _state("rest", moved.orders_by_vertical)  # pide poco: 0,76 / 0,77 pasaría de 0,99
+    assert synth._stay_probability(slow, now, 30) == pytest.approx(synth.MAX_SURVIVAL)
 
 
 def test_each_extra_vertical_inside_a_group_adds_retention_with_diminishing_returns():
@@ -198,18 +219,20 @@ def test_each_extra_vertical_inside_a_group_adds_retention_with_diminishing_retu
     two = _state("rest+retail", {**one.orders_by_vertical, "conveniencia": recent})
     three = _state("rest+retail", {**two.orders_by_vertical, "mall": recent})
     p1, p2, p3 = (synth._stay_probability(x, now, 30) for x in (one, two, three))
+    q = synth.month_order_probability("rest+retail")
 
-    assert p1 == pytest.approx(0.76)
-    assert p2 == pytest.approx(1 - 0.24 * 0.9)
-    assert p3 == pytest.approx(1 - 0.24 * 0.9 * 0.95)
+    assert p1 == pytest.approx(0.76 / q)
+    assert p2 == pytest.approx((1 - 0.24 * 0.9) / q)
+    assert p3 == pytest.approx((1 - 0.24 * 0.9 * 0.95) / q)
     assert p1 < p2 < p3 < 1
 
 
 def test_without_recent_orders_the_retention_is_the_archetype_one():
     now = END - timedelta(days=1)
-    assert synth._stay_probability(_state("rest", {}), now, 30) == pytest.approx(0.47)
+    survival = 0.47 / synth.month_order_probability("rest")
+    assert synth._stay_probability(_state("rest", {}), now, 30) == pytest.approx(survival)
     old = _state("rest", {"supermercado": [now - timedelta(days=45)]})  # fuera de los 30 días
-    assert synth._stay_probability(old, now, 30) == pytest.approx(0.47)
+    assert synth._stay_probability(old, now, 30) == pytest.approx(survival)
 
 
 def test_simulated_suggestions_follow_the_offer_guards():

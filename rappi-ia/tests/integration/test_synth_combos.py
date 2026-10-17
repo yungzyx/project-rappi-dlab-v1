@@ -10,7 +10,9 @@ import pytest
 
 from rappi_ia.demo.seed import seed_demo
 from rappi_ia.events.synth import generate
-from rappi_ia.motor.combos import combo_of_verticals
+from rappi_ia.motor.combos import SERVICE_COMBO, combo_of_verticals, load_combos
+from rappi_ia.motor.data import load_orders
+from rappi_ia.motor.model import combo_months, combo_stats
 
 LAST_MONTH = date(2026, 10, 1)  # `until` cae en octubre: septiembre no tiene su M+1 completo
 
@@ -60,3 +62,25 @@ def test_activity_does_not_collapse_at_the_end(simulated):
         active[month] += 1
     last_full = date(2026, 9, 1)  # `until` cae el 4 de octubre: octubre no está completo
     assert active[last_full] >= 0.4 * max(active.values()), sorted(active.items())
+
+
+def test_the_mix_and_the_retention_track_the_rappi_table(simulated):
+    """Medido como el motor (personas-mes, nivel grueso), sobre el catálogo de prueba: la retención de Restaurantes
+    queda a 0,1 de la de Rappi, rest+turbo+retail retiene más que todas y cada combinación de dos o más grupos retiene
+    más que cada una de un solo grupo. Esta prueba cuida la retención y las regresiones gruesas de la mezcla, no la
+    calibración fina: el catálogo de prueba es chico, muchas búsquedas no encuentran nada y la mezcla queda a 3,7 puntos
+    en la peor fila (Restaurantes, 70,7 % contra 67,0 %); el generador anterior a la calibración quedaba a 3,3, así que
+    la mezcla (a 4 puntos, Restaurantes la mayor) no los distingue, y la retención sí (0,315 contra 0,47). La
+    calibración se revisa con el catálogo real: scripts/calibrar_simulados.py (3.000 personas, 5 semillas: cada fila a
+    menos de 2 puntos)."""
+    stats = combo_stats(combo_months(load_orders(simulated, "synthetic")))
+    rappi = {c: r for c, r in load_combos().rappi.items() if c != SERVICE_COMBO}
+    total = sum(r.pct_users for r in rappi.values())
+    for combo, row in rappi.items():
+        assert stats[combo]["pct_users"] == pytest.approx(100 * row.pct_users / total, abs=4), (combo, stats)
+    assert max(stats, key=lambda c: stats[c]["pct_users"]) == "rest"
+    retention = {c: s["retention_m1"] for c, s in stats.items()}
+    assert max(retention, key=retention.get) == "rest+turbo+retail", retention
+    single = [retention[c] for c in ("rest", "turbo", "retail")]
+    assert min(r for c, r in retention.items() if "+" in c) > max(single), retention
+    assert retention["rest"] == pytest.approx(rappi["rest"].retention_m1, abs=0.1)

@@ -51,6 +51,7 @@ Las fuentes JSON de los diagramas están en [diagramas-fuente/](diagramas-fuente
 | Las cifras vigentes, con qué tipo de dato es cada una | [README.md#resultados](../README.md#resultados) |
 | Los reportes de evaluación de la búsqueda, uno por fecha | [resultados/](resultados/) (`busqueda-*.md`) |
 | La evaluación del motor multivertical sobre datos simulados (16-10-2026) | [resultados/motor-2026-10-16.md](resultados/motor-2026-10-16.md) |
+| Los datos simulados recalibrados a la mezcla de la tabla de Rappi: antes y después (17-10-2026) | [resultados/simulados-2026-10-17.md](resultados/simulados-2026-10-17.md) |
 | La revisión (QA) de las ofertas del motor sobre el catálogo real, en solo lectura (16-10-2026) | [resultados/qa-motor-2026-10-16.md](resultados/qa-motor-2026-10-16.md) |
 | La precisión medida de conceptos, atributos y marcas | [resultados/capas-precision-2026-10-06.md](resultados/capas-precision-2026-10-06.md) y [la muestra nueva](resultados/capas-precision-2026-10-06-nueva-muestra.md) |
 | Historia: cómo se verificaron los datos del juego de verticales (salió del proyecto el 16-10; fuente de cada tarjeta) | [resultados/juego-verificacion-2026-10-09.md](resultados/juego-verificacion-2026-10-09.md) |

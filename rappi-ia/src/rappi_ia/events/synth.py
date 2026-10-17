@@ -5,23 +5,37 @@ supuestos explícitos. El panel muestra la mecánica, no evidencia: por construc
 "confirman" en los gráficos.
 
 SUPUESTOS (editables aquí):
-- Cada persona simulada recibe un arquetipo de combinación (ARCHETYPES) sorteado con la mezcla de la tabla de Rappi
-  (motor/combos.toml, sin Favor, renormalizada): dice en qué grupos (rest, turbo, retail) pide. Su perfil (PERSONAS)
-  dice qué conceptos, las horas, el abandono y el atributo que prefiere; solo cuentan sus verticales de los grupos del
-  arquetipo. Si a un grupo no le queda ninguno, Turbo copia lo del súper y Express de la persona (sin alcohol, bebé,
-  salud ni sensibles) y, si no hay, usa GENERIC_INTERESTS, como Restaurantes y Retail; con un catálogo, lo copiado se
-  queda con lo que ese vertical vende.
-- El ritmo sale de los pedidos por persona de su arquetipo: una sesión cada 30 / (pedidos × SESSIONS_PER_ORDER) días,
-  porque no toda sesión termina en pedido. Ya no lo fija el perfil.
+- Cada persona simulada recibe un arquetipo de combinación (ARCHETYPES) que dice en qué grupos (rest, turbo, retail)
+  pide. Se sortea con la parte de cada combinación en la tabla de Rappi (motor/combos.toml, sin Favor) por un factor
+  de calibración (ARCHETYPE_CALIBRATION, ajustado con scripts/calibrar_simulados.py): la tabla cuenta personas-mes, no
+  altas, y quien combina grupos vive más meses, pasa algunos en un solo grupo y las sugerencias aceptadas llevan a
+  quien solo pide en Restaurantes a combinar. Por eso hay pocas altas «rest+retail» y «turbo+retail»: esas filas salen
+  sobre todo de otros arquetipos. Su perfil (PERSONAS) dice qué conceptos, las horas, el abandono y el atributo que
+  prefiere; solo cuentan sus verticales de los grupos del arquetipo. Si a un grupo no le queda ninguno, Turbo copia lo
+  del súper y Express de la persona (sin alcohol, bebé, salud ni sensibles) y, si no hay, usa GENERIC_INTERESTS, como
+  Restaurantes y Retail; con un catálogo, lo copiado se queda con lo que ese vertical vende. Cada sesión sortea primero
+  el grupo, parejo entre los del arquetipo, y después el vertical dentro de él.
+- El ritmo sale de los pedidos por persona de su arquetipo. La tabla los cuenta entre quienes pidieron ese mes, así que
+  son la media de un Poisson sin el cero: λ / (1 − e^−λ) = pedidos, y se despeja λ (monthly_order_rate). Una sesión
+  cada 30 × (parte de sesiones que terminan en pedido) / λ días: la parte depende del abandono de la persona, de
+  TRIP y de BROWSE_ONLY (session_order_share). Ya no lo fija el perfil.
 - La retención es la M+1 de la tabla de Rappi para la combinación de grupos de sus pedidos de los últimos 30 días (la
   de su arquetipo si no tiene pedidos), con el rendimiento decreciente de la escalera fina (motor/combos.toml,
   `[rendimiento_decreciente]`; supuesto propio, no viene de Rappi): cada vertical extra dentro de un grupo reduce la
   parte que no vuelve (10 %, 5 %, 2,5 %…), así que usar Súper y Express rinde más que solo Súper. Farmacia y Licores
-  cuentan como cualquier otra vertical del grupo: son uso propio de la persona (Mochi igual nunca las propone). En cada
-  sesión sigue activa con probabilidad retención^(días desde la anterior / 30). Los servicios (RappiFavor, RappiTravel)
-  no suman: la persona simulada los abre de pasada, no con regularidad.
-  Es la supervivencia del estado activo, no «pide el mes siguiente»: quien sigue activa puede saltarse un mes, así que
-  la retención M+1 medida en los simulados queda bajo la de Rappi. No es una falla de calibración.
+  cuentan como cualquier otra vertical del grupo: son uso propio de la persona (Mochi igual nunca las propone). Los
+  servicios (RappiFavor, RappiTravel) no suman: la persona simulada los abre de pasada, no con regularidad.
+  La M+1 de Rappi es «pide el mes siguiente», y quien sigue activa puede saltarse un mes: la supervivencia mensual es
+  esa retención dividida por la probabilidad de pedir en un mes con el ritmo de su arquetipo, 1 − e^−λ
+  (month_order_probability), con tope MAX_SURVIVAL. En cada sesión sigue activa con probabilidad supervivencia^(días
+  desde la anterior / 30). Con el tope, a quien pide poco y llegó a una combinación que retiene mucho (de «rest» a
+  «rest+retail» por una sugerencia) no le alcanza para mostrar el rendimiento decreciente.
+- Calibración, medida como el motor (personas-mes del nivel grueso) con el catálogo real (3.000 personas, semillas 7,
+  11, 23, 31 y 47; 17-10-2026 en una copia, rappi_staging): cada combinación queda a menos de 2 puntos de su parte en
+  la tabla sin Favor y la retención M+1 de las filas con 100 meses o más, a menos de 0,1 de la de Rappi;
+  rest+turbo+retail es la que más retiene y cada combinación de dos o más grupos retiene más que cada una de un solo
+  grupo (docs/resultados/simulados-2026-10-17.md). Los pedidos por persona quedan bajo los de la tabla en las
+  combinaciones de varios grupos (los meses de alta y de salida son parciales).
 - SUPUESTO EXPLÍCITO: la tabla es una correlación (quien pide mucho usa más grupos y además vuelve más), pero aquí se
   trata como efecto. Aceptar una sugerencia que la hace pedir en otro grupo cambia su combinación de verdad, y con ella
   su retención. Por construcción, el panel "confirma" que sumar grupos retiene: no es evidencia.
@@ -32,7 +46,7 @@ SUPUESTOS (editables aquí):
   aceptado llevaba a casi todos de «rest» a «rest+retail» (11,3 % de los meses-persona contra 5,4 % en Rappi) y dejaba
   corto «rest+turbo» (4,2 % contra 6,6 %). Con el catálogo real (3.000 personas, semilla 7; medido el 16-10-2026 en una
   copia, rappi_staging) quedan en 7,2 % y 8,0 %; la tabla reproducida está más cerca de la de Rappi en las semillas 7,
-  11 y 23 (docs/resultados/motor-2026-10-16.md, «Mejora continua»).
+  11 y 23 (docs/resultados/motor-2026-10-16.md, «Mejora continua»; antes de la calibración de las altas).
 - Personas pequeñas que ejercitan los segmentos de la capa de perfiles (sin gluten, vegana, mamá con bebé, perro, gato,
   fitness, nocturno, cazaofertas, gamer, cafetera, chocolatera, parrillera); algunas prefieren ítems con un atributo.
   La oficinista ya existe como «oficina». Los pesos (`share`) se normalizan al sortear: no hace falta que sumen 1.
@@ -60,6 +74,7 @@ import random
 import uuid
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
+from functools import cache
 
 from psycopg import Connection
 
@@ -346,12 +361,29 @@ WISHES = [
 CHURN_UNMET = 0.35  # +35% de riesgo por cada búsqueda sin resultado en las últimas 4 semanas
 CHURN_ABANDON = 0.2  # +20% por cada carro abandonado en las últimas 4 semanas
 CHECKOUT_ABANDON_SHARE = 0.4  # de los carros abandonados, la parte que alcanza a iniciar el pago
-SESSIONS_PER_ORDER = 1.3  # sesiones que no terminan en pedido: búsquedas sin resultado, carros abandonados, solo mirar
+MAX_SURVIVAL = 0.99  # la supervivencia mensual nunca llega a 1
 COMBO_WINDOW_DAYS = 30  # la combinación de una persona: los grupos de sus pedidos de los últimos 30 días
 _COMBOS = load_combos()
-# Las 7 combinaciones de la tabla de Rappi (sin Favor, que no tiene catálogo) con su parte de usuarios, sumando 1.
+# Las 7 combinaciones de la tabla de Rappi (sin Favor, que no tiene catálogo) con su parte de usuarios.
 _SHARES = {combo: row.pct_users for combo, row in _COMBOS.rappi.items() if combo != SERVICE_COMBO}
-ARCHETYPES: dict[str, float] = {combo: share / sum(_SHARES.values()) for combo, share in _SHARES.items()}
+# Cuánto se corrige el sorteo de cada arquetipo al darse de alta para que la mezcla de personas-mes (la que mide el
+# motor) se parezca a la de la tabla: quien combina grupos vive más meses, pasa meses en un solo grupo y las sugerencias
+# aceptadas llevan a quien solo pide en Restaurantes a combinar. Ajustado el 17-10-2026 con
+# `scripts/calibrar_simulados.py --base rappi_staging --ajustar --altas 12000 --hasta 2026-10-17` (semilla FIT_SEED =
+# 101) sobre el catálogo de rappi_staging de esa noche, mientras se reetiquetaban sus conceptos: la misma orden, más
+# tarde, dio factores algo distintos (rest+retail 0,15, turbo+retail 0,13), y con estos cada fila siguió a menos de
+# 1,2 puntos de la tabla (docs/resultados/simulados-2026-10-17.md).
+ARCHETYPE_CALIBRATION: dict[str, float] = {
+    "rest": 1.15,
+    "turbo": 0.87,
+    "rest+turbo": 0.67,
+    "retail": 1.14,
+    "rest+retail": 0.20,
+    "rest+turbo+retail": 0.68,
+    "turbo+retail": 0.19,
+}
+_DRAW = {combo: share * ARCHETYPE_CALIBRATION[combo] for combo, share in _SHARES.items()}
+ARCHETYPES: dict[str, float] = {combo: weight / sum(_DRAW.values()) for combo, weight in _DRAW.items()}
 # Lo que pide quien cae en un grupo sin verticales en su perfil (sin alcohol, bebé ni salud).
 GENERIC_INTERESTS: dict[str, dict[str, float]] = {
     "turbo": {"snacks-salados": 2, "gaseosas": 2, "lacteos": 1.5, "frutas": 1},
@@ -497,13 +529,38 @@ def _unofferable(conn: Connection, items: dict[tuple[str, str], list]) -> set[tu
 
 
 def draw_archetype(rng: random.Random) -> str:
-    """Una combinación de grupos sorteada con la mezcla de la tabla de Rappi."""
+    """Una combinación de grupos sorteada con la mezcla calibrada (ARCHETYPES): la de la tabla de Rappi por
+    ARCHETYPE_CALIBRATION."""
     return rng.choices(list(ARCHETYPES), weights=list(ARCHETYPES.values()))[0]
 
 
-def archetype_cadence(archetype: str) -> float:
-    """Días entre sesiones según los pedidos por persona de la combinación en la tabla de Rappi."""
-    return 30 / (_COMBOS.rappi[archetype].orders_per_user * SESSIONS_PER_ORDER)
+@cache
+def monthly_order_rate(archetype: str) -> float:
+    """Pedidos al mes de una persona activa del arquetipo (λ de un Poisson). La tabla de Rappi da los pedidos por
+    persona entre quienes pidieron ese mes, que es la media de un Poisson sin el cero: λ / (1 − e^−λ). Se despeja λ."""
+    target = _COMBOS.rappi[archetype].orders_per_user
+    low, high = 1e-9, target
+    for _ in range(60):
+        mid = (low + high) / 2
+        low, high = (mid, high) if mid / -math.expm1(-mid) < target else (low, mid)
+    return (low + high) / 2
+
+
+def month_order_probability(archetype: str) -> float:
+    """La probabilidad de que una persona activa del arquetipo pida algo en un mes: 1 − e^−λ."""
+    return -math.expm1(-monthly_order_rate(archetype))
+
+
+def session_order_share(persona: Persona) -> float:
+    """La parte de las sesiones que termina en pedido, sin contar búsquedas sin resultado: no habla de un viaje, no se
+    va solo mirando y no abandona el carro."""
+    return (1 - TRIP) * (1 - BROWSE_ONLY) * (1 - persona.abandon)
+
+
+def archetype_cadence(archetype: str, persona: Persona) -> float:
+    """Días entre sesiones: las que hacen falta para los pedidos al mes del arquetipo, dado que no toda sesión termina
+    en pedido."""
+    return 30 * session_order_share(persona) / monthly_order_rate(archetype)
 
 
 def effective_interests(
@@ -563,7 +620,7 @@ def generate(
             user_id=f"syn-{seed}-{n:05d}",
             persona=persona,
             city=rng.choices(["Santiago", "Valparaíso", "Concepción", "Antofagasta"], [0.7, 0.12, 0.1, 0.08])[0],
-            cadence=archetype_cadence(archetype) * math.exp(rng.gauss(0, 0.35)),
+            cadence=archetype_cadence(archetype, persona) * math.exp(rng.gauss(0, 0.35)),
             archetype=archetype,
             interests=effective_interests(persona, archetype, catalog),
         )
@@ -663,7 +720,7 @@ def _session(rng, catalog: Catalog, s: UserState, ts: datetime, start: datetime,
             emit("service_opened", clock + timedelta(seconds=12), payload=travel)
         return
 
-    vertical = _weighted(rng, {v: sum(c.values()) for v, c in s.interests.items()})
+    vertical = _pick_vertical(rng, s.interests)
     concept = _weighted(rng, s.interests[vertical])
     prefer = s.persona.prefer
     item = catalog.pick(rng, vertical, concept, prefer)
@@ -773,8 +830,9 @@ def _stay_probability(s: UserState, now: datetime, gap: float) -> float:
     since = now - timedelta(days=COMBO_WINDOW_DAYS)
     fine = fine_of(v for v, ts in s.orders_by_vertical.items() if any(t >= since for t in ts))
     retention = expected_retention(s.archetype) if fine == NONE_COMBO else expected_fine_retention(fine)
+    survival = min(retention / month_order_probability(s.archetype), MAX_SURVIVAL)
     risk = (1 + CHURN_UNMET * unmet) * (1 + CHURN_ABANDON * abandon)
-    return retention ** (gap / 30 * risk)
+    return survival ** (gap / 30 * risk)
 
 
 def _maybe_wish(rng, week: float):
@@ -806,6 +864,16 @@ def _suggestion(catalog: Catalog, concept: str, vertical: str, rng: random.Rando
                 chosen = "turbo"
             return target, chosen, weight
     return None
+
+
+def _pick_vertical(rng, interests: dict[str, dict[str, float]]) -> str:
+    """El vertical de una sesión: primero el grupo, parejo entre los grupos de sus intereses, y dentro de él un
+    vertical según el peso de sus conceptos. Sin el sorteo por grupo, el grupo con más conceptos se llevaba casi todas
+    las sesiones y quien combina grupos pasaba muchos meses en uno solo."""
+    group_of = _COMBOS.group_of
+    groups = [g for g in GROUP_ORDER if any(group_of[v] == g for v in interests)]
+    group = rng.choice(groups)
+    return _weighted(rng, {v: sum(c.values()) for v, c in interests.items() if group_of[v] == group})
 
 
 def _weighted(rng, weights: dict[str, float]) -> str:
