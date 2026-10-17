@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { AGENT_NAME } from '../../agent/name'
 import { storeOfProduct } from '../../api/catalog'
 import { ask as askAgent, profile as remoteProfile, recommendations, toMessage } from '../../api/client'
-import { offer } from '../../api/agent'
+import { offer, profileLadder, tasteProfiles } from '../../api/agent'
 import { firstShowing, noteShown } from '../../api/suggestions'
 import { userId } from '../../api/user'
 import { askAbout } from '../../assistant/agentAsk'
@@ -23,6 +23,7 @@ import AgentMessage from './AgentMessage'
 import DiscoverSection from './DiscoverSection'
 import Mascot from './Mascot'
 import { SparkleIcon } from './SmartBar'
+import { LadderRail, ProfileCard } from './TasteProfile'
 import '../search/search.css'
 import './assistant.css'
 
@@ -73,6 +74,8 @@ export default function AssistantPanel({ push, vertical, depth = 1 }) {
   const [confirmingForget, setConfirmingForget] = useState(false)
   const [forgetFailed, setForgetFailed] = useState(false)
   const [discoverRows, setDiscoverRows] = useState([])
+  // El perfil de gusto de la persona y su escalera (`{ profile, ladder }`); sin perfil, null y el panel de siempre.
+  const [taste, setTaste] = useState(null)
   const search = useSearch({ vertical })
 
   const later = (fn, ms) => timers.current.push(setTimeout(fn, ms))
@@ -238,6 +241,30 @@ export default function AssistantPanel({ push, vertical, depth = 1 }) {
     ask(() => answer(clean, askVertical))
   }
 
+  /**
+   * El perfil de gusto principal de la persona (`GET /profile/{id}/gustos`) con su escalera (el momento `perfil`), o
+   * null si no tiene, si no hay escalera o si la API no contesta: entonces el panel queda como siempre.
+   */
+  const loadTaste = async () => {
+    try {
+      const [main] = await tasteProfiles()
+      const ladder = main ? await profileLadder(main.id) : null
+      return ladder?.steps.length ? { profile: main, ladder } : null
+    } catch {
+      return null
+    }
+  }
+
+  /**
+   * Muestra el perfil y cuenta sus productos como sugerencias mostradas (una vez por pestaña, como las demás). Cuentan
+   * todos los peldaños: la escalera se pinta entera (una fila horizontal, como «Para ti»), aunque no quepa en pantalla.
+   */
+  const showTaste = (found) => {
+    setTaste(found)
+    for (const step of found?.ladder.steps ?? [])
+      noteShown(events.track, step.products, { origin: 'agent-perfil', generation: profile.resets })
+  }
+
   // Abrir, paso 1: el buscador se pinta fuera de la pantalla, a la derecha (como el de «Rappi hoy»).
   useLayoutEffect(() => {
     const session = assistant.session
@@ -260,6 +287,8 @@ export default function AssistantPanel({ push, vertical, depth = 1 }) {
       .then((data) => data.rows.filter((row) => row.products.length > 0))
       .catch(() => [])
     rows.then((list) => fresh() && setDiscoverRows(list.slice(0, DISCOVER_ROWS)))
+    // Solo si sigue siendo la misma persona («Olvidar» mientras llegaba): ni se muestra ni se cuenta.
+    loadTaste().then((found) => fresh() && showTaste(found))
 
     if (messages.length === 0) greet(rows)
     if (session.product) later(() => askPairing(session.product), OPEN_MS)
@@ -352,6 +381,7 @@ export default function AssistantPanel({ push, vertical, depth = 1 }) {
     profile.reset()
     setLearnedRemote(null)
     setDiscoverRows([])
+    setTaste(null)
     try {
       // Lo que ya salió (preguntas pendientes, un lote de eventos, un pedido) podría recrear lo olvidado en el
       // servidor: forgetAll lo espera antes del DELETE, descarta lo que haya dejado en cola, y deja el navegador en
@@ -466,6 +496,8 @@ export default function AssistantPanel({ push, vertical, depth = 1 }) {
                 </button>
               </div>
 
+              {taste && <ProfileCard profile={taste.profile} />}
+
               {showAsked && <p className="agent-asked">Elegiste «{asked.text}»</p>}
               {current && (
                 <AgentMessage
@@ -496,6 +528,15 @@ export default function AssistantPanel({ push, vertical, depth = 1 }) {
                 ))}
               </div>
             </section>
+
+            {taste && (
+              <LadderRail
+                ladder={taste.ladder}
+                onOpenVertical={(screen) => go(...routeForScreen(screen))}
+                onOpenTravel={() => onAction({ route: taste.ladder.trip?.route ?? ['travel'], service: 'rappitravel' })}
+                onOpenProduct={openProduct}
+              />
+            )}
 
             <section className="agent-block">
               <SearchIdeas onPick={search.pick} />

@@ -5,3 +5,5 @@ dist*/
 src/data/generated/
 # Configuración local (p. ej. VITE_API_URL para apuntar a otra API)
 .env.local
+# La muestra del catálogo de la demo sin conexión (npm run demo:snapshot): son datos descargados, no van a GitHub.
+src/api/offline/snapshot.json

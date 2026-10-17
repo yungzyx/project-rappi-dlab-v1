@@ -1017,3 +1017,79 @@ describe('barra del carrito dentro del panel', () => {
     expect(document.querySelector('.assistant.has-cart')).toBeTruthy()
   })
 })
+
+describe('perfil de gusto', () => {
+  const offers = () => tracked('suggestion_shown').filter((fields) => fields.payload.origen === 'agent-perfil')
+
+  test('con un perfil activo, muestra el perfil, su escalera de verticales con productos y la idea para RappiTravel', async () => {
+    const push = vi.fn()
+    const fetchMock = stubCatalog({
+      'GET /profile/*': fixture('profile-gustos'),
+      'POST /agent/offer': (req) => (req.body.moment === 'perfil' ? fixture('agent-offer-perfil') : 204),
+    })
+    await renderPanel({ push })
+
+    const card = screen.getByRole('region', { name: 'Tu perfil' })
+    expect(card.textContent).toContain('Amante de lo asiático')
+    expect(card.textContent).toContain('Nivel medio')
+    expect(card.textContent).toContain('Pediste 🍣 sushi 2 veces')
+    // Pide la escalera del perfil principal, como esta persona.
+    const asked = fetchMock.mock.calls.find(
+      ([url, init]) => url.endsWith('/agent/offer') && init.body.includes('perfil'),
+    )
+    expect(JSON.parse(asked[1].body)).toMatchObject({ moment: 'perfil', context: { perfil: 'asiatico' } })
+
+    const ladder = screen.getByRole('region', { name: 'Para ti en otras verticales' })
+    const steps = [...ladder.querySelectorAll('.taste-step')].map((step) => step.getAttribute('aria-label'))
+    expect(steps).toEqual([
+      '1. Restaurantes',
+      '2. Turbo',
+      '3. Express',
+      '4. Súper',
+      '5. Chocolatería',
+      '6. RappiTravel',
+    ])
+    expect(ladder.textContent).toContain('Roll salmón palta 10 piezas (prueba)')
+    expect(ladder.textContent).toContain('Idea para RappiTravel')
+    expect(ladder.textContent).toContain('¿Y si un día vas a Japón?')
+    // Cada peldaño cuenta como sugerencia mostrada de Mochi.
+    expect(offers().map((fields) => fields.concept_id)).toEqual([
+      'sushi',
+      'despensa-asiatica',
+      'snacks-asiaticos',
+      'bebidas-asiaticas',
+      'chocolates',
+    ])
+
+    fireEvent.click(screen.getByText('Ver Súper ›'))
+    await runUntilIdle()
+    expect(push).toHaveBeenCalledWith(...routeForScreen('grocery'))
+  })
+
+  test('«Olvidar» quita el perfil del panel', async () => {
+    stubCatalog({
+      'GET /profile/*': fixture('profile-gustos'),
+      'POST /agent/offer': (req) => (req.body.moment === 'perfil' ? fixture('agent-offer-perfil') : 204),
+    })
+    await renderPanel()
+    expect(screen.getByRole('region', { name: 'Tu perfil' })).toBeTruthy()
+    await forget()
+    expect(screen.queryByRole('region', { name: 'Tu perfil' })).toBeNull()
+    expect(screen.queryByText('Para ti en otras verticales')).toBeNull()
+  })
+
+  test('sin perfil activo, el panel queda como siempre', async () => {
+    const fetchMock = stubCatalog({ 'GET /profile/*': { perfiles: [] } })
+    await renderPanel()
+    expect(screen.queryByRole('region', { name: 'Tu perfil' })).toBeNull()
+    expect(screen.queryByText('Para ti en otras verticales')).toBeNull()
+    expect(fetchMock.mock.calls.some(([url]) => url.endsWith('/agent/offer'))).toBe(false)
+    expect(offers()).toEqual([])
+  })
+
+  test('si la API no responde los gustos, tampoco hay perfil', async () => {
+    stubCatalog({ 'GET /profile/*': 'offline' })
+    await renderPanel()
+    expect(screen.queryByRole('region', { name: 'Tu perfil' })).toBeNull()
+  })
+})

@@ -57,11 +57,43 @@ Si la API se cae con la app ya abierta, el buscador con Mochi dice «Sin conexi�
 | `npm run format` | Formato con Prettier |
 | `npm run build` | Build de producción en `dist/` |
 | `npm run screenshots` | Regenera las capturas de este README con el Chrome instalado. Necesita el MVP corriendo sobre una copia de la base (`DATABASE_URL=postgresql:///rappi_staging make mvp`) y `SCREENSHOTS_ALLOW_WRITES=1`, porque paga una compra: sin la variable se niega |
+| `npm run demo:snapshot` | Graba la muestra del catálogo para la demo sin conexión desde una API sobre una copia de la base (ver «Demo sin conexión») |
+| `npm run demo:html` | Arma «Prototipo MVP.html»: la app en un solo archivo, sin la API (ver «Demo sin conexión») |
 | `./scripts/make-icons.sh` | Regenera los íconos de pantalla de inicio desde `scripts/icon.svg` |
 
 Tests: las cifras vigentes están en [README.md#resultados](../README.md#resultados) (fila «Calidad»). CI en GitHub Actions: lint, tests y build.
 
 **Accesibilidad:** el buscador con Mochi y las hojas inferiores se usan con teclado y VoiceOver (el foco entra al abrir, Escape cierra, Tab no se sale y el foco vuelve al cerrar), cada respuesta de Mochi se anuncia completa al lector de pantalla y las áreas táctiles miden al menos 40 px.
+
+## Demo sin conexión: «Prototipo MVP.html»
+
+Un solo HTML que abre con doble clic (`file://`), sin la API ni el MVP corriendo, para mostrar lo que hace hoy el proyecto: Mochi en la Home y sus ofertas con «¿Por qué?», la Home que reordena los 6 accesos chicos, la escalera multivertical (Restaurantes → Turbo → Súper → otras de Retail → RappiFavor → RappiTravel; nunca Farmacia ni Licores), «¿Repetimos?», el buscador con Mochi, el complemento del checkout, los pedidos y el seguimiento, y el interruptor «Rappi hoy» / prototipo (tecla D). Las fotos de los productos son enlaces a images.rappi.cl: sin internet se ve sin fotos.
+
+Cómo funciona: el build de la demo (`vite build --mode demo`; sus variables están en `vite.config.js`) instala una API simulada en el navegador (`src/api/offline/`) que responde los mismos formatos que la real. Lee una muestra del catálogo grabada de la API real (`src/api/offline/snapshot.json`: listas, tiendas, menús, búsquedas, preguntas a Mochi, kits, complementos y la oferta real de cada paso de la escalera) y guarda lo que hace la persona en `localStorage` («Empezar de cero», bajo el aviso de la Home, lo borra). El orden de la Home, la escalera y las guardias de las ofertas son una copia simplificada del backend (los archivos que replica están al inicio de `src/api/offline/index.js`): sin población que aprenda, sin búsqueda semántica (las búsquedas y preguntas no grabadas se buscan por palabras en la muestra) y con una recompra sin ritmo (basta pedir algo dos veces). Los builds normales no la llevan: Vite pliega `VITE_OFFLINE_DEMO` y `src/api/offline/` no entra a `dist/`.
+
+**Panel de la demo** (solo en este HTML, junto al interruptor de modo):
+
+- **Persona:** borra lo de ahora y siembra un historial en la API simulada, de un clic: «Nueva (sin historial)», «Solo Restaurantes», «Restaurantes + Turbo», «Restaurantes + Turbo + Súper», «Todo el catálogo» (Mochi ofrece RappiFavor y, abierto RappiFavor, RappiTravel), «Usa mucho Farmacia» (Farmacia sube primera en la Home y Mochi igual nunca la ofrece) y los cinco perfiles de gusto (asiático, café, italiano, mascotero y carrete sin alcohol: tres pedidos de un concepto del perfil lo activan, y el buscador con Mochi muestra su perfil y su escalera, grabados de la API real).
+- **Mover la Home:** «+1 visita a Súper», Farmacia, Retail, Licores, Express o Chocolates registra un toque a ese acceso en el prototipo (no en «Rappi hoy») y la Home se reordena en vivo; «Borrar historial» la deja en su orden fijo.
+- Una línea con la combinación de la persona y el paso que Mochi propondría («Hoy: restaurantes+turbo → siguiente: supermercado»).
+
+La muestra son datos descargados del catálogo, así que no va a git (`.gitignore`). Para regenerarla y armar el HTML:
+
+```bash
+# 1. Una API sobre una COPIA de la base, en otro puerto (la muestra crea personas y pedidos de prueba y los borra)
+cd rappi-ia
+DATABASE_URL=postgresql:///rappi_staging .venv/bin/python -m rappi_ia migrate
+DATABASE_URL=postgresql:///rappi_staging HF_HUB_OFFLINE=1 API_PREWARM=0 \
+  .venv/bin/python -m uvicorn rappi_ia.api.app:app --host 127.0.0.1 --port 8020
+# 2. En otra terminal: la muestra (~1,6 MB) y el HTML (~4 MB), con una copia en el Escritorio
+cd prototipo-app
+SNAPSHOT_ALLOW_WRITES=1 DEMO_API_URL=http://127.0.0.1:8020 npm run demo:snapshot
+DEMO_HTML_COPY="$HOME/Desktop/Prototipo MVP.html" npm run demo:html
+```
+
+`demo:snapshot` muestra la API que va a usar antes de escribir nada y se niega con el puerto 8000 (la API de `make mvp`, sobre `rappi`) o con un host que no sea de este equipo; `SNAPSHOT_ALLOW_MAIN_API=1` lo permite, solo si esa API corre sobre una copia.
+
+Con la muestra ya grabada, `npm run demo:html` basta para volver a armar el HTML tras un cambio en la app.
 
 ## Modo demo: Rappi hoy y Prototipo final
 
@@ -97,6 +129,7 @@ En el prototipo final la barra de la Home («¿Qué se te antoja hoy?») abre el
 - **Toca y te armo algo:** botones con ideas fijas («¿Qué almuerzo hoy?», «Arma un carrete», «Algo dulce»). Al tocar uno, Mochi responde con productos y tiendas; si abres una tienda desde ahí y vuelves, la búsqueda sigue donde estaba.
 - **El campo de búsqueda** consulta la API y muestra los productos en un grupo por vertical, con la de la pantalla primero y «Ver más» en cada uno; sin resultados, Mochi dice dónde sí hay lo buscado. Debajo siguen «Search ideas», que son ideas fijas y no un historial, y «Popular stores», como en la app.
 - **Descubre con Mochi:** complementos de lo que le gusta a la persona, de `/recommendations`, cada uno con su vertical para abrirla.
+- **Tu perfil:** si la persona tiene un perfil de gusto (`GET /profile/{id}/gustos`: asiático, café, italiano, mascotero o carrete, de `rappi-ia/src/rappi_ia/offers/perfiles.toml`), Mochi lo muestra con su nivel y su porqué, y debajo «Para ti en otras verticales»: la escalera del perfil (el momento `perfil` de `/agent/offer`), un peldaño por vertical con sus productos, de lo más cercano a lo más lejano, y al final una idea para RappiTravel con dos datos y su fuente. Sin perfil, el panel queda como siempre.
 
 <img src="docs/screenshots/20-asistente.jpg" width="300" alt="Buscador con Mochi tras tocar «Arma un carrete»">
 

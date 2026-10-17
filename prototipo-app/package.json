@@ -13,7 +13,9 @@
     "test": "vitest run",
     "lint": "eslint .",
     "format": "prettier --write src scripts",
-    "screenshots": "node scripts/screenshots.mjs"
+    "screenshots": "node scripts/screenshots.mjs",
+    "demo:snapshot": "node scripts/demo-snapshot.mjs",
+    "demo:html": "node scripts/demo-html.mjs"
   },
   "dependencies": {
     "@fontsource-variable/figtree": "^5.3.0",
