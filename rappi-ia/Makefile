@@ -101,8 +101,14 @@ ANALYTICS := kpis weekly opportunities trends funnel cohorts rhythm at-risk sugg
 # Los perfiles de gusto (sus `id` en offers/perfiles.toml): la escalera de cada uno, sin persona. En frío, la primera
 # tardaba 4 a 5 s (el tope de la app para una oferta es 5 s); caliente, unos 0,2 a 0,3 s.
 PROFILES := $(shell sed -n 's/^id = "\(.*\)"$$/\1/p' src/rappi_ia/offers/perfiles.toml)
+# Las listas del catálogo viven en la caché de la API (catalog/cache.py): en frío, /catalog/home tardaba 2,7 s y las
+# tiendas de una vertical, 0,5 a 0,7 s; calientes, 1 a 2 ms. Los restaurantes, con el orden y largo que pide la Home.
+CATALOG_LISTS := /catalog/home /catalog/deals "/catalog/restaurants?sort=rating&limit=6"
 
 warm:  ## Calienta la API antes de una demo (con la API ya corriendo; repetirlo tras un rato sin uso)
+	@for path in $(CATALOG_LISTS) $$($(PY) -c 'from rappi_scraper.storage.search import VERTICALS; \
+	  print(" ".join(f"/catalog/verticals/{v}/stores" for v in VERTICALS))'); do \
+	  curl -s -o /dev/null -w "  %{time_total}s  $$path\n" "$(API)$$path" || exit 1; done
 	@for q in $(DEMO_PHRASES); do \
 	  curl -s -o /dev/null -w "  %{time_total}s  $$q\n" -X POST $(API)/agent/ask -H 'Content-Type: application/json' \
 	    -d "{\"message\": \"$$q\"}" || exit 1; done

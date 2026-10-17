@@ -16,3 +16,23 @@ def test_warm_asks_for_the_ladder_of_every_profile():
     assert loop in dry_run
     calls = dry_run[dry_run.index(loop) :]
     assert "/agent/offer" in calls and '\\"moment\\": \\"perfil\\"' in calls and '\\"perfil\\": \\"$p\\"' in calls
+
+
+def test_warm_reads_the_catalog_lists_of_the_home():
+    """Las listas del catálogo viven en la caché de la API: en frío, /catalog/home tardaba 2,7 s."""
+    from rappi_scraper.storage.search import VERTICALS
+
+    warm = subprocess.run(
+        ["make", "-n", "-C", str(PROJECT_ROOT), "warm"], capture_output=True, text=True, check=True
+    ).stdout
+    for path in ("/catalog/home", "/catalog/deals", "/catalog/restaurants?sort=rating&limit=6"):
+        assert path in warm, path
+    assert "/catalog/verticals/{v}/stores" in warm and "VERTICALS" in warm
+    listed = subprocess.run(
+        ["sh", "-c", warm[warm.index("$(") + 2 : warm.index("); do")]],
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.split()
+    assert listed == [f"/catalog/verticals/{v}/stores" for v in VERTICALS]
