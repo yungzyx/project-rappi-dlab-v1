@@ -158,7 +158,8 @@ verify-migrations:
 # purge va primero, para que la retención de 90 días se cumpla aunque falle un paso posterior, y otra vez al final
 # para los eventos simulados que synth acaba de generar: también si falla un paso (p. ej. el motor, al final de
 # layers), y entonces post-refresh sale con error. En producción (API_ENV=production) no migra: solo revisa.
+# prune-embeddings va al final: si la limpieza falla, conceptos, embeddings, evaluación y capas ya quedaron al día.
 post-refresh: $(if $(filter production,$(API_ENV)),verify-migrations,migrate) purge  ## Todo lo que sigue a un `rappi refresh` (sin imágenes)
-	$(MAKE) jev-categorias concepts embed prune-embeddings eval synth layers || { $(MAKE) purge; exit 1; }
+	$(MAKE) jev-categorias concepts embed eval synth layers prune-embeddings || { $(MAKE) purge; exit 1; }
 	$(MAKE) purge
 	@echo "Listo: conceptos, embeddings, evaluación y datos simulados al día."

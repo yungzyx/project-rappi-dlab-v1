@@ -261,6 +261,10 @@ def cmd_embed_text(conn, args) -> None:
         sys.exit(1)
 
 
+# Desde cuántos vectores borrados vale la pena sugerir VACUUM FULL (~4 KB cada uno: 10 mil son ~40 MB).
+VACUUM_FULL_HINT_ROWS = 10_000
+
+
 def cmd_prune_embeddings(conn, args) -> None:
     from .embeddings.text_store import ORPHAN_MIN_AGE_DAYS, ScrapeRunning, prune_orphan_embeddings
 
@@ -269,11 +273,10 @@ def cmd_prune_embeddings(conn, args) -> None:
     except ScrapeRunning as exc:
         log.error("%s", exc)
         sys.exit(1)
-    print(
-        f"Vectores sin uso de más de {ORPHAN_MIN_AGE_DAYS} días borrados: {result['vectores_borrados']} "
-        f"(quedan {result['vectores_que_quedan']}). El espacio lo reusa autovacuum; para devolverlo al disco, "
-        "VACUUM FULL text_embeddings a mano."
-    )
+    deleted, left = result["vectores_borrados"], result["vectores_que_quedan"]
+    print(f"Vectores sin uso de más de {ORPHAN_MIN_AGE_DAYS} días borrados: {deleted} (quedan {left}).")
+    if deleted >= VACUUM_FULL_HINT_ROWS:
+        print("El espacio lo reusa autovacuum; para devolverlo al disco, VACUUM FULL text_embeddings a mano.")
 
 
 def cmd_search(conn, args) -> None:
