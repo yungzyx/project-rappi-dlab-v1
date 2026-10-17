@@ -49,7 +49,7 @@ from psycopg import Connection
 from rappi_scraper.storage.search import MIN_PRICE
 
 from .. import config
-from ..agent.grouped_search import SCREEN_VERTICALS
+from ..agent.grouped_search import SCREEN_VERTICALS, SpareConnector
 from ..agent.tools import VERTICAL_LABELS, Product, search_products, suggest_complement
 from ..agent.verticals import contending_verticals, ranked_verticals, typical_verticals
 from ..catalog.cache import cached
@@ -262,12 +262,17 @@ def _likes_reason(template: str, contributions: dict[str, float], interests: Int
 
 
 def make_offer(
-    conn: Connection, embedder: TextEmbedder | None, moment: str, context: dict, user_id: str | None = None
+    conn: Connection,
+    embedder: TextEmbedder | None,
+    moment: str,
+    context: dict,
+    user_id: str | None = None,
+    spare: SpareConnector | None = None,
 ) -> Offer | ProfileOffer | None:
     """La oferta de un momento, o None si no hay una buena. Con `user_id` de alguien del prototipo, los momentos que
     personalizan se ordenan por lo que le gusta (`vertical_por_probar`; sus intereses se calculan una sola vez),
     prefieren las marcas que compra (el complemento de `carrito`, `checkout` y `proximo_pedido`) o parten de sus
-    perfiles de gusto (`perfil`)."""
+    perfiles de gusto (`perfil`, que busca sus peldaños a la vez con las conexiones extra de la API, `spare`)."""
     if moment == "plan":
         return plan(conn, embedder, context["occasion"])
     if moment == "carrito":
@@ -286,7 +291,7 @@ def make_offer(
     if moment == "recompra":
         return repeat_offer(conn, embedder, user_id)
     if moment == "perfil":
-        return profile_offer(conn, embedder, context.get("perfil"), user_id)
+        return profile_offer(conn, embedder, context.get("perfil"), user_id, spare)
     raise OfferError(f"Momento desconocido: {moment}")
 
 
@@ -839,7 +844,11 @@ def _days_ago(today: date, ts: datetime) -> str:
 
 # ── perfil ───────────────────────────────────────────────────────────────────
 def profile_offer(
-    conn: Connection, embedder: TextEmbedder | None, profile_id: str | None, user_id: str | None
+    conn: Connection,
+    embedder: TextEmbedder | None,
+    profile_id: str | None,
+    user_id: str | None,
+    spare: SpareConnector | None = None,
 ) -> ProfileOffer | None:
     """La escalera de un perfil de gusto. Sin `profile_id`, el primero de los perfiles de la persona (el principal y
     después por puntaje); con él, ese perfil, y con su «por qué» solo si es uno de los suyos (si no, «Porque elegiste…»,
@@ -854,7 +863,7 @@ def profile_offer(
         return None
     profile = profiles[profile_id] if profile_id is not None else next(iter(mine.values())).profile
     active = mine.get(profile.id)
-    steps = ladder(conn, embedder, profile, ordered_restaurants(conn, user_id), person_city(conn, user_id))
+    steps = ladder(conn, embedder, profile, ordered_restaurants(conn, user_id), person_city(conn, user_id), spare)
     if not steps:
         return None
     shown = {"id": profile.id, "nombre": profile.name, "emoji": profile.emoji}

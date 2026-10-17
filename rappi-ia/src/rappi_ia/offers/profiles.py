@@ -25,7 +25,7 @@ from psycopg import Connection
 from rappi_scraper.storage.search import VERTICALS
 
 from .. import config
-from ..agent.grouped_search import SCREEN_VERTICALS
+from ..agent.grouped_search import SCREEN_VERTICALS, SpareConnector, search_each
 from ..agent.tools import Product, search_products
 from ..concepts.taxonomy import load_taxonomy
 from ..embeddings.base import MemoizedQueryEmbedder, TextEmbedder
@@ -393,6 +393,10 @@ def ordered_restaurants(conn: Connection, user_id: str | None) -> set[int]:
 # ── la escalera ──────────────────────────────────────────────────────────────
 
 
+# store_id → (su cadena, o el local si no tiene; si es una tienda de licores; su comuna): lo que da `_stores`.
+StoreInfo = dict[int, tuple[tuple[str, int], bool, str]]
+
+
 @dataclass
 class LadderStep:
     step: Step
@@ -413,25 +417,34 @@ def ladder(
     profile: Profile,
     exclude_stores: set[int] | None = None,
     city: str | None = None,
+    spare: SpareConnector | None = None,
 ) -> list[LadderStep]:
     """Los peldaños del perfil que tienen productos, en su orden: de 1 a `STEP_PRODUCTS` por peldaño, sin repetir un
     nombre entre peldaños. Una lista vacía si quedan menos de `MIN_STEPS`: no hay escalera. `exclude_stores`
     (`ordered_restaurants`): los locales que el peldaño de restaurantes deja fuera, con las otras sucursales de su
     cadena. `city` (`person_city`; sin ella, `config.PROFILE_CITY`): los restaurantes son de sus comunas. Una búsqueda
-    de oferta por peldaño (y una consulta por sus tiendas); cada consulta se embebe una vez, en un solo lote."""
+    de oferta por peldaño (y una consulta por sus tiendas); cada consulta se embebe una vez, en un solo lote. Con
+    `spare` (las conexiones extra de la API), los peldaños se buscan a la vez, como las verticales de `/search`
+    (`grouped_search.search_each`, con su tope y sin tomar la reserva del pool); después se eligen sus productos en
+    orden, así que la escalera es la misma que en serie."""
     queries = [_step_query(step) for step in profile.ladder]
     if embedder is not None:
         if not isinstance(embedder, MemoizedQueryEmbedder):
             embedder = MemoizedQueryEmbedder(embedder)
         embedder.embed_queries(list(dict.fromkeys(queries)))
     places = city_places(city or config.PROFILE_CITY)
+    known = [set(exclude_stores or ()) if step.vertical == "restaurantes" else set() for step in profile.ladder]
+
+    def search(connection: Connection, index: int) -> tuple[list[Product], StoreInfo]:
+        return _step_search(connection, embedder, profile.ladder[index], queries[index], known[index])
+
+    found = search_each(conn, list(range(len(profile.ladder))), search, spare)
     steps: list[LadderStep] = []
     shown: set[str] = set()
-    for step, query in zip(profile.ladder, queries, strict=True):
-        known = set(exclude_stores or ()) if step.vertical == "restaurantes" else set()
-        if products := _step_products(conn, embedder, step, query, known, shown, places):
-            steps.append(LadderStep(step, products))
-            shown |= {_name_key(p.name) for p in products}
+    for step, stores_known, (products, stores) in zip(profile.ladder, known, found, strict=True):
+        if chosen := _step_products(step, products, stores, stores_known, shown, places):
+            steps.append(LadderStep(step, chosen))
+            shown |= {_name_key(p.name) for p in chosen}
     return steps if len(steps) >= MIN_STEPS else []
 
 
@@ -461,25 +474,32 @@ def _step_query(step: Step) -> str:
     return " ".join(chosen)
 
 
+def _step_search(
+    conn: Connection, embedder: TextEmbedder | None, step: Step, query: str, known: set[int]
+) -> tuple[list[Product], StoreInfo]:
+    """Lo que un peldaño lee de la base: su búsqueda de oferta y las tiendas de lo que encontró y de `known`. No depende
+    de los otros peldaños: se puede buscar a la vez que ellos."""
+    k = RESTAURANT_CANDIDATES if step.vertical == "restaurantes" else STEP_CANDIDATES
+    outcome = search_products(conn, step.vertical, query, list(step.concepts), embedder, k=k, offer=True)
+    stores = _stores(conn, {p.store_id for p in outcome.products if p.store_id is not None} | known)
+    return outcome.products, stores
+
+
 def _step_products(
-    conn: Connection,
-    embedder: TextEmbedder | None,
     step: Step,
-    query: str,
+    found: list[Product],
+    stores: StoreInfo,
     known: set[int],
     shown: set[str],
     city: frozenset[str],
 ) -> list[Product]:
-    """Los productos de los conceptos del peldaño que calzan sus palabras y que otro peldaño no mostró, primero los con
-    foto y alternando sus conceptos (la despensa italiana no son cuatro pastas). Ninguno de una tienda de licores. Los
-    platos, de un local en una comuna de `city` (`city_places`), uno por cadena (o local, si no tiene) y no de las que
-    la persona ya conoce."""
-    k = RESTAURANT_CANDIDATES if step.vertical == "restaurantes" else STEP_CANDIDATES
-    outcome = search_products(conn, step.vertical, query, list(step.concepts), embedder, k=k, offer=True)
-    stores = _stores(conn, {p.store_id for p in outcome.products if p.store_id is not None} | known)
+    """De lo que encontró el peldaño (`_step_search`), los productos de sus conceptos que calzan sus palabras y que otro
+    peldaño no mostró, primero los con foto y alternando sus conceptos (la despensa italiana no son cuatro pastas).
+    Ninguno de una tienda de licores. Los platos, de un local en una comuna de `city` (`city_places`), uno por cadena
+    (o local, si no tiene) y no de las que la persona ya conoce."""
     places = {stores[store_id][0] for store_id in known if store_id in stores}
     by_concept: dict[str, list[Product]] = {c: [] for c in step.concepts}
-    for product in sorted(outcome.products, key=lambda p: p.img is None):  # estable: sigue el orden de la búsqueda
+    for product in sorted(found, key=lambda p: p.img is None):  # estable: sigue el orden de la búsqueda
         if product.concept not in by_concept or not step.fits(product.name) or _name_key(product.name) in shown:
             continue
         place, liquor, comuna = stores.get(product.store_id, (("local", product.store_id), False, ""))
@@ -494,7 +514,7 @@ def _step_products(
     return mixed[:STEP_PRODUCTS]
 
 
-def _stores(conn: Connection, store_ids: set[int]) -> dict[int, tuple[tuple[str, int], bool, str]]:
+def _stores(conn: Connection, store_ids: set[int]) -> StoreInfo:
     """store_id → (su cadena, o el local si no tiene; si su nombre o su marca dicen licores o botillería; su comuna,
     `stores.city`, normalizada)."""
     if not store_ids:
