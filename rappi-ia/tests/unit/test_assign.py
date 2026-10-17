@@ -286,3 +286,233 @@ def test_asian_specialty_concepts_do_not_count_in_menus(matcher, name, section, 
     }
     sections["postres"] = MappedName("postres", "llm", 0.9)
     assert assign_menu_item("60", name, section, [], sections, {}, matcher).concept_id == concept
+
+
+# Productos mal asignados en la base real del 14-10-2026 (juicio de precisión del 17-10-2026, muestras fijas).
+STORE_CATEGORIES = {
+    "otras salsas": MappedName("salsas", "llm", 0.88),
+    "sopas y cremas": MappedName("sopas", "llm", 0.95),
+    "energizantes": MappedName("energizantes", "llm", 0.95),
+    "jugos": MappedName("jugos", "llm", 0.98),
+    "té listo": MappedName("te", "llm", 0.9),
+    "tés": MappedName("te", "llm", 0.95),
+    "café": MappedName("cafe", "llm", 0.98),
+    "hielo": MappedName("hielo", "llm", 0.95),
+    "otras aguas": MappedName("gaseosas", "llm", 0.8),
+    "gaseosas": MappedName("gaseosas", "llm", 0.98),
+    "agua saborizada": MappedName("agua", "llm", 0.9),
+    "pescados": MappedName("pescados-mariscos", "llm", 0.95),
+    "mermeladas": MappedName("untables-dulces", "llm", 0.95),
+    "frutos secos y semillas": MappedName("frutos-secos", "llm", 0.9),
+    "postres refrigerados": MappedName("postres", "llm", 0.9),
+    "cereales": MappedName("cereales", "llm", 0.95),
+    "otros accesorios de belleza": MappedName("maquillaje", "llm", 0.8),
+    "gomitas y caramelos": MappedName("golosinas", "llm", 0.85),
+    "herramientas": MappedName("ferreteria", "llm", 0.9),
+    "cartones": MappedName("utiles", "llm", 0.9),
+    "paños multiusos": MappedName("limpieza", "llm", 0.9),
+    "quesos maduros": MappedName("quesos", "llm", 0.95),
+    "juguetes didácticos": MappedName("juguetes-infantiles", "llm", 0.95),
+    "pañales y forros para mascotas": MappedName("accesorios-mascota", "curado", 0.85),
+    "productos naturales": MappedName("vitaminas", "llm", 0.5),  # dudoso: bajo MIN_MAP_CONFIDENCE
+}
+
+
+@pytest.mark.parametrize(
+    ("name", "category"),
+    [
+        ("Ramen Muy Picante Buldak Original", "Otras salsas"),
+        ("Ramen Muy Picante Carbo Buldak", "Sopas y cremas"),
+        ("Ramen Muy Picante Buldak Rosé, Servir", "Sopas y cremas"),
+    ],
+)
+def test_a_buldak_ramen_is_instant_ramen_not_a_sauce(matcher, name, category):
+    """«ramen» (comida asiática, de restaurante) calzaba antes que «buldak» y no afinaba: el ramen quedaba en salsas."""
+    a = assign_catalog_item("70", name, category, STORE_CATEGORIES, matcher)
+    assert (a.concept_id, a.method, a.source) == ("snacks-asiaticos", "regla", "nombre:buldak"), a
+    assert a.refines == STORE_CATEGORIES[category.lower()].concept_id
+
+
+@pytest.mark.parametrize(
+    ("name", "concept"), [("Salsa Gochujang 500g", "despensa-asiatica"), ("Salsa Wasabi", "despensa-asiatica")]
+)
+def test_an_asian_word_refines_even_after_a_generic_one(matcher, name, concept):
+    """«Salsa» calza primero (salsas); «gochujang» o «wasabi» dicen qué salsa es."""
+    assert assign_catalog_item("71", name, "Otras salsas", STORE_CATEGORIES, matcher).concept_id == concept
+
+
+@pytest.mark.parametrize("name", ["Salsa Wasabi Sabor Whisky", "Soju Salsa Gochujang"])
+def test_a_name_that_also_says_alcohol_is_never_refined_into_an_offered_concept(matcher, name):
+    """Basta una regla de alcohol (o sensible, o de bebé) en cualquier parte del nombre: la categoría queda como está y
+    la guardia de ofertas lo bloquea por el nombre."""
+    from rappi_ia.offers.guards import alcohol_in_name
+
+    a = assign_catalog_item("80", name, "Otras salsas", STORE_CATEGORIES, matcher)
+    assert (a.concept_id, a.refines) == ("salsas", None), a
+    assert alcohol_in_name("catalog_item", name)
+
+
+def test_a_sensitive_name_is_never_refined_into_an_asian_concept(matcher):
+    categories = {"agua saborizada": MappedName("agua", "llm", 0.85)}
+    a = assign_catalog_item("72", "Lubricante Íntimo Sabor Té Matcha", "Agua saborizada", categories, matcher)
+    assert a.concept_id == "bienestar-sexual", a
+
+
+@pytest.mark.parametrize(
+    ("name", "category", "concept"),
+    [
+        ("Mistral Ice Energy Lata 355", "Energizantes", "pisco"),
+        ("Gin Santos + 2 Red Bull Yellow + Sprite Zero 1.5lts + Hielo 2kg", "Energizantes", "gin"),
+        ("Johnnie Red 700 Cc Con Bebida 1.5lt", "Jugos", "whisky"),
+        ("Campanario Mango Sour", "Jugos", "pisco"),
+        ("La Pizca Cóctel Natural Martini Manzana", "Jugos", "cocteles"),
+        ("Bauza 35º 750cc + Bebida 1.5lt", "Jugos", "licores"),
+        ("Republicano Manzana 35° 750ml", "Jugos", "licores"),
+        ("Coc Vin Export Selecto Tropical 8°", "Té listo", "licores"),
+        ("3R Pisco 35 + Coca-Cola Gaseosa + Hielo Líquidos", "Gaseosas", "pisco"),
+        ("Promo Tres Erres Transparente 1l + Coca Normal 3l + Hielo 1kg", "Hielo", "pisco"),
+        ("Makgeolli Milkis Durazno 6°", "Gaseosas", "licores"),  # el alcohol antes que lo asiático («milkis»)
+    ],
+)
+def test_a_drink_with_alcohol_leaves_a_soft_drink_category_and_is_never_offered(matcher, name, category, concept):
+    """Sin marca de alcohol de la tienda y sin palabra genérica de trago, el agente los ofrecía como bebida o jugo."""
+    from rappi_ia.offers.guards import is_offerable
+
+    a = assign_catalog_item("73", name, category, STORE_CATEGORIES, matcher)
+    assert (a.concept_id, a.method) == (concept, "regla"), a
+    assert not is_offerable(load_taxonomy().concepts[a.concept_id])
+
+
+@pytest.mark.parametrize(
+    ("name", "category", "concept"),
+    [
+        ("Fentimans Cerveza de Jengibre", "Otras aguas", "gaseosas"),  # la ginger beer es una gaseosa
+        ("Corteza Jesuita Cerveza Ginger Beer Zero", "Otras aguas", "gaseosas"),
+        ("Score Bebida Energética Mojito", "Energizantes", "energizantes"),  # Score es una marca de energéticas
+        ("Café Amaretto Almond (50g) Beanies", "Café", "cafe"),  # en café y té, un trago es un sabor
+        ("Dosha. Caramel & Whisky", "Tés", "te"),
+        ("Coca-Cola Sin Azúcar 1,5 L", "Gaseosas", "gaseosas"),
+        ("Agua Mineral 0° Sin Gas", "Agua saborizada", "agua"),
+        ("Filete De Merluza Austral", "Pescados", "pescados-mariscos"),  # fuera de las bebidas, la categoría manda
+        ("Mermelada De Cebolla Al Vino Tinto", "Mermeladas", "untables-dulces"),
+    ],
+)
+def test_a_soft_drink_or_a_food_that_names_a_drink_keeps_its_category(matcher, name, category, concept):
+    assert assign_catalog_item("74", name, category, STORE_CATEGORIES, matcher).concept_id == concept
+
+
+@pytest.mark.parametrize(
+    ("name", "category", "concept"),
+    [
+        ("Philips Mamadera Natural Response 125 mL", "Frutos secos y semillas", "articulos-bebe"),
+        ("Philips Tetina Natural Flujo Variable", "Otros accesorios de belleza", "articulos-bebe"),
+        ("Nestlé Compota Sabor a Pera", "Postres refrigerados", "alimentacion-bebe"),
+        ("Nestum Cereal Infantil de Avena y Arroz", "Cereales", "alimentacion-bebe"),
+    ],
+)
+def test_a_baby_name_wins_over_a_common_category(matcher, name, category, concept):
+    """Guardia simétrica, como la de los sensibles: una mamadera en «Frutos secos y semillas» se ofrecía como snack."""
+    from rappi_ia.offers.guards import is_offerable
+
+    a = assign_catalog_item("75", name, category, STORE_CATEGORIES, matcher)
+    assert (a.concept_id, a.method) == (concept, "regla"), a
+    assert not is_offerable(load_taxonomy().concepts[a.concept_id])
+
+
+@pytest.mark.parametrize(
+    ("name", "category", "concept"),
+    [
+        ("Bon Bon Bum Chupete Sabor a Fresa", "Gomitas y caramelos", "golosinas"),  # un chupete con sabor es un dulce
+        ("Yogueta Chupete Surtida", "Gomitas y caramelos", "golosinas"),
+        ("Cuña Niveladora Para Cerámicas 100unds", "Herramientas", "ferreteria"),  # sin ñ, «cuña» es «cuna»
+        ("Ferrari Queso Cuña Pecorino Romano", "Quesos maduros", "quesos"),
+        ("Carton Panal 10Mm 77X110Cm", "Cartones", "utiles"),  # sin ñ, «pañal» es «panal»
+        ("Virutex Toallitas Húmedas Desinfectantes Multiuso Aroma Limón", "Paños multiusos", "limpieza"),
+        ("Dog It Pañal Desechable para Perro Talla M", "Pañales y forros para Mascotas", "accesorios-mascota"),
+        ("Mordedor Para Bebe 2 Piezas", "Juguetes didácticos", "juguetes-infantiles"),  # juguetes: manda la categoría
+    ],
+)
+def test_the_baby_guard_does_not_take_look_alikes(matcher, name, category, concept):
+    assert assign_catalog_item("76", name, category, STORE_CATEGORIES, matcher).concept_id == concept
+
+
+@pytest.mark.parametrize(
+    ("name", "concept"),
+    [
+        ("Compota Casera de Manzana", "postres"),
+        ("Compota de Ciruelas", "postres"),
+        ("Compota Para Adultos Sabor Pera", "postres"),
+        ("Chupete Avent Ultra Air 6-18m Surtido", "articulos-bebe"),  # «surtido» suelto no lo saca de bebé
+    ],
+)
+def test_an_adult_compote_is_dessert_and_a_real_baby_item_keeps_the_guard(matcher, name, concept):
+    assert assign_catalog_item("81", name, "Postres refrigerados", STORE_CATEGORIES, matcher).concept_id == concept
+
+
+@pytest.mark.parametrize(
+    ("name", "strength"),
+    [
+        ("Bauza 35º 750cc + Bebida 1.5lt", "35º"),
+        ("Mistral Ice Energy 7°G 355 cc", "7°"),
+        ("Cóctel Mistral Ice Low Blend 2.5° Botella 275cc", "2.5°"),
+        ("Coc Vin Export Selecto Tropical 8°", "8°"),
+        ("Hielo Nórdico Conservar a -18°", None),
+        ("Té Helado Servir a 4°C", None),
+        ("Té Helado Servir a 4 °C", None),
+        ("Kombucha 4° Celsius", None),
+        ("Jugo de Naranja 12° Brix", None),
+        ("Libro de Cócteles 2° Edición", None),
+        ("Cerveza Sin Alcohol Heineken 0.0", None),
+        ("Espumante Sin Alcohol 5°", None),
+        ("Cerveza Royal 0,0 4.5°", None),
+        ("Spaghetti N°5", None),
+        ("Agua Mineral 0°", None),
+    ],
+)
+def test_alcohol_strength_in_a_name(name, strength):
+    from rappi_ia.concepts.assign import alcohol_strength
+
+    assert alcohol_strength(name) == strength
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "Oregano Oil 60 Softgels Marca Laboratorio Fnl",
+        "Cola De Pavo 500mg 120 Caps Swanson",
+        "Vinagre De Manzana 60 Capsulas Marca Laboratorio Fnl",
+        "Propoleo Spray Miel Jengibre",
+        "Minigummies Calm 30 Gomitas",
+        "FNL Cetona De Frambuesa 300Mg 60 Capsulas",
+        "Carbon Activado 500mg 60 Cápsulas - Fnl",  # «activado»: no es carbón para la parrilla
+        "Bach Flores Rescue Gotas",
+    ],
+)
+def test_a_supplement_named_for_a_food_stays_a_supplement(matcher, name):
+    """En «Productos naturales» (vitaminas, mapeo dudoso) la regla del nombre ganaba: orégano, pavo, miel o frambuesa
+    pasaban a condimentos, pollo, untables o frutas, conceptos que el agente ofrece."""
+    a = assign_catalog_item("77", name, "Productos naturales", STORE_CATEGORIES, matcher)
+    assert (a.concept_id, a.method) == ("vitaminas", "llm"), a
+
+
+def test_a_doubtful_supplement_category_still_gives_way_to_a_name_that_is_not_food(matcher):
+    """Las velas y los difusores de «Productos naturales» siguen siendo decoración."""
+    a = assign_catalog_item(
+        "78", "Mood Vela Aromaterapia Bosque Nativo", "Productos naturales", STORE_CATEGORIES, matcher
+    )
+    assert (a.concept_id, a.method) == ("decoracion", "regla")
+
+
+@pytest.mark.parametrize(
+    ("name", "category", "concept"),
+    [
+        ("Wool - Mostaza 100 Gr", "Hilos", "manualidades"),
+        ("Warm Mix - Verde Pistacho 100 Gr", "Hilos", "manualidades"),
+        ("Skinny - Sandía 0425 100 Gr", "Hilos", "manualidades"),
+        ("Alfombra de Baño Boro Rectangular Poliéster U Casaideas", "Tapetes y Alfombras", "textil-hogar"),
+    ],
+)
+def test_the_real_map_keeps_yarn_and_rugs_out_of_food_and_baby(matcher, csv_maps, name, category, concept):
+    """«Hilos» tenía un mapeo dudoso (útiles, 0,55) y el color del ovillo («Mostaza», «Verde Pistacho») lo mandaba a
+    salsas o frutos secos; «Tapetes y Alfombras» (artículos de bebé) son sobre todo alfombras de baño."""
+    assert assign_catalog_item("79", name, category, csv_maps["categoria"], matcher).concept_id == concept

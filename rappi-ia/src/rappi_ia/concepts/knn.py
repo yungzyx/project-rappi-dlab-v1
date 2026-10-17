@@ -18,7 +18,7 @@ from psycopg import Connection
 
 from ..embeddings.base import TextEmbedder, to_pgvector
 from .assign import Assignment, dish_name_concepts, refinable_by_name
-from .taxonomy import keeps_sensitive, sensitive_concepts
+from .taxonomy import keeps_guarded, keeps_sensitive, sensitive_concepts
 
 log = logging.getLogger(__name__)
 
@@ -158,6 +158,12 @@ def _decide(
     if current and current.concept_id == best:
         return replace(current, confidence=round(max(current.confidence, share), 3))
     if current and keeps_sensitive(current.concept_id, best):  # los vecinos no sacan a nadie de un sensible
+        return current
+    # Ni sacan un producto del alcohol o de bebé: en la base real del 14-10-2026 un «Espresso Martini» listo pasaba a
+    # café y una fórmula Similac a lácteos, conceptos que el agente ofrece. En los platos sí: ahí el alcohol sale de
+    # palabras con otro sentido («Pizza Margarita», «Hamburguesa Cebolla al Vino Tinto») y las ofertas lo bloquean por
+    # el nombre y la sección (offers/guards.py).
+    if current and item.entity_type == "catalog_item" and keeps_guarded(current.concept_id, best):
         return current
     # El nombre de un plato que nombra un plato o su proteína («Pollo asado + Bebida», «Pescado frito») manda: los
     # combos con bebida se parecen entre sí y los vecinos los mandaban a sushi o a platos listos.

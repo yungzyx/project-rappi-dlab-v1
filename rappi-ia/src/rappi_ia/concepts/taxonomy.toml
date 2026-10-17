@@ -131,6 +131,8 @@ emoji = "🍺"
 age_restricted = true
 keywords = ["cerveza", "chela", "lager", "ipa", "stout", "pilsner", "pale ale", "heineken", "kunstmann", "cristal", "escudo", "royal guard", "corona extra", "stella artois", "austral", "becker", "budweiser", "michelob", "sidra"]
 query_keywords = ["serbesa", "serveza", "chelita", "chelitas", "beer", "beers"]
+# La ginger beer es una gaseosa de jengibre («Fentimans Cerveza de Jengibre», «Corteza Jesuita Cerveza Ginger Beer»).
+avoid = ["ginger beer", "cerveza de jengibre"]
 
 [[concept]]
 id = "vino"
@@ -154,7 +156,7 @@ parent = "alcohol"
 name = "Whisky"
 emoji = "🥃"
 age_restricted = true
-keywords = ["whisky", "whiskey", "bourbon", "johnnie walker", "jack daniel", "chivas", "jameson", "ballantine"]
+keywords = ["whisky", "whiskey", "bourbon", "johnnie walker", "johnnie", "jack daniel", "chivas", "jameson", "ballantine"]
 
 [[concept]]
 id = "pisco"
@@ -162,7 +164,7 @@ parent = "alcohol"
 name = "Pisco"
 emoji = "🍸"
 age_restricted = true
-keywords = ["pisco", "mistral", "alto del carmen", "capel", "control c", "piscola", "pisco sour"]
+keywords = ["pisco", "mistral", "alto del carmen", "capel", "control c", "campanario", "tres erres", "piscola", "pisco sour"]
 
 [[concept]]
 id = "ron"
@@ -202,7 +204,7 @@ parent = "alcohol"
 name = "Licores y aperitivos"
 emoji = "🍹"
 age_restricted = true
-keywords = ["licor", "crema de licor", "aperitivo", "aperol", "campari", "fernet", "jägermeister", "jagermeister", "baileys", "amaretto", "cognac", "coñac", "brandy", "aguardiente", "vermouth", "martini", "anís", "araucano", "manzanilla licor"]
+keywords = ["licor", "crema de licor", "aperitivo", "aperol", "campari", "fernet", "jägermeister", "jagermeister", "baileys", "amaretto", "cognac", "coñac", "brandy", "aguardiente", "vermouth", "martini", "anís", "araucano", "manzanilla licor", "soju", "makgeolli"]
 
 [[concept]]
 id = "cocteles"
@@ -211,6 +213,8 @@ name = "Cócteles listos"
 emoji = "🍹"
 age_restricted = true
 keywords = ["cóctel", "coctel", "cocktail", "hard seltzer", "seltzer", "mojito", "margarita", "spritz", "ready to drink"]
+# Score es una marca de energéticas: «Score Mojito» no es un mojito.
+avoid = ["score"]
 
 # Bebidas sin alcohol
 [[concept]]
@@ -651,6 +655,9 @@ name = "Pañales y toallitas"
 emoji = "🧷"
 keywords = ["pañal", "pañales", "toallitas húmedas", "huggies", "pampers", "babysec", "pañal para adulto"]
 query_keywords = ["toallas humedas", "toallitas humedas", "toallitas"]
+# El nombre de bebé manda sobre la categoría (assign.py): toallitas de limpieza o íntimas no son de guagua, y sin tildes
+# ni ñ, «pañal» es «panal» («Carton Panal 10Mm», «Blusa Panal Estampada», «Molde Panal Abejas»).
+avoid = ["húmedas desinfectantes", "húmedas íntimas", "cartón panal", "blusa panal", "largo panal", "bola panal", "panal abejas", "panal de abejas"]
 
 [[concept]]
 id = "alimentacion-bebe"
@@ -659,6 +666,8 @@ name = "Alimentación infantil"
 emoji = "🍼"
 keywords = ["fórmula infantil", "leche infantil", "papilla", "compota", "colado", "nan", "similac", "nestum", "alimento infantil"]
 query_keywords = ["leche de formula", "leche de fórmula", "formula para bebe"]
+# El nombre de bebé manda sobre la categoría (assign.py): una compota casera o de ciruelas para adultos es un postre.
+avoid = ["adulto", "adultos", "casera", "ciruela", "ciruelas"]
 
 [[concept]]
 id = "articulos-bebe"
@@ -666,6 +675,9 @@ parent = "bebe"
 name = "Artículos de bebé"
 emoji = "🧸"
 keywords = ["mamadera", "chupete", "tetina", "mordedor", "babero", "coche de bebé", "silla de auto", "cuna", "extractor de leche", "ropa de bebé", "body de bebé", "pañalera", "bañera de bebé"]
+# El nombre de bebé manda sobre la categoría (assign.py): un chupete con sabor es un dulce («Bon Bon Bum Chupete Sabor a
+# Fresa») y sin tildes ni ñ, «cuña» es «cuna» («Cuña Niveladora Para Cerámicas», «Queso Cuña Pecorino»).
+avoid = ["chupete sabor", "chupetes sabor", "pin pop", "bon bon bum", "bom bom bum", "yogueta", "cuña niveladora", "cuña piñón", "queso cuña"]
 
 # Salud y cuidado personal
 [[concept]]
@@ -832,6 +844,8 @@ parent = "hogar"
 name = "Carbón y leña"
 emoji = "🔥"
 keywords = ["carbón", "carbon", "leña", "briquetas", "encendedor de carbón", "parrilla portátil"]
+# El carbón activado es un suplemento o un filtro, no carbón para la parrilla.
+avoid = ["activado"]
 
 # Mascotas
 [[concept]]
@@ -1030,6 +1044,8 @@ parent = "regalos"
 name = "Flores y regalos"
 emoji = "💐"
 keywords = ["flores", "ramo", "bouquet", "rosas", "arreglo floral", "caja de regalo", "gift card", "tarjeta de regalo", "desayuno sorpresa", "peluche de regalo"]
+# Las flores de Bach son un remedio («Bach Flores Rescue Gotas»).
+avoid = ["bach"]
 
 # ─── Ocasiones: una necesidad que abarca varios conceptos ─────────────────────
 [[occasion]]

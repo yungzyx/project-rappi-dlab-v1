@@ -326,6 +326,10 @@ def test_an_offer_never_brings_a_dish_whose_name_says_alcohol(db):
     stock(db, embedder, [])
     # Aquí el nombre la lleva a `cocteles`; en la base real 24 pizzas así quedaron con concepto pizza.
     db.execute("UPDATE item_concepts SET concept_id = 'pizza' WHERE entity_type = 'menu_item' AND entity_id = '943'")
+    # «soju» ya es palabra de licores (taxonomy.toml); aquí vuelve a sushi, como estaba en la base real, para probar la
+    # guardia por el nombre.
+    assert db.execute("SELECT concept_id FROM item_concepts WHERE entity_id = '942'").fetchone()[0] == "licores"
+    db.execute("UPDATE item_concepts SET concept_id = 'sushi' WHERE entity_type = 'menu_item' AND entity_id = '942'")
     concepts = dict(db.execute("SELECT entity_id, concept_id FROM item_concepts WHERE entity_type = 'menu_item'"))
     assert (concepts["942"], concepts["944"]) == ("sushi", "pizza")  # conceptos que se ofrecen
 

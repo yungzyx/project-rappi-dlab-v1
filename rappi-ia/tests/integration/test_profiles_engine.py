@@ -11,6 +11,7 @@ from test_query_budget import CountingConnection
 
 from rappi_ia import config
 from rappi_ia.agent.tools import search_products
+from rappi_ia.concepts.store import refresh_assortment
 from rappi_ia.concepts.taxonomy import load_taxonomy
 from rappi_ia.demo import seed
 from rappi_ia.embeddings.base import HashEmbedder
@@ -92,6 +93,15 @@ def catalog(db, monkeypatch):
     db.execute("UPDATE stores SET brand_id = %s WHERE store_id IN (%s, %s)", (CHAIN, SUSHI_STORE, CHAIN_BRANCH))
     embedder = HashEmbedder()
     embed_search_documents(db, embedder)
+    # La capa de conceptos ya pasa el soju de «Gaseosas» a licores (assign.py); aquí vuelve a gaseosas, como estaba en
+    # la base real, para probar la segunda red: la guardia de ofertas por el nombre.
+    soju = "SELECT concept_id FROM item_concepts WHERE entity_type = 'catalog_item' AND entity_id = %s"
+    assert db.execute(soju, (str(SOJU),)).fetchone()[0] == "licores"
+    db.execute(
+        "UPDATE item_concepts SET concept_id = 'gaseosas' WHERE entity_type = 'catalog_item' AND entity_id = %s",
+        (str(SOJU),),
+    )
+    refresh_assortment(db)
     db.commit()
     extra = [str(p) for p in (SOJU, CUPS, COASTERS, PIZZA_CUTTER, POT_CLEANER, TOY_PIZZA, SHOP_BALLOONS)]
     concepts = dict(

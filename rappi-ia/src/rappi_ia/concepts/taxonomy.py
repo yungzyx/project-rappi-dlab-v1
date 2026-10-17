@@ -137,6 +137,22 @@ def keeps_sensitive(current: str | None, candidate: str) -> bool:
 
 
 @cache
+def guarded_concepts() -> frozenset[str]:
+    """Lo sensible, lo +18 (el alcohol) y lo de bebé: lo que el agente nunca ofrece y una pista débil (los vecinos del
+    kNN) no saca de su concepto. Salud no está: sus categorías mezclan de todo (cinturones en «Productos naturales»,
+    anzuelos en «Equipos médicos») y ahí los vecinos corrigen bien."""
+    return frozenset(
+        c.id for c in load_taxonomy().concepts.values() if c.sensitive or c.age_restricted or c.parent == "bebe"
+    )
+
+
+def keeps_guarded(current: str | None, candidate: str) -> bool:
+    """True si reemplazar `current` por `candidate` sacaría un producto de lo sensible, lo +18 o lo de bebé."""
+    guarded = guarded_concepts()
+    return current in guarded and candidate not in guarded
+
+
+@cache
 def load_complements(path: Path = DATA_DIR / "complements.toml") -> tuple[tuple[str, str, float], ...]:
     edges = tomllib.loads(path.read_text(encoding="utf-8"))["edges"]
     taxonomy = load_taxonomy()
