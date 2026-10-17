@@ -47,6 +47,7 @@ from .. import config
 from ..agent.grouped_search import SCREEN_VERTICALS
 from ..agent.tools import VERTICAL_LABELS, Product, search_products, suggest_complement
 from ..agent.verticals import contending_verticals, ranked_verticals, typical_verticals
+from ..catalog.cache import cached
 from ..catalog.deals import deals
 from ..catalog.stores import BIGINT_MAX, product_card, product_detail
 from ..concepts.taxonomy import Concept, Service, load_taxonomy
@@ -956,7 +957,12 @@ def _typical_first(found: list[dict], vertical: str, typical: dict[str, str]) ->
 def _popular_dishes(conn: Connection) -> list[dict]:
     """Los platos populares (`is_popular`) de los conceptos que más se piden hechos en restaurantes, uno por concepto y
     solo de los que el agente puede proponer, sin un nombre que diga alcohol ni de una sección de tragos
-    (`alcohol_in_name`, `alcohol_section`). Restaurantes no tiene ofertas ni otro dato de pedidos."""
+    (`alcohol_in_name`, `alcohol_section`). Restaurantes no tiene ofertas ni otro dato de pedidos. Es dato del catálogo
+    y no de la persona: sale de su caché (catalog/cache.py), porque buscarlos recorre todos los platos."""
+    return cached("popular_dishes", conn, lambda: _find_popular_dishes(conn))
+
+
+def _find_popular_dishes(conn: Connection) -> list[dict]:
     concepts = load_taxonomy().concepts
     ranked = [
         concept_id

@@ -3,6 +3,7 @@ servicios nunca proponen alcohol, farmacia, bebé, salud, conceptos sensibles, s
 
 import pytest
 from rappi_scraper.storage.search import build_search_documents
+from test_query_budget import CountingConnection
 
 from conftest import add_dish, add_price, add_product, add_store
 from owner_client import OwnerClient
@@ -12,6 +13,7 @@ from rappi_ia.agent.tools import search_products, suggest_complement
 from rappi_ia.agent.verticals import ranked_verticals
 from rappi_ia.api import app as api
 from rappi_ia.api.services import Services
+from rappi_ia.catalog import cache
 from rappi_ia.concepts.pipeline import build_concepts
 from rappi_ia.concepts.taxonomy import load_taxonomy
 from rappi_ia.demo.seed import seed_demo
@@ -346,6 +348,7 @@ def test_vertical_to_try_never_offers_a_popular_dish_whose_name_says_alcohol(dem
     db, _ = demo
     assert "Tiramisú individual (prueba)" in {d["name"] for d in _popular_dishes(db)}
     db.execute("UPDATE menu_items SET name = 'Mojito de la casa (prueba)' WHERE item_id = 98004")  # sigue en postres
+    cache.clear()  # sin corrida nueva: como si la caché del catálogo hubiera vencido
 
     assert "Mojito de la casa (prueba)" not in {d["name"] for d in _popular_dishes(db)}
 
@@ -392,5 +395,22 @@ def test_vertical_to_try_never_offers_a_popular_dish_from_a_drinks_section(demo)
         """UPDATE menu_sections SET name = 'Tragos de autor'
            WHERE (store_id, section_id) = (SELECT store_id, section_id FROM menu_items WHERE item_id = 98004)"""
     )
+    cache.clear()
 
     assert "Tiramisú individual (prueba)" not in {d["name"] for d in _popular_dishes(db)}
+
+
+def test_popular_dishes_come_from_the_catalog_cache(demo):
+    """Buscar los platos populares recorre todos los platos: se guardan hasta una corrida nueva (o su TTL)."""
+    from rappi_ia.offers.engine import _popular_dishes
+
+    db, _ = demo
+    first = _popular_dishes(db)
+    assert first
+    counting = CountingConnection(db)
+
+    assert _popular_dishes(counting) == first
+    assert not any("menu_items" in s for s in counting.statements)
+    cache.clear()  # vence (corrida nueva o TTL): se buscan de nuevo
+    assert _popular_dishes(counting) == first
+    assert any("is_popular" in s for s in counting.statements)
