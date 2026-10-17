@@ -69,18 +69,49 @@ def _configure(conn: Connection) -> None:
 
 def make_pool(conninfo: str) -> ConnectionPool:
     """El pool de la API, sin abrir. `connect_timeout`: Postgres caído no deja a un request esperando minutos. `check`:
-    una conexión que Postgres cortó (reinicio, idle timeout) se cambia antes de entregarla."""
-    return ConnectionPool(
+    una conexión que Postgres cortó (reinicio, idle timeout) se cambia antes de entregarla (`checked`)."""
+    pool = ConnectionPool(
         conninfo,
         min_size=config.API_POOL_MIN,
         max_size=config.API_POOL_MAX,
         timeout=config.API_POOL_TIMEOUT_S,
         kwargs={"application_name": APPLICATION_NAME, "connect_timeout": 3},
         configure=_configure,
-        check=ConnectionPool.check_connection,
+        check=lambda conn: checked(pool, conn),
         open=False,
         name=APPLICATION_NAME,
     )
+    return pool
+
+
+def checked(pool: ConnectionPool, conn: Connection, check=ConnectionPool.check_connection) -> None:
+    """Revisa la conexión antes de entregarla. Si Postgres la cortó, lo más probable es que haya cortado todas (un
+    reinicio de Postgres o de Docker): además de descartarla, revisa en otro hilo todas las libres (`pool.check()`, que
+    cambia las muertas por nuevas). Sin eso, el pool las encontraba una a una, esperando 1 s, 2 s… entre cada una: los
+    requests de los primeros 6–9 s salían con 503, y las muertas seguían ahí hasta que alguien las pidiera."""
+    try:
+        check(conn)
+    except Exception:
+        _check_pool_soon(pool)
+        raise
+
+
+_pool_check = threading.Lock()  # una revisión a la vez: un corte no lanza un hilo por request
+
+
+def _check_pool_soon(pool: ConnectionPool) -> None:
+    if not _pool_check.acquire(blocking=False):
+        return
+
+    def run() -> None:
+        try:
+            pool.check()
+        except Exception as exc:  # el pool cerrado (la API se apaga): nada que revisar
+            log.warning("No se pudo revisar el pool de conexiones: %s", exc)
+        finally:
+            _pool_check.release()
+
+    threading.Thread(target=run, name="rappi-ia-pool-check", daemon=True).start()
 
 
 def open_pool() -> None:
