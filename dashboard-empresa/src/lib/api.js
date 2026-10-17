@@ -17,7 +17,9 @@ export function apiUrl(env, location) {
 const devApiUrl = import.meta.env.DEV ? (location) => `http://${location?.hostname || 'localhost'}:8000` : undefined
 
 export const API_URL = apiUrl(import.meta.env, typeof window !== 'undefined' ? window.location : undefined)
-// /analytics/weekly tardó entre 7 y 28 s en las pruebas (según la carga de la máquina); el resto, menos de 1 s.
+// El mismo tope que la API le da al panel (API_TIMEOUT_ANALYTICS_MS, 30 s, y su fila de 2 métricas a la vez). Hoy
+// cada métrica responde en menos de 0,4 s (/analytics/weekly, unos 133 ms; el panel completo, unos 0,3 s: medido en
+// una copia de la base el 17-10-2026): el margen es para una máquina cargada o una base fría.
 const TIMEOUT_MS = 30_000
 
 export const SOURCES = ['synthetic', 'prototype']
