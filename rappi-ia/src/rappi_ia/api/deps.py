@@ -5,6 +5,7 @@ que importar `app`."""
 import logging
 import threading
 import time
+import weakref
 from collections.abc import AsyncIterator, Callable, Iterator
 from contextlib import AbstractContextManager, ExitStack, contextmanager
 
@@ -88,7 +89,11 @@ def checked(pool: ConnectionPool, conn: Connection, check=ConnectionPool.check_c
     """Revisa la conexión antes de entregarla. Si Postgres la cortó, lo más probable es que haya cortado todas (un
     reinicio de Postgres o de Docker): además de descartarla, revisa en otro hilo todas las libres (`pool.check()`, que
     cambia las muertas por nuevas). Sin eso, el pool las encontraba una a una, esperando 1 s, 2 s… entre cada una: los
-    requests de los primeros 6–9 s salían con 503, y las muertas seguían ahí hasta que alguien las pidiera."""
+    requests de los primeros 6–9 s salían con 503, y las muertas seguían ahí hasta que alguien las pidiera.
+
+    Tras el primer fallo, psycopg_pool pide otra conexión al tiro (sin espera). Si la toma antes de que el hilo vacíe
+    el pool, puede tocarle otra muerta, y ese segundo fallo sí espera ~1 s antes del tercer intento, que ya recibe una
+    nueva: en el peor caso, el primer request tras el corte tarda ~1 s (medido: 10–13 ms)."""
     try:
         check(conn)
     except Exception:
@@ -96,11 +101,21 @@ def checked(pool: ConnectionPool, conn: Connection, check=ConnectionPool.check_c
         raise
 
 
-_pool_check = threading.Lock()  # una revisión a la vez: un corte no lanza un hilo por request
+# Una revisión a la vez por pool: un corte no lanza un hilo por request. Débil: un pool cerrado no queda aquí.
+_pool_checks: weakref.WeakKeyDictionary[ConnectionPool, threading.Lock] = weakref.WeakKeyDictionary()
+_pool_checks_lock = threading.Lock()
+
+
+def _pool_check_lock(pool: ConnectionPool) -> threading.Lock:
+    with _pool_checks_lock:
+        return _pool_checks.setdefault(pool, threading.Lock())
 
 
 def _check_pool_soon(pool: ConnectionPool) -> None:
-    if not _pool_check.acquire(blocking=False):
+    """Lanza `pool.check()` en otro hilo, si no hay otra revisión de ese pool en curso. Nunca falla: quien la pide
+    está por relanzar el error de su conexión."""
+    lock = _pool_check_lock(pool)
+    if not lock.acquire(blocking=False):
         return
 
     def run() -> None:
@@ -109,9 +124,13 @@ def _check_pool_soon(pool: ConnectionPool) -> None:
         except Exception as exc:  # el pool cerrado (la API se apaga): nada que revisar
             log.warning("No se pudo revisar el pool de conexiones: %s", exc)
         finally:
-            _pool_check.release()
+            lock.release()
 
-    threading.Thread(target=run, name="rappi-ia-pool-check", daemon=True).start()
+    try:
+        threading.Thread(target=run, name="rappi-ia-pool-check", daemon=True).start()
+    except Exception as exc:  # sin hilos (RuntimeError «can't start new thread»): el pool sigue a su ritmo
+        lock.release()
+        log.warning("No se pudo lanzar la revisión del pool de conexiones: %s", exc)
 
 
 def open_pool() -> None:

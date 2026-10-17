@@ -392,7 +392,7 @@ def _has_phrase(text: str, phrase: str) -> bool:
     return any(words[i : i + len(target)] == target for i in range(len(words) - len(target) + 1))
 
 
-@lru_cache(maxsize=100_000)
+@lru_cache(maxsize=20_000)
 def _words(text: str) -> tuple[str, ...]:
     """Las palabras normalizadas y sin plural de una consulta o de una frase de regla (`phrase_key`), con memoria: una
     corrida compara cada consulta con cada frase de cada regla (millones de veces los mismos textos) y normalizarlos

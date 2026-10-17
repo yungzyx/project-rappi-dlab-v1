@@ -63,7 +63,7 @@ def test_a_broken_connection_checks_the_whole_pool_once():
     with pytest.raises(OperationalError):  # otra muerta mientras se revisa: no lanza otra revisión
         deps.checked(pool, object(), check=broken)
     pool.release.set()
-    assert eventually(lambda: not deps._pool_check.locked())  # terminó: la próxima vez se revisa de nuevo
+    assert eventually(lambda: not deps._pool_check_lock(pool).locked())  # terminó: la próxima vez se revisa de nuevo
 
     assert pool.checks == 1
 
@@ -74,8 +74,40 @@ def test_a_failed_pool_check_is_logged_and_the_next_cut_checks_again(caplog):
 
     with pytest.raises(OperationalError):
         deps.checked(pool, object(), check=broken)
-    assert eventually(lambda: "No se pudo revisar el pool" in caplog.text and not deps._pool_check.locked())
+    assert eventually(lambda: "No se pudo revisar el pool" in caplog.text and not deps._pool_check_lock(pool).locked())
     with pytest.raises(OperationalError):
         deps.checked(pool, object(), check=broken)
 
     assert eventually(lambda: pool.checks == 2)
+
+
+def test_each_pool_has_its_own_check():
+    """Dos pools (los tests abren varios): la revisión de uno no tapa la del otro."""
+    first, second = FakePool(), FakePool()
+
+    for pool in (first, second):
+        with pytest.raises(OperationalError):
+            deps.checked(pool, object(), check=broken)
+    assert first.started.wait(timeout=5) and second.started.wait(timeout=5)
+    first.release.set()
+    second.release.set()
+    assert eventually(lambda: not deps._pool_check_lock(first).locked() and not deps._pool_check_lock(second).locked())
+
+
+def test_a_thread_that_cannot_start_releases_the_lock_and_keeps_the_original_error(monkeypatch, caplog):
+    pool = FakePool()
+
+    class NoThreads:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def start(self):
+            raise RuntimeError("can't start new thread")
+
+    monkeypatch.setattr(deps.threading, "Thread", NoThreads)
+    with pytest.raises(OperationalError, match="server closed"):
+        deps.checked(pool, object(), check=broken)
+
+    assert not deps._pool_check_lock(pool).locked()  # el próximo corte vuelve a intentarlo
+    assert "No se pudo lanzar la revisión" in caplog.text
+    assert pool.checks == 0

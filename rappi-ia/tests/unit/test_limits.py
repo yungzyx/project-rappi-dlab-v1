@@ -229,8 +229,9 @@ def test_caps_take_their_size_from_config():
     assert api.SEARCH_CAP.limit == config.API_MAX_CONCURRENT_SEARCH == 8
     assert api.ORDERS_CAP.limit == config.API_MAX_CONCURRENT_ORDERS == 4
     assert api.ANALYTICS_CAP.limit == config.API_MAX_CONCURRENT_ANALYTICS == 2
-    # La fila de Mochi queda bajo el tope de la app para una oferta (5 s); la búsqueda y los pedidos rechazan al tiro.
-    assert api.ASK_CAP.wait_s == agent_api.OFFER_CAP.wait_s == config.API_CAP_WAIT_S == 2
+    # La fila de Mochi más la del pool (3 s) cabe en el tope de la app para una oferta (5 s); la búsqueda y los
+    # pedidos rechazan al tiro.
+    assert api.ASK_CAP.wait_s == agent_api.OFFER_CAP.wait_s == config.API_CAP_WAIT_S == 1.5
     assert api.SEARCH_CAP.wait_s == api.ORDERS_CAP.wait_s == 0
 
 
