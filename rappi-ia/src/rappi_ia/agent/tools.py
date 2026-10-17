@@ -194,7 +194,7 @@ def search_remedies(
 
 SIMILAR_MARGIN = 0.1  # dos complementos cuyo peso difiere en menos que esto son parecidos: decide la combinación
 CROSS_LIFT_SPAN = 3  # peso de una compra cruzada: min(1, (lift − 1) / 3); con lift 4 o más pesa 1, lo máximo
-COMPLEMENT_REPEAT_DAYS = 7  # un complemento que Mochi ya le ofreció a la persona en estos días cede su lugar
+COMPLEMENT_REPEAT_DAYS = 7  # un complemento ofrecido en estos días y antes del último pedido cede su lugar
 # De dónde viene un complemento ofrecido (`payload.origen` de su `suggestion_shown`): los momentos `carrito`,
 # `checkout` y `proximo_pedido` y lo que sugiere al preguntarle (`ask`). `mochi-<momento>` es el nombre histórico de
 # `agent-<momento>`.
@@ -240,8 +240,10 @@ def suggest_complement(
     comprada con más pedidos va primero. Si ninguno es de sus marcas, el resultado es el de siempre.
 
     Con `user_id`, un concepto que Mochi ya le ofreció como complemento en los últimos `COMPLEMENT_REPEAT_DAYS` días
-    (`_recently_offered`) pasa al final: sale el siguiente mejor. Si todos los candidatos con productos se ofrecieron
-    hace poco, sale el mejor de siempre. La razón y la `basis` no cambian: dicen por qué sale este complemento."""
+    y antes de su último pedido (`_recently_offered`) pasa al final: sale el siguiente mejor. Lo ofrecido desde ese
+    pedido (la compra en curso) no cuenta: el complemento no cambia mientras se arma el mismo pedido. Si todos los
+    candidatos con productos se ofrecieron hace poco, sale el mejor de siempre. La razón y la `basis` no cambian: dicen
+    por qué sale este complemento."""
     taxonomy = load_taxonomy()
     sources = [c for c in source_concepts if c in taxonomy.concepts and not taxonomy.concepts[c].sensitive]
     if not sources:
@@ -371,14 +373,19 @@ def suggest_complement(
 
 
 def _recently_offered(conn: Connection, user_id: str) -> set[str]:
-    """Los conceptos que Mochi le ofreció a la persona como complemento en los últimos `COMPLEMENT_REPEAT_DAYS` días:
-    sus `suggestion_shown` de `COMPLEMENT_ORIGINS`. «Rappi hoy» (`payload.mode = 'actual'`) no cuenta."""
+    """Los conceptos que Mochi le ofreció a la persona como complemento en los últimos `COMPLEMENT_REPEAT_DAYS` días
+    y antes de su último pedido en «Propuesta»: sus `suggestion_shown` de `COMPLEMENT_ORIGINS`. Lo mostrado después de
+    ese pedido es la sesión de compra en curso: no cuenta, así el complemento no cambia mientras se arma el mismo
+    pedido. «Rappi hoy» (`payload.mode = 'actual'`) no cuenta; sin pedidos, no se salta nada."""
     rows = conn.execute(
-        """SELECT DISTINCT concept_id FROM app_events
-           WHERE user_id = %s AND type = 'suggestion_shown' AND concept_id IS NOT NULL
-             AND payload ->> 'origen' = ANY(%s) AND payload ->> 'mode' IS DISTINCT FROM 'actual'
-             AND ts > now() - make_interval(days => %s) AND ts <= now()""",
-        (user_id, COMPLEMENT_ORIGINS, COMPLEMENT_REPEAT_DAYS),
+        """SELECT DISTINCT e.concept_id
+           FROM app_events e
+           JOIN (SELECT max(ts) AS ts FROM app_orders WHERE user_id = %(user)s AND mode = 'propuesta') o
+             ON e.ts < o.ts
+           WHERE e.user_id = %(user)s AND e.type = 'suggestion_shown' AND e.concept_id IS NOT NULL
+             AND e.payload ->> 'origen' = ANY(%(origins)s) AND e.payload ->> 'mode' IS DISTINCT FROM 'actual'
+             AND e.ts > now() - make_interval(days => %(days)s)""",
+        {"user": user_id, "origins": COMPLEMENT_ORIGINS, "days": COMPLEMENT_REPEAT_DAYS},
     )
     return {concept for (concept,) in rows}
 
