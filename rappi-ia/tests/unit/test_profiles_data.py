@@ -168,11 +168,15 @@ def test_every_trip_is_a_question_with_two_sourced_facts():
 
 
 def test_the_three_approved_graph_edges_exist_below_the_first_cross_sell():
-    """Las aristas se aprobaron, no su peso: el primer complemento del sushi y de lo asiático sigue siendo el postre."""
+    """Las aristas se aprobaron, no su peso. El primer complemento de lo asiático sigue siendo el postre; el del sushi,
+    desde el 17-10-2026, son las bebidas asiáticas (antes empataban postres, vino y gaseosas y ganaban las gaseosas)."""
     weights = {(source, target): weight for source, target, weight in load_complements()}
     new = [("sushi", "despensa-asiatica"), ("sushi", "bebidas-asiaticas"), ("asiatica", "snacks-asiaticos")]
     assert all(edge in weights for edge in new)
-    assert max(weights[edge] for edge in new[:2]) < weights[("sushi", "postres")]
+    assert weights[new[0]] < weights[("sushi", "postres")]
+    others = [w for (source, target), w in weights.items() if source == "sushi" and target != "bebidas-asiaticas"]
+    assert weights[new[1]] > max(others)
+    assert weights[("sushi", "gaseosas")] < weights[("sushi", "postres")]
     assert weights[new[2]] < weights[("asiatica", "postres")]
 
 

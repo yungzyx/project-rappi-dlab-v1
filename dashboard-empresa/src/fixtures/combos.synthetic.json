@@ -11,14 +11,7 @@
       {
         "combo": "restaurantes+conveniencia",
         "esperada": 0.76,
-        "meses_usuario": 2,
-        "retencion_m1": null,
-        "retencion_n": 0
-      },
-      {
-        "combo": "restaurantes+chocolateria",
-        "esperada": 0.76,
-        "meses_usuario": 1,
+        "meses_usuario": 3,
         "retencion_m1": null,
         "retencion_n": 0
       },
@@ -58,7 +51,7 @@
       },
       {
         "combo": "rest+retail",
-        "gasto_por_usuario": 25052.5,
+        "gasto_por_usuario": 24927.5,
         "meses_usuario": 4,
         "pct_pedidos": 26.829268,
         "pct_usuarios": 17.391304,
@@ -181,7 +174,7 @@
     }
   },
   "guardado": {
-    "fecha": "2026-10-16",
+    "fecha": "2026-10-17",
     "origen": "make contract · simulación chica con semilla fija (40 personas, 8 semanas)"
   },
   "source": "synthetic"

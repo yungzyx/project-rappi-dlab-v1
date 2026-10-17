@@ -194,6 +194,13 @@ def search_remedies(
 
 SIMILAR_MARGIN = 0.1  # dos complementos cuyo peso difiere en menos que esto son parecidos: decide la combinación
 CROSS_LIFT_SPAN = 3  # peso de una compra cruzada: min(1, (lift − 1) / 3); con lift 4 o más pesa 1, lo máximo
+COMPLEMENT_REPEAT_DAYS = 7  # un complemento ofrecido en estos días y antes del último pedido cede su lugar
+# De dónde viene un complemento ofrecido (`payload.origen` de su `suggestion_shown`): los momentos `carrito`,
+# `checkout` y `proximo_pedido` y lo que sugiere al preguntarle (`ask`). `mochi-<momento>` es el nombre histórico de
+# `agent-<momento>`.
+COMPLEMENT_ORIGINS = [
+    f"{prefix}-{moment}" for prefix in ("agent", "mochi") for moment in ("carrito", "checkout", "proximo_pedido", "ask")
+]
 
 
 @dataclass
@@ -230,7 +237,13 @@ def suggest_complement(
     (o aprendida) en las verticales de siempre, y la sugerencia sale sin esa `basis`.
 
     Con `prefer_brands` (brand_key → pedidos de la persona), se miran más candidatos del concepto y el de la marca
-    comprada con más pedidos va primero. Si ninguno es de sus marcas, el resultado es el de siempre."""
+    comprada con más pedidos va primero. Si ninguno es de sus marcas, el resultado es el de siempre.
+
+    Con `user_id`, un concepto que Mochi ya le ofreció como complemento en los últimos `COMPLEMENT_REPEAT_DAYS` días
+    y antes de su último pedido (`_recently_offered`) pasa al final: sale el siguiente mejor. Lo ofrecido desde ese
+    pedido (la compra en curso) no cuenta: el complemento no cambia mientras se arma el mismo pedido. Si todos los
+    candidatos con productos se ofrecieron hace poco, sale el mejor de siempre. La razón y la `basis` no cambian: dicen
+    por qué sale este complemento."""
     taxonomy = load_taxonomy()
     sources = [c for c in source_concepts if c in taxonomy.concepts and not taxonomy.concepts[c].sensitive]
     if not sources:
@@ -309,44 +322,72 @@ def suggest_complement(
             basis = [*basis, {"kind": "compra_cruzada", "id": rule, "source": f"poblacion:{population}"}]
         return Suggestion(candidate.concept, candidate.source, vertical, reason, products, brand, basis)
 
-    best = candidates[0]
-    searched: dict[str, tuple[str, list[Product], str | None] | None] = {}  # lo ya buscado de un candidato
-    # Los pesos son `real`: redondeados, 0,4 − 0,3 no queda bajo el margen por el error de coma flotante.
-    similar = [c for c in candidates[1:] if round(best.weight - c.weight, 6) < SIMILAR_MARGIN]
-    step = target_step(conn, user_id, population) if user_id is not None and similar else None
-    if step is not None:
-        # Un servicio no tiene productos.
-        group = {step.vertical} if step.vertical not in SERVICES and offerable_vertical(step.vertical) else set()
-        for candidate in (best, *similar):
-            if completing := [v for v in verticals_of(candidate) if v in group and v != current_vertical]:
-                break
-        # Si el primero ya completa la combinación, o ninguno la completa, el orden de siempre.
-        if completing and candidate is not best:
-            # Su marca gana al desempate: el primero con un producto de una marca que compra va igual primero.
-            if prefer_brands:
-                usual = searched[best.concept] = search(best, verticals_of(best))
-                if usual is not None and usual[2] is not None:
-                    return suggestion(best, usual, [])
-            # Primero en la vertical del paso; si ahí no hay productos, vuelve a su lugar de siempre.
-            if result := search(candidate, completing):
-                return suggestion(candidate, result, [step_signal(conn, step, population)])
+    def choose(candidates: list[_Candidate]) -> Suggestion | None:
+        """El primer candidato con productos, con el desempate de la combinación."""
+        best = candidates[0]
+        searched: dict[str, tuple[str, list[Product], str | None] | None] = {}  # lo ya buscado de un candidato
+        # Los pesos son `real`: redondeados, 0,4 − 0,3 no queda bajo el margen por el error de coma flotante.
+        similar = [c for c in candidates[1:] if round(best.weight - c.weight, 6) < SIMILAR_MARGIN]
+        step = target_step(conn, user_id, population) if user_id is not None and similar else None
+        if step is not None:
+            # Un servicio no tiene productos.
+            group = {step.vertical} if step.vertical not in SERVICES and offerable_vertical(step.vertical) else set()
+            for candidate in (best, *similar):
+                if completing := [v for v in verticals_of(candidate) if v in group and v != current_vertical]:
+                    break
+            # Si el primero ya completa la combinación, o ninguno la completa, el orden de siempre.
+            if completing and candidate is not best:
+                # Su marca gana al desempate: el primero con un producto de una marca que compra va igual primero.
+                if prefer_brands:
+                    usual = searched[best.concept] = search(best, verticals_of(best))
+                    if usual is not None and usual[2] is not None:
+                        return suggestion(best, usual, [])
+                # Primero en la vertical del paso; si ahí no hay productos, vuelve a su lugar de siempre.
+                if result := search(candidate, completing):
+                    return suggestion(candidate, result, [step_signal(conn, step, population)])
 
-    for candidate in candidates:
-        if candidate.concept in searched:
-            result = searched[candidate.concept]
-        else:
-            result = search(candidate, verticals_of(candidate))
-        if result:
-            return suggestion(candidate, result, [])
-        # La regla no encontró nada en su vertical: el mismo concepto por su arista, en sus verticales de siempre.
-        edge = edges_found.get(candidate.concept)
-        if (
-            candidate.pick
-            and edge is not None
-            and (result := search(edge, _verticals_for(conn, edge.concept, current_vertical)))
-        ):
-            return suggestion(edge, result, [])
+        for candidate in candidates:
+            if candidate.concept in searched:
+                result = searched[candidate.concept]
+            else:
+                result = search(candidate, verticals_of(candidate))
+            if result:
+                return suggestion(candidate, result, [])
+            # La regla no encontró nada en su vertical: el mismo concepto por su arista, en sus verticales de siempre.
+            edge = edges_found.get(candidate.concept)
+            if (
+                candidate.pick
+                and edge is not None
+                and (result := search(edge, _verticals_for(conn, edge.concept, current_vertical)))
+            ):
+                return suggestion(edge, result, [])
+        return None
+
+    recent = _recently_offered(conn, user_id) if user_id is not None else set()
+    fresh = [c for c in candidates if c.concept not in recent]
+    # Primero sin lo ofrecido hace poco; si no queda nada o nada de eso tiene productos, el mejor de siempre.
+    for pool in [fresh, candidates] if 0 < len(fresh) < len(candidates) else [candidates]:
+        if (chosen := choose(pool)) is not None:
+            return chosen
     return None
+
+
+def _recently_offered(conn: Connection, user_id: str) -> set[str]:
+    """Los conceptos que Mochi le ofreció a la persona como complemento en los últimos `COMPLEMENT_REPEAT_DAYS` días
+    y antes de su último pedido en «Propuesta»: sus `suggestion_shown` de `COMPLEMENT_ORIGINS`. Lo mostrado después de
+    ese pedido es la sesión de compra en curso: no cuenta, así el complemento no cambia mientras se arma el mismo
+    pedido. «Rappi hoy» (`payload.mode = 'actual'`) no cuenta; sin pedidos, no se salta nada."""
+    rows = conn.execute(
+        """SELECT DISTINCT e.concept_id
+           FROM app_events e
+           JOIN (SELECT max(ts) AS ts FROM app_orders WHERE user_id = %(user)s AND mode = 'propuesta') o
+             ON e.ts < o.ts
+           WHERE e.user_id = %(user)s AND e.type = 'suggestion_shown' AND e.concept_id IS NOT NULL
+             AND e.payload ->> 'origen' = ANY(%(origins)s) AND e.payload ->> 'mode' IS DISTINCT FROM 'actual'
+             AND e.ts > now() - make_interval(days => %(days)s)""",
+        {"user": user_id, "origins": COMPLEMENT_ORIGINS, "days": COMPLEMENT_REPEAT_DAYS},
+    )
+    return {concept for (concept,) in rows}
 
 
 def _ordered_lately(conn: Connection, user_id: str, concepts: list[str]) -> bool:
