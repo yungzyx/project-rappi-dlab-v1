@@ -202,14 +202,36 @@ LEFT JOIN item_concepts ic ON ic.entity_type = 'menu_item' AND ic.entity_id = mi
 WHERE mi.item_id = %(id)s"""
 
 
-# El precio vigente de un producto del catálogo en UNA tienda: su oferta vigente por SKU, no agotada (la regla de
-# _CATALOG_DETAIL, sin pedir pasillo); si la tienda lo tiene en dos SKU, el más barato.
-_STORE_PRICE = """
-SELECT min(l.price)
-FROM store_products sp
+# El precio vigente de productos del catálogo, cada uno en SU tienda: su oferta vigente por SKU, no agotada (la regla
+# de _CATALOG_DETAIL, sin pedir pasillo); si la tienda lo tiene en dos SKU, el más barato. Una sola consulta para todas
+# las líneas de un pedido: `n` es la posición de cada par (producto, tienda), y uno sin oferta vigente no sale.
+_STORE_PRICES = """
+SELECT x.n, min(l.price)
+FROM unnest(%(ids)s::bigint[], %(stores)s::bigint[]) WITH ORDINALITY x(id, store_id, n)
+JOIN store_products sp ON sp.store_id = x.store_id AND sp.master_product_id = x.id
 JOIN v_latest_offers l ON l.store_id = sp.store_id AND l.sku = sp.sku
-WHERE sp.store_id = %(store_id)s AND sp.master_product_id = %(id)s AND l.current AND l.in_stock IS NOT FALSE
-  AND l.price >= %(min_price)s"""
+WHERE l.current AND l.in_stock IS NOT FALSE AND l.price >= %(min_price)s
+GROUP BY x.n"""
+
+
+def store_prices(conn: Connection, wanted: list[tuple[str, int]]) -> list[float | None]:
+    """El precio vigente de cada producto del catálogo (`entity_id`) en su tienda, en el orden de `wanted`, con una
+    sola consulta. `None` si no hay oferta vigente o el id no es válido."""
+    valid = [
+        (i, int(entity_id), store_id)
+        for i, (entity_id, store_id) in enumerate(wanted)
+        if entity_id.isascii() and entity_id.isdigit() and int(entity_id) <= BIGINT_MAX and 0 <= store_id <= BIGINT_MAX
+    ]
+    prices: list[float | None] = [None] * len(wanted)
+    if not valid:
+        return prices
+    rows = conn.execute(
+        _STORE_PRICES,
+        {"ids": [item_id for _, item_id, _ in valid], "stores": [s for _, _, s in valid], "min_price": MIN_PRICE},
+    )
+    for n, price in rows:
+        prices[valid[n - 1][0]] = float(price)
+    return prices
 
 
 def offer_price(conn: Connection, entity_type: str, entity_id: str, store_id: int | None) -> float | None:
@@ -217,11 +239,7 @@ def offer_price(conn: Connection, entity_type: str, entity_id: str, store_id: in
     tiendas el precio cambia) o, sin tienda, el de la ficha del producto (la oferta más barata). Un plato es de un solo
     restaurante: con otra tienda no tiene precio. `None` si no hay oferta vigente."""
     if entity_type == "catalog_item" and store_id is not None:
-        item_id = int(entity_id) if entity_id.isascii() and entity_id.isdigit() else None
-        if item_id is None or item_id > BIGINT_MAX or not 0 <= store_id <= BIGINT_MAX:
-            return None
-        price = conn.execute(_STORE_PRICE, {"id": item_id, "store_id": store_id, "min_price": MIN_PRICE}).fetchone()[0]
-        return float(price) if price is not None else None
+        return store_prices(conn, [(entity_id, store_id)])[0]
     detail = product_detail(conn, entity_type, entity_id)
     if detail is None or (entity_type == "menu_item" and store_id is not None and detail["store_id"] != store_id):
         return None

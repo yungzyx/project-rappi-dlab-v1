@@ -12,7 +12,7 @@ from datetime import datetime
 from psycopg import Connection
 from psycopg.types.json import Jsonb
 
-from ..catalog.stores import offer_price
+from ..catalog.stores import offer_price, store_prices
 from ..concepts.matcher import KeywordMatcher
 from ..concepts.taxonomy import load_taxonomy
 
@@ -258,10 +258,19 @@ def record_order(
 def catalog_prices(conn: Connection, lines: list[dict]) -> tuple[list[dict], int]:
     """Las líneas de un pedido del cliente con el precio vigente del catálogo en su tienda (`offer_price`): el que
     manda el cliente no se usa, porque el total alimenta segmentos y métricas. Devuelve las líneas con precio y cuántas
-    se omitieron (agotadas, de una tienda que no las vende o que no están en el catálogo)."""
+    se omitieron (agotadas, de una tienda que no las vende o que no están en el catálogo). Los productos con tienda (lo
+    normal) salen en una sola consulta; un plato o un producto sin tienda, uno por uno."""
+    in_store = [
+        i for i, line in enumerate(lines) if line["entity_type"] == "catalog_item" and line.get("store_id") is not None
+    ]
+    in_store_prices = store_prices(conn, [(lines[i]["entity_id"], lines[i]["store_id"]) for i in in_store])
+    known = dict(zip(in_store, in_store_prices, strict=True))
     priced = []
-    for line in lines:
-        price = offer_price(conn, line["entity_type"], line["entity_id"], line.get("store_id"))
+    for i, line in enumerate(lines):
+        if i in known:
+            price = known[i]
+        else:
+            price = offer_price(conn, line["entity_type"], line["entity_id"], line.get("store_id"))
         if price is not None:
             priced.append({**line, "unit_price": price})
     return priced, len(lines) - len(priced)

@@ -299,7 +299,7 @@ Notas del modelo:
 - **Platos y productos:** no hay una tabla de platos estándar. Un plato y un producto del súper se conectan al compartir concepto en `item_concepts`.
 - **Eventos:** `APP_EVENT` lleva `session_id` (una sesión termina tras 30 minutos sin actividad) y `cart_id` en los eventos de carro (`cart_add`, `cart_remove`, `checkout_start`, `order_placed`).
 - **Líneas de pedido:** `APP_ORDER_LINE` puede apuntar a un producto o a un plato.
-- **Precio vigente:** `latest_prices` y `latest_menu_prices` guardan el último precio de cada oferta y de cada plato (migración 032), y `v_latest_offers` es la única definición de oferta vigente.
+- **Precio vigente:** `latest_prices` y `latest_menu_prices` guardan el último precio de cada oferta y de cada plato (migración 032), `store_last_snapshot` el último snapshot de cada tienda, del que `v_store_format_runs` saca la corrida de cada formato (migración 038), y `v_latest_offers` es la única definición de oferta vigente.
 - **Jev:** `eval_judgments` guarda los juicios de Jev (migración 030), y el mapa de categorías suma el método `jev`.
 - **Motor multivertical:** siete tablas (migración 036): `user_vertical_affinity` y `replenishment` por persona (se van con «Olvidar»), y `vertical_transitions`, `combo_stats`, `combo_steps`, `cross_sell_rules` y `trends` por población, con `data_source` (`synthetic` o `prototype`). No están en el diagrama: dependen de `app_users`, `app_orders` y `concepts`. Cada una tiene su vista en `capa` ([capa-de-datos.md](capa-de-datos.md#motor-multivertical)).
 - **Capa de datos:** las vistas estables para otras herramientas están en el esquema `capa` ([capa-de-datos.md](capa-de-datos.md)).

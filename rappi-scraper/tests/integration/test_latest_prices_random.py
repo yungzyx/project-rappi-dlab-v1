@@ -1,5 +1,6 @@
-"""Los triggers de la migración 032 contra escrituras al azar (semilla fija): después de cada paso, latest_prices y
-latest_menu_prices son exactamente el último snapshot de cada SKU y de cada plato según el historial."""
+"""Los triggers de las migraciones 032 y 038 contra escrituras al azar (semilla fija): después de cada paso,
+latest_prices, latest_menu_prices y store_last_snapshot son exactamente el último snapshot de cada SKU, de cada plato y
+de cada tienda según el historial."""
 
 import random
 from datetime import UTC, datetime, timedelta
@@ -19,11 +20,16 @@ LATEST_MENU = (
 HISTORY_MENU = """
 SELECT DISTINCT ON (item_id) item_id, price, real_price, discount_pct, is_available, run_id, scraped_at
 FROM menu_price_snapshots ORDER BY item_id, scraped_at DESC, run_id DESC"""
+STORE_LAST = "SELECT store_id, run_id, scraped_at FROM store_last_snapshot"
+HISTORY_STORE = """
+SELECT DISTINCT ON (store_id) store_id, run_id, scraped_at
+FROM price_snapshots ORDER BY store_id, scraped_at DESC, run_id DESC"""
 
 
 def _assert_matches_history(db, step) -> None:
     assert set(db.execute(LATEST).fetchall()) == set(db.execute(HISTORY).fetchall()), step
     assert set(db.execute(LATEST_MENU).fetchall()) == set(db.execute(HISTORY_MENU).fetchall()), step
+    assert set(db.execute(STORE_LAST).fetchall()) == set(db.execute(HISTORY_STORE).fetchall()), step
 
 
 def test_latest_prices_always_match_the_history(db):
@@ -91,9 +97,11 @@ def test_latest_prices_always_match_the_history(db):
         _assert_matches_history(db, step)
 
     assert db.execute("SELECT count(*) FROM latest_prices").fetchone()[0] > 0  # no es una comprobación vacía
+    assert db.execute("SELECT count(*) FROM store_last_snapshot").fetchone()[0] > 0
     db.execute("DELETE FROM store_products WHERE store_id = 2 AND sku = 'a'")  # en cascada desde el producto
     db.execute("DELETE FROM menu_items WHERE item_id = 2")
     _assert_matches_history(db, "productos borrados")
     db.execute("TRUNCATE scrape_runs CASCADE")
     assert db.execute("SELECT count(*) FROM latest_prices").fetchone()[0] == 0
     assert db.execute("SELECT count(*) FROM latest_menu_prices").fetchone()[0] == 0
+    assert db.execute("SELECT count(*) FROM store_last_snapshot").fetchone()[0] == 0

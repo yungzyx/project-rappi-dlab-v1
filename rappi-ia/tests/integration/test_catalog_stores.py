@@ -19,6 +19,7 @@ from rappi_ia.api import app as api
 from rappi_ia.catalog import cache as catalog_cache
 from rappi_ia.catalog.stores import offer_price, product_detail, store_page, vertical_stores
 from rappi_ia.demo.seed import DEMO_VERTICALS, seed_demo
+from rappi_ia.events.store import catalog_prices
 
 CENTRO, NORTE, OLD_BRANCH, DISCOVERED, PIZZERIA = 9101, 9102, 9103, 9104, 9801
 PHARMACY_IN_SUPER = 9111  # Rappi la lista entre los súper (subvertical Farmacia): se abre desde su vertical
@@ -310,6 +311,57 @@ def test_product_detail_is_none_without_a_current_offer_or_for_nonsense_ids(seed
         ("store", "9101"),
     ]:
         assert product_detail(seeded, entity_type, entity_id) is None, (entity_type, entity_id)
+
+
+# El precio de una línea de pedido antes de la consulta única de catalog_prices: una consulta por línea.
+OLD_STORE_PRICE = """
+SELECT min(l.price)
+FROM store_products sp
+JOIN v_latest_offers l ON l.store_id = sp.store_id AND l.sku = sp.sku
+WHERE sp.store_id = %(store_id)s AND sp.master_product_id = %(id)s AND l.current AND l.in_stock IS NOT FALSE
+  AND l.price >= 10"""
+
+
+def test_order_prices_in_one_query_match_the_line_by_line_prices(seeded):
+    """catalog_prices pide los precios de todas las líneas con tienda en una consulta: da los mismos precios que la
+    consulta por línea de antes, en cada par (producto, tienda) del catálogo de prueba y en los casos sin precio
+    (corrida anterior, agotado, otra tienda, ids inválidos), y deja fuera las mismas líneas."""
+    pairs = seeded.execute(
+        "SELECT DISTINCT master_product_id::text, store_id FROM store_products WHERE master_product_id IS NOT NULL"
+    ).fetchall()
+    lines = [{"entity_type": "catalog_item", "entity_id": item, "store_id": store, "qty": 1} for item, store in pairs]
+    lines += [
+        {"entity_type": "catalog_item", "entity_id": "91001", "store_id": CENTRO, "qty": 2},  # repetida
+        {"entity_type": "catalog_item", "entity_id": "91001", "store_id": DISCOVERED},  # tienda que no lo vende
+        {"entity_type": "catalog_item", "entity_id": "1", "store_id": CENTRO},  # no está en el catálogo
+        {"entity_type": "catalog_item", "entity_id": "no-es-un-numero", "store_id": CENTRO},
+        {"entity_type": "catalog_item", "entity_id": "99999999999999999999", "store_id": CENTRO},
+        {"entity_type": "catalog_item", "entity_id": "91001"},  # sin tienda: el de la ficha
+        {"entity_type": "menu_item", "entity_id": "98001", "store_id": PIZZERIA},
+        {"entity_type": "menu_item", "entity_id": "98001", "store_id": CENTRO},  # un plato es de un solo local
+    ]
+
+    def old_price(line):
+        if line["entity_type"] == "catalog_item" and line.get("store_id") is not None:
+            if not line["entity_id"].isdigit() or int(line["entity_id"]) > 2**63 - 1:
+                return None
+            price = seeded.execute(OLD_STORE_PRICE, {"id": int(line["entity_id"]), "store_id": line["store_id"]})
+            price = price.fetchone()[0]
+            return float(price) if price is not None else None
+        return offer_price(seeded, line["entity_type"], line["entity_id"], line.get("store_id"))
+
+    expected = [{**line, "unit_price": p} for line in lines if (p := old_price(line)) is not None]
+    priced, skipped = catalog_prices(seeded, lines)
+
+    assert priced == expected
+    assert skipped == len(lines) - len(expected)
+    # No es una comparación vacía: hay precios, líneas sin oferta vigente y los dos casos que van uno por uno.
+    unpriced = {(line["entity_id"], line.get("store_id")) for line in lines} - {
+        (line["entity_id"], line.get("store_id")) for line in priced
+    }
+    assert {("91201", CENTRO), ("91202", CENTRO), ("91001", DISCOVERED), ("98001", CENTRO)} <= unpriced
+    assert {("91001", None), ("98001", PIZZERIA)} <= {(line["entity_id"], line.get("store_id")) for line in priced}
+    assert len(priced) > 20
 
 
 def test_product_endpoint(client):
