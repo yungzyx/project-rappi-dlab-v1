@@ -13,9 +13,10 @@ Solo conceptos que el agente propone por su cuenta y verticales que ofrece (nunc
 la app. Por persona, primero los conceptos (el hábito más fuerte: más días de compra, después el menos atrasado
 respecto de su ritmo) y después las verticales (más días con pedido, después la más reciente).
 
-Para no insistir (`blocked`): la misma invitación (el concepto, o la vertical) no vuelve a mostrarse en
-`COOLDOWN_DAYS` días y se deja de ofrecer cuando la persona la descartó `MAX_DISMISSALS` veces después de su último
-pedido de eso. Cuenta lo que registra la app con el origen `agent-volver`; lo hecho en «Rappi hoy» no cuenta.
+Para no insistir (`available`): la pausa es por persona. Si en los últimos `COOLDOWN_DAYS` días se le mostró una
+invitación, solo puede volver esa misma (si sigue calificando) y ninguna otra; una invitación descartada
+`MAX_DISMISSALS` veces después de su último pedido de eso no se ofrece más. Cuenta lo que registra la app con el origen
+`agent-volver` (`payload.kind` dice si es de un concepto o de una vertical); lo hecho en «Rappi hoy» no cuenta.
 
 `reach` estima a cuántas personas de una fuente les tocaría, para el panel: con datos simulados no es evidencia.
 """
@@ -39,6 +40,8 @@ VERTICAL_MIN_DAYS = 3  # días distintos con pedido en la vertical: como la reco
 COOLDOWN_DAYS = 7  # la misma invitación no se repite antes
 MAX_DISMISSALS = 2  # descartada estas veces después de su último pedido de eso, no se ofrece más
 ORIGIN = "agent-volver"  # `payload.origen` de lo que la app registra de esta oferta
+# La señal de la `basis` de cada tipo de invitación, que la app también manda en `payload.kind` de sus eventos.
+BASIS_KINDS = {"concepto": "volver", "vertical": "vuelta"}
 
 
 @dataclass(frozen=True)
@@ -134,35 +137,62 @@ def lapses(
     conn: Connection, today: date, *, user_id: str | None = None, source: str | None = None
 ) -> dict[str, list[Lapse]]:
     """persona → sus invitaciones posibles, en orden (`_rank`), de una persona (`user_id`) o de todas las de una fuente
-    (`source`). Sin mirar lo ya mostrado ni descartado (`blocked`)."""
+    (`source`). Sin mirar lo ya mostrado ni descartado (`available`)."""
     found: dict[str, list[Lapse]] = defaultdict(list)
     for lapse in [*_concept_lapses(conn, today, user_id, source), *_vertical_lapses(conn, today, user_id, source)]:
         found[lapse.user_id].append(lapse)
     return {user: sorted(items, key=_rank) for user, items in found.items()}
 
 
-def blocked(conn: Connection, user_id: str, candidates: list[Lapse], now: datetime | None = None) -> set[tuple]:
-    """Las invitaciones (`(kind, key)`) que no se muestran ahora: mostradas en los últimos `COOLDOWN_DAYS` días o
-    descartadas `MAX_DISMISSALS` veces después de su último pedido de eso. Una de concepto se reconoce por el concepto
-    del evento; una de vertical, por su vertical. «Rappi hoy» (`payload.mode = 'actual'`) no cuenta."""
+def _same(lapse: Lapse, kind: str | None, concept: str | None, vertical: str | None) -> bool:
+    """Si un evento de la app es de esta invitación: la de un concepto lleva su concepto (y `payload.kind` «volver» o
+    nada); la de una vertical, `payload.kind` «vuelta» y su vertical. Así una invitación de concepto en el súper no
+    cuenta como la del súper."""
+    if lapse.kind == "concepto":
+        return kind != BASIS_KINDS["vertical"] and concept == lapse.key
+    return kind == BASIS_KINDS["vertical"] and vertical == lapse.key
+
+
+def available(conn: Connection, user_id: str, candidates: list[Lapse], now: datetime | None = None) -> list[Lapse]:
+    """Las invitaciones de `candidates` (en su orden) que se pueden mostrar ahora:
+    - sin las de un concepto que la persona volvió a pedir después de su fila de `replenishment` (el motor la recalcula
+      en segundo plano después del pedido);
+    - sin las descartadas `MAX_DISMISSALS` veces después de su último pedido de eso;
+    - la pausa es por persona: si en los últimos `COOLDOWN_DAYS` días se le mostró una, solo esa, si sigue calificando
+      (y si no, ninguna).
+    Cuentan los eventos con origen `agent-volver`; los de «Rappi hoy» (`payload.mode = 'actual'`) no."""
     if not candidates:
-        return set()
+        return []
     now = now or datetime.now(UTC)
+    concepts = [lapse.key for lapse in candidates if lapse.kind == "concepto"]
+    ordered = dict(
+        conn.execute(
+            """SELECT l.concept_id, max(o.ts) FROM app_order_lines l JOIN app_orders o USING (order_id)
+               WHERE o.user_id = %s AND o.mode = 'propuesta' AND l.concept_id = ANY(%s) GROUP BY 1""",
+            (user_id, concepts),
+        ).fetchall()
+    )
     rows = conn.execute(
-        """SELECT type, concept_id, vertical, ts FROM app_events
+        """SELECT type, payload ->> 'kind', concept_id, vertical, ts FROM app_events
            WHERE user_id = %s AND type IN ('suggestion_shown', 'suggestion_dismissed')
-             AND payload ->> 'origen' = %s AND payload ->> 'mode' IS DISTINCT FROM 'actual'""",
+             AND payload ->> 'origen' = %s AND payload ->> 'mode' IS DISTINCT FROM 'actual'
+           ORDER BY ts DESC, event_id DESC""",
         (user_id, ORIGIN),
     ).fetchall()
-    out = set()
-    for lapse in candidates:
-        column = 1 if lapse.kind == "concepto" else 2  # el concepto o la vertical del evento
-        mine = [(row[0], row[3]) for row in rows if row[column] == lapse.key]
-        recent = any(kind == "suggestion_shown" and ts > now - timedelta(days=COOLDOWN_DAYS) for kind, ts in mine)
-        dismissed = sum(kind == "suggestion_dismissed" and ts > lapse.last_ts for kind, ts in mine)
-        if recent or dismissed >= MAX_DISMISSALS:
-            out.add((lapse.kind, lapse.key))
-    return out
+    open_ = [
+        lapse
+        for lapse in candidates
+        if not (lapse.kind == "concepto" and ordered.get(lapse.key, lapse.last_ts) > lapse.last_ts)
+        and sum(
+            kind == "suggestion_dismissed" and ts > lapse.last_ts and _same(lapse, payload_kind, concept, vertical)
+            for kind, payload_kind, concept, vertical, ts in rows
+        )
+        < MAX_DISMISSALS
+    ]
+    recent = next((r for r in rows if r[0] == "suggestion_shown" and r[4] > now - timedelta(days=COOLDOWN_DAYS)), None)
+    if recent is None:
+        return open_
+    return [lapse for lapse in open_ if _same(lapse, *recent[1:4])][:1]
 
 
 def reference_day(conn: Connection, source: str) -> date | None:
@@ -176,14 +206,13 @@ def reference_day(conn: Connection, source: str) -> date | None:
 
 def reach(conn: Connection, source: str) -> dict:
     """A cuántas personas de la fuente les tocaría «¿Volvemos a…?» el día de referencia (`reference_day`), por el tipo
-    de su primera invitación, y a cuántas la recompra, para comparar. Sin productos ni lo ya mostrado: es quién
-    califica, no a quién se le mostró."""
+    de su primera invitación, y a cuántas la recompra, para comparar. Quien tiene recompra no cuenta como que califica
+    (la Home le muestra la recompra). Sin productos ni lo ya mostrado: es quién califica, no a quién se le mostró."""
     today = reference_day(conn, source)
     people = conn.execute(
         "SELECT count(DISTINCT user_id) FROM app_orders WHERE source = %s AND mode = 'propuesta'", (source,)
     ).fetchone()[0]
     found = lapses(conn, today, source=source) if today else {}
-    first = [items[0].kind for items in found.values()]
     repeat = set()
     if today:
         for user, concept_id, vertical, interval, due_on in conn.execute(
@@ -193,10 +222,12 @@ def reach(conn: Connection, source: str) -> dict:
         ):
             if repeat_due(due_on, interval, today) and _offerable_concept(concept_id, vertical):
                 repeat.add(user)
+    # A quien le toca la recompra, la Home le muestra «¿Repetimos?» y no esta invitación: no califica.
+    first = [items[0].kind for user, items in found.items() if user not in repeat]
     return {
         "dia": today.isoformat() if today and source != "prototype" else None,
         "personas": people,
-        "califican": len(found),
+        "califican": len(first),
         "por_concepto": first.count("concepto"),
         "por_vertical": first.count("vertical"),
         "recompra": len(repeat),

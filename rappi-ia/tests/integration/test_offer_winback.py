@@ -1,6 +1,6 @@
 """«¿Volvemos a…?» (momento `volver`): lo que la persona pedía con ritmo y dejó de pedir (un concepto atrasado más de un
-intervalo, o una vertical sin pedidos en más de un mes mientras pide en otra), sin repetirse en 7 días y hasta que la
-descarte dos veces. Sobre el catálogo de prueba (`seed_demo`)."""
+intervalo, o una vertical sin pedidos en más de un mes mientras pide en otra). La pausa es por persona: 7 días después
+de mostrar una, solo esa; y hasta que la descarte dos veces. Sobre el catálogo de prueba (`seed_demo`)."""
 
 from datetime import UTC, datetime, time, timedelta
 
@@ -79,8 +79,9 @@ def still_ordering(db, user, days_ago=5):
     refresh_user_conn(db, user)
 
 
-def event(db, kind, concept=None, vertical=None, days_ago=0, mode=None, user=USER):
-    payload = {"origen": "agent-volver", **({"mode": mode} if mode else {})}
+def event(db, kind, concept=None, vertical=None, days_ago=0, mode=None, user=USER, of="volver"):
+    """Un evento de la app con origen `agent-volver`; `of` es su `payload.kind` («volver» o «vuelta»)."""
+    payload = {"origen": "agent-volver", "kind": of, **({"mode": mode} if mode else {})}
     events.ensure_user(db, user, "prototype")
     db.execute(
         """INSERT INTO app_events (user_id, session_id, ts, type, vertical, concept_id, payload, source)
@@ -97,10 +98,10 @@ def test_a_concept_left_behind_comes_with_its_last_product_and_says_why(client, 
     assert reply.status_code == 200, reply.text
     body = reply.json()
     assert body["moment"] == "volver"
-    assert body["text"] == "¿Volvemos a café? Tu último pedido fue hace 20 días."
+    assert body["text"] == "¿Volvemos a café? Lo pediste por última vez hace 20 días."
     assert body["reason"] == {
         "concept": "cafe",
-        "text": "Porque pedías café cada 7 días y tu último pedido fue hace 20 días.",
+        "text": "Porque pedías café cada 7 días y la última vez fue hace 20 días.",
         "basis": [{"kind": "volver", "id": "cafe", "source": "pedidos"}],
     }
     assert body["vertical"] == "supermercado" and body["prototype_vertical"] == "grocery"
@@ -170,22 +171,59 @@ def test_a_concept_goes_before_a_vertical(client, db):
     assert offer(client).json()["reason"]["basis"][0] == {"kind": "volver", "id": "cafe", "source": "pedidos"}
 
 
-def test_shown_in_the_last_week_waits_and_then_comes_back(client, db):
+def test_shown_in_the_last_week_the_same_invitation_stays_and_no_other(client, db):
     rhythm(db, USER, "supermercado", "cafe", COFFEE, last_days_ago=20)
-    event(db, "suggestion_shown", concept="cafe", vertical="supermercado", days_ago=6)
-    assert offer(client).status_code == 204
+    left_vertical(db, USER, "turbo", ICE_CREAM, last_days_ago=40)
+    still_ordering(db, USER)
+    # La primera es café; se le mostró la de Turbo hace 6 días: la pausa es por persona y vuelve esa, no café.
+    event(db, "suggestion_shown", vertical="turbo", concept="helados", days_ago=6, of="vuelta")
+
+    assert offer(client).json()["reason"]["basis"][0] == {"kind": "vuelta", "id": "turbo", "source": "pedidos"}
 
     db.execute("UPDATE app_events SET ts = ts - interval '2 days' WHERE type = 'suggestion_shown'")
-    assert offer(client).status_code == 200
+    assert offer(client).json()["reason"]["concept"] == "cafe"  # pasada la semana, la mejor otra vez
 
 
-def test_the_next_invitation_takes_the_place_of_one_shown_lately(client, db):
+def test_the_next_invitation_does_not_take_the_place_of_one_shown_lately(client, db):
     rhythm(db, USER, "supermercado", "cafe", COFFEE, last_days_ago=20)
     left_vertical(db, USER, "turbo", ICE_CREAM, last_days_ago=40)
     still_ordering(db, USER)
     event(db, "suggestion_shown", concept="cafe", vertical="supermercado", days_ago=1)
 
-    assert offer(client).json()["reason"]["basis"][0]["kind"] == "vuelta"
+    assert offer(client).json()["reason"]["concept"] == "cafe"  # la misma, no la de Turbo
+
+
+def test_shown_lately_and_no_longer_due_means_nothing_else_this_week(client, db):
+    rhythm(db, USER, "supermercado", "cafe", COFFEE, last_days_ago=20)
+    left_vertical(db, USER, "turbo", ICE_CREAM, last_days_ago=40)
+    still_ordering(db, USER)
+    event(db, "suggestion_shown", concept="cafe", vertical="supermercado", days_ago=1)
+    bought(db, USER, "supermercado", "cafe", COFFEE, 0)  # volvió a pedir café (el motor aún no lo recalcula)
+
+    assert offer(client).status_code == 204  # Turbo también califica, pero no antes de una semana
+
+
+def test_a_concept_invitation_is_not_the_invitation_of_its_vertical(client, db):
+    # Ayer se mostró una invitación de concepto (galletas) en el súper; la persona dejó el súper como vertical, pero esa
+    # es otra invitación: no es «la misma», así que durante la pausa no hay nada. Si se mostró la del súper, vuelve.
+    left_vertical(db, USER, "supermercado", COOKIES, last_days_ago=40)
+    bought(db, USER, "turbo", None, ICE_CREAM, 3)
+    refresh_user_conn(db, USER)
+    event(db, "suggestion_shown", concept="galletas", vertical="supermercado", days_ago=1)
+    assert offer(client).status_code == 204
+
+    event(db, "suggestion_shown", concept="galletas", vertical="supermercado", days_ago=1, of="vuelta")
+    assert offer(client).json()["reason"]["basis"][0] == {"kind": "vuelta", "id": "supermercado", "source": "pedidos"}
+
+
+def test_a_vertical_without_a_product_with_concept_is_not_offered(client, db):
+    # Lo único que pidió en Turbo es un plato sin concepto en el catálogo: sin concepto la app no registra la mostrada
+    # y la pausa no empezaría.
+    db.execute("DELETE FROM item_concepts WHERE entity_type = 'catalog_item' AND entity_id = %s", (ICE_CREAM[1],))
+    left_vertical(db, USER, "turbo", ICE_CREAM, last_days_ago=40)
+    still_ordering(db, USER)
+
+    assert offer(client).status_code == 204
 
 
 def test_dismissed_twice_since_the_last_order_it_stops(client, db):
@@ -195,6 +233,16 @@ def test_dismissed_twice_since_the_last_order_it_stops(client, db):
 
     event(db, "suggestion_dismissed", concept="cafe", vertical="supermercado", days_ago=9)
     assert offer(client).status_code == 204
+
+
+def test_dismissals_of_another_kind_do_not_count(client, db):
+    left_vertical(db, USER, "supermercado", COOKIES, last_days_ago=40)
+    bought(db, USER, "turbo", None, ICE_CREAM, 3)
+    refresh_user_conn(db, USER)
+    for days in (10, 9):  # descartó dos veces café en el súper (de concepto), no la vertical
+        event(db, "suggestion_dismissed", concept="cafe", vertical="supermercado", days_ago=days)
+
+    assert offer(client).json()["reason"]["basis"][0]["kind"] == "vuelta"
 
 
 def test_dismissals_before_the_last_order_do_not_count(client, db):
@@ -283,4 +331,18 @@ def test_the_panel_counts_who_qualifies_by_kind(client, db):
     assert reply.json() == {
         "source": "prototype",
         "data": {"dia": None, "personas": 2, "califican": 2, "por_concepto": 1, "por_vertical": 1, "recompra": 0},
+    }
+
+
+def test_the_panel_does_not_count_who_gets_the_repeat(client, db):
+    rhythm(db, USER, "supermercado", "cafe", COFFEE, last_days_ago=20)  # volver…
+    rhythm(db, USER, "supermercado", "galletas", COOKIES, last_days_ago=7)  # …pero la Home le muestra la recompra
+
+    assert reach(db, "prototype") == {
+        "dia": None,
+        "personas": 1,
+        "califican": 0,
+        "por_concepto": 0,
+        "por_vertical": 0,
+        "recompra": 1,
     }
