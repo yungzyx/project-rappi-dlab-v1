@@ -6,7 +6,8 @@ otra tienda), `checkout`, `proximo_pedido`, `sin_resultado` (dónde sí está lo
 vertical que más sube la retención esperada de su combinación, según el motor, o RappiFavor o RappiTravel si ya pide en
 todas las que se ofrecen; sin ese paso, la vertical donde la persona aún no ha pedido y más le gusta, y sin historia, la
 primera), `recompra` («¿Repetimos?»: lo que la
-persona pide con ritmo y está por tocarle, según la tabla `replenishment` del motor) y `perfil` (la escalera de
+persona pide con ritmo y está por tocarle, según la tabla `replenishment` del motor), `volver` («¿Volvemos a…?»: lo
+que pedía con ritmo y dejó de pedir, `offers/winback.py`) y `perfil` (la escalera de
 un perfil de gusto, `offers/profiles.py`, con su forma propia: `ProfileOffer`). Si no hay una buena oferta, no hay
 oferta (`None`: 204): el agente no dice nada.
 
@@ -26,7 +27,9 @@ pesó la retención aprendida) y suma de dónde salen los productos: `compra_cru
 («<vertical>»), con `source` «poblacion:<fuente>», y `vuelta` («<vertical>», `source` «pedidos») si la persona ya pidió
 ahí hace más de un mes; el texto habla de la persona, nunca de cifras de retención ni de lo que hace la población. Si
 el paso es un servicio sin catálogo, la oferta no trae productos: lo presenta y su acción abre su pantalla. La
-`recompra` lleva su señal `recompra` («<concepto>», `source` «pedidos»: sale de los pedidos de la persona). Un
+`recompra` lleva su señal `recompra` («<concepto>», `source` «pedidos»: sale de los pedidos de la persona) y `volver`,
+la suya: `volver` («<concepto>») si dejó un concepto o `vuelta` («<vertical>») si dejó una vertical, las dos con
+`source` «pedidos». Un
 complemento de una persona (`carrito`, `checkout`,
 `proximo_pedido`) suma `combinacion` si entre dos parecidos ganó el de la vertical que completa su combinación, y
 `compra_cruzada` si lo trajo una regla de la población (`agent.tools.suggest_complement`). Un complemento cuyo primer
@@ -81,6 +84,7 @@ from .profiles import (
     ordered_restaurants,
     person_city,
 )
+from .winback import REPEAT_AHEAD_DAYS, Lapse, blocked, lapses, repeat_due
 
 KIT_SIZE = 4  # productos del kit de una ocasión
 # El concepto ya está elegido: la búsqueda léxica de su nombre (miles de platos «pizza») costaba ~140 ms por búsqueda en
@@ -165,7 +169,13 @@ REASON_SERVICE = {
 REPEAT_TEXT = "¿Repetimos {destino}? Pides {cada}."
 REASON_REPEAT = "Porque pides {destino} {cada} y tu último pedido fue {hace}."
 REPEAT_ACTION = "Ver producto"  # abre su tienda con el producto destacado; la aceptación cuenta al agregarlo al carro
-REPEAT_AHEAD_DAYS = 2  # se ofrece desde 2 días antes del día en que le toca
+# «¿Volvemos a…?»: {destino} es el concepto, {cada} cada cuánto lo pedía, {n} los días desde su último pedido y {veces}
+# los días con pedido en la vertical. Sin artículo ni verbo que deba concordar con el concepto («frutas»).
+WINBACK_TEXT = "¿Volvemos a {destino}? Tu último pedido fue hace {n} días."
+REASON_WINBACK = "Porque pedías {destino} {cada} y tu último pedido fue hace {n} días."
+WINBACK_VERTICAL_TEXT = "¿Volvemos a {vertical}? Tu último pedido ahí fue hace {n} días."
+REASON_WINBACK_VERTICAL = "Porque pediste {veces} veces en {vertical} y tu último pedido ahí fue hace {n} días."
+WINBACK_VERTICAL_PRODUCTS = 10  # lo último que compró en la vertical: se prueban estos para encontrar uno a la venta
 SEE_ACTION = "Ver {destino}"
 OPEN_ACTION = "Abrir {vertical}"
 REASON_LIKES_VERTICAL = "Por tu interés en {emoji} {name}: en {vertical} hay más."
@@ -282,6 +292,8 @@ def make_offer(
         return vertical_to_try(conn, embedder, tried_verticals(conn, user_id), user_interests(conn, user_id), user_id)
     if moment == "recompra":
         return repeat_offer(conn, embedder, user_id)
+    if moment == "volver":
+        return winback_offer(conn, embedder, user_id)
     if moment == "perfil":
         return profile_offer(conn, embedder, context.get("perfil"), user_id, spare)
     raise OfferError(f"Momento desconocido: {moment}")
@@ -789,7 +801,7 @@ def repeat_offer(
     for concept_id, vertical, interval, last_ts, due_on in rows:
         days = round(interval)
         concept = concepts.get(concept_id)
-        if due_on < today - timedelta(days=days) or concept is None or not is_offerable(concept):
+        if not repeat_due(due_on, interval, today) or concept is None or not is_offerable(concept):
             continue
         if not offerable_vertical(vertical) or vertical not in SCREEN_VERTICALS:
             continue
@@ -821,6 +833,62 @@ def _repeat_product(
     outcome = search_products(conn, vertical, concept.name, [concept.id], embedder, k=4, offer=True)
     found = [p.to_dict() for p in outcome.products if p.concept == concept.id]
     return next(iter(_offerable_products(conn, found)), None)
+
+
+# ── volver ───────────────────────────────────────────────────────────────────
+def winback_offer(
+    conn: Connection, embedder: TextEmbedder | None, user_id: str | None, now: datetime | None = None
+) -> Offer | None:
+    """«¿Volvemos a…?»: la primera invitación de la persona (`winback.lapses`, ya con las guardias) que no se mostró
+    hace poco ni descartó (`winback.blocked`) y tiene un producto: de un concepto, el de la recompra
+    (`_repeat_product`); de una vertical, lo último que compró ahí que siga a la venta. None (204) sin persona o sin
+    nada que le toque."""
+    if user_id is None:
+        return None
+    now = now or datetime.now(TZ)
+    candidates = lapses(conn, now.astimezone(TZ).date(), user_id=user_id).get(user_id, [])
+    skip = blocked(conn, user_id, candidates, now)
+    concepts = load_taxonomy().concepts
+    for lapse in candidates:
+        if (lapse.kind, lapse.key) in skip:
+            continue
+        if lapse.kind == "concepto":
+            product = _repeat_product(conn, embedder, user_id, concepts[lapse.key], lapse.vertical)
+        else:
+            product = _last_bought_in(conn, user_id, lapse.vertical)
+        if product:
+            return _winback(lapse, product)
+    return None
+
+
+def _winback(lapse: Lapse, product: dict) -> Offer:
+    action = {"label": REPEAT_ACTION, "route": [SCREEN_VERTICALS[lapse.vertical]], "store_id": product["store_id"]}
+    if lapse.kind == "concepto":
+        name = load_taxonomy().concepts[lapse.key].name.lower()
+        text = WINBACK_TEXT.format(destino=name, n=lapse.days)
+        why = REASON_WINBACK.format(destino=name, cada=_every(lapse.interval), n=lapse.days)
+        reason = _reason(why, [{"kind": "volver", "id": lapse.key, "source": "pedidos"}], concept=lapse.key)
+    else:
+        label = VERTICAL_LABELS.get(lapse.vertical, lapse.vertical)
+        text = contract_articles(WINBACK_VERTICAL_TEXT.format(vertical=label, n=lapse.days))
+        why = REASON_WINBACK_VERTICAL.format(veces=lapse.orders, vertical=label, n=lapse.days)
+        reason = _reason(why, [{"kind": "vuelta", "id": lapse.vertical, "source": "pedidos"}])
+    return Offer("volver", text, [product], lapse.vertical, reason, [action])
+
+
+def _last_bought_in(conn: Connection, user_id: str, vertical: str) -> dict | None:
+    """Lo último que la persona compró en la vertical (pedidos `propuesta`) que siga a la venta ahí, con el precio de
+    ahí y pasando las guardias de las ofertas."""
+    kind = "menu_item" if vertical == "restaurantes" else "catalog_item"
+    rows = conn.execute(
+        """SELECT l.entity_id FROM app_order_lines l JOIN app_orders o USING (order_id)
+           WHERE o.user_id = %s AND o.mode = 'propuesta' AND o.vertical = %s AND l.entity_type = %s
+           ORDER BY o.ts DESC, o.order_id DESC, l.line_no DESC LIMIT %s""",
+        (user_id, vertical, kind, WINBACK_VERTICAL_PRODUCTS),
+    ).fetchall()
+    ids = list(dict.fromkeys(i for (i,) in rows if _valid_id(i)))
+    found = _priced_in_vertical(conn, vertical, ids)
+    return next(iter(_offerable_products(conn, [found[i].to_dict() for i in ids if i in found])), None)
 
 
 def _every(days: int) -> str:
