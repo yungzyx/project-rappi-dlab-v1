@@ -16,13 +16,11 @@ from psycopg import Connection
 from psycopg import Error as DatabaseError
 from rappi_scraper.storage.search import VERTICALS
 
-from ..concepts.matcher import KeywordMatcher
-from ..concepts.taxonomy import Occasion, load_taxonomy
+from ..concepts.taxonomy import load_taxonomy
 from ..embeddings.base import MemoizedQueryEmbedder, TextEmbedder
 from ..retrieval.hybrid import detect_concepts, has_words
-from ..text import normalize
 from .rappi_agent import PROTOTYPE_VERTICALS
-from .tools import Product, search_products
+from .tools import Product, named_occasion, search_products
 from .verticals import ranked_verticals
 
 TYPICAL_VERTICALS = 3  # con un concepto detectado, las verticales donde es más típico
@@ -73,19 +71,6 @@ class GroupedResult:
             "unmet": self.unmet,
             "unmet_reason": self.unmet_reason,
         }
-
-
-_OCCASIONS = None
-
-
-def _occasion(q: str) -> Occasion | None:
-    """La ocasión que nombra la consulta («algo para el carrete»), con las keywords de taxonomy.toml."""
-    global _OCCASIONS
-    taxonomy = load_taxonomy()
-    if _OCCASIONS is None:
-        _OCCASIONS = KeywordMatcher((o.id, kw) for o in taxonomy.occasions.values() for kw in o.keywords)
-    match = _OCCASIONS.best(normalize(q))
-    return taxonomy.occasions[match.target] if match else None
 
 
 def _verticals_to_search(
@@ -174,7 +159,7 @@ def search_grouped(
     productos. Con `spare` (las conexiones extra de la API), las verticales se buscan a la vez (`search_each`); el
     resultado es el mismo que en serie."""
     concepts = detect_concepts(q)
-    occasion = None if concepts else _occasion(q)
+    occasion = None if concepts else named_occasion(q)
     query, fixed = q, None
     if occasion:
         taxonomy = load_taxonomy()

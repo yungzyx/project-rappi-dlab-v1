@@ -16,6 +16,8 @@
 # - `age_restricted = true`: +18; la respuesta lleva el recordatorio.
 # - `prepared = true` (en el grupo o en el concepto): se pide hecho, así que también se busca en restaurantes.
 #   El resto nunca compite en restaurantes aunque sus locales lo tengan (gaseosas, papas fritas en combos).
+# - `broad = true`: agrupa productos de varios tipos («picoteo», «desayuno»). Donde el vertical no lo vende, la búsqueda
+#   no exige que el nombre del producto diga lo pedido (agent/tools._focus).
 
 version = "2026-10-14"
 
@@ -613,6 +615,7 @@ query_keywords = ["sano", "algo sano", "mas sano", "más sano", "liviano", "algo
 [[concept]]
 id = "desayuno"
 parent = "comida"
+broad = true
 name = "Desayunos y brunch"
 emoji = "🥞"
 keywords = ["desayuno", "brunch", "huevos revueltos", "pancakes", "waffles", "avocado toast", "tostada con palta", "omelette", "huevos benedictinos"]
@@ -620,6 +623,7 @@ keywords = ["desayuno", "brunch", "huevos revueltos", "pancakes", "waffles", "av
 [[concept]]
 id = "picoteo"
 parent = "comida"
+broad = true
 name = "Picoteo y tablas"
 emoji = "🍟"
 keywords = ["chorrillana", "picoteo", "tabla", "papas rústicas", "aros de cebolla", "aros de cebollas", "fritos", "papas con queso", "salchipapa"]
