@@ -5,6 +5,7 @@ import { HomeTaps } from './HomeTaps.jsx'
 import { OffersByMoment } from './OffersByMoment.jsx'
 import { SavedNote, SourceNote } from './SourceNote.jsx'
 import { UnmetSearches } from './UnmetSearches.jsx'
+import { WinbackReach } from './WinbackReach.jsx'
 import './mvp.css'
 
 function Offers({ source }) {
@@ -37,6 +38,16 @@ function Home({ source }) {
   )
 }
 
+function Winback({ source }) {
+  const { data, saved } = useAnalyticsWithOrigin('volver', source)
+  return (
+    <>
+      <SavedNote saved={saved} />
+      <WinbackReach data={data} source={source} />
+    </>
+  )
+}
+
 export function MvpUsageView({ source }) {
   return (
     <div className="view">
@@ -45,9 +56,9 @@ export function MvpUsageView({ source }) {
           <h2 id="ofertas">Ofertas del agente por momento</h2>
           <p>
             Aceptada: la oferta se agregó al carro. El momento es dónde se hizo: en un plan, con el carro armado, antes
-            de pagar, para el próximo pedido, cuando una búsqueda no encontró nada, para probar otro vertical, al
-            preguntarle al agente o en «Para ti». Los servicios sin catálogo tienen su propia sección, en «Entre
-            verticales».
+            de pagar, para el próximo pedido, cuando una búsqueda no encontró nada, para probar otro vertical, para
+            repetir lo que toca, para volver a pedir lo que dejó, al preguntarle al agente o en «Para ti». Los servicios
+            sin catálogo tienen su propia sección, en «Entre verticales».
           </p>
           <ProvenanceBadge kind={source} />
         </div>
@@ -55,6 +66,23 @@ export function MvpUsageView({ source }) {
           <SourceNote source={source} />
           <Async>
             <Offers source={source} />
+          </Async>
+        </div>
+      </section>
+
+      <section className="section" aria-labelledby="volver">
+        <div className="section-head">
+          <h2 id="volver">A quién invitar a volver</h2>
+          <p>
+            Cuántas personas dejaron de pedir algo que pedían con ritmo: a ellas Mochi les dice «¿Volvemos a…?» en la
+            Home, si no les toca la recompra. Lo que se mostró y se aceptó está arriba, en «Volver a pedir».
+          </p>
+          <ProvenanceBadge kind={source} />
+        </div>
+        <div className="block enter">
+          <SourceNote source={source} />
+          <Async>
+            <Winback source={source} />
           </Async>
         </div>
       </section>

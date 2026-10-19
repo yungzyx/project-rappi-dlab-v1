@@ -12,6 +12,7 @@ from psycopg.rows import dict_row
 from ..agent.verticals import MIN_ITEMS_ELSEWHERE, SHARES
 from ..concepts.taxonomy import load_taxonomy
 from ..motor.combos import OWN_SIGNALS_ONLY, expected_fine_retention, load_combos
+from ..offers.winback import reach
 
 SOURCES = ("synthetic", "prototype")
 ACTIVE_DAYS = 30
@@ -473,6 +474,7 @@ OFFER_MOMENTS = (
     "sin_resultado",
     "vertical_por_probar",
     "recompra",
+    "volver",
     "perfil",
 )
 OFFER_ORDER = (*OFFER_MOMENTS, "pregunta", "para_ti", "sin_momento")
@@ -519,6 +521,15 @@ def offers(conn: Connection, source: str = "synthetic") -> dict:
     )
     row["momentos"].sort(key=lambda m: OFFER_ORDER.index(m["momento"]))
     return row
+
+
+def winback(conn: Connection, source: str = "synthetic") -> dict:
+    """«¿Volvemos a…?»: a cuántas personas de la fuente les tocaría, por el tipo de su primera invitación (un concepto
+    o una vertical que dejó), y a cuántas la recompra, el día de referencia (`offers.winback.reach`: el último pedido
+    simulado, u hoy en el prototipo; `dia` solo en simulados). Es quién califica, no a quién se le mostró; con datos
+    simulados no es evidencia."""
+    _check(source)
+    return reach(conn, source)
 
 
 MAX_UNMET_ROWS = 20

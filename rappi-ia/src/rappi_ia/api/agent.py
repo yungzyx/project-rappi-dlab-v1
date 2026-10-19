@@ -63,6 +63,13 @@ class RepeatContext(Clean):
     model_config = ConfigDict(extra="forbid")
 
 
+class WinbackContext(Clean):
+    """Sin datos: lo que dejó de pedir sale de los pedidos de la persona y de lo que ya se le mostró
+    (`offers/winback.py`)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class ProfileContext(Clean):
     """El perfil de gusto que se pide (`offers/perfiles.toml`); sin él, el primero de los de la persona."""
 
@@ -108,13 +115,18 @@ class RepeatIn(OfferBase):
     context: RepeatContext
 
 
+class WinbackIn(OfferBase):
+    moment: Literal["volver"]
+    context: WinbackContext
+
+
 class ProfileIn(OfferBase):
     moment: Literal["perfil"]
     context: ProfileContext
 
 
 OfferIn = Annotated[
-    PlanIn | CartIn | CheckoutIn | NoResultIn | NextOrderIn | ToTryIn | RepeatIn | ProfileIn,
+    PlanIn | CartIn | CheckoutIn | NoResultIn | NextOrderIn | ToTryIn | RepeatIn | WinbackIn | ProfileIn,
     Field(discriminator="moment"),
 ]
 

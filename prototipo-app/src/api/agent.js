@@ -12,7 +12,7 @@ function toAction({ route, ...action }) {
 
 /**
  * La oferta del agente para un momento (`carrito`, `checkout`, `sin_resultado`, `proximo_pedido`, `plan`,
- * `vertical_por_probar`, `recompra`) con su contexto, o `null` si no tiene nada que ofrecer (204): entonces el agente no dice nada.
+ * `vertical_por_probar`, `recompra`, `volver`) con su contexto, o `null` si no tiene nada que ofrecer (204): entonces el agente no dice nada.
  * Devuelve `{ moment, text, products, vertical, backendVertical, reason, actions }`; la `vertical` es la de la app y
  * cada producto lleva `fromSuggestion` y `suggestionOrigin: 'agent-<momento>'` para los eventos y el pedido, y cada
  * acción la `route` de la app (`push(...route)`).

@@ -37,7 +37,7 @@ from rappi_ia.motor.model import TZ
 
 FIXTURES = Path(__file__).resolve().parents[3] / "prototipo-app" / "src" / "api" / "fixtures"
 PANEL_FIXTURES = Path(__file__).resolve().parents[3] / "dashboard-empresa" / "src" / "fixtures"
-PANEL_METRICS = ("offers", "unmet", "combos", "motor", "home")
+PANEL_METRICS = ("offers", "unmet", "combos", "motor", "home", "volver")
 # Las métricas de /analytics que guarda `npm run fixtures` (dashboard-empresa/scripts/update-fixtures.mjs).
 PANEL_SHAPE = (
     "kpis",
@@ -171,6 +171,13 @@ CONTRACT: tuple[Example, ...] = (
         "/agent/offer",
         {"moment": "recompra", "user_id": "u-recompra", "context": {}},
     ),
+    # Pedía café en el súper cada 7 días y el último fue hace 20 (u-volver): «¿Volvemos a café?».
+    Example(
+        "agent-offer-volver",
+        "POST",
+        "/agent/offer",
+        {"moment": "volver", "user_id": "u-volver", "context": {}},
+    ),
     # La escalera de un perfil elegido, sin persona: lo que usa la demo.
     Example("agent-offer-perfil", "POST", "/agent/offer", {"moment": "perfil", "context": {"perfil": "asiatico"}}),
     Example("profile-gustos", "GET", "/profile/u-gustos/gustos"),
@@ -252,6 +259,11 @@ def client(db):
         cart = f"c-recompra-{days}"
         events.record_order(db, "u-recompra", f"s-recompra-{days}", cart, "supermercado", [coffee], ts=ts)
     refresh_user_conn(db, "u-recompra")
+    # Una persona que pedía café en el súper cada 7 días y lo dejó hace 20, para `agent-offer-volver`.
+    for days in (34, 27, 20):
+        ts = datetime.combine(today - timedelta(days=days), time(12), TZ)
+        events.record_order(db, "u-volver", f"s-volver-{days}", f"c-volver-{days}", "supermercado", [coffee], ts=ts)
+    refresh_user_conn(db, "u-volver")
     # Lo más pedido en el súper por la población, para la fila «Lo más pedido en…» de `recommendations` (u-contrato
     # tiene un solo interés: le queda una fila libre).
     for rank, product in enumerate(("91004", "91002", "91006"), start=1):
@@ -377,9 +389,9 @@ def test_panel_examples_are_up_to_date(client, db, name, source):
         prototype_journey(client)
     else:
         generate(db, users=40, weeks=8, seed=11, until=date(2026, 10, 4))
-    # Lo que muestran `motor` y `combos` sale de la corrida del motor. Las combinaciones del prototipo salen de pedidos
-    # fechados desde hoy (cambian con el mes): su ejemplo es el de «sin pedidos propios».
-    if name == "motor" or (name == "combos" and source == "synthetic"):
+    # Lo que muestran `motor` y `combos` sale de la corrida del motor, y `volver`, de su recompra. Las combinaciones del
+    # prototipo salen de pedidos fechados desde hoy (cambian con el mes): su ejemplo es el de «sin pedidos propios».
+    if name == "motor" or (name in ("combos", "volver") and source == "synthetic"):
         build_motor(db, source)
         db.execute("UPDATE layer_runs SET finished_at = '2026-10-04 12:00+00' WHERE layer = 'motor'")  # la fecha varía
         db.commit()
