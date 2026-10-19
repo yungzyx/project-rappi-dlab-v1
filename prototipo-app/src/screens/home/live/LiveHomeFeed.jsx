@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { offer, plans as fetchPlans } from '../../../api/agent'
+import { conceptOf } from '../../../api/orders'
 import { noteShown } from '../../../api/suggestions'
 import { userId } from '../../../api/user'
 import DemoDisclaimer from '../../../components/DemoDisclaimer'
@@ -25,9 +26,10 @@ import { isHushed, isQuiet, noteDismissed } from '../../../state/agentQuiet'
 import { today } from '../../../utils/today'
 import './live.css'
 
-// Las secciones de la Home de hoy, más «¿Repetimos?» (la recompra), que solo aparece cuando la API la ofrece.
+// Las secciones de la Home de hoy, más «¿Repetimos?» (la recompra) o, si no hay, «¿Volvemos a…?» (lo que dejó de pedir),
+// que solo aparecen cuando la API los ofrece.
 const ORDER = ['essentials', 'recompra', 'promos', 'turbo', 'plan', 'nearby', 'lower']
-const REPEAT_ORIGIN = 'agent-recompra'
+const WINBACK_ORIGIN = 'agent-volver'
 const T = { enter: 900, greet: 3400, greetHold: 6000, notice: 500 }
 // Silenciado por hoy (desde el agente flotante) o callado porque lo ignoraron: no habla por su cuenta; si lo tocan, sí.
 const silent = () => isQuiet(today()) || isHushed()
@@ -70,7 +72,7 @@ export default function LiveHomeFeed({ push, active = true }) {
   const [say, setSay] = useState(null)
   const [target, setTarget] = useState(null) // id del bloque donde se para el agente
   const [present, setPresent] = useState(() => session.played) // aún no entra a escena
-  const [repeat, setRepeat] = useState(null) // «¿Repetimos?»: la oferta `recompra`, si la API tiene una
+  const [repeat, setRepeat] = useState(null) // «¿Repetimos?» (`recompra`) o, si no hay, «¿Volvemos a…?» (`volver`)
   const [entering, setEntering] = useState(false)
 
   const screenRef = useRef(null)
@@ -269,27 +271,54 @@ export default function LiveHomeFeed({ push, active = true }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active])
 
-  // «¿Repetimos?» se pide cada vez que la Home vuelve a estar arriba (un pedido nuevo cambia lo que le toca). Sin
-  // oferta (204) o sin red, no hay bloque; en silencio, o si ya dijeron «Después», no se pide.
+  // «¿Repetimos?» se pide cada vez que la Home vuelve a estar arriba (un pedido nuevo cambia lo que le toca). Si no hay
+  // (204), «¿Volvemos a…?», una vez por pestaña: la API no repite la misma invitación en 7 días, así que se guarda la
+  // primera para que no cambie ni desaparezca al volver a la Home. La recompra siempre gana. Sin ninguna o sin red, no
+  // hay bloque; en silencio, o si ya dijeron «Después», no se pide.
   useEffect(() => {
     if (!active || silent() || session.repeatLater) return undefined
     let current = true
-    offer('recompra', {}, { userId: userId() }).then(
-      (made) => {
-        if (!current) return
-        const shown = made?.products.length ? made : null
-        if (shown) noteShown(events.track, shown.products, { origin: REPEAT_ORIGIN, generation: profile.resets })
-        setRepeat(shown)
-      },
-      () => {},
-    )
+    const generation = profile.resets
+    const winback = () => {
+      if (session.winback?.generation === generation) return session.winback.offer
+      return offer('volver', {}, { userId: userId() }).then((made) => {
+        session.winback = { generation, offer: made?.products.length ? made : null }
+        return session.winback.offer
+      })
+    }
+    offer('recompra', {}, { userId: userId() })
+      .then((made) => (made?.products.length ? made : winback()))
+      .then(
+        (made) => {
+          if (!current) return
+          const shown = made?.products.length ? made : null
+          if (shown)
+            noteShown(events.track, shown.products, {
+              origin: `agent-${shown.moment}`,
+              concept: shown.reason?.concept,
+              generation,
+            })
+          setRepeat(shown)
+        },
+        () => {},
+      )
     return () => {
       current = false
     }
   }, [active, events.track, profile.resets])
 
+  // «Después» deja el bloque para otra vez. En «¿Volvemos a…?» se registra el descarte: con dos, la API deja de
+  // ofrecer esa invitación.
   const repeatLater = () => {
     noteDismissed()
+    if (repeat?.moment === 'volver') {
+      const [product] = repeat.products
+      events.track('suggestion_dismissed', {
+        concept_id: repeat.reason?.concept ?? conceptOf(product),
+        vertical: product.vertical,
+        payload: { origen: WINBACK_ORIGIN },
+      })
+    }
     session.repeatLater = true
     setRepeat(null)
   }
