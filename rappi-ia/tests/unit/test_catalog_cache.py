@@ -110,6 +110,26 @@ def test_concurrent_misses_compute_once(clock):
     assert cache.cached("otra", conn, slow) == {"vez": 2}  # otro nombre no espera a «home»
 
 
+def test_a_slow_load_does_not_keep_the_others_waiting_forever(clock, monkeypatch):
+    """Quien espera tiene la transacción quieta: si el que calcula tarda más que LOADING_WAIT_S, lo calcula él (si no,
+    la API cortaría su transacción a los 10 s)."""
+    monkeypatch.setattr(cache, "LOADING_WAIT_S", 0.05)
+    conn, release = FakeConn(), threading.Event()
+
+    def stuck():
+        release.wait(2)
+        return {"de": "el lento"}
+
+    with ThreadPoolExecutor(1) as executor:
+        slow = executor.submit(cache.cached, "home", conn, stuck)
+        time.sleep(0.02)  # el lento ya tiene el candado
+        started = time.monotonic()
+        assert cache.cached("home", conn, lambda: {"de": "quien esperaba"}) == {"de": "quien esperaba"}
+        assert time.monotonic() - started < 1
+        release.set()
+        assert slow.result() == {"de": "el lento"}
+
+
 def test_a_failed_load_is_retried_by_the_next_caller(clock):
     conn, (compute, calls) = FakeConn(), _counter()
 
