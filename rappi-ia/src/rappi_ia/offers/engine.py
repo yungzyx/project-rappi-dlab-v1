@@ -170,8 +170,8 @@ REPEAT_TEXT = "¿Repetimos {destino}? Pides {cada}."
 REASON_REPEAT = "Porque pides {destino} {cada} y tu último pedido fue {hace}."
 REPEAT_ACTION = "Ver producto"  # abre su tienda con el producto destacado; la aceptación cuenta al agregarlo al carro
 # «¿Volvemos a…?»: {destino} es el concepto, {cada} cada cuánto lo pedía, {n} los días desde su último pedido y {veces}
-# los días con pedido en la vertical.
-WINBACK_TEXT = "¿Volvemos a {destino}? Lo pediste por última vez hace {n} días."
+# los días con pedido en la vertical. Sin pronombre ni verbo que deba concordar con el concepto («galletas», «sushi»).
+WINBACK_TEXT = "¿Volvemos a {destino}? La última vez que pediste {destino} fue hace {n} días."
 REASON_WINBACK = "Porque pedías {destino} {cada} y la última vez fue hace {n} días."
 WINBACK_VERTICAL_TEXT = "¿Volvemos a {vertical}? Tu último pedido ahí fue hace {n} días."
 REASON_WINBACK_VERTICAL = "Porque pediste {veces} veces en {vertical} y tu último pedido ahí fue hace {n} días."

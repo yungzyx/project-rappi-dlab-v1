@@ -98,7 +98,7 @@ def test_a_concept_left_behind_comes_with_its_last_product_and_says_why(client, 
     assert reply.status_code == 200, reply.text
     body = reply.json()
     assert body["moment"] == "volver"
-    assert body["text"] == "¿Volvemos a café? Lo pediste por última vez hace 20 días."
+    assert body["text"] == "¿Volvemos a café? La última vez que pediste café fue hace 20 días."
     assert body["reason"] == {
         "concept": "cafe",
         "text": "Porque pedías café cada 7 días y la última vez fue hace 20 días.",
