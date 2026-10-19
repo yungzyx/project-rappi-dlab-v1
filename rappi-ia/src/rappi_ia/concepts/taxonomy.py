@@ -23,6 +23,7 @@ class Concept:
     sensitive: bool = False
     age_restricted: bool = False
     prepared: bool = False  # se pide hecho: también puede buscarse en restaurantes
+    broad: bool = False  # agrupa productos de varios tipos («picoteo»): su nombre no lo dice
 
     @property
     def label(self) -> str:
@@ -100,6 +101,7 @@ def load_taxonomy(path: Path = DATA_DIR / "taxonomy.toml") -> Taxonomy:
             sensitive=c.get("sensitive", False),
             age_restricted=c.get("age_restricted", False),
             prepared=c.get("prepared", groups[c["parent"]].prepared if c["parent"] in groups else False),
+            broad=c.get("broad", False),
         )
         for c in raw["concept"]
     }

@@ -139,7 +139,7 @@ Las cifras vigentes (catálogo, búsqueda, precisión de conceptos y de la capa 
 
 **Set:** 124 consultas positivas en los 8 verticales y 41 negativas (al menos 5 por vertical, verificadas contra el catálogo completo), en [`src/rappi_ia/eval/queries.json`](src/rappi_ia/eval/queries.json). La relevancia se juzga automáticamente por concepto: un resultado es relevante si su concepto es uno de los esperados para la consulta. El reporte trae la comparación pareada completa (léxico, vectorial, híbrido y la ablación sin refuerzo por concepto), por tipo de consulta y por vertical.
 
-**"Sin resultado"** (demanda no satisfecha), sobre las 41 consultas negativas y con los τ de `src/rappi_ia/eval/thresholds.json`. El reporte dice por qué se detecta o no cada una. Las cifras del reporte son de la búsqueda (`retrieve`); Mochi anota la demanda en menos casos, porque cuando el concepto pedido tiene unos pocos productos (surtido testimonial) los muestra y no la anota.
+**"Sin resultado"** (demanda no satisfecha), sobre las 41 consultas negativas y con los τ de `src/rappi_ia/eval/thresholds.json`. El reporte dice por qué se detecta o no cada una. Las cifras del reporte son de la búsqueda (`retrieve`); Mochi anota la demanda cuando la búsqueda la marca y no muestra ningún producto. Desde el 18-10-2026 tampoco muestra los pocos productos de un concepto con surtido testimonial bajo el 1 % del vertical (solían ser otra cosa con su etiqueta, como un cable HDMI para «televisor 55 pulgadas» en Turbo), así que las dos cifras casi coinciden.
 
 - **Regla:** es un "sin resultado" cuando nada calza todas las palabras y, además, se cumple la condición que corresponda:
   - si la consulta nombra un concepto, ese concepto no tiene surtido real en el vertical;
