@@ -109,12 +109,15 @@ class _ForbiddenAfterClient(_SitemapClient):
         raise requests.HTTPError(f"403 Client Error: Forbidden for url: {url}", response=response)
 
 
-def test_a_403_after_a_shard_below_the_limit_is_the_end_of_the_sitemap():
+def test_a_403_after_a_shard_below_the_limit_is_the_end_of_the_sitemap(caplog):
+    """Y queda un aviso en el log: si fuera un bloqueo a mitad del sitemap, faltarían las partes siguientes."""
     template = discover.CHAIN_SITEMAP
     client = _ForbiddenAfterClient({template.format(0): ["https://x/a", "https://x/b"]})
 
     assert discover._sitemap_urls(client, template) == ["https://x/a", "https://x/b"]
     assert client.requested == [template.format(0), template.format(1)]
+    [warning] = [r for r in caplog.records if r.levelname == "WARNING"]
+    assert "parte 1 respondió 403 tras una de 2 URLs" in warning.getMessage()
 
 
 def test_a_403_after_a_full_shard_or_on_the_first_one_is_an_error(monkeypatch):

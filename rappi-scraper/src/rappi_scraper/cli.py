@@ -64,6 +64,11 @@ POSSIBLE_BLOCK_EXIT = 4
 RESTAURANTS_FAILED_EXIT = 5
 # 6: las dos cosas, restaurantes sin actualizar y respaldo fallido: la tarea semanal anota ambas y sigue.
 RESTAURANTS_AND_BACKUP_FAILED_EXIT = 6
+# Avisos que no cambian el código de salida: si la variable trae una ruta, `refresh` escribe ahí una marca fija por
+# línea, y refresh-semanal.sh la anota en ultimo-estado.txt. La única por ahora: los restaurantes se bajaron con la
+# lista de una corrida anterior porque el sitemap no respondió (sale con 0).
+REFRESH_NOTES_ENV = "RAPPI_REFRESH_NOTES"
+FALLBACK_NOTE = "restaurantes_con_lista_anterior"
 
 
 def _run_id(conn, kind: str, args) -> int:
@@ -166,6 +171,7 @@ def cmd_refresh(conn, args) -> None:
         raise SystemExit(POSSIBLE_BLOCK_EXIT) from exc
     for report in reports:
         print(render_markdown(report))
+    _write_refresh_notes(reports)
     restaurants_failed = any(r["status"] == "failed" for r in reports)
     if restaurants_failed and backup_failed:
         raise SystemExit(RESTAURANTS_AND_BACKUP_FAILED_EXIT)
@@ -173,6 +179,13 @@ def cmd_refresh(conn, args) -> None:
         raise SystemExit(RESTAURANTS_FAILED_EXIT)
     if backup_failed:
         raise SystemExit(BACKUP_FAILED_EXIT)
+
+
+def _write_refresh_notes(reports: list[dict]) -> None:
+    path = os.environ.get(REFRESH_NOTES_ENV)
+    notes = [FALLBACK_NOTE for report in reports if report.get("fallback_list")]
+    if path and notes:
+        Path(path).write_text("".join(f"{note}\n" for note in notes), encoding="utf-8")
 
 
 def cmd_backup(conn, args) -> None:

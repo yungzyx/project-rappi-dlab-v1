@@ -189,9 +189,22 @@ def _with_retry(discover_stores):
 
 
 def test_refresh_exits_0_when_the_fallback_updated_the_restaurants(db, monkeypatch, tmp_path):
+    """Sale con 0, y deja la marca fija que refresh-semanal.sh anota en ultimo-estado.txt."""
     _previous_run(db, [(_job("rest:384", "/restaurantes/384"), "done", {})])
+    notes = tmp_path / "avisos.txt"
+    monkeypatch.setenv(cli.REFRESH_NOTES_ENV, str(notes))
 
     assert _cmd_refresh(db, monkeypatch, tmp_path, SitemapClient({"/restaurantes/384": "restaurant"})) == 0
+    assert notes.read_text(encoding="utf-8") == f"{cli.FALLBACK_NOTE}\n"
+
+
+def test_a_normal_refresh_leaves_no_notes(db, monkeypatch, tmp_path):
+    notes = tmp_path / "avisos.txt"
+    monkeypatch.setenv(cli.REFRESH_NOTES_ENV, str(notes))
+    client = SitemapClient(sitemaps={discover.CHAIN_SITEMAP.format(0): [], discover.PARTNER_SITEMAP.format(0): []})
+
+    assert _cmd_refresh(db, monkeypatch, tmp_path, client) == 0
+    assert not notes.exists()
 
 
 def test_blocked_sitemap_without_a_previous_list_still_exits_5_with_a_clear_message(db, monkeypatch, tmp_path):

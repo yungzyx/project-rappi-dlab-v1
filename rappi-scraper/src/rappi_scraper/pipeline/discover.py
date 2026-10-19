@@ -185,7 +185,13 @@ def _sitemap_urls(client: RappiClient, template: str) -> list[str]:
             status = exc.response.status_code if exc.response is not None else None
             if shard == 0 or status != 403 or last_count >= SITEMAP_MAX_URLS:
                 raise
-            log.info("Sitemap %s: la parte %d respondió 403 tras una que no estaba llena: es el final", template, shard)
+            log.warning(
+                "Sitemap %s: la parte %d respondió 403 tras una de %d URLs (no llena): se toma como el final. Si fuera "
+                "un bloqueo, faltarían las partes siguientes",
+                template,
+                shard,
+                last_count,
+            )
             return urls
         found = re.findall(r"<loc>([^<]+)</loc>", xml)
         urls += found
