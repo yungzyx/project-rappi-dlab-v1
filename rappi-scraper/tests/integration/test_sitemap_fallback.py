@@ -9,6 +9,7 @@ import requests
 from conftest import FakeClient
 from rappi_scraper import cli
 from rappi_scraper.pipeline import discover
+from rappi_scraper.pipeline.queue import PossibleBlock
 from rappi_scraper.pipeline.refresh import refresh
 from rappi_scraper.reporting import FALLBACK_LIST, render_markdown
 from rappi_scraper.storage import repository
@@ -38,6 +39,9 @@ class SitemapClient(FakeClient):
         return gzip.compress("".join(f"<url><loc>{u}</loc></url>" for u in self.sitemaps[url]).encode())
 
 
+REFRESH = {"trigger": "refresh"}  # como las corridas que empieza `refresh` (ensure_run)
+
+
 def _job(key: str, path: str) -> dict:
     return {
         "job_key": key,
@@ -48,7 +52,7 @@ def _job(key: str, path: str) -> dict:
 
 def _previous_run(db, jobs: list[tuple[dict, str, dict | None]]) -> int:
     """Una corrida de restaurantes terminada con esos jobs (job, estado, resultado)."""
-    run = repository.start_run(db, "restaurants", {"trigger": "refresh"})
+    run = repository.start_run(db, "restaurants", REFRESH)
     repository.add_jobs(db, run, [job for job, _, _ in jobs])
     for job, status, result in jobs:
         repository.mark_job(db, run, job["job_key"], status, result)
@@ -143,7 +147,7 @@ def test_refresh_with_a_blocked_sitemap_updates_the_known_restaurants_and_says_s
 
 def test_a_second_fallback_says_where_the_list_was_discovered(db):
     first = _previous_run(db, [(_job("rest:384", "/restaurantes/384"), "done", {})])
-    second = repository.start_run(db, "restaurants", {})
+    second = repository.start_run(db, "restaurants", REFRESH)
     discover.discover_restaurants(db, SitemapClient(), second)
     repository.finish_run(db, second)
     third = repository.start_run(db, "restaurants", {})
@@ -231,10 +235,90 @@ def test_a_block_while_downloading_the_fallback_list_exits_4_and_leaves_the_run_
 @pytest.mark.parametrize("status", ["done", "failed"])
 def test_the_fallback_ignores_runs_that_are_not_finished(db, status):
     """Solo una corrida terminada (`done`) da su lista: una abierta o fallida puede tener la cola a medias."""
-    run_before = repository.start_run(db, "restaurants", {})
+    run_before = repository.start_run(db, "restaurants", REFRESH)
     repository.add_jobs(db, run_before, [_job("rest:1", "/restaurantes/1")])
     repository.finish_run(db, run_before, status)
 
     assert repository.last_done_run_with_jobs(db, "restaurants", run_before + 1) == (
         run_before if status == "done" else None
     )
+
+
+def test_a_manual_discovery_never_becomes_the_fallback_list(db):
+    """Un `rappi discover --max-chains 5` a mano, terminado, no reemplaza la lista de la última actualización."""
+    weekly = _previous_run(db, [(_job("rest:1", "/restaurantes/1"), "done", {})])
+    manual = repository.start_run(db, "restaurants", {})
+    repository.add_jobs(db, manual, [_job("rest:2", "/restaurantes/2")])
+    repository.finish_run(db, manual)
+    run = repository.start_run(db, "restaurants", REFRESH)
+
+    discover.discover_restaurants(db, SitemapClient(), run)
+
+    assert set(_keys(db, run)) == {"rest:1"}
+    assert repository.run_params(db, run)[FALLBACK_LIST]["corrida"] == weekly
+
+
+def test_the_fallback_respects_the_discovery_limits(db):
+    _previous_run(
+        db,
+        [(_job(f"chain:{i}", f"/restaurantes/delivery/{i}"), "done", {}) for i in range(3)]
+        + [(_job(f"rest:{i}", f"/restaurantes/{i}"), "done", {}) for i in range(3)],
+    )
+    run = repository.start_run(db, "restaurants", {})
+
+    n_jobs = discover.discover_restaurants(db, SitemapClient(), run, max_chains=1, max_independents=2)
+
+    assert n_jobs == 3
+    assert set(_keys(db, run)) == {"chain:0", "rest:0", "rest:1"}
+
+
+def test_a_blocked_partner_sitemap_skips_old_independents_that_are_branches_of_todays_chains(db):
+    """Vapiano (cadena 1833) lista hoy la sucursal 900021447: su job suelto de la lista anterior no se copia."""
+    _previous_run(
+        db,
+        [
+            (_job("rest:900021447", "/restaurantes/900021447-vapiano"), "done", {}),
+            (_job("rest:555", "/restaurantes/555-independiente"), "done", {}),
+        ],
+    )
+    run = repository.start_run(db, "restaurants", REFRESH)
+    client = SitemapClient(
+        {"/restaurantes/delivery/1833-vapiano": "brand_chain"}, sitemaps={discover.CHAIN_SITEMAP.format(0): [CHAIN_URL]}
+    )
+
+    assert discover.discover_restaurants(db, client, run) == 2
+    assert set(_keys(db, run)) == {"chain:1833", "rest:555"}
+
+
+def test_a_possible_block_while_reading_a_sitemap_still_exits_4(db, monkeypatch, tmp_path):
+    """La lista de respaldo es para un sitemap caído o rechazado, no para un bloqueo: ese sigue deteniendo todo."""
+    _previous_run(db, [(_job("rest:384", "/restaurantes/384"), "done", {})])
+
+    class BlockedClient(SitemapClient):
+        def get_content(self, url):
+            raise PossibleBlock("posible bloqueo: 20 requests seguidos rechazados")
+
+    assert _cmd_refresh(db, monkeypatch, tmp_path, BlockedClient()) == cli.POSSIBLE_BLOCK_EXIT == 4
+    [(status, params)] = db.execute(
+        "SELECT status, params FROM scrape_runs WHERE kind = 'restaurants' ORDER BY run_id DESC LIMIT 1"
+    ).fetchall()
+    assert status == "failed" and FALLBACK_LIST not in params
+
+
+def test_a_stopped_fallback_run_does_not_promise_a_new_discovery(db):
+    report = {**_minimal_report(), "alert": "posible bloqueo", "status": "running"}
+    report["fallback_list"] = {"corrida": 8, "descubierta_en": 8, "restaurantes": 10, "error": "HTTPError: 403"}
+
+    text = render_markdown(report)
+
+    assert "se usó la lista de la corrida 8 (10 restaurantes)" in text
+    assert "vuelve a descubrir" not in text
+    assert "vuelve a descubrir" in render_markdown({**report, "alert": None, "status": "done"})
+
+
+def test_a_notes_file_that_cannot_be_written_only_warns(db, monkeypatch, tmp_path, caplog):
+    _previous_run(db, [(_job("rest:384", "/restaurantes/384"), "done", {})])
+    monkeypatch.setenv(cli.REFRESH_NOTES_ENV, str(tmp_path))  # un directorio: escribir ahí falla
+
+    assert _cmd_refresh(db, monkeypatch, tmp_path, SitemapClient({"/restaurantes/384": "restaurant"})) == 0
+    assert any("No pude escribir los avisos" in r.getMessage() for r in caplog.records)

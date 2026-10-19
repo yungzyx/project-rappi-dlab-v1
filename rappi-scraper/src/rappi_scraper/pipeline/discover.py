@@ -20,7 +20,6 @@ from ..scraping.client import PAGE_ERRORS, PageNotFound, RappiClient, StoreUnava
 from ..scraping.listing_parser import parse_brand_chain, parse_vertical_listing
 from ..scraping.store_metadata import normalize_stores
 from ..storage import repository
-from .restaurants import GONE_REASON
 
 log = logging.getLogger(__name__)
 
@@ -235,7 +234,7 @@ def discover_restaurants(
     try:
         chain_urls = _sitemap_urls(client, CHAIN_SITEMAP)[:max_chains]
     except SITEMAP_ERRORS as exc:
-        return _use_previous_list(conn, run_id, exc)
+        return _use_previous_list(conn, run_id, exc, max_chains, max_independents)
     failed = []
     # Segunda pasada solo con las que fallaron (suelen ser errores transitorios de Rappi).
     for attempt, urls in enumerate((chain_urls, failed)):
@@ -252,8 +251,8 @@ def discover_restaurants(
 
     try:
         partner_urls = _sitemap_urls(client, PARTNER_SITEMAP)
-    except SITEMAP_ERRORS as exc:  # las cadenas recién descubiertas quedan; el resto sale de la lista anterior
-        return len(jobs) + _use_previous_list(conn, run_id, exc)
+    except SITEMAP_ERRORS as exc:  # las cadenas recién descubiertas quedan; los independientes, de la lista anterior
+        return len(jobs) + _use_previous_list(conn, run_id, exc, 0, max_independents, skip_store_ids=chain_store_ids)
     independents = []
     for url in partner_urls:
         match = _RESTAURANT_ID_RE.search(url)
@@ -275,20 +274,34 @@ def discover_restaurants(
     return len(jobs) + len(independents)
 
 
-def _use_previous_list(conn: Connection, run_id: int, exc: Exception) -> int:
-    """El sitemap no respondió (bloqueo o caída): la cola se completa con los jobs de la última corrida terminada de
-    restaurantes (lo que se descubrió entonces, se haya bajado o no; sin los que ya no existían en Rappi), y se
-    descargan con los mismos jobs, pausas y detección de bloqueos de siempre. Lo que ya estaba en la cola no se toca.
-    La próxima corrida vuelve a descubrir. Sin una corrida anterior, sube SitemapUnavailable (la corrida queda
-    fallida, como antes)."""
+def _use_previous_list(
+    conn: Connection,
+    run_id: int,
+    exc: Exception,
+    max_chains: int | None,
+    max_independents: int | None,
+    skip_store_ids: set[int] = frozenset(),
+) -> int:
+    """El sitemap no respondió (bloqueo o caída): la cola se completa con los jobs de la última corrida de restaurantes
+    terminada por `refresh` (lo que se descubrió entonces, se haya bajado o no; sin los que ya no existían en Rappi), y
+    se descargan con los mismos jobs, pausas y detección de bloqueos de siempre. Lo que ya estaba en la cola no se toca.
+    Los topes valen como al descubrir (`max_chains=0`: sin cadenas, porque ya se descubrieron hoy), y un independiente
+    que hoy es sucursal de una cadena (`skip_store_ids`) no entra. La próxima corrida nueva vuelve a descubrir. Sin una
+    corrida anterior, sube SitemapUnavailable (la corrida queda fallida, como antes)."""
     error = f"{type(exc).__name__}: {exc}"
     source = repository.last_done_run_with_jobs(conn, "restaurants", run_id)
     if source is None:
         raise SitemapUnavailable(
             f"{error}. No hay una corrida de restaurantes terminada de la que usar la lista: no se actualizan"
         ) from exc
-    copied = repository.copy_jobs(conn, source, run_id, "restaurant", skip_reason=GONE_REASON)
+    previous_jobs = repository.run_jobs(conn, source, "restaurant", skip_reason=repository.GONE_REASON)
+    chains = [j for j in previous_jobs if j["job_key"].startswith("chain:")][:max_chains]
+    skipped_keys = {f"rest:{store_id}" for store_id in skip_store_ids}
+    others = [j for j in previous_jobs if not j["job_key"].startswith("chain:") and j["job_key"] not in skipped_keys]
     previous = repository.run_params(conn, source).get(FALLBACK_LIST)
+    # Los jobs y la nota se guardan juntos (set_run_param hace el commit): una corrida con la lista copiada lleva la
+    # nota aunque se corte justo después.
+    copied = repository.insert_new_jobs(conn, run_id, chains + others[:max_independents])
     fallback = {
         "corrida": source,
         "descubierta_en": previous["descubierta_en"] if previous else source,

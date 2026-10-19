@@ -246,11 +246,9 @@ def render_markdown(report: dict) -> str:
         lines += [f"⛔ Corrida detenida: {report['alert']}. Quedó abierta: la próxima actualización la retoma.", ""]
     if report.get("fallback_list"):  # la corrida se hizo, pero sin descubrir: restaurantes nuevos no entraron
         fallback = report["fallback_list"]
-        lines += [
-            f"⚠ {fallback_message(fallback)}. Error del sitemap: {fallback['error']}. "
-            "La próxima actualización vuelve a descubrir.",
-            "",
-        ]
+        # Detenida por un bloqueo, la próxima actualización la retoma con la misma lista: no vuelve a descubrir.
+        again = "" if report.get("alert") else " La próxima actualización vuelve a descubrir."
+        lines += [f"⚠ {fallback_message(fallback)}. Error del sitemap: {fallback['error']}.{again}", ""]
     if warnings:
         names = ", ".join(c["label"] for c in warnings)
         lines.append(f"⚠ {len(warnings)} validaciones fuera de rango: {names}")

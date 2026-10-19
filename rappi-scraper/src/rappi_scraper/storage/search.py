@@ -6,6 +6,8 @@ embedding. Si el texto cambia (otro `content_hash`), el embedding guardado se in
 
 from psycopg import Connection
 
+from .repository import GONE_REASON
+
 VERTICALS = ("supermercado", "conveniencia", "turbo", "mall", "farmacia", "licores", "chocolateria", "restaurantes")
 
 # Bajo $10 no hay precio real en pesos chilenos: un plato a $0 o $1 es de relleno (su precio depende de las opciones
@@ -61,7 +63,7 @@ CREATE TEMP TABLE offer_prices ON COMMIT DROP AS
 SELECT store_id, sku, price, current FROM v_latest_offers
 """
 
-_DISH_PRICES = """
+_DISH_PRICES = f"""
 CREATE TEMP TABLE dish_prices ON COMMIT DROP AS
 WITH latest AS (
     SELECT lmp.item_id, lmp.price, lmp.real_price, lmp.run_id, lmp.scraped_at,
@@ -76,7 +78,7 @@ chain_run AS (
 gone AS (
     SELECT job_key, max(run_id) AS run_id
     FROM scrape_jobs
-    WHERE job_type = 'restaurant' AND status = 'skipped' AND result->>'reason' = 'ya no existe en Rappi'
+    WHERE job_type = 'restaurant' AND status = 'skipped' AND result->>'reason' = '{GONE_REASON}'
     GROUP BY job_key
 )
 SELECT l.item_id, l.price, l.real_price,

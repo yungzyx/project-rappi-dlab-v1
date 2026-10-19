@@ -185,7 +185,10 @@ def _write_refresh_notes(reports: list[dict]) -> None:
     path = os.environ.get(REFRESH_NOTES_ENV)
     notes = [FALLBACK_NOTE for report in reports if report.get("fallback_list")]
     if path and notes:
-        Path(path).write_text("".join(f"{note}\n" for note in notes), encoding="utf-8")
+        try:
+            Path(path).write_text("".join(f"{note}\n" for note in notes), encoding="utf-8")
+        except OSError as exc:  # solo es un aviso: la descarga ya terminó y el reporte lo dice
+            log.warning("No pude escribir los avisos en %s (%s): ultimo-estado.txt no los anotará", path, exc)
 
 
 def cmd_backup(conn, args) -> None:
@@ -263,8 +266,14 @@ def build_parser() -> argparse.ArgumentParser:
         choices=[*VERTICAL_LISTINGS, "restaurantes"],
     )
     p.add_argument("--cities", nargs="+", help="Limitar ciudades (coincidencia parcial)")
-    p.add_argument("--max-chains", type=int, help="Máximo de cadenas de restaurantes (pruebas)")
-    p.add_argument("--max-independents", type=int, help="Máximo de restaurantes independientes (pruebas)")
+    p.add_argument(
+        "--max-chains", type=int, help="Máximo de cadenas de restaurantes (pruebas; también con la lista de respaldo)"
+    )
+    p.add_argument(
+        "--max-independents",
+        type=int,
+        help="Máximo de restaurantes independientes (pruebas; también con la lista de respaldo)",
+    )
     p.add_argument("--new-run", action="store_true", help="Empezar corrida nueva en vez de reanudar")
 
     p = sub.add_parser("scrape-stores", help="Procesar la cola de tiendas")
