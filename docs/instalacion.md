@@ -73,7 +73,7 @@ No cambia la configuración de Postgres. Si el equipo tiene poca memoria, usa un
 cd rappi-ia
 make install install-ml db-test migrate   # .venv, paquetes de los modelos (~1 GB), base de tests
 make test
-caffeinate -i make post-refresh           # purga, categorías nuevas con Jev (si está adoptado), conceptos, embeddings, evaluación, datos simulados y capa de datos al día con la base, y otra purga
+caffeinate -i make post-refresh           # purga, categorías nuevas con Jev (si está adoptado), conceptos, embeddings (y limpieza de los que ya no se usan), evaluación, datos simulados y capa de datos al día con la base, y otra purga
 ```
 
 - **τ:** `make post-refresh` también recalibra τ en `src/rappi_ia/eval/thresholds.json` (solo en verticales con negativas que dependen de τ; los demás conservan el suyo). Si cambia, revisar y hacer commit.
@@ -139,7 +139,7 @@ make schedule-status   # ¿está activa? ¿cómo terminó la última vez?
 
 - **Qué corre:** `rappi-scraper/scripts/refresh-semanal.sh`.
   - Primero `rappi migrate` (las migraciones que haya traído un `git pull`) y `rappi refresh`: tiendas, restaurantes, búsqueda, reportes y respaldo en `data/backups/` (quedan los últimos 4).
-  - Si termina bien (o solo fallaron el respaldo o los restaurantes: códigos 3, 5 y 6 de `rappi refresh`, ver [rappi-scraper/README.md](../rappi-scraper/README.md)), `make post-refresh` de rappi-ia: purga (primero, para cumplir la retención aunque falle otro paso), categorías nuevas con Jev (solo con clave y adopción), conceptos, embeddings, evaluación (con Jev como juez si está adoptado), datos simulados, capa de datos (`make layers`) y otra purga.
+  - Si termina bien (o solo fallaron el respaldo o los restaurantes: códigos 3, 5 y 6 de `rappi refresh`, ver [rappi-scraper/README.md](../rappi-scraper/README.md)), `make post-refresh` de rappi-ia: purga (primero, para cumplir la retención aunque falle otro paso), categorías nuevas con Jev (solo con clave y adopción), conceptos, embeddings (y limpieza de los que ya no se usan, `make prune-embeddings`), evaluación (con Jev como juez si está adoptado), datos simulados, capa de datos (`make layers`) y otra purga.
   - Nunca corren dos descargas a la vez: los comandos que descargan comparten el candado `rappi-scraper/data/scraper.lock`, que el sistema suelta aunque el proceso muera. Además, la tarea semanal tiene su propio candado, que se borra aunque la corten con una señal (Ctrl-C, cerrar la terminal).
 - **τ:** la evaluación semanal no guarda τ, porque `thresholds.json` está en el repositorio. Para recalibrar: `make eval` a mano en `rappi-ia/` y commit.
 - **Dormido o apagado:** si a esa hora el equipo estaba **dormido**, la tarea corre al despertar; si estaba **apagado**, esa semana se salta. Por eso conviene:
@@ -152,7 +152,8 @@ make schedule-status   # ¿está activa? ¿cómo terminó la última vez?
   - «omitida»: otra descarga estaba en curso;
   - «interrumpida»: la anterior se cortó (apagado, corte de luz) y se retoma en la etapa donde quedó, sin volver a bajar tiendas ya terminadas; si el corte fue después de las descargas (en la búsqueda, el respaldo o la capa de IA), `./scripts/refresh-semanal.sh --resume-only` termina esos pasos sin descargar de nuevo;
   - «respaldo fallido»: la descarga y la capa de IA terminaron, pero no hay respaldo nuevo (se conservan los anteriores); el error está en `launchd.err.log`, y «Respaldo más nuevo» muestra de cuándo es el último;
-  - «restaurantes sin actualizar»: falló el descubrimiento de restaurantes (p. ej. un sitemap caído); las tiendas, la búsqueda, el respaldo y la capa de IA sí se hicieron, y la semana siguiente se descubre de nuevo (si además falló el respaldo, la línea dice las dos cosas);
+  - «restaurantes sin actualizar»: falló el descubrimiento de restaurantes y no había una corrida anterior terminada de la que usar la lista; las tiendas, la búsqueda, el respaldo y la capa de IA sí se hicieron, y la semana siguiente se descubre de nuevo (si además falló el respaldo, la línea dice las dos cosas). Con un sitemap caído o bloqueado y esa lista, los restaurantes se bajan igual y la línea dice `exit=0`, con la nota siguiente;
+  - «restaurantes con la lista de la corrida anterior»: el sitemap de restaurantes no respondió y se bajaron los restaurantes de la última corrida terminada (sin los nuevos); el detalle («⚠ sitemap bloqueado o caído: se usó la lista de la corrida N») está en el reporte de restaurantes, y la semana siguiente se descubre de nuevo. Si se repite varias semanas, revisar el error del sitemap en el reporte;
   - `exit=4` «detenida: posible bloqueo»: ver el punto siguiente;
   - un código distinto de 0: falló; el detalle está en `rappi-scraper/data/logs/launchd.err.log`.
 - **Posible bloqueo:** si 20 requests seguidos son rechazados (403, 429, página de desafío) o 10 jobs seguidos fallan sin respuesta útil de rappi.cl (403, 429, red), la descarga se detiene, el reporte de la corrida lo marca con ⛔ y la corrida queda abierta, salvo si fue al descubrir: la próxima actualización la retoma. No hay que hacer nada salvo revisar el reporte. Si el ⛔ se repite semana tras semana con los mismos jobs, no es un bloqueo sino un error fijo de esos jobs (por ejemplo, rappi.cl cambió esas páginas): hay que revisar su error. Mientras tanto no se actualiza nada; después de unas semanas (4 intentos) esos jobs quedan fallidos y la corrida sigue.

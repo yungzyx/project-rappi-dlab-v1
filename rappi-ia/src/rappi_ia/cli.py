@@ -7,6 +7,7 @@ Flujo típico (después de cada `rappi refresh` del scraper):
     rappi-ia map-categories          # categorías sin mapeo revisado, con concepto sugerido, a un CSV para revisar
     rappi-ia map-categories --jev    # Jev propone su concepto (solo con clave y adopción); --exportar para revisarlas
     rappi-ia embed-text              # embeddings e5 de search_documents (incremental) + HNSW por vertical
+    rappi-ia prune-embeddings        # borra del caché los vectores que ya no usa ningún documento ni nombre
     rappi-ia search "algo para el carrete" --vertical licores
     rappi-ia eval-search             # léxico vs vectorial vs híbrido + calibración de τ ("sin resultado")
     rappi-ia jev-planillas           # planillas CSV (data/eval/) para juzgar a mano; luego `eval-human` da el κ
@@ -258,6 +259,24 @@ def cmd_embed_text(conn, args) -> None:
     except ScrapeRunning as exc:
         log.error("%s", exc)
         sys.exit(1)
+
+
+# Desde cuántos vectores borrados vale la pena sugerir VACUUM FULL (~4 KB cada uno: 10 mil son ~40 MB).
+VACUUM_FULL_HINT_ROWS = 10_000
+
+
+def cmd_prune_embeddings(conn, args) -> None:
+    from .embeddings.text_store import ORPHAN_MIN_AGE_DAYS, ScrapeRunning, prune_orphan_embeddings
+
+    try:
+        result = prune_orphan_embeddings(conn)
+    except ScrapeRunning as exc:
+        log.error("%s", exc)
+        sys.exit(1)
+    deleted, left = result["vectores_borrados"], result["vectores_que_quedan"]
+    print(f"Vectores sin uso de más de {ORPHAN_MIN_AGE_DAYS} días borrados: {deleted} (quedan {left}).")
+    if deleted >= VACUUM_FULL_HINT_ROWS:
+        print("El espacio lo reusa autovacuum; para devolverlo al disco, VACUUM FULL text_embeddings a mano.")
 
 
 def cmd_search(conn, args) -> None:
@@ -663,6 +682,7 @@ COMMANDS = {
     "concepts": cmd_concepts,
     "map-categories": cmd_map_categories,
     "embed-text": cmd_embed_text,
+    "prune-embeddings": cmd_prune_embeddings,
     "search": cmd_search,
     "eval-search": cmd_eval_search,
     "eval-sample": cmd_eval_sample,
@@ -732,6 +752,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     embed = sub.add_parser("embed-text", help="embeddings de texto de search_documents (incremental)")
     embed.add_argument("--limit", type=int, help="máximo de textos nuevos (para probar)")
+    sub.add_parser("prune-embeddings", help="borra del caché de embeddings los vectores que ya nadie usa")
     search = sub.add_parser("search", help="búsqueda híbrida dentro de un vertical")
     search.add_argument("query")
     search.add_argument("--vertical", required=True)

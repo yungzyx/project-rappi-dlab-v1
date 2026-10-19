@@ -3,13 +3,16 @@
 Todo producto que el agente muestra pasa por aquí: sale de la base, con su precio vigente, nunca inventado.
 """
 
+import re
+import unicodedata
 from dataclasses import dataclass, field
 
 from psycopg import Connection
 from rappi_scraper.storage.search import MIN_PRICE
 
 from .. import config
-from ..concepts.taxonomy import load_taxonomy
+from ..concepts.matcher import KeywordMatcher
+from ..concepts.taxonomy import Occasion, load_taxonomy
 from ..embeddings.base import TextEmbedder
 from ..motor.combos import SERVICES
 from ..motor.predict import step_signal, target_step
@@ -130,14 +133,14 @@ def search_products(
     concepts = result.query_concepts
     capped = price_max is not None
     strict = symptom or vertical == "farmacia"
-    hits = _focus([h for h in result.hits if _allowed(h.concept_id, concepts, strict)], concepts, result.unmet, capped)
+    hits = _focus([h for h in result.hits if _allowed(h.concept_id, concepts, strict)], result, capped)
     products = _dedupe(_within_budget(_with_prices(conn, vertical, hits, offer, adult_ok), price_max))[:k]
     cheapest = None
     if not products and capped:
         unfiltered = retrieve(conn, vertical, query, embedder, k=k * 2, mode=mode, concepts=concepts, words=words)
         allowed = [h for h in unfiltered.hits if _allowed(h.concept_id, concepts, strict)]
         # «El más barato» es de lo pedido: el mismo foco que con tope.
-        candidates = _with_prices(conn, vertical, _focus(allowed, concepts, unfiltered.unmet, capped), offer, adult_ok)
+        candidates = _with_prices(conn, vertical, _focus(allowed, unfiltered, capped), offer, adult_ok)
         priced = [p for p in candidates if p.price_value is not None]
         cheapest = min(priced, key=lambda p: p.price_value) if priced else None
     return SearchOutcome(result, products, cheapest)
@@ -439,23 +442,103 @@ def _dedupe(products: list[Product]) -> list[Product]:
     return unique
 
 
-def _focus(hits, concepts: list[str], unmet: bool, capped: bool = False):
-    """Si la consulta nombra conceptos, solo esos: pedir cigarrillos no debe traer cerveza.
+# Bajo esta participación en el vertical (y bajo el mínimo de «sin resultado», retrieval.hybrid.MIN_CONCEPT_ITEMS), lo
+# rotulado con el concepto pedido no se muestra. En la práctica es un interruptor: en la base real todo surtido
+# testimonial queda bajo el 1 % (el vertical más chico tiene más de mil documentos), así que siempre se oculta; solo en
+# un catálogo chico (los de prueba, de decenas de productos) dos productos pasan el 1 % y se siguen mostrando.
+TESTIMONIAL_SHARE = 0.01
+
+
+def _focus(hits, result: RetrievalResult, capped: bool = False):
+    """Si la consulta nombra conceptos (`result.query_concepts`), solo esos: pedir cigarrillos no debe traer cerveza.
 
     - "Sin resultado" no muestra nada, nombre o no un concepto: mostrar una pizza a quien pidió kebab, o los vecinos
-      de un coseno bajo τ, sería inventar una respuesta (y la demanda no se anotaría).
+      de un coseno bajo τ, sería inventar una respuesta (y la demanda no se anotaría). Tampoco los pocos productos de
+      un concepto que el vertical casi no tiene (bajo TESTIMONIAL_SHARE), que suelen ser otra cosa con su etiqueta: un
+      cable HDMI para «televisor 55 pulgadas» en Turbo, un pack de regalo para «cerveza en lata» en el Mall.
     - Con tope de precio (`capped`), si nada del concepto pedido cabe bajo el tope tampoco se muestra otra cosa:
       El agente dice cuánto cuesta lo más barato de lo pedido.
+    - Si nada de lo encontrado es del concepto pedido y el vertical no lo vende (`concept_in_vertical`, la regla de
+      «sin resultado»), solo se muestra lo que lo dice en su nombre (`_names_query`): «sándwiches» en Express trae los
+      sándwiches rotulados como empanadas, pero «pañales» en restaurantes no trae el postre con «panal» que el
+      stemming juntaba. El agente y el buscador dicen dónde sí lo venden. No rige si la consulta nombra una ocasión
+      («algo para el asado» en Licores) o un concepto amplio (`broad` en taxonomy.toml: «picoteo»): ahí lo pedido
+      son productos de varios tipos que su nombre no dice.
     - El foco no cede ante productos de otro concepto que calzan las palabras: esa coincidencia mira todo el texto y
       el stemming junta palabras («flores» calza con azúcar flor). Que el concepto de la consulta (keywords) y el de
       los productos (categoría) coincidan se asegura en la taxonomía.
     """
+    concepts = result.query_concepts
     if not concepts:
-        return [] if unmet else hits
+        return [] if result.unmet else hits
+    if result.unmet and (result.concept_share or 0.0) < TESTIMONIAL_SHARE:
+        return []
     matching = [h for h in hits if h.concept_id in concepts]
     if matching:
         return matching
-    return [] if unmet or capped else hits
+    if result.unmet or capped:
+        return []
+    if result.concept_in_vertical or _broad_request(result.query, concepts):
+        return hits
+    return [h for h in hits if _names_query(h.content, result.query)]
+
+
+_OCCASIONS = None
+
+
+def named_occasion(q: str) -> Occasion | None:
+    """La ocasión que nombra la consulta («algo para el carrete»), con las keywords de taxonomy.toml."""
+    global _OCCASIONS
+    taxonomy = load_taxonomy()
+    if _OCCASIONS is None:
+        _OCCASIONS = KeywordMatcher((o.id, kw) for o in taxonomy.occasions.values() for kw in o.keywords)
+    match = _OCCASIONS.best(normalize(q))
+    return taxonomy.occasions[match.target] if match else None
+
+
+def _broad_request(query: str, concepts: list[str]) -> bool:
+    """¿Pide productos de varios tipos? Una ocasión («algo para el asado») o un concepto amplio («picoteo»)."""
+    taxonomy = load_taxonomy()
+    return named_occasion(query) is not None or any(
+        c in taxonomy.concepts and taxonomy.concepts[c].broad for c in concepts
+    )
+
+
+# Palabras que el nombre de un producto no necesita repetir: de enlace («detergente para ropa») y de relleno («algo
+# para…», «lo que…», «mi…»); además de las de saludo y pedido (text.FILLER_WORDS).
+_NAME_SKIP = FILLER_WORDS | frozenset(
+    {"a", "al", "algo", "con", "de", "del", "el", "en", "la", "las", "lo", "los", "mi", "para", "que", "sin", "y"}
+)
+
+
+def _name_words(text: str) -> list[str]:
+    """Las palabras sin tildes, como `text.tokens`, pero con la ñ: «pañal» no es «panal»."""
+    marked = unicodedata.normalize("NFC", text.lower()).replace("ñ", "\x00")
+    return [w.replace("\x00", "ñ") for w in re.findall(r"[a-z0-9\x00]+", _without_marks(marked))]
+
+
+def _without_marks(text: str) -> str:
+    return "".join(ch for ch in unicodedata.normalize("NFD", text) if unicodedata.category(ch) != "Mn")
+
+
+def _forms(word: str) -> set[str]:
+    """La palabra y sus singulares posibles: «limones» → limones, limone, limon; «sándwiches» → … sandwich."""
+    forms = {word}
+    if word.endswith("s") and len(word) > 3:
+        forms.add(word[:-1])
+    if word.endswith("es") and len(word) > 4:
+        forms.add(word[:-2])
+    return forms
+
+
+def _names_query(content: str, query: str) -> bool:
+    """¿El nombre dice todas las palabras de la consulta? El nombre es lo que va antes del primer «. » del documento
+    (search_documents lo arma así: nombre, marca, presentación, categoría…; un nombre con «. » adentro queda cortado
+    ahí). Palabras enteras sin tildes y con la ñ, en singular o plural (s/es) de cualquiera de los dos lados:
+    «limones» dice Limón y «sándwiches», Sándwich; «pañales» no dice Panal."""
+    name = set().union(*(_forms(w) for w in _name_words(content.split(". ", 1)[0])))
+    wanted = [w for w in _name_words(query) if normalize(w) not in _NAME_SKIP]
+    return bool(wanted) and all(_forms(w) & name for w in wanted)
 
 
 def _allowed(concept_id: str | None, requested: list[str], strict: bool = False) -> bool:
@@ -492,22 +575,24 @@ def _with_prices(conn: Connection, vertical: str, hits, offer: bool = False, adu
         # El precio, el precio anterior y la tienda (id y nombre) son los de una misma oferta: la más barata de las
         # tiendas que la app abre con este producto en un pasillo (como /catalog/stores). Una tienda sin pasillos,
         # importada de un CSV antiguo, no tiene página: sin ninguna que se abra vale la oferta más barata de todas y
-        # el id es nulo.
+        # el id es nulo. El pasillo va como LEFT JOIN (uno por llave) y la vertical como EXISTS: como subconsulta, el
+        # pasillo recorría todos los pasillos raíz dos veces y la vertical se armaba entera (−2,5 ms por búsqueda).
         for pid, name, price, real, store, age, store_id, presentation in conn.execute(
             f"""WITH offers AS (
                    SELECT sp.master_product_id, ci.name, l.price, l.real_price, l.store_id,
                           btrim(coalesce(b.name, s.name)) AS store, ci.is_alcoholic OR ci.age_restricted AS adult,
-                          ci.presentation,
-                          EXISTS (SELECT 1 FROM aisles a WHERE a.store_id = l.store_id AND a.aisle_id = sp.aisle_id
-                                                           AND a.parent_aisle_id IS NULL) AS openable
+                          ci.presentation, a.store_id IS NOT NULL AS openable
                    FROM store_products sp
                    JOIN v_latest_offers l ON l.store_id = sp.store_id AND l.sku = sp.sku
                    JOIN stores s ON s.store_id = sp.store_id
                    LEFT JOIN brands b ON b.brand_id = s.brand_id
                    JOIN catalog_items ci ON ci.master_product_id = sp.master_product_id
-                   JOIN v_store_verticals v ON v.store_id = s.store_id AND v.vertical = %(vertical)s
+                   LEFT JOIN aisles a ON a.store_id = l.store_id AND a.aisle_id = sp.aisle_id
+                                     AND a.parent_aisle_id IS NULL
                    WHERE sp.master_product_id = ANY(%(ids)s::bigint[]) AND l.current
                      AND l.in_stock IS NOT FALSE{store_filter}
+                     AND EXISTS (SELECT 1 FROM v_store_verticals v
+                                 WHERE v.store_id = s.store_id AND v.vertical = %(vertical)s)
                )
                SELECT DISTINCT ON (master_product_id) master_product_id::text, name, price, real_price, store, adult,
                       CASE WHEN openable THEN store_id END, presentation

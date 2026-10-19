@@ -470,6 +470,38 @@ def test_exit_codes_3_4_5_noted(tmp_path, shell, code, exit_code, ai_layer_runs,
     assert line.endswith(f"exit={exit_code}{note}")
 
 
+@pytest.mark.parametrize(
+    ("code", "note"),
+    [
+        (0, " (restaurantes con la lista de la corrida anterior)"),
+        (3, " (respaldo fallido: se conservan los anteriores; restaurantes con la lista de la corrida anterior)"),
+    ],
+)
+def test_restaurants_from_the_previous_list_are_noted(tmp_path, shell, code, note):
+    """El sitemap de restaurantes no respondió y se bajó la lista de una corrida anterior: sale con 0 (o 3), pero la
+    línea de estado lo dice, para que un sitemap bloqueado varias semanas no pase inadvertido."""
+    marker = cli.FALLBACK_NOTE
+    project = _project(
+        tmp_path, f'[[ $1 == refresh ]] && {{ echo {marker} > "${cli.REFRESH_NOTES_ENV}"; exit {code}; }}; exit 0'
+    )
+
+    result = _run(project, shell)
+
+    assert result.returncode == 0
+    [line] = _status_lines(project)
+    assert line.endswith(f"exit=0{note}")
+
+
+def test_a_previous_weeks_notes_are_not_noted_again(tmp_path, shell):
+    project = _project(tmp_path, "exit 0")
+    logs = project / "data" / "logs"
+    logs.mkdir(parents=True)
+    (logs / "refresh-avisos.txt").write_text(f"{cli.FALLBACK_NOTE}\n")
+
+    assert _run(project, shell).returncode == 0
+    assert _status_lines(project)[0].endswith("exit=0")
+
+
 def test_big_launchd_log_rotated(tmp_path, shell):
     """launchd escribe siempre en el mismo archivo: pasados 10 MB, el script lo copia a .1 (y pisa el .1 anterior) y lo
     vacía. Lo de esta misma ejecución, que launchd sigue escribiendo ahí, queda en el archivo vivo."""

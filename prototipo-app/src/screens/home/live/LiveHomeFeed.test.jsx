@@ -12,6 +12,7 @@ vi.mock('../../../state/EventsContext', async (importOriginal) => ({
 
 // La memoria de la escena vive en el módulo (lo que dura la pestaña): cada test, una pestaña nueva.
 let HomeScreen
+let useOrders
 let Providers
 let memory
 let useAssistant
@@ -29,6 +30,7 @@ beforeEach(async () => {
   const address = await import('../../../state/AddressContext')
   const toast = await import('../../../components/Toast')
   const orders = await import('../../../state/OrdersContext')
+  useOrders = orders.useOrders
   memory = await import('../../../state/liveMemory')
   useAssistant = assistant.useAssistant
   HomeScreen = (await import('../HomeScreen')).default
@@ -70,17 +72,22 @@ const stubAgent = (routes = {}) =>
   })
 const allOfferRequests = (mock = api) =>
   mock.mock.calls.filter(([url]) => url.endsWith('/agent/offer')).map(([, init]) => JSON.parse(init.body))
-// La recompra se pide sola cada vez que la Home está arriba: sus tests la miran con `repeatRequests`.
-const offerRequests = (mock = api) => allOfferRequests(mock).filter((body) => body.moment !== 'recompra')
+// La recompra (y, sin ella, «¿Volvemos a…?») se pide sola cada vez que la Home está arriba: sus tests la miran con
+// `repeatRequests` y `winbackRequests`.
+const SLOT_MOMENTS = ['recompra', 'volver']
+const offerRequests = (mock = api) => allOfferRequests(mock).filter((body) => !SLOT_MOMENTS.includes(body.moment))
 const repeatRequests = (mock = api) => allOfferRequests(mock).filter((body) => body.moment === 'recompra')
-// Con una recompra que ofrecer (los demás momentos, como siempre).
-const stubRepeat = () =>
+const winbackRequests = (mock = api) => allOfferRequests(mock).filter((body) => body.moment === 'volver')
+// Con una recompra o un «¿Volvemos a…?» que ofrecer (los demás momentos, como siempre).
+const stubSlot = (slot) =>
   stubAgent({
     'POST /agent/offer': (req) => {
-      const name = req.body.moment === 'recompra' ? 'agent-offer-recompra' : OFFER_FIXTURES[req.body.moment]
+      const name = slot[req.body.moment] ?? OFFER_FIXTURES[req.body.moment]
       return name ? fixture(name) : 204
     },
   })
+const stubRepeat = () => stubSlot({ recompra: 'agent-offer-recompra' })
+const stubWinback = (slot = {}) => stubSlot({ volver: 'agent-offer-volver', ...slot })
 const LOOSE_CART = {
   id: 'cat-94001',
   name: 'Cerveza rubia lata 470 cc (prueba)',
@@ -504,6 +511,165 @@ describe('Home del prototipo final', () => {
       await advance(100)
       expect(repeatRequests()).toHaveLength(1)
       expect(repeatBlock(container)).toBeNull()
+    })
+  })
+
+  describe('«¿Volvemos a…?» (lo que dejó de pedir)', () => {
+    const slotBlock = (container) => container.querySelector('.live-block--recompra')
+
+    test('sin recompra, ocupa su lugar, dice por qué y registra la mostrada con su origen', async () => {
+      api = stubWinback()
+      const made = fixture('agent-offer-volver')
+      const { container } = await renderHome()
+      await advance(100)
+      expect(winbackRequests()).toEqual([{ moment: 'volver', user_id: expect.any(String), context: {} }])
+      const block = slotBlock(container)
+      expect(within(block).getByRole('region', { name: 'Volver a pedir' })).toBeTruthy()
+      expect(within(block).getByText(made.text)).toBeTruthy()
+      fireEvent.click(within(block).getByRole('button', { name: '¿Por qué?' }))
+      expect(within(block).getByText(made.reason.text)).toBeTruthy()
+      expect(tracked('suggestion_shown', 'agent-volver')).toEqual([
+        [
+          'suggestion_shown',
+          { concept_id: 'cafe', vertical: 'grocery', payload: { origen: 'agent-volver', kind: 'volver' } },
+        ],
+      ])
+    })
+
+    test('la recompra gana: con una, «¿Volvemos a…?» ni se pide', async () => {
+      api = stubWinback({ recompra: 'agent-offer-recompra' })
+      const { container } = await renderHome()
+      await advance(100)
+      expect(winbackRequests()).toEqual([])
+      expect(within(slotBlock(container)).getByText(fixture('agent-offer-recompra').text)).toBeTruthy()
+      expect(tracked('suggestion_shown', 'agent-volver')).toEqual([])
+    })
+
+    test('se pide una vez por pestaña: al volver a la Home sigue el mismo, sin contarlo otra vez', async () => {
+      api = stubWinback()
+      const { container, rerender } = await renderHome()
+      await advance(100)
+      rerender(homeTree({ active: false }))
+      rerender(homeTree({ active: true }))
+      await advance(100)
+      expect(repeatRequests()).toHaveLength(2)
+      expect(winbackRequests()).toHaveLength(1)
+      expect(within(slotBlock(container)).getByText(fixture('agent-offer-volver').text)).toBeTruthy()
+      expect(tracked('suggestion_shown', 'agent-volver')).toHaveLength(1)
+    })
+
+    test('«Ver producto» lleva a su tienda con el origen de la oferta', async () => {
+      api = stubWinback()
+      const push = vi.fn()
+      const { container } = await renderHome({ push })
+      await advance(100)
+      fireEvent.click(within(slotBlock(container)).getByRole('button', { name: 'Ver producto' }))
+      expect(tracked('suggestion_accepted', 'agent-volver')).toEqual([])
+      expect(push).toHaveBeenLastCalledWith(
+        'store',
+        expect.objectContaining({ item: expect.objectContaining({ suggestionOrigin: 'agent-volver' }) }),
+      )
+    })
+
+    test('«Después» registra el descarte (la API deja de ofrecerla con dos) y no se vuelve a pedir', async () => {
+      api = stubWinback()
+      const { container, rerender } = await renderHome()
+      await advance(100)
+      fireEvent.click(within(slotBlock(container)).getByRole('button', { name: 'Después' }))
+      expect(slotBlock(container)).toBeNull()
+      expect(tracked('suggestion_dismissed', 'agent-volver')).toEqual([
+        [
+          'suggestion_dismissed',
+          { concept_id: 'cafe', vertical: 'grocery', payload: { origen: 'agent-volver', kind: 'volver' } },
+        ],
+      ])
+
+      rerender(homeTree({ active: false }))
+      rerender(homeTree({ active: true }))
+      await advance(100)
+      expect(winbackRequests()).toHaveLength(1)
+      expect(slotBlock(container)).toBeNull()
+    })
+
+    test('un pedido nuevo la vuelve a pedir (no invita a volver a lo que se acaba de comprar)', async () => {
+      api = stubWinback()
+      let place
+      function Orders() {
+        place = useOrders().place
+        return null
+      }
+      const tree = (active) => (
+        <Providers>
+          <Orders />
+          <div className="phone">
+            <div className="screen-wrap">
+              <HomeScreen push={vi.fn()} tab="home" setTab={vi.fn()} active={active} />
+            </div>
+          </div>
+        </Providers>
+      )
+      const { rerender } = render(tree(true))
+      await advance(100)
+      rerender(tree(false))
+      act(() => place({ stores: [], items: [], total: 0 }))
+      rerender(tree(true))
+      await advance(100)
+      expect(winbackRequests()).toHaveLength(2)
+    })
+
+    test('una API que no conoce el momento (422) no deja bloque, ni la recompra de antes, y no se vuelve a pedir', async () => {
+      let repeats = 0
+      api = stubAgent({
+        'POST /agent/offer': (req) => {
+          if (req.body.moment === 'recompra') return (repeats += 1) === 1 ? fixture('agent-offer-recompra') : 204
+          if (req.body.moment === 'volver') return 422
+          return OFFER_FIXTURES[req.body.moment] ? fixture(OFFER_FIXTURES[req.body.moment]) : 204
+        },
+      })
+      const { container, rerender } = await renderHome()
+      await advance(100)
+      expect(slotBlock(container)).not.toBeNull() // la recompra
+      rerender(homeTree({ active: false }))
+      rerender(homeTree({ active: true }))
+      await advance(100)
+      expect(winbackRequests()).toHaveLength(1)
+      expect(slotBlock(container)).toBeNull()
+      rerender(homeTree({ active: false }))
+      rerender(homeTree({ active: true }))
+      await advance(100)
+      expect(winbackRequests()).toHaveLength(1) // guardada como «no hay»
+    })
+
+    test('si la Home invitó a volver a una vertical, tocar a Mochi no dice «Vuelve a…» de esa misma', async () => {
+      const back = fixture('agent-offer-volver')
+      back.reason = { text: 'Porque pediste 3 veces en el súper…', basis: [{ kind: 'vuelta', id: 'supermercado' }] }
+      const toTry = fixture('agent-offer-vertical-por-probar')
+      toTry.reason.basis = [{ kind: 'vuelta', id: 'supermercado', source: 'pedidos' }]
+      api = stubAgent({
+        'POST /agent/offer': (req) =>
+          ({ volver: back, vertical_por_probar: toTry })[req.body.moment] ??
+          (OFFER_FIXTURES[req.body.moment] ? fixture(OFFER_FIXTURES[req.body.moment]) : 204),
+      })
+      const { container } = await renderHome()
+      await advance(900 + 3400)
+      fireEvent.click(screen.getByRole('button', { name: /^Mochi:/ }))
+      await advance(3000)
+      expect(offerRequests()).toEqual([{ moment: 'vertical_por_probar', user_id: expect.any(String), context: {} }])
+      expect(container.querySelector('.live-bubble p')?.textContent ?? '').not.toBe(POKE_LINE)
+      expect(tracked('suggestion_shown', 'agent-volver')).toEqual([
+        [
+          'suggestion_shown',
+          { concept_id: 'cafe', vertical: 'grocery', payload: { origen: 'agent-volver', kind: 'vuelta' } },
+        ],
+      ])
+    })
+
+    test('«Después» en la recompra no registra un descarte de «¿Volvemos a…?»', async () => {
+      api = stubRepeat()
+      const { container } = await renderHome()
+      await advance(100)
+      fireEvent.click(within(slotBlock(container)).getByRole('button', { name: 'Después' }))
+      expect(tracked('suggestion_dismissed', 'agent-volver')).toEqual([])
     })
   })
 

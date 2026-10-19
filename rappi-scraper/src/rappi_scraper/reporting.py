@@ -25,6 +25,8 @@ MAX_MISSING_DISH_PRICE_PCT = 2  # los platos siempre tienen precio
 MIN_DISHES_PER_RESTAURANT = 5  # menos indica menús que no se leyeron completos
 MAX_DROP_VS_PREVIOUS_PCT = 25  # caer más que esto frente a la corrida anterior suele ser bloqueo parcial o parser roto
 COMPARED_TOTALS = {"stores": ("ofertas",), "restaurants": ("restaurantes", "platos")}
+# Clave en scrape_runs.params: el sitemap de restaurantes no respondió y se usó la lista de una corrida anterior.
+FALLBACK_LIST = "lista_de_respaldo"
 
 STORE_QUALITY_SQL = """
 SELECT count(*),
@@ -85,6 +87,17 @@ FROM menu_price_snapshots mps
 JOIN menu_items mi USING (item_id)
 WHERE mps.run_id = %(run)s
 """
+
+
+def fallback_message(fallback: dict) -> str:
+    """Una línea para el log y el reporte: de qué corrida salió la lista y cuántos restaurantes trajo."""
+    message = (
+        f"sitemap bloqueado o caído: se usó la lista de la corrida {fallback['corrida']} "
+        f"({fallback['restaurantes']} restaurantes)"
+    )
+    if fallback["descubierta_en"] != fallback["corrida"]:  # esa corrida también usó una lista anterior
+        message += f", descubierta en la corrida {fallback['descubierta_en']}"
+    return message
 
 
 def _pct(part: int, total: int) -> float:
@@ -186,6 +199,9 @@ def build_run_report(conn: Connection, run_id: int, alert: str | None = None) ->
     }
     if kind == "restaurants":
         report["totals"], checks = _restaurant_section(conn, params)
+        fallback = repository.run_params(conn, run_id).get(FALLBACK_LIST)
+        if fallback:
+            report["fallback_list"] = fallback
     else:
         report["verticals"], report["totals"], checks = _store_section(conn, params, jobs)
         # Un listado que falla no deja jobs fallidos: sus tiendas nunca entran a la cola (licores, 04-10).
@@ -228,6 +244,11 @@ def render_markdown(report: dict) -> str:
         lines += [f"⛔ Corrida fallida: {report['alert']}. La próxima actualización empieza otra.", ""]
     elif report.get("alert"):
         lines += [f"⛔ Corrida detenida: {report['alert']}. Quedó abierta: la próxima actualización la retoma.", ""]
+    if report.get("fallback_list"):  # la corrida se hizo, pero sin descubrir: restaurantes nuevos no entraron
+        fallback = report["fallback_list"]
+        # Detenida por un bloqueo, la próxima actualización la retoma con la misma lista: no vuelve a descubrir.
+        again = "" if report.get("alert") else " La próxima actualización vuelve a descubrir."
+        lines += [f"⚠ {fallback_message(fallback)}. Error del sitemap: {fallback['error']}.{again}", ""]
     if warnings:
         names = ", ".join(c["label"] for c in warnings)
         lines.append(f"⚠ {len(warnings)} validaciones fuera de rango: {names}")

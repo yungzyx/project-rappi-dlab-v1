@@ -152,9 +152,11 @@ def test_set_local_does_not_leak_to_next_request(db, test_url, make_pool, client
     """La búsqueda vectorial sube `hnsw.ef_search` y baja `random_page_cost` solo en su transacción: con una sola
     conexión en el pool, el request siguiente la recibe con los valores normales."""
     _catalog(db)
-    default_page_cost = db.execute("SELECT current_setting('random_page_cost')").fetchone()[0]
+    # El valor de sesión se fija en la URL: el servidor local puede tener otro (p. ej. 1.1 con ALTER SYSTEM).
+    default_page_cost = "4"
     assert default_page_cost != str(VECTOR_RANDOM_PAGE_COST)  # si no, la prueba no prueba nada
-    pool = make_pool(test_url, max_size=1)
+    separator = "&" if "?" in test_url else "?"
+    pool = make_pool(f"{test_url}{separator}options=-c%20random_page_cost%3D{default_page_cost}", max_size=1)
 
     reply = client.get("/search", params={"q": "papas fritas", "vertical": "supermercado", "mode": "vector"})
     assert reply.status_code == 200 and reply.json()["products"]
@@ -188,10 +190,10 @@ def test_the_vector_search_plans_with_the_ssd_page_cost_only_in_its_transaction(
     _catalog(db)
     embedder = HashEmbedder()
     vector = embedder.embed_queries(["papas fritas"])[0]
-    for session_value, end in ((None, db.commit), ("2.5", db.rollback)):
-        if session_value:
-            db.execute(f"SET random_page_cost = {session_value}")
-            db.commit()  # de sesión: un SET dentro de una transacción deshecha se deshace con ella
+    # Valores de sesión fijos: el servidor local puede tener `random_page_cost` = 1.1 (ALTER SYSTEM).
+    for session_value, end in (("4", db.commit), ("2.5", db.rollback)):
+        db.execute(f"SET random_page_cost = {session_value}")
+        db.commit()  # de sesión: un SET dentro de una transacción deshecha se deshace con ella
         before = db.execute("SELECT current_setting('random_page_cost')").fetchone()[0]
         assert before != str(VECTOR_RANDOM_PAGE_COST)
         spy = PlannerSpy(db)

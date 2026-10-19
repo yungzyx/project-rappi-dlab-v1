@@ -193,6 +193,8 @@ export function makeOffer(snapshot, state, now, { moment, context = {} }) {
       return verticalToTry(snapshot, state, now)
     case 'recompra':
       return repeatOffer(snapshot, state, now)
+    case 'volver':
+      return null // «¿Volvemos a…?» pide semanas sin pedir algo: la demo sin conexión no las tiene (204)
     case 'carrito':
       return complementOffer(snapshot, moment, context.product ? [context.product] : (context.cart ?? []))
     case 'checkout':

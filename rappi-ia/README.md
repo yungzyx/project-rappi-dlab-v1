@@ -39,7 +39,7 @@ Las versiones de las librerías están fijadas en `requirements.lock.txt` (las d
 Después de cada `rappi refresh` del scraper:
 
 ```bash
-make post-refresh                 # migrate + purge + jev-categorias + concepts + embed + eval + synth + layers + purge
+make post-refresh                 # migrate + purge + jev-categorias + concepts + embed + eval + synth + layers + prune-embeddings + purge
 ./scripts/despues-del-refresh.sh  # lo mismo, pero espera a que termine un `rappi refresh` lanzado a mano
 ```
 
@@ -50,6 +50,7 @@ La tarea semanal del scraper (`make schedule` en `rappi-scraper/`) ya lo hace so
 | `make jev-categorias` | Jev etiqueta las categorías nuevas (`map-categories --jev --solo-nuevas`). Opcional: sin `TYPESAFE_API_KEY` o sin `eval/jev-adopcion.json` no hace nada y termina bien. Va antes de `concepts` en `post-refresh` (guía en [docs/jev.md](../docs/jev.md)) |
 | `make concepts` | Capa 2: conceptos por producto y plato (con kNN si está el extra `ml`) |
 | `make embed` | Embeddings de texto (incrementales) + índices HNSW por vertical. No corre si hay una descarga del scraper en curso |
+| `make prune-embeddings` | Borra del caché `text_embeddings` los vectores de más de 7 días que no usa ningún documento de búsqueda ni el kNN de conceptos (los nombres de productos y platos). Un hash en uso conserva sus vectores de todos los modelos, también los de un modelo viejo. Va al final de `post-refresh` (después de `layers`: si falla, lo demás ya quedó al día). Corre `ANALYZE`; el espacio lo reusa autovacuum, y para devolverlo al disco hay que correr `VACUUM FULL text_embeddings` a mano (la salida lo sugiere desde 10.000 borrados) |
 | `make eval` | Evalúa la búsqueda (léxico, vectorial, híbrido y ablación sin refuerzo), guarda τ en `src/rappi_ia/eval/thresholds.json` (solo en verticales con negativas que dependen de τ; los demás conservan el suyo; `make eval EVAL_ARGS=` no guarda) y deja el reporte en `data/eval/busqueda.md`. Con `--jev-auto` (lo que usa `make eval`) suma a Jev como tercer juez solo si hay clave y adopción |
 | `make synth` | Usuarios y eventos **simulados** para métricas y segmentos (3.000 usuarios × 26 semanas, semilla 7; reemplaza los anteriores) |
 | `make purge` | Borra el texto de las consultas con más de 90 días y a las personas del prototipo sin actividad en 180 (`PROTOTYPE_USER_RETENTION_DAYS`) |
@@ -84,7 +85,7 @@ La tarea semanal del scraper (`make schedule` en `rappi-scraper/`) ya lo hace so
 | `GET /live` · `GET /health` | El proceso responde (sin mirar la base) · lista para atender: 200 con capacidades y documentos, o 503 con `motivos` (`base`, `saturada`, `sin_documentos`, `migraciones_pendientes`, `busqueda_semantica`) |
 | `POST /session` | Sesión anónima: `{legacy_user_id?}` → `{user_id, token}`. El token va en la cabecera `X-User-Token` de toda ruta con datos de una persona (401 sin él, 403 con el de otra) |
 | `POST /agent/ask` | El agente (Mochi): `{message, vertical?, user_id?, session_id?, profile?, shown_topics?, mode}`. Acepta los ids de vertical del prototipo (`liquor`, `grocery`…) |
-| `POST /agent/offer` · `GET /agent/plans` | Lo que el agente propone en cada momento de la app (`plan`, `carrito`, `checkout`, `proximo_pedido`, `sin_resultado`, `vertical_por_probar` (el siguiente paso de la escalera de combinaciones, Restaurantes → Turbo → Retail, con su razón en `basis`), `recompra` («¿Repetimos …?», cuando le toca a un concepto que la persona pide con ritmo) y `perfil`: la escalera de un perfil de gusto; 204 si no hay una buena oferta, 422 con un perfil desconocido) · las ocasiones de la Home con su kit |
+| `POST /agent/offer` · `GET /agent/plans` | Lo que el agente propone en cada momento de la app (`plan`, `carrito`, `checkout`, `proximo_pedido`, `sin_resultado`, `vertical_por_probar` (el siguiente paso de la escalera de combinaciones, Restaurantes → Turbo → Retail, con su razón en `basis`), `recompra` («¿Repetimos …?», cuando le toca a un concepto que la persona pide con ritmo), `volver` («¿Volvemos a …?», lo que pedía con ritmo y dejó: un concepto atrasado más de un intervalo o una vertical que dejó; `offers/winback.py`) y `perfil`: la escalera de un perfil de gusto; 204 si no hay una buena oferta, 422 con un perfil desconocido) · las ocasiones de la Home con su kit |
 | `GET /catalog/home` · `/catalog/verticals/{vertical}/stores` · `/catalog/stores/{store_id}` · `/catalog/products/{entity_type}/{entity_id}` · `/catalog/restaurants` · `/catalog/restaurants/{store_id}/menu` · `/catalog/deals` | Las pantallas de catálogo del prototipo (Home, verticales, tienda, producto, restaurantes, menú, ofertas), con el precio vigente |
 | `GET /search` | Búsqueda híbrida en un vertical, con precios vigentes |
 | `GET /recommendations` | "Para ti, de otras tiendas": intereses → complementos → otro vertical |
@@ -93,7 +94,7 @@ La tarea semanal del scraper (`make schedule` en `rappi-scraper/`) ya lo hace so
 | `GET /profile/{id}/gustos` | Los perfiles de gusto de la persona (por ejemplo «🥢 Amante de lo asiático»): `{perfiles: [{id, nombre, emoji, nivel, principal, por_que, basis}]}`, o la lista vacía. Salen de sus segmentos y "Olvidar" los quita |
 | `POST /events` · `POST /orders` | Eventos y pedidos del prototipo (`source = prototype`). Un pedido sin vertical del catálogo es un 400; ya respondido, la API recalcula los segmentos, la afinidad y la recompra de esa persona |
 | `POST /events/beacon` | Lo que queda en cola al cerrar la pestaña (`sendBeacon`, text/plain: sin preflight de CORS) |
-| `GET /analytics/{kpis, weekly, opportunities, trends, funnel, cohorts, rhythm, at-risk, suggestions, multi-vertical, affinity, assortment, services, catalog, offers, unmet, combos, motor, home}` | Métricas de negocio (las muestra el [panel](../dashboard-empresa/), parte del MVP). `combos` y `motor` son las de «Entre verticales»; `offers`, `unmet` y `home` (los accesos de la Home), las de «Uso del MVP» |
+| `GET /analytics/{kpis, weekly, opportunities, trends, funnel, cohorts, rhythm, at-risk, suggestions, multi-vertical, affinity, assortment, services, catalog, offers, volver, unmet, combos, motor, home}` | Métricas de negocio (las muestra el [panel](../dashboard-empresa/), parte del MVP). `combos` y `motor` son las de «Entre verticales»; `offers`, `volver` (a quién invitar a volver), `unmet` y `home` (los accesos de la Home), las de «Uso del MVP» |
 | `GET /concepts` | Taxonomía de conceptos (id, nombre, emoji, grupo y si es sensible) con su versión |
 
 **Seguridad.** En local (`API_ENV=local`, por defecto) es una demo sin puerta de acceso:
@@ -138,7 +139,7 @@ Las cifras vigentes (catálogo, búsqueda, precisión de conceptos y de la capa 
 
 **Set:** 124 consultas positivas en los 8 verticales y 41 negativas (al menos 5 por vertical, verificadas contra el catálogo completo), en [`src/rappi_ia/eval/queries.json`](src/rappi_ia/eval/queries.json). La relevancia se juzga automáticamente por concepto: un resultado es relevante si su concepto es uno de los esperados para la consulta. El reporte trae la comparación pareada completa (léxico, vectorial, híbrido y la ablación sin refuerzo por concepto), por tipo de consulta y por vertical.
 
-**"Sin resultado"** (demanda no satisfecha), sobre las 41 consultas negativas y con los τ de `src/rappi_ia/eval/thresholds.json`. El reporte dice por qué se detecta o no cada una. Las cifras del reporte son de la búsqueda (`retrieve`); Mochi anota la demanda en menos casos, porque cuando el concepto pedido tiene unos pocos productos (surtido testimonial) los muestra y no la anota.
+**"Sin resultado"** (demanda no satisfecha), sobre las 41 consultas negativas y con los τ de `src/rappi_ia/eval/thresholds.json`. El reporte dice por qué se detecta o no cada una. Las cifras del reporte son de la búsqueda (`retrieve`); Mochi anota la demanda cuando la búsqueda la marca y no muestra ningún producto. Desde el 18-10-2026 tampoco muestra los pocos productos de un concepto con surtido testimonial bajo el 1 % del vertical (solían ser otra cosa con su etiqueta, como un cable HDMI para «televisor 55 pulgadas» en Turbo), así que las dos cifras casi coinciden.
 
 - **Regla:** es un "sin resultado" cuando nada calza todas las palabras y, además, se cumple la condición que corresponda:
   - si la consulta nombra un concepto, ese concepto no tiene surtido real en el vertical;
@@ -222,4 +223,4 @@ rappi-ia/
 | `036_motor.sql` | Motor multivertical: 7 tablas (`user_vertical_affinity`, `vertical_transitions`, `combo_stats`, `combo_steps`, `cross_sell_rules`, `trends`, `replenishment`) con sus vistas en `capa`, el evento `vertical_open` y la capa `motor` en `layer_runs`. Las de población llevan `data_source`; las de cada persona se borran con ella |
 | `037_combos_finos.sql` | Escalera fina: `combo_stats` y `combo_steps` guardan dos niveles (`nivel`: `grueso`, los grupos de la tabla de Rappi, y `fino`, las verticales una por una más RappiFavor y RappiTravel) y sus vistas en `capa` lo exponen |
 
-`014`–`015` (limpieza del HTML de los documentos de búsqueda), `017`–`019` y `021` (formatos de tienda, Turbo, vigencia y platos por local) y `032` (`latest_prices` y `latest_menu_prices`, el último precio mantenido por triggers, y la vista `v_latest_offers`, la definición única de oferta vigente, que esta capa también lee) y `038` (`store_last_snapshot`, el último snapshot de cada tienda, de donde `v_store_format_runs` saca la corrida de cada formato) son del scraper.
+`014`–`015` (limpieza del HTML de los documentos de búsqueda), `017`–`019` y `021` (formatos de tienda, Turbo, vigencia y platos por local) y `032` (`latest_prices` y `latest_menu_prices`, el último precio mantenido por triggers, y la vista `v_latest_offers`, la definición única de oferta vigente, que esta capa también lee) y `038`–`039` (`store_last_snapshot`, el último snapshot de cada tienda con su formato y la última corrida del formato, que es `v_store_format_runs`) son del scraper.

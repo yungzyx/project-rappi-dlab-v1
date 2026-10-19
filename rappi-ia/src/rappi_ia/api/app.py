@@ -647,6 +647,7 @@ ANALYTICS = {
     "suggestions": queries.suggestions,
     "services": queries.services,
     "offers": queries.offers,
+    "volver": queries.winback,
     "unmet": queries.unmet,
     "multi-vertical": queries.multi_vertical_retention,
     "affinity": queries.affinity,

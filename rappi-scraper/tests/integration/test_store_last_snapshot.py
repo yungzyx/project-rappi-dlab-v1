@@ -1,6 +1,7 @@
-"""El último snapshot de cada tienda en su propia tabla (migración 038): store_last_snapshot sigue al historial y
-v_store_format_runs, que ahora lee de ella, da lo mismo que antes; v_latest_offers, la única definición de oferta
-vigente, también. Las definiciones viejas (019 y 032) se copian aquí para comparar fila por fila."""
+"""El último snapshot de cada tienda (migración 038), con su formato y la última corrida del formato (039), en su propia
+tabla: store_last_snapshot sigue al historial y a stores, y v_store_format_runs, que ahora es esa tabla, da lo mismo que
+antes; v_latest_offers, la única definición de oferta vigente, también. Las definiciones viejas (019 y 032) se copian
+aquí para comparar fila por fila."""
 
 from datetime import UTC, datetime, timedelta
 
@@ -51,6 +52,7 @@ NEW_LATEST_OFFERS = """
 SELECT store_id, sku, price, real_price, discount_pct, in_stock, run_id, scraped_at, format_run_id, current
 FROM v_latest_offers"""
 
+STORE_LAST = "SELECT store_id, run_id, scraped_at FROM store_last_snapshot"
 HISTORY_STORE = """
 SELECT DISTINCT ON (store_id) store_id, run_id, scraped_at
 FROM price_snapshots ORDER BY store_id, scraped_at DESC, run_id DESC"""
@@ -88,7 +90,7 @@ def _download(db, run: int, store_id: int, skus: str, day: float, skipped=(), pr
 def _assert_same_as_before(db) -> dict:
     """La tabla es el último snapshot del historial y las dos vistas dan exactamente las filas de antes. Devuelve la
     vigencia de cada oferta, para comprobar que el caso no es trivial."""
-    assert set(db.execute("SELECT * FROM store_last_snapshot").fetchall()) == set(db.execute(HISTORY_STORE).fetchall())
+    assert set(db.execute(STORE_LAST).fetchall()) == set(db.execute(HISTORY_STORE).fetchall())
     old_runs = db.execute(OLD_STORE_FORMAT_RUNS).fetchall()
     assert sorted(db.execute("SELECT * FROM v_store_format_runs").fetchall()) == sorted(old_runs)
     old_offers = db.execute(OLD_LATEST_OFFERS).fetchall()
@@ -158,6 +160,20 @@ def test_format_runs_and_offers_match_the_old_views(db):
     _assert_same_as_before(db)
     db.execute("DELETE FROM store_products WHERE store_id = 1 AND sku = 'a'")
     _assert_same_as_before(db)
+    db.execute("UPDATE stores SET store_type = store_type, name = 'Otra' WHERE store_id = 3")  # como al redescubrirla
+    _assert_same_as_before(db)
+    db.execute("UPDATE stores SET store_type = NULL WHERE store_id = 3")  # jumbo pierde a su tienda más nueva
+    _assert_same_as_before(db)
+
+    # Borrar la tienda que tiene la última corrida de su formato (en cascada hasta sus snapshots).
+    lider = "SELECT DISTINCT format_run_id FROM v_store_format_runs WHERE format = 'lider'"
+    before = db.execute(lider).fetchone()[0]
+    holder = db.execute(
+        "SELECT store_id FROM store_last_snapshot WHERE format = 'lider' AND run_id = %s", (before,)
+    ).fetchone()[0]
+    db.execute("DELETE FROM stores WHERE store_id = %s", (holder,))
+    assert db.execute(lider).fetchone()[0] != before
+    _assert_same_as_before(db)
 
     db.execute("TRUNCATE price_snapshots")
     assert db.execute("SELECT count(*) FROM store_last_snapshot").fetchone()[0] == 0
@@ -210,10 +226,10 @@ def test_moving_a_snapshot_to_another_store_updates_both_rows(db):
     _download(db, r1, 1, "a", 0)
     _download(db, r2, 1, "a", 7)
     _download(db, r1, 2, "a", 3)
-    assert set(db.execute("SELECT * FROM store_last_snapshot").fetchall()) == set(db.execute(HISTORY_STORE).fetchall())
+    assert set(db.execute(STORE_LAST).fetchall()) == set(db.execute(HISTORY_STORE).fetchall())
 
     db.execute("DELETE FROM price_snapshots WHERE run_id = %s AND store_id = 2", (r1,))
     db.execute("UPDATE price_snapshots SET store_id = 2 WHERE run_id = %s AND store_id = 1", (r2,))
-    rows = dict((s, (r, t)) for s, r, t in db.execute("SELECT * FROM store_last_snapshot").fetchall())
+    rows = dict((s, (r, t)) for s, r, t in db.execute(STORE_LAST).fetchall())
     assert rows == {1: (r1, T0), 2: (r2, T0 + timedelta(days=7))}
     _assert_same_as_before(db)
