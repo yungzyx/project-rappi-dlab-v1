@@ -36,13 +36,14 @@ describe('MvpUsageView', () => {
     expect(screen.queryByRole('table', { name: 'Juego por vertical' })).toBeNull()
   })
 
-  test('the MVP view shows the three sections', async () => {
+  test('the MVP view shows the four sections', async () => {
     serveFixtures()
     await renderWithData(<MvpUsageView source="prototype" />)
 
     expect(screen.getByRole('heading', { name: 'Ofertas del agente por momento' })).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'Búsquedas sin resultado' })).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'Accesos de la Home' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'A quién invitar a volver' })).toBeTruthy()
 
     const offers = await screen.findByRole('table', { name: 'Ofertas del agente por momento' })
     expect(within(offers).getByText('Plan')).toBeTruthy()
@@ -57,8 +58,9 @@ describe('MvpUsageView', () => {
     serveFixtures()
     await renderWithData(<MvpUsageView source="prototype" />)
 
-    expect(screen.getAllByText(NOT_EVIDENCE)).toHaveLength(3)
-    expect((await screen.findAllByText('1 persona')).length).toBe(3)
+    expect(screen.getAllByText(NOT_EVIDENCE)).toHaveLength(4)
+    // Una por sección de uso; en «A quién invitar a volver», las que califican por un concepto y las de la recompra.
+    expect((await screen.findAllByText('1 persona')).length).toBe(5)
     expect(screen.queryByText(/datos simulados/i)).toBeNull()
   })
 
@@ -196,6 +198,70 @@ describe('MvpUsageView', () => {
     ).toEqual(['Recompra', '2', '1', '—'])
   })
 
+  test('the win-back moment («¿Volvemos a…?») has its own label', async () => {
+    serveWith({
+      offers: {
+        source: 'prototype',
+        data: { personas: 1, momentos: [{ momento: 'volver', mostradas: 3, aceptadas: 1, aceptacion_pct: null }] },
+      },
+    })
+    await renderWithData(<MvpUsageView source="prototype" />)
+
+    const offers = await screen.findByRole('table', { name: 'Ofertas del agente por momento' })
+    const [row] = within(offers).getAllByRole('row').slice(1)
+    expect(
+      within(row)
+        .getAllByRole('cell')
+        .map((cell) => cell.textContent),
+    ).toEqual(['Volver a pedir', '3', '1', '—'])
+  })
+
+  test('who to invite back: who qualifies by kind, next to the repeat, with the MVP label', async () => {
+    serveWith({
+      volver: {
+        source: 'prototype',
+        data: { dia: null, personas: 8, califican: 2, por_concepto: 1, por_vertical: 1, recompra: 3 },
+      },
+    })
+    await renderWithData(<MvpUsageView source="prototype" />)
+
+    const section = screen.getByRole('region', { name: 'A quién invitar a volver' })
+    expect(await within(section).findByText('8 personas')).toBeTruthy()
+    expect(within(section).getByText('2 personas (25,0%)')).toBeTruthy()
+    expect(within(section).getAllByText('1 persona')).toHaveLength(2)
+    expect(within(section).getByText('3 personas')).toBeTruthy()
+    expect(within(section).getByText(NOT_EVIDENCE)).toBeTruthy()
+    expect(within(section).queryByText(/Simulado/)).toBeNull()
+  })
+
+  test('who to invite back, simulated: labelled «Simulado: no es evidencia» with its reference day', async () => {
+    serveWith({
+      volver: {
+        source: 'synthetic',
+        data: { dia: '2026-10-16', personas: 2297, califican: 154, por_concepto: 135, por_vertical: 19, recompra: 96 },
+      },
+    })
+    await renderWithData(<MvpUsageView source="synthetic" />)
+
+    const section = screen.getByRole('region', { name: 'A quién invitar a volver' })
+    expect(await within(section).findByText('Simulado: no es evidencia.')).toBeTruthy()
+    expect(within(section).getByText(/al 16-10-2026, el último día de los pedidos simulados/)).toBeTruthy()
+    expect(within(section).getByText('154 personas (6,7%)')).toBeTruthy()
+    expect(within(section).queryByText(NOT_EVIDENCE)).toBeNull()
+  })
+
+  test('who to invite back without orders says so', async () => {
+    serveWith({
+      volver: {
+        source: 'prototype',
+        data: { dia: null, personas: 0, califican: 0, por_concepto: 0, por_vertical: 0, recompra: 0 },
+      },
+    })
+    await renderWithData(<MvpUsageView source="prototype" />)
+
+    expect(await screen.findByText('Todavía no hay pedidos')).toBeTruthy()
+  })
+
   test('a search without vertical says so and the offers note names the tab', async () => {
     serveWith({
       unmet: {
@@ -226,7 +292,7 @@ describe('MvpUsageView', () => {
     const unmet = await screen.findByRole('table', { name: 'Búsquedas sin resultado por vertical y concepto' })
     expect(within(unmet).getByText('🥗 Ensaladas y bowls')).toBeTruthy()
     expect(screen.getByText('39 de 94 búsquedas sin resultado')).toBeTruthy()
-    expect(screen.getAllByText(/Datos simulados/)).toHaveLength(3)
+    expect(screen.getAllByText(/Datos simulados/)).toHaveLength(4)
     expect(screen.queryByText(NOT_EVIDENCE)).toBeNull()
   })
 
@@ -249,7 +315,7 @@ describe('MvpUsageView', () => {
     await renderWithData(<App />)
 
     const errors = await screen.findAllByText('La API no responde: el uso del MVP solo se ve con la base viva.')
-    expect(errors).toHaveLength(4) // un ErrorState por bloque y otro en la fecha de corte de la cabecera
+    expect(errors).toHaveLength(5) // un ErrorState por bloque y otro en la fecha de corte de la cabecera
     expect(screen.queryByRole('table', { name: 'Ofertas del agente por momento' })).toBeNull()
     expect(screen.queryByText('1 persona')).toBeNull()
     expect(screen.queryByText('Modo sin conexión (datos guardados):')).toBeNull() // no hay nada guardado que avisar
@@ -262,7 +328,7 @@ describe('MvpUsageView', () => {
     await screen.findByRole('table', { name: 'Búsquedas sin resultado por vertical y concepto' })
     const origin = (await import('../../fixtures/unmet.synthetic.json')).default.guardado
     expect(screen.getAllByText(`Guardado sin conexión: ${origin.origen} (${origin.fecha}).`).length).toBeGreaterThan(0)
-    expect(screen.getAllByText(/Guardado sin conexión:/)).toHaveLength(3) // uno por bloque
+    expect(screen.getAllByText(/Guardado sin conexión:/)).toHaveLength(4) // uno por bloque
   })
 
   test('con la API viva no hay rótulo de guardado', async () => {
