@@ -25,6 +25,9 @@ from psycopg import Connection
 DEFAULT_TTL_S = 600
 VERSION_TTL_S = 5
 MANY_MAX = 50_000  # entradas de `cached_many` (unos pocos MB)
+# Cuánto espera a quien ya está calculando el mismo valor. Quien espera tiene una transacción abierta y quieta, y la API
+# corta las que pasan 10 s así (`idle_in_transaction_session_timeout`, api/deps.py): pasado este tiempo lo calcula él.
+LOADING_WAIT_S = 8.0
 
 _lock = threading.Lock()
 _values: dict[str, tuple[int, float, object]] = {}  # nombre → (versión, cuándo se guardó, valor)
@@ -58,17 +61,23 @@ def cached[T](name: str, conn: Connection, fn: Callable[[], T], ttl_s: float = D
     """`fn()` guardado por `name` mientras la versión del catálogo sea la misma y no pasen `ttl_s` segundos. `name`
     lleva los parámetros que cambian el resultado («deals:licores:24»). Si falta, lo calcula uno solo: los demás que
     lo piden a la vez esperan su resultado (en frío, seis personas abriendo la Home recorrían el catálogo seis
-    veces). Si el cálculo falla, el siguiente que espera lo intenta."""
+    veces). Si el cálculo falla, el siguiente que espera lo intenta. Se espera a lo más LOADING_WAIT_S: si el otro
+    tarda más, lo calcula también quien esperaba (su transacción no queda quieta hasta que la API la corte)."""
     version = _current_version(conn)
     if (value := _fresh(name, version, ttl_s)) is not _MISSING:
         return value
-    with _loading_lock(name):
+    loading = _loading_lock(name)
+    got = loading.acquire(timeout=LOADING_WAIT_S)
+    try:
         if (value := _fresh(name, version, ttl_s)) is not _MISSING:  # otro lo calculó mientras esperaba
             return value
         now = _now()
         value = fn()
         with _lock:
             _values[name] = (version, now, value)
+    finally:
+        if got:
+            loading.release()
     return value
 
 
