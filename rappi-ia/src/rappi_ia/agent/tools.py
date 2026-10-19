@@ -130,14 +130,14 @@ def search_products(
     concepts = result.query_concepts
     capped = price_max is not None
     strict = symptom or vertical == "farmacia"
-    hits = _focus([h for h in result.hits if _allowed(h.concept_id, concepts, strict)], concepts, result.unmet, capped)
+    hits = _focus([h for h in result.hits if _allowed(h.concept_id, concepts, strict)], result, capped)
     products = _dedupe(_within_budget(_with_prices(conn, vertical, hits, offer, adult_ok), price_max))[:k]
     cheapest = None
     if not products and capped:
         unfiltered = retrieve(conn, vertical, query, embedder, k=k * 2, mode=mode, concepts=concepts, words=words)
         allowed = [h for h in unfiltered.hits if _allowed(h.concept_id, concepts, strict)]
         # «El más barato» es de lo pedido: el mismo foco que con tope.
-        candidates = _with_prices(conn, vertical, _focus(allowed, concepts, unfiltered.unmet, capped), offer, adult_ok)
+        candidates = _with_prices(conn, vertical, _focus(allowed, unfiltered, capped), offer, adult_ok)
         priced = [p for p in candidates if p.price_value is not None]
         cheapest = min(priced, key=lambda p: p.price_value) if priced else None
     return SearchOutcome(result, products, cheapest)
@@ -439,23 +439,56 @@ def _dedupe(products: list[Product]) -> list[Product]:
     return unique
 
 
-def _focus(hits, concepts: list[str], unmet: bool, capped: bool = False):
-    """Si la consulta nombra conceptos, solo esos: pedir cigarrillos no debe traer cerveza.
+# Bajo esta participación en el vertical (y bajo el mínimo de «sin resultado», retrieval.hybrid.MIN_CONCEPT_ITEMS), lo
+# rotulado con el concepto pedido no se muestra. En la base real todo surtido testimonial queda bajo ella (el vertical
+# más chico tiene más de mil documentos); en un catálogo de prueba de decenas de productos, dos son surtido de verdad.
+TESTIMONIAL_SHARE = 0.01
+
+
+def _focus(hits, result: RetrievalResult, capped: bool = False):
+    """Si la consulta nombra conceptos (`result.query_concepts`), solo esos: pedir cigarrillos no debe traer cerveza.
 
     - "Sin resultado" no muestra nada, nombre o no un concepto: mostrar una pizza a quien pidió kebab, o los vecinos
-      de un coseno bajo τ, sería inventar una respuesta (y la demanda no se anotaría).
+      de un coseno bajo τ, sería inventar una respuesta (y la demanda no se anotaría). Tampoco los pocos productos de
+      un concepto que el vertical casi no tiene (bajo TESTIMONIAL_SHARE), que suelen ser otra cosa con su etiqueta: un
+      cable HDMI para «televisor 55 pulgadas» en Turbo, un pack de regalo para «cerveza en lata» en el Mall.
     - Con tope de precio (`capped`), si nada del concepto pedido cabe bajo el tope tampoco se muestra otra cosa:
       El agente dice cuánto cuesta lo más barato de lo pedido.
+    - Si nada de lo encontrado es del concepto pedido y el vertical no lo vende (`concept_in_vertical`, la regla de
+      «sin resultado»), solo se muestra lo que lo dice en su nombre (`_names_query`): «sándwich» en Express trae los
+      sándwiches rotulados como empanadas, pero «pañales» en restaurantes no trae el postre con «panal» que el
+      stemming juntaba. El agente y el buscador dicen dónde sí lo venden.
     - El foco no cede ante productos de otro concepto que calzan las palabras: esa coincidencia mira todo el texto y
       el stemming junta palabras («flores» calza con azúcar flor). Que el concepto de la consulta (keywords) y el de
       los productos (categoría) coincidan se asegura en la taxonomía.
     """
+    concepts = result.query_concepts
     if not concepts:
-        return [] if unmet else hits
+        return [] if result.unmet else hits
+    if result.unmet and (result.concept_share or 0.0) < TESTIMONIAL_SHARE:
+        return []
     matching = [h for h in hits if h.concept_id in concepts]
     if matching:
         return matching
-    return [] if unmet or capped else hits
+    if result.unmet or capped:
+        return []
+    return hits if result.concept_in_vertical else [h for h in hits if _names_query(h.content, result.query)]
+
+
+# Palabras de enlace que el nombre de un producto no necesita repetir («detergente para ropa»).
+_CONNECTORS = frozenset({"a", "al", "con", "de", "del", "el", "en", "la", "las", "los", "para", "sin", "y"})
+
+
+def _names_query(content: str, query: str) -> bool:
+    """¿El nombre (lo que va antes del primer «. » del documento) dice todas las palabras de la consulta? Palabras
+    enteras sin tildes, con el plural en «s» («tacos» dice taco); no «es»: «pañales» no dice «panal»."""
+
+    def singular(word: str) -> str:
+        return word[:-1] if word.endswith("s") and len(word) > 3 else word
+
+    name = {singular(w) for w in tokens(content.split(". ", 1)[0])}
+    wanted = [singular(w) for w in tokens(query) if w not in FILLER_WORDS | _CONNECTORS]
+    return bool(wanted) and all(w in name for w in wanted)
 
 
 def _allowed(concept_id: str | None, requested: list[str], strict: bool = False) -> bool:

@@ -7,6 +7,7 @@
 """
 
 import json
+import math
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
@@ -61,6 +62,9 @@ class RetrievalResult:
     unmet: bool
     unmet_reason: str | None
     has_words: bool = True  # le queda alguna palabra sin las stopwords («té» no)
+    # Ítems del concepto nombrado con más surtido en el vertical sobre los documentos del vertical (None si la consulta
+    # no nombra ninguno): agent/tools._focus no muestra lo rotulado con un concepto que el vertical casi no tiene.
+    concept_share: float | None = None
 
 
 def thresholds() -> dict[str, float]:
@@ -145,7 +149,8 @@ def retrieve(
         # otro precio no es demanda no satisfecha (el agente dice cuánto cuesta lo más barato).
         unfiltered = _vector(conn, vertical, query_vector, embedder, Filters(entity_types=filters.entity_types))
         max_cosine = max((cosine for _, cosine in unfiltered), default=None)
-    concept_here = _concept_in_vertical(conn, vertical, query_concepts, doc_count)
+    concept_items = _concept_items(conn, vertical, query_concepts)
+    concept_here = bool(query_concepts) and concept_items >= _concept_floor(doc_count)
     if words is None:
         words = has_words(conn, query)
     unmet, reason = _unmet(
@@ -157,8 +162,9 @@ def retrieve(
         has_vectors=embedder is not None,
         has_words=words,
     )
+    share = concept_items / doc_count if query_concepts and doc_count else None
     return RetrievalResult(
-        vertical, query, hits, query_concepts, strict, max_cosine, concept_here, unmet, reason, words
+        vertical, query, hits, query_concepts, strict, max_cosine, concept_here, unmet, reason, words, share
     )
 
 
@@ -397,18 +403,21 @@ def concepts_of(conn: Connection, keys: list[tuple[str, str]]) -> dict[tuple[str
     return {(t, i): c for t, i, c in rows}
 
 
-def _concept_in_vertical(conn: Connection, vertical: str, concepts: list[str], doc_count: int) -> bool:
+def _concept_floor(doc_count: int) -> int:
+    """Ítems que necesita un concepto para estar en un vertical de `doc_count` documentos: MIN_CONCEPT_ITEMS y el
+    MIN_CONCEPT_SHARE del vertical, redondeado como lo hacía Postgres (la mitad, hacia arriba). Bajo eso, el surtido
+    es testimonial."""
+    return max(MIN_CONCEPT_ITEMS, math.floor(MIN_CONCEPT_SHARE * doc_count + 0.5))
+
+
+def _concept_items(conn: Connection, vertical: str, concepts: list[str]) -> int:
+    """Los ítems del concepto con más surtido en el vertical (0 si no tiene ninguno)."""
     if not concepts:
-        return False
-    return bool(
-        conn.execute(
-            """SELECT 1 FROM concept_assortment a
-               WHERE a.vertical = %(v)s AND a.concept_id = ANY(%(c)s)
-                 AND a.items >= greatest(%(min)s, round(%(share)s * %(n)s))
-               LIMIT 1""",
-            {"v": vertical, "c": concepts, "min": MIN_CONCEPT_ITEMS, "share": MIN_CONCEPT_SHARE, "n": doc_count},
-        ).fetchone()
-    )
+        return 0
+    return conn.execute(
+        "SELECT coalesce(max(items), 0) FROM concept_assortment WHERE vertical = %s AND concept_id = ANY(%s)",
+        (vertical, concepts),
+    ).fetchone()[0]
 
 
 def _hydrate(conn, vertical, keys, scores, cosines, ranks) -> list[Hit]:
