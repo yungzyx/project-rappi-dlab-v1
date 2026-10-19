@@ -6,8 +6,8 @@ import { Stats } from './Stats.jsx'
 const count = (n) => `${formatNumber(n)} ${plural(n, 'persona')}`
 
 /**
- * «¿Volvemos a…?»: a cuántas personas les toca (pedían algo con ritmo y lo dejaron), por el tipo de su primera
- * invitación, y a cuántas la recompra, para comparar. Es quién califica, no a quién se le mostró. Con datos simulados
+ * «¿Volvemos a…?»: a cuántas personas les toca (pedían algo con ritmo y lo dejaron, y no les toca la recompra), por el
+ * tipo de su primera invitación, y a cuántas la recompra, para comparar. Es quién califica, no a quién se le mostró. Con datos simulados
  * la estimación es del último día simulado (`dia`) y no es evidencia.
  */
 export function WinbackReach({ data, source }) {
@@ -36,8 +36,9 @@ export function WinbackReach({ data, source }) {
           />
           <p className="card-note">
             Califica quien dejó de pedir algo que pedía con ritmo: un concepto atrasado más de un intervalo (desde 14
-            días) o una vertical sin pedidos en más de un mes mientras pide en otra, hasta 90 días. Nunca alcohol,
-            Farmacia, bebé, salud ni conceptos sensibles. Es quién califica, no a quién se le mostró.
+            días) o una vertical sin pedidos en más de un mes mientras pide en otra, hasta 90 días. Quien tiene recompra
+            no cuenta: la Home le muestra «¿Repetimos?». Nunca alcohol, Farmacia, bebé, salud ni conceptos sensibles. Es
+            quién califica, no a quién se le mostró.
           </p>
         </>
       )}

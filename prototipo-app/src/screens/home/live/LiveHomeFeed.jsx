@@ -13,6 +13,7 @@ import { useScrollState } from '../../../hooks/useScrollState'
 import { useAddress } from '../../../state/AddressContext'
 import { useAddToCart } from '../../../hooks/useAddToCart'
 import { useEvents } from '../../../state/EventsContext'
+import { useOrders } from '../../../state/OrdersContext'
 import { useProfile } from '../../../state/ProfileContext'
 import CreditsBanner from '../CreditsBanner'
 import { BestRated, FastRestaurants, MainTiles, NearbyStores, Promos, Shortcuts, useHomeCatalog } from '../HomeSections'
@@ -30,6 +31,14 @@ import './live.css'
 // que solo aparecen cuando la API los ofrece.
 const ORDER = ['essentials', 'recompra', 'promos', 'turbo', 'plan', 'nearby', 'lower']
 const WINBACK_ORIGIN = 'agent-volver'
+// El tipo de una invitación a volver (su señal): `volver` si es de un concepto, `vuelta` si es de una vertical. Va en
+// `payload.kind` de sus eventos: así la API reconoce cuál se mostró o se descartó.
+const winbackKind = (made) => made.reason?.basis?.[0]?.kind
+/** Si la invitación a volver de esta sesión es la de una vertical (`¿Volvemos a Turbo?`): su vertical del backend. */
+const backVertical = () => {
+  const made = session.winback?.offer
+  return made && winbackKind(made) === 'vuelta' ? made.backendVertical : null
+}
 const T = { enter: 900, greet: 3400, greetHold: 6000, notice: 500 }
 // Silenciado por hoy (desde el agente flotante) o callado porque lo ignoraron: no habla por su cuenta; si lo tocan, sí.
 const silent = () => isQuiet(today()) || isHushed()
@@ -61,6 +70,7 @@ export default function LiveHomeFeed({ push, active = true }) {
   const profile = useProfile()
   const events = useEvents()
   const verticalOrder = useVerticalOrder(active)
+  const lastOrder = useOrders().orders[0]?.id ?? null // cambia con cada pedido: «¿Volvemos a…?» se vuelve a pedir
   const reduceMotion = useReducedMotion()
   const [replays, setReplays] = useState(0)
 
@@ -272,19 +282,22 @@ export default function LiveHomeFeed({ push, active = true }) {
   }, [active])
 
   // «¿Repetimos?» se pide cada vez que la Home vuelve a estar arriba (un pedido nuevo cambia lo que le toca). Si no hay
-  // (204), «¿Volvemos a…?», una vez por pestaña: la API no repite la misma invitación en 7 días, así que se guarda la
-  // primera para que no cambie ni desaparezca al volver a la Home. La recompra siempre gana. Sin ninguna o sin red, no
-  // hay bloque; en silencio, o si ya dijeron «Después», no se pide.
+  // (204), «¿Volvemos a…?», una vez por pestaña y por pedido: la API mantiene la misma invitación una semana, así que se
+  // guarda para que no cambie ni desaparezca al volver a la Home; un pedido nuevo (o «Olvidar») la vuelve a pedir, para
+  // no invitar a volver a lo que se acaba de comprar. La recompra siempre gana. Sin ninguna, sin red o con una API que no
+  // conoce el momento, no hay bloque; en silencio, o si ya dijeron «Después», no se pide.
   useEffect(() => {
     if (!active || silent() || session.repeatLater) return undefined
     let current = true
     const generation = profile.resets
+    const key = `${generation}|${lastOrder}`
     const winback = () => {
-      if (session.winback?.generation === generation) return session.winback.offer
-      return offer('volver', {}, { userId: userId() }).then((made) => {
-        session.winback = { generation, offer: made?.products.length ? made : null }
+      if (session.winback?.key === key) return session.winback.offer
+      const keep = (made) => {
+        session.winback = { key, offer: made?.products.length ? made : null }
         return session.winback.offer
-      })
+      }
+      return offer('volver', {}, { userId: userId() }).then(keep, () => keep(null))
     }
     offer('recompra', {}, { userId: userId() })
       .then((made) => (made?.products.length ? made : winback()))
@@ -297,6 +310,7 @@ export default function LiveHomeFeed({ push, active = true }) {
               origin: `agent-${shown.moment}`,
               concept: shown.reason?.concept,
               generation,
+              ...(shown.moment === 'volver' ? { kind: winbackKind(shown) } : {}),
             })
           setRepeat(shown)
         },
@@ -305,10 +319,10 @@ export default function LiveHomeFeed({ push, active = true }) {
     return () => {
       current = false
     }
-  }, [active, events.track, profile.resets])
+  }, [active, events.track, profile.resets, lastOrder])
 
-  // «Después» deja el bloque para otra vez. En «¿Volvemos a…?» se registra el descarte: con dos, la API deja de
-  // ofrecer esa invitación.
+  // «Después» deja el bloque para otra vez. En «¿Volvemos a…?» se registra el descarte (con su tipo, como la mostrada):
+  // con dos, la API deja de ofrecer esa invitación.
   const repeatLater = () => {
     noteDismissed()
     if (repeat?.moment === 'volver') {
@@ -316,7 +330,7 @@ export default function LiveHomeFeed({ push, active = true }) {
       events.track('suggestion_dismissed', {
         concept_id: repeat.reason?.concept ?? conceptOf(product),
         vertical: product.vertical,
-        payload: { origen: WINBACK_ORIGIN },
+        payload: { origen: WINBACK_ORIGIN, kind: winbackKind(repeat) },
       })
     }
     session.repeatLater = true
@@ -431,8 +445,10 @@ export default function LiveHomeFeed({ push, active = true }) {
     } finally {
       poking.current = false
     }
-    // Sin nada que proponer (204) el agente no dice nada.
+    // Sin nada que proponer (204) el agente no dice nada. Tampoco repite con «Vuelve a…» la vertical a la que la Home ya
+    // invitó a volver en esta sesión («¿Volvemos a…?»): una sola invitación por vertical.
     if (mine !== run.current || !made) return
+    if (made.reason?.basis?.some((signal) => signal.kind === 'vuelta' && signal.id === backVertical())) return
     noteShown(events.track, made.products, { origin: `agent-${made.moment}`, generation: profile.resets })
     const open = made.actions.find((action) => action.route)
     // Si el paso es un servicio sin catálogo (RappiFavor, RappiTravel), se anota ofrecido y, al abrirlo, abierto: así

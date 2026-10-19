@@ -38,6 +38,8 @@ Para partir de cero: **↺ Repetir escena** (junto al interruptor, arriba a la i
 
 **La recompra («¿Repetimos …?»):** una persona que pide el mismo concepto con ritmo (por ejemplo, café cada 14 días) ve, cuando le toca, el bloque «¿Repetimos …? Pides cada N días.» en la Home, después de los accesos, con **Ver producto**. Necesita tres compras del concepto en días distintos y un ritmo regular, así que con una cuenta nueva no sale en la demo: se cuenta con la [captura de ejemplo](../prototipo-app/docs/screenshots/21-recompra.jpg). Se cuenta como aceptada cuando la persona agrega el producto al carro, no al tocar el botón.
 
+**Volver a pedir («¿Volvemos a …?»):** si no le toca la recompra, el mismo bloque invita a volver a lo que la persona pedía con ritmo y dejó: un concepto atrasado más de un intervalo (14 a 90 días), «¿Volvemos a café? Lo pediste por última vez hace 20 días.», o una vertical que dejó hace más de un mes mientras pide en otra. Necesita semanas de pedidos, así que con una cuenta nueva no sale (ni en la demo sin conexión). **Qué decir:** apunta a la retención; Mochi no insiste: una invitación por semana y, con dos «Después», no la repite. En el panel, «A quién invitar a volver» dice cuántas personas califican (con datos simulados, «Simulado: no es evidencia»).
+
 ### 2. El buscador con Mochi (unos 6 minutos)
 
 En el prototipo final la barra de la Home abre el buscador con Mochi y se toca. El campo de arriba busca tiendas y productos; las ideas de Mochi están en los botones de «Toca y te armo algo».
@@ -64,7 +66,7 @@ Los productos y precios salen del catálogo real y la sugerencia de otra vertica
 
 Con `make mvp` el panel ya está arriba. Después de la demo de la app, ábrelo en [http://localhost:5175/?vista=mvp&fuente=prototipo](http://localhost:5175/?vista=mvp&fuente=prototipo) (o elige **Prototipo** arriba y la pestaña **Uso del MVP**; **Actualizar** vuelve a pedir lo nuevo sin recargar).
 
-1. **Ofertas del agente por momento:** el kit de «Carrete» aparece en **Plan**, lo que propuso Mochi al tocarlo en **Vertical por probar** y, si usaste el carro o el checkout, en **Carro** y **Antes de pagar**, con lo mostrado y lo aceptado (una recompra aparecería en **Recompra**). **Qué decir:** así se ve en qué momento la oferta de Mochi funciona; el porcentaje aparece recién con 10 mostradas, antes solo las cuentas.
+1. **Ofertas del agente por momento:** el kit de «Carrete» aparece en **Plan**, lo que propuso Mochi al tocarlo en **Vertical por probar** y, si usaste el carro o el checkout, en **Carro** y **Antes de pagar**, con lo mostrado y lo aceptado (una recompra aparecería en **Recompra** y una invitación a volver, en **Volver a pedir**). **Qué decir:** así se ve en qué momento la oferta de Mochi funciona; el porcentaje aparece recién con 10 mostradas, antes solo las cuentas.
 2. **Búsquedas sin resultado:** una búsqueda sin resultado en la app (por ejemplo, algo que el catálogo no tiene) suma a su vertical; el concepto solo se suma si la pregunta pasó por el agente (las búsquedas de la app no llevan concepto). Nunca se ve lo que se escribió.
 3. **Accesos de la Home:** el acceso que tocaste en la parte 1 suma un toque a su vertical. **Qué decir:** son los toques con los que la Home aprende el orden de cada persona; en «Rappi hoy» no se cuenta nada.
 
