@@ -11,6 +11,8 @@ from ..pricing import discount_pct
 
 # ---------------------------------------------------------------- corridas y jobs
 
+GONE_REASON = "ya no existe en Rappi"  # motivo de un job omitido porque Rappi redirigió a restaurantNotFound
+
 
 def start_run(conn: Connection, kind: str, params: dict) -> int:
     row = conn.execute(
@@ -89,6 +91,46 @@ def add_jobs(conn: Connection, run_id: int, jobs: list[dict]) -> None:
             [(run_id, j["job_key"], j["job_type"], Jsonb(j["payload"])) for j in jobs],
         )
     conn.commit()
+
+
+def last_done_run_with_jobs(conn: Connection, kind: str, before_run: int) -> int | None:
+    """Última corrida terminada de ese tipo, anterior a `before_run`, que empezó `refresh` y tiene jobs (su lista de qué
+    descargar). Las de `discover` a mano no cuentan: pueden ser una prueba chica (`--max-chains`)."""
+    row = conn.execute(
+        "SELECT r.run_id FROM scrape_runs r WHERE r.kind = %s AND r.status = 'done' AND r.run_id < %s "
+        "AND r.params->>'trigger' = 'refresh' "
+        "AND EXISTS (SELECT 1 FROM scrape_jobs j WHERE j.run_id = r.run_id) ORDER BY r.run_id DESC LIMIT 1",
+        (kind, before_run),
+    ).fetchone()
+    return row[0] if row else None
+
+
+def run_jobs(conn: Connection, run_id: int, job_type: str, skip_reason: str | None = None) -> list[dict]:
+    """Todos los jobs de la corrida de ese tipo, en cualquier estado salvo los omitidos por `skip_reason`."""
+    rows = conn.execute(
+        "SELECT job_key, job_type, payload FROM scrape_jobs WHERE run_id = %s AND job_type = %s "
+        "AND (status <> 'skipped' OR result->>'reason' IS DISTINCT FROM %s) ORDER BY job_key",
+        (run_id, job_type, skip_reason),
+    ).fetchall()
+    return [{"job_key": key, "job_type": kind, "payload": payload} for key, kind, payload in rows]
+
+
+def insert_new_jobs(conn: Connection, run_id: int, jobs: list[dict]) -> int:
+    """Agrega los jobs como pendientes; los que ya están en la corrida no se tocan. Devuelve cuántos se agregaron.
+
+    No hace commit: el que llama lo guarda junto con lo que corresponda (p. ej. la nota de la corrida)."""
+    cur = conn.execute(
+        "INSERT INTO scrape_jobs (run_id, job_key, job_type, payload) "
+        "SELECT %s, k, t, p FROM unnest(%s::text[], %s::text[], %s::jsonb[]) AS j(k, t, p) "
+        "ON CONFLICT (run_id, job_key) DO NOTHING",
+        (
+            run_id,
+            [j["job_key"] for j in jobs],
+            [j["job_type"] for j in jobs],
+            [Jsonb(j["payload"]) for j in jobs],
+        ),
+    )
+    return cur.rowcount
 
 
 def pending_jobs(conn: Connection, run_id: int, job_type: str, vertical: str | None = None) -> list[dict]:

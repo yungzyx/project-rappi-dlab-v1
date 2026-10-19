@@ -122,8 +122,13 @@ fi
 # revisa, y si falta una se detiene (las aplica el despliegue: `docker compose run --rm migrate`, que respalda antes).
 if [ "${API_ENV:-}" = production ]; then "$RAPPI_BIN" migrate --solo-revisar; else "$RAPPI_BIN" migrate; fi
 # Código 3: todo terminó salvo el respaldo (quedan los anteriores). Código 5: los restaurantes no se actualizaron
-# (tiendas, búsqueda y respaldo sí). Código 6: las dos cosas. En los tres la capa de IA corre igual, pero queda
-# anotado. Código 4: posible bloqueo de rappi.cl; aquí se detiene.
+# (tiendas, búsqueda y respaldo sí; con el sitemap caído y una corrida anterior se usa su lista y sale con 0). Código
+# 6: las dos cosas. En los tres la capa de IA corre igual, pero queda anotado. Código 4: posible bloqueo de rappi.cl;
+# aquí se detiene. Los avisos que no cambian el código (restaurantes bajados con la lista de una corrida anterior, con
+# 0 o 3) los deja `rappi refresh` como marcas fijas en RAPPI_REFRESH_NOTES; se borra antes para no anotar los de otra
+# semana.
+export RAPPI_REFRESH_NOTES=$LOGS/refresh-avisos.txt
+rm -f "$RAPPI_REFRESH_NOTES"
 refresh_rc=0
 ${AWAKE[@]+"${AWAKE[@]}"} "$RAPPI_BIN" refresh "$@" || refresh_rc=$?
 if [ "$refresh_rc" -eq 3 ]; then
@@ -137,6 +142,9 @@ elif [ "$refresh_rc" -eq 4 ]; then
   exit "$refresh_rc"
 elif [ "$refresh_rc" -ne 0 ]; then
   exit "$refresh_rc"
+fi
+if grep -qx restaurantes_con_lista_anterior "$RAPPI_REFRESH_NOTES" 2>/dev/null; then
+  nota="${nota:+$nota; }restaurantes con la lista de la corrida anterior"
 fi
 # El python de rappi-ia: RAPPI_IA_PY (en el contenedor, el del sistema) o su .venv, si está instalado al lado.
 if [ -n "${RAPPI_IA_PY:-}" ] || [ -x ../rappi-ia/.venv/bin/python ]; then

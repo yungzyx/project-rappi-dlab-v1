@@ -58,11 +58,17 @@ LONG_COMMANDS = {"discover", "scrape-stores", "scrape-restaurants", "refresh", "
 BACKUP_FAILED_EXIT = 3
 # 4: posible bloqueo; la corrida quedó abierta y la tarea semanal se detiene ahí.
 POSSIBLE_BLOCK_EXIT = 4
-# 5: los restaurantes no se actualizaron (falló su descubrimiento), y tiendas, búsqueda y respaldo sí: sigue la capa
-# de IA.
+# 5: los restaurantes no se actualizaron (falló su descubrimiento y no había una corrida anterior terminada de la que
+# usar la lista), y tiendas, búsqueda y respaldo sí: sigue la capa de IA. Con un sitemap caído o bloqueado y esa lista,
+# los restaurantes se bajan igual y sale con 0 (el reporte lo avisa).
 RESTAURANTS_FAILED_EXIT = 5
 # 6: las dos cosas, restaurantes sin actualizar y respaldo fallido: la tarea semanal anota ambas y sigue.
 RESTAURANTS_AND_BACKUP_FAILED_EXIT = 6
+# Avisos que no cambian el código de salida: si la variable trae una ruta, `refresh` escribe ahí una marca fija por
+# línea, y refresh-semanal.sh la anota en ultimo-estado.txt. La única por ahora: los restaurantes se bajaron con la
+# lista de una corrida anterior porque el sitemap no respondió (sale con 0).
+REFRESH_NOTES_ENV = "RAPPI_REFRESH_NOTES"
+FALLBACK_NOTE = "restaurantes_con_lista_anterior"
 
 
 def _run_id(conn, kind: str, args) -> int:
@@ -165,6 +171,7 @@ def cmd_refresh(conn, args) -> None:
         raise SystemExit(POSSIBLE_BLOCK_EXIT) from exc
     for report in reports:
         print(render_markdown(report))
+    _write_refresh_notes(reports)
     restaurants_failed = any(r["status"] == "failed" for r in reports)
     if restaurants_failed and backup_failed:
         raise SystemExit(RESTAURANTS_AND_BACKUP_FAILED_EXIT)
@@ -172,6 +179,16 @@ def cmd_refresh(conn, args) -> None:
         raise SystemExit(RESTAURANTS_FAILED_EXIT)
     if backup_failed:
         raise SystemExit(BACKUP_FAILED_EXIT)
+
+
+def _write_refresh_notes(reports: list[dict]) -> None:
+    path = os.environ.get(REFRESH_NOTES_ENV)
+    notes = [FALLBACK_NOTE for report in reports if report.get("fallback_list")]
+    if path and notes:
+        try:
+            Path(path).write_text("".join(f"{note}\n" for note in notes), encoding="utf-8")
+        except OSError as exc:  # solo es un aviso: la descarga ya terminó y el reporte lo dice
+            log.warning("No pude escribir los avisos en %s (%s): ultimo-estado.txt no los anotará", path, exc)
 
 
 def cmd_backup(conn, args) -> None:
@@ -249,8 +266,14 @@ def build_parser() -> argparse.ArgumentParser:
         choices=[*VERTICAL_LISTINGS, "restaurantes"],
     )
     p.add_argument("--cities", nargs="+", help="Limitar ciudades (coincidencia parcial)")
-    p.add_argument("--max-chains", type=int, help="Máximo de cadenas de restaurantes (pruebas)")
-    p.add_argument("--max-independents", type=int, help="Máximo de restaurantes independientes (pruebas)")
+    p.add_argument(
+        "--max-chains", type=int, help="Máximo de cadenas de restaurantes (pruebas; también con la lista de respaldo)"
+    )
+    p.add_argument(
+        "--max-independents",
+        type=int,
+        help="Máximo de restaurantes independientes (pruebas; también con la lista de respaldo)",
+    )
     p.add_argument("--new-run", action="store_true", help="Empezar corrida nueva en vez de reanudar")
 
     p = sub.add_parser("scrape-stores", help="Procesar la cola de tiendas")
