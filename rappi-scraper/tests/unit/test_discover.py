@@ -1,5 +1,8 @@
 import gzip
 
+import pytest
+import requests
+
 from rappi_scraper.pipeline import discover
 from rappi_scraper.pipeline.discover import _add_candidate, canonical_vertical, city_locations
 from rappi_scraper.scraping.client import PageNotFound
@@ -92,3 +95,33 @@ def test_sitemap_shards_are_capped():
 
     assert len(client.requested) == discover.MAX_SITEMAP_SHARDS
     assert len(urls) == discover.MAX_SITEMAP_SHARDS
+
+
+class _ForbiddenAfterClient(_SitemapClient):
+    """Como rappi.cl el 18-10: 403 (no 404) a la parte que no existe."""
+
+    def get_content(self, url):
+        if url in self.shards:
+            return super().get_content(url)
+        self.requested.append(url)
+        response = requests.Response()
+        response.status_code = 403
+        raise requests.HTTPError(f"403 Client Error: Forbidden for url: {url}", response=response)
+
+
+def test_a_403_after_a_shard_below_the_limit_is_the_end_of_the_sitemap():
+    template = discover.CHAIN_SITEMAP
+    client = _ForbiddenAfterClient({template.format(0): ["https://x/a", "https://x/b"]})
+
+    assert discover._sitemap_urls(client, template) == ["https://x/a", "https://x/b"]
+    assert client.requested == [template.format(0), template.format(1)]
+
+
+def test_a_403_after_a_full_shard_or_on_the_first_one_is_an_error(monkeypatch):
+    template = discover.CHAIN_SITEMAP
+    monkeypatch.setattr(discover, "SITEMAP_MAX_URLS", 2)  # la -0 viene llena: la -1 debería existir
+
+    with pytest.raises(requests.HTTPError):
+        discover._sitemap_urls(_ForbiddenAfterClient({template.format(0): ["https://x/a", "https://x/b"]}), template)
+    with pytest.raises(requests.HTTPError):
+        discover._sitemap_urls(_ForbiddenAfterClient({}), template)

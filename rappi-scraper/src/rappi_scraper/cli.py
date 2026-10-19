@@ -58,8 +58,9 @@ LONG_COMMANDS = {"discover", "scrape-stores", "scrape-restaurants", "refresh", "
 BACKUP_FAILED_EXIT = 3
 # 4: posible bloqueo; la corrida quedó abierta y la tarea semanal se detiene ahí.
 POSSIBLE_BLOCK_EXIT = 4
-# 5: los restaurantes no se actualizaron (falló su descubrimiento), y tiendas, búsqueda y respaldo sí: sigue la capa
-# de IA.
+# 5: los restaurantes no se actualizaron (falló su descubrimiento y no había una corrida anterior terminada de la que
+# usar la lista), y tiendas, búsqueda y respaldo sí: sigue la capa de IA. Con un sitemap caído o bloqueado y esa lista,
+# los restaurantes se bajan igual y sale con 0 (el reporte lo avisa).
 RESTAURANTS_FAILED_EXIT = 5
 # 6: las dos cosas, restaurantes sin actualizar y respaldo fallido: la tarea semanal anota ambas y sigue.
 RESTAURANTS_AND_BACKUP_FAILED_EXIT = 6

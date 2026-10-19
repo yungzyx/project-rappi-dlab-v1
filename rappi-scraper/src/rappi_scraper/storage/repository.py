@@ -91,6 +91,32 @@ def add_jobs(conn: Connection, run_id: int, jobs: list[dict]) -> None:
     conn.commit()
 
 
+def last_done_run_with_jobs(conn: Connection, kind: str, before_run: int) -> int | None:
+    """Última corrida terminada de ese tipo, anterior a `before_run`, que tenga jobs (su lista de qué descargar)."""
+    row = conn.execute(
+        "SELECT r.run_id FROM scrape_runs r WHERE r.kind = %s AND r.status = 'done' AND r.run_id < %s "
+        "AND EXISTS (SELECT 1 FROM scrape_jobs j WHERE j.run_id = r.run_id) ORDER BY r.run_id DESC LIMIT 1",
+        (kind, before_run),
+    ).fetchone()
+    return row[0] if row else None
+
+
+def copy_jobs(conn: Connection, from_run: int, to_run: int, job_type: str, skip_reason: str | None = None) -> int:
+    """Copia a `to_run`, como pendientes, los jobs de `from_run` (sin los omitidos por `skip_reason`). Los que ya están
+    en `to_run` no se tocan. Devuelve cuántos se agregaron."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "INSERT INTO scrape_jobs (run_id, job_key, job_type, payload) "
+            "SELECT %s, job_key, job_type, payload FROM scrape_jobs "
+            "WHERE run_id = %s AND job_type = %s AND (status <> 'skipped' OR result->>'reason' IS DISTINCT FROM %s) "
+            "ON CONFLICT (run_id, job_key) DO NOTHING",
+            (to_run, from_run, job_type, skip_reason),
+        )
+        copied = cur.rowcount
+    conn.commit()
+    return copied
+
+
 def pending_jobs(conn: Connection, run_id: int, job_type: str, vertical: str | None = None) -> list[dict]:
     rows = conn.execute(
         "SELECT job_key, payload FROM scrape_jobs "

@@ -122,7 +122,8 @@ fi
 # revisa, y si falta una se detiene (las aplica el despliegue: `docker compose run --rm migrate`, que respalda antes).
 if [ "${API_ENV:-}" = production ]; then "$RAPPI_BIN" migrate --solo-revisar; else "$RAPPI_BIN" migrate; fi
 # Código 3: todo terminó salvo el respaldo (quedan los anteriores). Código 5: los restaurantes no se actualizaron
-# (tiendas, búsqueda y respaldo sí). Código 6: las dos cosas. En los tres la capa de IA corre igual, pero queda
+# (tiendas, búsqueda y respaldo sí; con el sitemap caído y una corrida anterior se usa su lista y sale con 0). Código
+# 6: las dos cosas. En los tres la capa de IA corre igual, pero queda
 # anotado. Código 4: posible bloqueo de rappi.cl; aquí se detiene.
 refresh_rc=0
 ${AWAKE[@]+"${AWAKE[@]}"} "$RAPPI_BIN" refresh "$@" || refresh_rc=$?

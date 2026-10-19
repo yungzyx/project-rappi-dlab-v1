@@ -13,6 +13,7 @@ from .queue import NO_BRANCH_WITH_MENU, process_with_retry
 log = logging.getLogger(__name__)
 
 LOG_EVERY_N_JOBS = 25  # los restaurantes son muchos y rápidos: no se loguea cada uno
+GONE_REASON = "ya no existe en Rappi"  # motivo de un job omitido porque Rappi redirigió a restaurantNotFound
 
 
 def process_restaurant_jobs(conn: Connection, client: RappiClient, run_id: int, limit: int | None = None) -> None:
@@ -58,5 +59,5 @@ def _run_restaurant_job(
             done_brands.add(brand_id)
         return "done", {"store_id": parsed["store"]["store_id"], "brand_id": brand_id, "items": saved}, None
     if candidates and gone == len(candidates):  # no hay nada que bajar: no es una falla del scraper
-        return "skipped", {"reason": "ya no existe en Rappi"}, None
+        return "skipped", {"reason": GONE_REASON}, None
     return "failed", None, error
