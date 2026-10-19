@@ -20,7 +20,13 @@ from rappi_ia.motor.build import build_motor, refresh_user_conn
 from rappi_ia.motor.model import TZ
 from rappi_ia.offers.winback import reach
 
-TODAY = datetime.now(TZ).date()
+
+def today():
+    """El día de hoy en Santiago al momento de usarlo (no al importar: una corrida que cruza la medianoche dejaba
+    los pedidos un día corridos respecto del día que usa la API)."""
+    return datetime.now(TZ).date()
+
+
 USER = "u-volver"
 COFFEE = ("catalog_item", "91004")  # café molido, solo en el súper
 COOKIES = ("catalog_item", "91002")
@@ -55,7 +61,7 @@ def offer(client, moment="volver", user_id=USER, context=None):
 
 def bought(db, user, vertical, concept, entity, days_ago, mode="propuesta", source="prototype"):
     """Un pedido a mediodía (hora de Santiago) de hace `days_ago` días."""
-    ts = datetime.combine(TODAY - timedelta(days=days_ago), time(12), TZ)
+    ts = datetime.combine(today() - timedelta(days=days_ago), time(12), TZ)
     line = {"entity_type": entity[0], "entity_id": entity[1], "concept_id": concept, "unit_price": 1990}
     cart = f"c-{user}-{vertical}-{concept}-{days_ago}-{mode}"
     events.record_order(db, user, f"s-{days_ago}", cart, vertical, [line], source=source, ts=ts, mode=mode)
@@ -302,7 +308,7 @@ def test_a_simulated_person_and_the_prototype_do_not_mix(client, db):
     assert offer(client).status_code == 204
     synthetic, prototype = reach(db, "synthetic"), reach(db, "prototype")
     assert synthetic == {
-        "dia": (TODAY - timedelta(days=20)).isoformat(),  # el último pedido simulado
+        "dia": (today() - timedelta(days=20)).isoformat(),  # el último pedido simulado
         "personas": 1,
         "califican": 0,  # ese día lo acababa de pedir
         "por_concepto": 0,

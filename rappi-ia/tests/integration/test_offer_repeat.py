@@ -18,7 +18,13 @@ from rappi_ia.motor.build import refresh_user_conn
 from rappi_ia.motor.model import TZ
 from rappi_ia.offers.engine import _days_ago, _every
 
-TODAY = datetime.now(TZ).date()
+
+def today():
+    """El día de hoy en Santiago al momento de usarlo (no al importar: una corrida que cruza la medianoche dejaba
+    los pedidos un día corridos respecto del día que usa la API)."""
+    return datetime.now(TZ).date()
+
+
 COFFEE = ("catalog_item", "91004")  # café molido, solo en el súper
 COLA_SMALL = ("catalog_item", "92001")  # gaseosa de 500 cc: Express y Turbo, no el súper
 DIAPERS = ("catalog_item", "91007")
@@ -50,7 +56,7 @@ def repeat(client, user_id="u-ritmo", context=None):
 
 def bought(db, user, vertical, concept, entity, days_ago, mode="propuesta"):
     """Un pedido a mediodía (hora de Santiago) de hace `days_ago` días."""
-    day = TODAY - timedelta(days=days_ago)
+    day = today() - timedelta(days=days_ago)
     line = {"entity_type": entity[0], "entity_id": entity[1], "concept_id": concept, "unit_price": 1990}
     events.record_order(
         db, user, f"s-{concept}-{days_ago}", f"c-{user}-{concept}-{days_ago}-{mode}", vertical, [line],
