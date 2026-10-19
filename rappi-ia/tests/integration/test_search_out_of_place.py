@@ -13,7 +13,7 @@ from rappi_ia.demo.seed import seed_demo
 from rappi_ia.embeddings.base import HashEmbedder
 from rappi_ia.embeddings.text_store import embed_search_documents
 
-EXPRESS, TURBO, MALL, PASTRY = 9201, 9301, 9601, 9806  # tiendas de `seed_demo`
+EXPRESS, TURBO, LIQUOR, MALL, PASTRY = 9201, 9301, 9401, 9601, 9806  # tiendas de `seed_demo`
 
 
 def _price(db, store_id: int, product_id: int, price: int) -> None:
@@ -49,6 +49,16 @@ def catalog(db):
     # La categoría de Rappi «Sandwiches y empanadas» va al concepto empanadas: Express no tiene sándwiches rotulados.
     add_product(db, 99005, "Sándwich de jamón y queso (prueba)", EXPRESS, "Sandwiches y empanadas")
     _price(db, EXPRESS, 99005, 2490)
+    # Contraejemplos donde el vertical no vende el concepto pero lo encontrado sí es lo pedido: un limón en el nombre
+    # de una bebida de Licores, y una cerveza y un maní que su ficha recomienda para el asado y el picoteo.
+    add_product(db, 99006, "Agua tónica limón 1,5 L (prueba)", LIQUOR, "Gaseosas")
+    _price(db, LIQUOR, 99006, 1990)
+    add_product(db, 99007, "Cerveza lager pack 6 latas (prueba)", LIQUOR, "Cervezas")
+    _price(db, LIQUOR, 99007, 6990)
+    add_product(db, 99008, "Maní salado 200 g (prueba)", EXPRESS, "Snacks salados")
+    _price(db, EXPRESS, 99008, 1290)
+    for pid, description in [(99007, "Ideal para el asado"), (99008, "Ideal para el picoteo")]:
+        db.execute("UPDATE catalog_items SET description = %s WHERE master_product_id = %s", (description, pid))
     add_dish(db, 99101, "Panal de miel con crema (prueba)", PASTRY, "Postres")
     db.execute(
         """INSERT INTO menu_price_snapshots (run_id, item_id, price)
@@ -84,15 +94,43 @@ def test_word_matches_of_another_concept_are_not_shown_where_the_concept_is_not_
     assert outcome.products == []
 
 
-def test_what_says_it_in_its_name_is_shown_even_with_another_concept(catalog):
+@pytest.mark.parametrize("query", ["sándwich", "sándwiches"])
+def test_what_says_it_in_its_name_is_shown_even_with_another_concept(catalog, query):
     """Express no vende el concepto sándwiches, pero su sándwich (rotulado empanadas por su categoría) lo dice en el
-    nombre: es lo pedido y se muestra. Lo demás que encuentra la búsqueda, no."""
+    nombre, en singular o en plural: es lo pedido y se muestra. Lo demás que encuentra la búsqueda, no."""
     db, embedder = catalog
 
-    outcome = search_products(db, "conveniencia", "sándwich", None, embedder)
+    outcome = search_products(db, "conveniencia", query, None, embedder)
 
     assert outcome.result.query_concepts == ["sandwiches"] and not outcome.result.concept_in_vertical
     assert [p.entity_id for p in outcome.products] == ["99005"]
+
+
+def test_a_plural_query_finds_the_singular_name(catalog):
+    """«limones» en Licores (sin frutas): la tónica dice «limón» en el nombre."""
+    db, embedder = catalog
+
+    outcome = search_products(db, "licores", "limones", None, embedder)
+
+    assert outcome.result.query_concepts == ["frutas"] and not outcome.result.concept_in_vertical
+    assert [p.entity_id for p in outcome.products] == ["99006"]
+
+
+@pytest.mark.parametrize(
+    ("vertical", "query", "concept", "product"),
+    [
+        ("licores", "algo para el asado", "carnes", "99007"),  # nombra la ocasión asado
+        ("conveniencia", "picoteo", "picoteo", "99008"),  # concepto amplio (`broad` en taxonomy.toml)
+    ],
+)
+def test_an_occasion_or_a_broad_concept_keeps_what_was_found(catalog, vertical, query, concept, product):
+    """Lo pedido son productos de varios tipos que su nombre no dice: no se exige que lo digan."""
+    db, embedder = catalog
+
+    outcome = search_products(db, vertical, query, None, embedder)
+
+    assert outcome.result.query_concepts == [concept] and not outcome.result.concept_in_vertical
+    assert not outcome.result.unmet and product in [p.entity_id for p in outcome.products]
 
 
 def test_grouped_search_shows_it_where_it_is_sold_and_not_in_the_current_vertical(catalog):

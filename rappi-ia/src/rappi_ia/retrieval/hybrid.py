@@ -7,7 +7,6 @@
 """
 
 import json
-import math
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
@@ -405,9 +404,9 @@ def concepts_of(conn: Connection, keys: list[tuple[str, str]]) -> dict[tuple[str
 
 def _concept_floor(doc_count: int) -> int:
     """Ítems que necesita un concepto para estar en un vertical de `doc_count` documentos: MIN_CONCEPT_ITEMS y el
-    MIN_CONCEPT_SHARE del vertical, redondeado como lo hacía Postgres (la mitad, hacia arriba). Bajo eso, el surtido
-    es testimonial."""
-    return max(MIN_CONCEPT_ITEMS, math.floor(MIN_CONCEPT_SHARE * doc_count + 0.5))
+    MIN_CONCEPT_SHARE del vertical, redondeado como lo hacía la consulta en Postgres (round de un double: la mitad, al
+    par, igual que `round` de Python). Bajo eso, el surtido es testimonial."""
+    return max(MIN_CONCEPT_ITEMS, round(MIN_CONCEPT_SHARE * doc_count))
 
 
 def _concept_items(conn: Connection, vertical: str, concepts: list[str]) -> int:

@@ -3,13 +3,16 @@
 Todo producto que el agente muestra pasa por aquí: sale de la base, con su precio vigente, nunca inventado.
 """
 
+import re
+import unicodedata
 from dataclasses import dataclass, field
 
 from psycopg import Connection
 from rappi_scraper.storage.search import MIN_PRICE
 
 from .. import config
-from ..concepts.taxonomy import load_taxonomy
+from ..concepts.matcher import KeywordMatcher
+from ..concepts.taxonomy import Occasion, load_taxonomy
 from ..embeddings.base import TextEmbedder
 from ..motor.combos import SERVICES
 from ..motor.predict import step_signal, target_step
@@ -440,8 +443,9 @@ def _dedupe(products: list[Product]) -> list[Product]:
 
 
 # Bajo esta participación en el vertical (y bajo el mínimo de «sin resultado», retrieval.hybrid.MIN_CONCEPT_ITEMS), lo
-# rotulado con el concepto pedido no se muestra. En la base real todo surtido testimonial queda bajo ella (el vertical
-# más chico tiene más de mil documentos); en un catálogo de prueba de decenas de productos, dos son surtido de verdad.
+# rotulado con el concepto pedido no se muestra. En la práctica es un interruptor: en la base real todo surtido
+# testimonial queda bajo el 1 % (el vertical más chico tiene más de mil documentos), así que siempre se oculta; solo en
+# un catálogo chico (los de prueba, de decenas de productos) dos productos pasan el 1 % y se siguen mostrando.
 TESTIMONIAL_SHARE = 0.01
 
 
@@ -455,9 +459,11 @@ def _focus(hits, result: RetrievalResult, capped: bool = False):
     - Con tope de precio (`capped`), si nada del concepto pedido cabe bajo el tope tampoco se muestra otra cosa:
       El agente dice cuánto cuesta lo más barato de lo pedido.
     - Si nada de lo encontrado es del concepto pedido y el vertical no lo vende (`concept_in_vertical`, la regla de
-      «sin resultado»), solo se muestra lo que lo dice en su nombre (`_names_query`): «sándwich» en Express trae los
+      «sin resultado»), solo se muestra lo que lo dice en su nombre (`_names_query`): «sándwiches» en Express trae los
       sándwiches rotulados como empanadas, pero «pañales» en restaurantes no trae el postre con «panal» que el
-      stemming juntaba. El agente y el buscador dicen dónde sí lo venden.
+      stemming juntaba. El agente y el buscador dicen dónde sí lo venden. No rige si la consulta nombra una ocasión
+      («algo para el asado» en Licores) o un concepto amplio (`broad` en taxonomy.toml: «picoteo»): ahí lo pedido
+      son productos de varios tipos que su nombre no dice.
     - El foco no cede ante productos de otro concepto que calzan las palabras: esa coincidencia mira todo el texto y
       el stemming junta palabras («flores» calza con azúcar flor). Que el concepto de la consulta (keywords) y el de
       los productos (categoría) coincidan se asegura en la taxonomía.
@@ -472,23 +478,67 @@ def _focus(hits, result: RetrievalResult, capped: bool = False):
         return matching
     if result.unmet or capped:
         return []
-    return hits if result.concept_in_vertical else [h for h in hits if _names_query(h.content, result.query)]
+    if result.concept_in_vertical or _broad_request(result.query, concepts):
+        return hits
+    return [h for h in hits if _names_query(h.content, result.query)]
 
 
-# Palabras de enlace que el nombre de un producto no necesita repetir («detergente para ropa»).
-_CONNECTORS = frozenset({"a", "al", "con", "de", "del", "el", "en", "la", "las", "los", "para", "sin", "y"})
+_OCCASIONS = None
+
+
+def named_occasion(q: str) -> Occasion | None:
+    """La ocasión que nombra la consulta («algo para el carrete»), con las keywords de taxonomy.toml."""
+    global _OCCASIONS
+    taxonomy = load_taxonomy()
+    if _OCCASIONS is None:
+        _OCCASIONS = KeywordMatcher((o.id, kw) for o in taxonomy.occasions.values() for kw in o.keywords)
+    match = _OCCASIONS.best(normalize(q))
+    return taxonomy.occasions[match.target] if match else None
+
+
+def _broad_request(query: str, concepts: list[str]) -> bool:
+    """¿Pide productos de varios tipos? Una ocasión («algo para el asado») o un concepto amplio («picoteo»)."""
+    taxonomy = load_taxonomy()
+    return named_occasion(query) is not None or any(
+        c in taxonomy.concepts and taxonomy.concepts[c].broad for c in concepts
+    )
+
+
+# Palabras que el nombre de un producto no necesita repetir: de enlace («detergente para ropa») y de relleno («algo
+# para…», «lo que…», «mi…»); además de las de saludo y pedido (text.FILLER_WORDS).
+_NAME_SKIP = FILLER_WORDS | frozenset(
+    {"a", "al", "algo", "con", "de", "del", "el", "en", "la", "las", "lo", "los", "mi", "para", "que", "sin", "y"}
+)
+
+
+def _name_words(text: str) -> list[str]:
+    """Las palabras sin tildes, como `text.tokens`, pero con la ñ: «pañal» no es «panal»."""
+    marked = unicodedata.normalize("NFC", text.lower()).replace("ñ", "\x00")
+    return [w.replace("\x00", "ñ") for w in re.findall(r"[a-z0-9\x00]+", _without_marks(marked))]
+
+
+def _without_marks(text: str) -> str:
+    return "".join(ch for ch in unicodedata.normalize("NFD", text) if unicodedata.category(ch) != "Mn")
+
+
+def _forms(word: str) -> set[str]:
+    """La palabra y sus singulares posibles: «limones» → limones, limone, limon; «sándwiches» → … sandwich."""
+    forms = {word}
+    if word.endswith("s") and len(word) > 3:
+        forms.add(word[:-1])
+    if word.endswith("es") and len(word) > 4:
+        forms.add(word[:-2])
+    return forms
 
 
 def _names_query(content: str, query: str) -> bool:
-    """¿El nombre (lo que va antes del primer «. » del documento) dice todas las palabras de la consulta? Palabras
-    enteras sin tildes, con el plural en «s» («tacos» dice taco); no «es»: «pañales» no dice «panal»."""
-
-    def singular(word: str) -> str:
-        return word[:-1] if word.endswith("s") and len(word) > 3 else word
-
-    name = {singular(w) for w in tokens(content.split(". ", 1)[0])}
-    wanted = [singular(w) for w in tokens(query) if w not in FILLER_WORDS | _CONNECTORS]
-    return bool(wanted) and all(w in name for w in wanted)
+    """¿El nombre dice todas las palabras de la consulta? El nombre es lo que va antes del primer «. » del documento
+    (search_documents lo arma así: nombre, marca, presentación, categoría…; un nombre con «. » adentro queda cortado
+    ahí). Palabras enteras sin tildes y con la ñ, en singular o plural (s/es) de cualquiera de los dos lados:
+    «limones» dice Limón y «sándwiches», Sándwich; «pañales» no dice Panal."""
+    name = set().union(*(_forms(w) for w in _name_words(content.split(". ", 1)[0])))
+    wanted = [w for w in _name_words(query) if normalize(w) not in _NAME_SKIP]
+    return bool(wanted) and all(_forms(w) & name for w in wanted)
 
 
 def _allowed(concept_id: str | None, requested: list[str], strict: bool = False) -> bool:
