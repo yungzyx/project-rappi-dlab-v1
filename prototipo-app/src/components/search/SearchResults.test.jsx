@@ -197,6 +197,22 @@ describe('SearchResults con resultados', () => {
     expect(screen.getByRole('button', { name: 'Ver más (2)' })).toBeTruthy()
   })
 
+  test('lo que la vertical de la pantalla no vende sale solo donde se vende, sin un grupo de esa vertical', async () => {
+    // Desde Turbo, «televisor 55 pulgadas»: la API ya no trae el cable HDMI de Turbo, solo el grupo del Mall.
+    const fetchMock = stubApi({})
+    const tv = { id: 'cat-1', name: 'Televisor smart 55 pulgadas', price: '$299.990', store: 'Tienda', storeId: 1 }
+    const found = { query: 'televisor 55 pulgadas', unmet: false, groups: [{ vertical: 'retail', products: [tv] }] }
+    render(<SearchResults query="televisor 55 pulgadas" data={found} onOpenVertical={vi.fn()} />, {
+      wrapper: Providers,
+    })
+    await flush()
+
+    expect(screen.getByRole('heading', { name: 'Rappi Mall' })).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: 'Turbo' })).toBeNull()
+    expect(screen.getByText('Televisor smart 55 pulgadas')).toBeTruthy()
+    expect(fetchMock).not.toHaveBeenCalled() // con resultados, Mochi no ofrece «Ver en…»
+  })
+
   test('el mismo producto en varios grupos no repite llaves', () => {
     const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
     render(<SearchResults query="cerveza" data={data()} />, { wrapper: Providers })
