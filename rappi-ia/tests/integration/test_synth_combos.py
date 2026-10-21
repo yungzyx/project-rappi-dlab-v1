@@ -4,7 +4,7 @@ Sobre el catálogo inventado de la demo: prueba la mecánica, no un efecto.
 """
 
 from collections import Counter
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 
@@ -14,7 +14,11 @@ from rappi_ia.motor.combos import SERVICE_COMBO, combo_of_verticals, load_combos
 from rappi_ia.motor.data import load_orders
 from rappi_ia.motor.model import combo_months, combo_stats
 
-LAST_MONTH = date(2026, 10, 1)  # `until` cae en octubre: septiembre no tiene su M+1 completo
+# Fecha fija para que la simulación sea la misma cada día (no depende de hoy). El mes de UNTIL queda incompleto: el
+# anterior (LAST_FULL) es el último completo y no tiene su M+1 completo.
+UNTIL = date(2026, 10, 4)
+LAST_MONTH = UNTIL.replace(day=1)
+LAST_FULL = (LAST_MONTH - timedelta(days=1)).replace(day=1)
 
 
 @pytest.fixture
@@ -22,7 +26,7 @@ def simulated(db):
     seed_demo(db)
     # Con 1.200, rest+turbo+retail quedaba en 19 al llevar la mitad de los complementos a Turbo (TURBO_SUGGESTION); con
     # 1.500, en 18 al pasar el sushi a las bebidas asiáticas (cambian los complementos que acepta el agente simulado).
-    generate(db, users=1800, weeks=26, seed=3, until=date(2026, 10, 4))
+    generate(db, users=1800, weeks=26, seed=3, until=UNTIL)
     return db
 
 
@@ -60,8 +64,7 @@ def test_activity_does_not_collapse_at_the_end(simulated):
     active: Counter[date] = Counter()
     for _user, month in _user_months(simulated):
         active[month] += 1
-    last_full = date(2026, 9, 1)  # `until` cae el 4 de octubre: octubre no está completo
-    assert active[last_full] >= 0.4 * max(active.values()), sorted(active.items())
+    assert active[LAST_FULL] >= 0.4 * max(active.values()), sorted(active.items())
 
 
 def test_the_mix_and_the_retention_track_the_rappi_table(simulated):

@@ -87,5 +87,14 @@ def test_load_signals_skip_actual_mode_and_bring_vertical_open(people):
     assert [s.kind for s in load_signals(people, "prototype", user_id="p1", before=T2)] == ["order", "vertical_open"]
 
 
+def test_load_signals_with_the_orders_already_read_gives_the_same_signals(people):
+    """El motor pasa los pedidos que ya leyó (`orders`) para no leerlos dos veces: las señales son las mismas."""
+    for source in ("prototype", "synthetic"):
+        assert load_signals(people, source, orders=load_orders(people, source)) == load_signals(people, source)
+    p1 = load_orders(people, "prototype", user_id=["p1"])
+    assert load_signals(people, "prototype", ["p1"], orders=p1) == load_signals(people, "prototype", ["p1"])
+    assert [s.kind for s in load_signals(people, "prototype", orders=[])] == ["vertical_open", "cart_add"]
+
+
 def test_sensitive_concepts(people):
     assert sensitive_concepts(people) == frozenset({"preservativos"})

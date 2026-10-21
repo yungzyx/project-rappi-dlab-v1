@@ -94,11 +94,18 @@ def load_orders(
 
 
 def load_signals(
-    conn: Connection, source: str, user_id: str | list[str] | None = None, before: datetime | None = None
+    conn: Connection,
+    source: str,
+    user_id: str | list[str] | None = None,
+    before: datetime | None = None,
+    orders: list[Order] | None = None,
 ) -> list[Signal]:
     """Las señales de afinidad de la fuente en orden de `ts`: cada pedido `propuesta` (`kind="order"`) y los eventos
-    con vertical de `EVENT_KINDS`, sin los hechos en «Rappi hoy»."""
-    signals = [Signal(o.user_id, o.ts, "order", o.vertical) for o in load_orders(conn, source, user_id, before)]
+    con vertical de `EVENT_KINDS`, sin los hechos en «Rappi hoy». `orders`: lo que da `load_orders` con la misma fuente,
+    personas y `before`, si quien llama ya lo leyó (así no se lee dos veces)."""
+    if orders is None:
+        orders = load_orders(conn, source, user_id, before)
+    signals = [Signal(o.user_id, o.ts, "order", o.vertical) for o in orders]
     where, params = _filters(source, user_id, before, "e")
     rows = conn.execute(
         f"""SELECT e.user_id, e.ts, e.type, e.vertical

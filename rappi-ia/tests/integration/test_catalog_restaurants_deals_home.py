@@ -21,6 +21,7 @@ concepto sensible, los dos con baja de precio (ver `_NOT_PUSHED_STORES` en el se
 
 import math
 import types
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -704,11 +705,14 @@ def test_dish_prices_read_latest_menu_prices(seeded, newer_first):
         for _ in range(2)
     )
     arrivals = [(newer, 11990), (older, 15990)]
+    # La misma fecha para los dos y más nueva que la de los platos sembrados (`now()`), relativa a hoy: con una fija
+    # (era el 01-01-2030), desde ese día lo sembrado sería lo más nuevo y el test fallaría.
+    when = datetime.now(UTC) + timedelta(days=1)
     for run, price in arrivals if newer_first else arrivals[::-1]:
         seeded.execute(
             "INSERT INTO menu_price_snapshots (run_id, item_id, price, real_price, scraped_at)"
-            " VALUES (%s, 98001, %s, %s, '2030-01-01T12:00:00Z')",
-            (run, price, price),
+            " VALUES (%s, 98001, %s, %s, %s)",
+            (run, price, price, when),
         )
     latest = dict(seeded.execute("SELECT item_id::text, price FROM latest_menu_prices").fetchall())
     assert latest["98001"] == 11990

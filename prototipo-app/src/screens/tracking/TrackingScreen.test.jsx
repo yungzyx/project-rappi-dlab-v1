@@ -40,7 +40,9 @@ function Harness({ reset }) {
 
 let api
 beforeEach(() => {
-  vi.useFakeTimers()
+  // A mediodía: «en silencio por hoy» guarda la fecha y `deliver()` adelanta el reloj 21 s; con la hora real, un test que
+  // partía antes de la medianoche terminaba en otro día.
+  vi.useFakeTimers({ now: new Date(2026, 9, 21, 12) })
   events.track.mockClear()
   api = stubApi({ 'POST /agent/offer': fixture('agent-offer-proximo-pedido') })
 })
