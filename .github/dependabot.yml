@@ -33,6 +33,15 @@ updates:
       rappi-ia-menores:
         patterns: ["*"]
         update-types: [minor, patch]
+    # Versiones que no caben con el resto del lock: pip no resuelve y la imagen de la API no se construye (21-10-2026).
+    # Quitar cada regla cuando el paquete que la limita las acepte.
+    ignore:
+      # sympy 1.14.0, que trae torch, pide mpmath<1.4.
+      - dependency-name: mpmath
+        versions: [">=1.4"]
+      # sentence-transformers 6.1.0 pide huggingface-hub<2.0.0.
+      - dependency-name: huggingface-hub
+        versions: [">=2"]
   - package-ecosystem: pip
     directory: /rappi-scraper
     schedule:
