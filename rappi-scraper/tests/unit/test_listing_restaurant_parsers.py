@@ -1,5 +1,6 @@
 import pytest
 
+from conftest import restaurant_block, with_top_section
 from rappi_scraper.scraping.listing_parser import parse_brand_chain, parse_vertical_listing
 from rappi_scraper.scraping.next_data import ParseError
 from rappi_scraper.scraping.restaurant_parser import parse_restaurant
@@ -48,24 +49,12 @@ def test_parse_restaurant_menu_and_details(page):
     assert all(i["image_url"].startswith("https://images.rappi.cl/") for i in r["items"] if i["image_url"])
 
 
-def _restaurant_block(data):
-    return next(v for k, v in data["props"]["pageProps"]["fallback"].items() if k.startswith('@"restaurant/'))
-
-
-def _with_top_section(data, products, corridor_id=99999):
-    """El fixture con un pasillo «Más vendidos» arriba, con copias de `products` (Rappi repite el plato con su id y le
-    pone el corridorId del pasillo popular)."""
-    copies = [{**p, "corridorId": corridor_id} for p in products]
-    _restaurant_block(data)["corridors"].insert(0, {"name": "Más vendidos", "products": copies})
-    return data
-
-
 def test_a_dish_in_mas_vendidos_and_in_its_own_section_keeps_both(page):
     """Un plato en «Más vendidos» y en «Hamburguesas» es un solo ítem: queda en su sección (la última en el menú, como
     antes) y recuerda las otras en `extra_section_ids`. Antes venía dos veces y al guardarse ganaba la última."""
     data = page("restaurant")
-    burgers = next(c for c in _restaurant_block(data)["corridors"] if c["name"] == "Hamburguesas")
-    data = _with_top_section(data, burgers["products"][:2])
+    burgers = next(c for c in restaurant_block(data)["corridors"] if c["name"] == "Hamburguesas")
+    data = with_top_section(data, burgers["products"][:2])
 
     r = parse_restaurant(data)
 
@@ -82,8 +71,8 @@ def test_a_dish_in_mas_vendidos_and_in_its_own_section_keeps_both(page):
 
 def test_a_dish_marked_popular_in_any_section_is_popular(page):
     data = page("restaurant")
-    burgers = next(c for c in _restaurant_block(data)["corridors"] if c["name"] == "Hamburguesas")
-    data = _with_top_section(data, [{**burgers["products"][0], "isPopular": True}])
+    burgers = next(c for c in restaurant_block(data)["corridors"] if c["name"] == "Hamburguesas")
+    data = with_top_section(data, [{**burgers["products"][0], "isPopular": True}])
 
     [dish] = [i for i in parse_restaurant(data)["items"] if i["item_id"] == burgers["products"][0]["id"]]
 
@@ -93,7 +82,7 @@ def test_a_dish_marked_popular_in_any_section_is_popular(page):
 def test_a_menu_without_repeated_dishes_does_not_change(page):
     """Sin platos repetidos (el fixture tal cual): un ítem por plato, en el orden del menú y sin otras secciones."""
     data = page("restaurant")
-    products = [p for c in _restaurant_block(data)["corridors"] for p in c["products"]]
+    products = [p for c in restaurant_block(data)["corridors"] for p in c["products"]]
 
     r = parse_restaurant(data)
 
