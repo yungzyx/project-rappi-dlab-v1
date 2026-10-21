@@ -267,6 +267,42 @@ def test_a_dish_the_restaurant_no_longer_offers_leaves_the_search(db, page):
     assert len(dishes) == 60 and str(parsed["items"][0]["item_id"]) not in dishes
 
 
+def _with_top_section(data, products, corridor_id=99999):
+    """La página del restaurante con un pasillo «Más vendidos» arriba que repite `products` (como lo manda Rappi)."""
+    block = next(v for k, v in data["props"]["pageProps"]["fallback"].items() if k.startswith('@"restaurant/'))
+    copies = [{**p, "corridorId": corridor_id} for p in products]
+    block["corridors"].insert(0, {"name": "Más vendidos", "products": copies})
+    return data
+
+
+# Los platos de una sección, también los que están en otra (como lo leería «lo más pedido», #106).
+SECTION_DISHES = """
+SELECT mi.rappi_item_id FROM menu_items mi
+JOIN menu_sections ms ON ms.store_id = mi.store_id
+     AND (ms.section_id = mi.section_id OR ms.section_id = ANY(mi.extra_section_ids))
+WHERE ms.name = %s ORDER BY 1"""
+
+
+def test_a_dish_in_mas_vendidos_and_in_its_own_section_is_saved_in_both(db, page):
+    """Antes el plato quedaba solo en la última sección y «Más vendidos» quedaba vacía (24 de 66 en `rappi`, 21-10)."""
+    data = page("restaurant")
+    block = next(v for k, v in data["props"]["pageProps"]["fallback"].items() if k.startswith('@"restaurant/'))
+    products = next(c for c in block["corridors"] if c["name"] == "Hamburguesas")["products"]
+    burgers = [p["id"] for p in products]
+    run = repository.start_run(db, "restaurants", {})
+
+    repository.save_restaurant(db, run, parse_restaurant(_with_top_section(data, products[:2])))
+
+    assert _count(db, "SELECT count(*) FROM menu_items") == 61
+    assert [r[0] for r in db.execute(SECTION_DISHES, ("Más vendidos",))] == sorted(burgers[:2])
+    assert [r[0] for r in db.execute(SECTION_DISHES, ("Hamburguesas",))] == sorted(burgers)
+
+    # La descarga siguiente ya no trae «Más vendidos»: el plato vuelve a estar solo en su sección.
+    repository.save_restaurant(db, repository.start_run(db, "restaurants", {}), parse_restaurant(page("restaurant")))
+    assert _count(db, "SELECT count(*) FROM menu_items WHERE extra_section_ids <> '{}'") == 0
+    assert [r[0] for r in db.execute(SECTION_DISHES, ("Hamburguesas",))] == sorted(burgers)
+
+
 def test_two_restaurants_sharing_a_rappi_dish_id_keep_their_own_dish_and_price(db, page):
     """Rappi repite el id de un plato entre restaurantes distintos: con item_id como clave global, el segundo se lo
     quitaba al primero (11 locales quedaron sin platos y se pisaron 1.717 precios, 30-09)."""

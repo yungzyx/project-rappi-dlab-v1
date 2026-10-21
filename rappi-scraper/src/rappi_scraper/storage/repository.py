@@ -457,14 +457,14 @@ def save_restaurant(conn: Connection, run_id: int, parsed: dict) -> int:
         # Un plato es único por (local, id de Rappi): Rappi repite ids entre restaurantes (migración 021).
         cur.executemany(
             """
-            INSERT INTO menu_items (item_id, rappi_item_id, store_id, section_id, name, description, image_url,
-                                    is_popular, has_toppings)
+            INSERT INTO menu_items (item_id, rappi_item_id, store_id, section_id, extra_section_ids, name,
+                                    description, image_url, is_popular, has_toppings)
             VALUES (CASE WHEN EXISTS (SELECT 1 FROM menu_items WHERE item_id = %(rappi_id)s)
                          THEN -nextval('menu_items_shared_id_seq') ELSE %(rappi_id)s END,
-                    %(rappi_id)s, %(store_id)s, %(section_id)s, %(name)s, %(description)s, %(image_url)s,
-                    %(is_popular)s, %(has_toppings)s)
+                    %(rappi_id)s, %(store_id)s, %(section_id)s, %(extra_section_ids)s, %(name)s, %(description)s,
+                    %(image_url)s, %(is_popular)s, %(has_toppings)s)
             ON CONFLICT (store_id, rappi_item_id) DO UPDATE SET
-                section_id = EXCLUDED.section_id, name = EXCLUDED.name,
+                section_id = EXCLUDED.section_id, extra_section_ids = EXCLUDED.extra_section_ids, name = EXCLUDED.name,
                 description = EXCLUDED.description, image_url = EXCLUDED.image_url,
                 is_popular = EXCLUDED.is_popular, has_toppings = EXCLUDED.has_toppings, last_seen = now()
             RETURNING item_id
@@ -474,6 +474,7 @@ def save_restaurant(conn: Connection, run_id: int, parsed: dict) -> int:
                     "rappi_id": i["item_id"],
                     "store_id": store_id,
                     "section_id": i["section_id"],
+                    "extra_section_ids": i["extra_section_ids"],
                     "name": i["name"],
                     "description": i["description"],
                     "image_url": i["image_url"],
