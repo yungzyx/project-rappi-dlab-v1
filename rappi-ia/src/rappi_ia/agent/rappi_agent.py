@@ -59,6 +59,7 @@ CHEAP_POOL = 24  # «barato»: reordenar solo los 6 más relevantes no daba lo m
 MIN_SHOWN = 3  # menos productos se completan con la búsqueda por el nombre del concepto
 MIN_ELSEWHERE = 2  # productos con el detalle pedido para cambiar de vertical: con uno solo suele ser casualidad
 MIN_HOME_ITEMS = MIN_ITEMS_ELSEWHERE  # con menos productos del concepto, la pantalla actual no es donde buscarlo
+RECOMMEND_INTERESTS = 3  # «qué me recomiendas» prueba hasta estos intereses antes de pasar a los ejemplos
 GENERAL_REMEDIES = "analgésico"  # si nada nombra el síntoma: paracetamol, aspirina y similares
 REMEDY_WORDS = {"remedio", "remedios", "medicamento", "medicamentos", "pastilla", "pastillas", "algo", "para"}
 # Palabras de un pedido que no son un detalle que deba decir el nombre del producto («lúcuma» en «helado de lúcuma» sí).
@@ -113,13 +114,7 @@ class RappiAgent:
         ctx = ctx or Context()
         intent = self.understander.understand(conn, message, ctx.vertical, previous=ctx.previous)
         if intent.kind == "recomendar":  # «qué me recomiendas»: lo que le gusta; sin perfil, ejemplos
-            interest = self._top_interest(ctx.profile) if ctx.mode == "propuesta" else None
-            if interest is None:
-                return self._small_talk(replace(intent, kind="ayuda"), ctx)
-            concept = self.taxonomy.concepts[interest]
-            response = self._reply(conn, concept.name, ctx, offer=True)
-            response["text"] = f"Por tu interés en {concept.label.lower()} 😉 " + response["text"]
-            return response
+            return self._recommend(conn, intent, ctx)
         if intent.kind in (
             "saludo",
             "gracias",
@@ -140,7 +135,7 @@ class RappiAgent:
         vertical = intent.vertical or ctx.vertical or "supermercado"
         # «vino» desde Farmacia: si la pantalla actual casi no tiene el concepto, se busca donde está y se dice.
         missing = None  # (vertical donde no está, qué, cuántos hay allí) para decirlo
-        home = self._home_for(conn, intent, vertical) if vertical == ctx.vertical else None
+        home = self._home_for(conn, intent, vertical, offer) if vertical == ctx.vertical else None
         if home:
             missing = (vertical, self.taxonomy.concepts[intent.concepts[0]].name.lower(), home[1])
             vertical = home[0]
@@ -269,6 +264,38 @@ class RappiAgent:
             )
             response["service"] = favor.id
         return response
+
+    def _recommend(self, conn: Connection, intent: Intent, ctx: Context) -> dict:
+        """«Qué me recomiendas», como una oferta (`offer`). Por cada interés que Mochi puede proponer, de mayor a menor
+        (hasta RECOMMEND_INTERESTS), busca su nombre y, si no trae productos del interés, su primera keyword, que es
+        como se llaman sus productos (las lanas del Mall no dicen «manualidades y mercería»). Desde Farmacia o Licores,
+        que Mochi no propone, o sin pantalla (la Home), busca en la vertical más típica del interés entre las que
+        propone (`ranked_verticals`). Responde el primero que trae productos del interés; si ninguno, los ejemplos de
+        siempre, como sin perfil: lo que no encontró no se muestra ni se anota como demanda (no lo pidió la persona).
+        Los intentos se redactan con plantillas; con Claude, solo el que responde."""
+        interests = self._interests(ctx.profile)[:RECOMMEND_INTERESTS] if ctx.mode == "propuesta" else []
+        trial = copy.copy(self)
+        trial.composer = TemplateComposer()
+        for interest in interests:
+            vertical = ctx.vertical
+            if not vertical or not offerable_vertical(vertical):
+                vertical = next((v for v in ranked_verticals(conn, [interest]) if offerable_vertical(v)), None)
+                if vertical is None:
+                    continue
+            concept = self.taxonomy.concepts[interest]
+            keyword = [k for k in concept.keywords[:1] if normalize(k) != normalize(concept.name)]  # «Pizza», «pizza»
+            for query in (concept.name, *keyword):
+                response = trial._reply(conn, query, replace(ctx, vertical=vertical), offer=True)
+                # Solo productos del interés (no lo que solo dice la palabra: «Set Parrillero Con Forma De Guitarra»), y
+                # de una vertical que Mochi propone.
+                found = any(p["concept"] == interest for p in response["products"])
+                if not found or not offerable_vertical(response["vertical"]):
+                    continue
+                if self.composer.remote:
+                    response = self._reply(conn, query, replace(ctx, vertical=vertical), offer=True)
+                response["text"] = f"Por tu interés en {concept.label.lower()} 😉 " + response["text"]
+                return response
+        return self._small_talk(replace(intent, kind="ayuda"), ctx)
 
     def _service(self, conn: Connection, intent: Intent, ctx: Context) -> dict:
         """Servicio sin catálogo: su pantalla y, en «Propuesta», UN gancho del catálogo que lo acompaña (el primero
@@ -409,9 +436,11 @@ class RappiAgent:
             v["prototype_vertical"] = PROTOTYPE_VERTICALS.get(v["vertical"])
         return {"concept": concept.id, "label": concept.label, "verticals": verticals}
 
-    def _home_for(self, conn: Connection, intent: Intent, vertical: str) -> tuple[str, int] | None:
+    def _home_for(self, conn: Connection, intent: Intent, vertical: str, offer: bool = False) -> tuple[str, int] | None:
         """(vertical, productos del concepto en `vertical`) donde buscar un concepto nombrado que `vertical` casi no
-        tiene (menos de MIN_HOME_ITEMS), si otra tiene al menos eso. Nunca si se nombró la vertical o en síntomas."""
+        tiene (menos de MIN_HOME_ITEMS), si otra tiene al menos eso. Nunca si se nombró la vertical o en síntomas. En
+        una oferta (`offer`), solo una vertical que Mochi propone: «en chocolaterías casi no hay gaseosas» llevaba a
+        Licores."""
         if not intent.explicit_concepts or intent.explicit_vertical or intent.symptom or intent.follow_up:
             return None
         concept = intent.concepts[0]
@@ -420,7 +449,14 @@ class RappiAgent:
         )
         if items.get(vertical, 0) >= MIN_HOME_ITEMS:
             return None
-        home = next((v for v in ranked_verticals(conn, [concept]) if items.get(v, 0) >= MIN_HOME_ITEMS), None)
+        home = next(
+            (
+                v
+                for v in ranked_verticals(conn, [concept])
+                if items.get(v, 0) >= MIN_HOME_ITEMS and (not offer or offerable_vertical(v))
+            ),
+            None,
+        )
         return (home, items.get(vertical, 0)) if home else None
 
     def _avoided(self, intent: Intent) -> list[str]:
@@ -512,12 +548,16 @@ class RappiAgent:
                 return candidate, outcome, products
         return None
 
-    def _top_interest(self, profile: dict[str, float]) -> str | None:
+    def _interests(self, profile: dict[str, float]) -> list[str]:
         concepts = self.taxonomy.concepts
         # Lo recomienda el agente por su cuenta («Por tu interés en…», «Veo tu interés en…»): solo intereses que puede
-        # proponer.
+        # proponer, de mayor a menor (a igual puntaje, en el orden del perfil).
         allowed = {c: s for c, s in profile.items() if c in concepts and is_offerable(concepts[c])}
-        return max(allowed, key=allowed.get) if allowed else None
+        return sorted(allowed, key=allowed.get, reverse=True)
+
+    def _top_interest(self, profile: dict[str, float]) -> str | None:
+        interests = self._interests(profile)
+        return interests[0] if interests else None
 
 
 def _offerable_elsewhere(conn: Connection, verticals: list[dict]) -> list[dict]:
