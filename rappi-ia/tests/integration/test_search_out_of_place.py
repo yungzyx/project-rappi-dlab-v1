@@ -59,6 +59,27 @@ def catalog(db):
     _price(db, EXPRESS, 99008, 1290)
     for pid, description in [(99007, "Ideal para el asado"), (99008, "Ideal para el picoteo")]:
         db.execute("UPDATE catalog_items SET description = %s WHERE master_product_id = %s", (description, pid))
+    # «neumáticos aro 15» en Express, como en la base real: el vertical vende artículos para el auto, pero ninguno dice
+    # «neumáticos» ni «15», y lo que calza el «15» son jugos en polvo de 15 g, más que el corte de lo que se mira. Los
+    # neumáticos están en el mall.
+    for pid, name in [
+        (99030, "Cubreauto talla M (prueba)"),
+        (99031, "Cera para auto en aerosol 360 cc (prueba)"),
+        (99032, "Amarras elásticas para auto x 22 (prueba)"),
+    ]:
+        add_product(db, pid, name, EXPRESS, "Accesorios para exterior")
+        _price(db, EXPRESS, pid, 3990)
+    flavors = ["naranja", "piña", "frambuesa", "durazno", "manzana", "frutilla", "melón", "huesillo", "limón", "mango"]
+    for i, flavor in enumerate(flavors + ["uva", "pera"]):
+        add_product(db, 99010 + i, f"Jugo en polvo {flavor} 15 g (prueba)", EXPRESS, "Refrescos en polvo")
+        _price(db, EXPRESS, 99010 + i, 290)
+    for pid, name in [
+        (99040, "Neumático aro 15 175/65 (prueba)"),
+        (99041, "Neumático aro 15 185/60 (prueba)"),
+        (99042, "Neumático aro 14 165/70 (prueba)"),
+    ]:
+        add_product(db, pid, name, MALL, "Accesorios para exterior")
+        _price(db, MALL, pid, 49990)
     add_dish(db, 99101, "Panal de miel con crema (prueba)", PASTRY, "Postres")
     db.execute(
         """INSERT INTO menu_price_snapshots (run_id, item_id, price)
@@ -92,6 +113,44 @@ def test_word_matches_of_another_concept_are_not_shown_where_the_concept_is_not_
 
     assert outcome.result.query_concepts == ["panales"] and outcome.result.strict_lexical_matches > 0
     assert outcome.products == []
+
+
+def test_a_number_alone_does_not_show_another_concept_where_the_concept_is_sold(catalog):
+    """«neumáticos aro 15» en Express: el vertical vende el concepto (artículos para el auto), pero lo que calza el «15»
+    en la léxica y en la vectorial son jugos en polvo de 15 g, que en la fusión dejan fuera los productos del concepto.
+    Se mostraban los jugos; ahora, como donde no se vende el concepto, solo lo que dice lo pedido en su nombre."""
+    db, embedder = catalog
+
+    outcome = search_products(db, "conveniencia", "neumáticos aro 15", None, embedder)
+
+    assert outcome.result.query_concepts == ["automotriz"] and outcome.result.concept_in_vertical
+    assert not outcome.result.unmet and outcome.products == []
+
+
+def test_grouped_search_shows_the_tyres_where_they_are_sold(catalog):
+    db, embedder = catalog
+
+    found = search_grouped(db, "neumáticos aro 15", embedder, current="conveniencia", limit=6)
+
+    assert [g.vertical for g in found.groups] == ["mall"]
+    assert [p.entity_id for p in found.groups[0].products][:2] == ["99040", "99041"]
+
+
+@pytest.mark.parametrize(
+    ("vertical", "query", "product"),
+    [
+        ("licores", "cerveza pack 6", "99007"),
+        ("supermercado", "pañales talla 3", "91007"),
+        ("farmacia", "pañales talla 3", "91007"),
+        ("mall", "neumáticos aro 15", "99040"),
+    ],
+)
+def test_a_number_next_to_what_the_vertical_sells_still_finds_it(catalog, vertical, query, product):
+    db, embedder = catalog
+
+    outcome = search_products(db, vertical, query, None, embedder)
+
+    assert product in [p.entity_id for p in outcome.products]
 
 
 @pytest.mark.parametrize("query", ["sándwich", "sándwiches"])

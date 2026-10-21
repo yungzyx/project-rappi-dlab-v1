@@ -458,12 +458,13 @@ def _focus(hits, result: RetrievalResult, capped: bool = False):
       cable HDMI para «televisor 55 pulgadas» en Turbo, un pack de regalo para «cerveza en lata» en el Mall.
     - Con tope de precio (`capped`), si nada del concepto pedido cabe bajo el tope tampoco se muestra otra cosa:
       El agente dice cuánto cuesta lo más barato de lo pedido.
-    - Si nada de lo encontrado es del concepto pedido y el vertical no lo vende (`concept_in_vertical`, la regla de
-      «sin resultado»), solo se muestra lo que lo dice en su nombre (`_names_query`): «sándwiches» en Express trae los
-      sándwiches rotulados como empanadas, pero «pañales» en restaurantes no trae el postre con «panal» que el
-      stemming juntaba. El agente y el buscador dicen dónde sí lo venden. No rige si la consulta nombra una ocasión
-      («algo para el asado» en Licores) o un concepto amplio (`broad` en taxonomy.toml: «picoteo»): ahí lo pedido
-      son productos de varios tipos que su nombre no dice.
+    - Si nada de lo encontrado es del concepto pedido, solo se muestra lo que lo dice en su nombre (`_names_query`):
+      «sándwiches» en Express trae los sándwiches rotulados como empanadas, pero «pañales» en restaurantes no trae el
+      postre con «panal» que el stemming juntaba. Rige también si el vertical vende el concepto: lo que calza solo un
+      número o una medida de la consulta puede dejar fuera de lo encontrado los productos del concepto, y
+      «neumáticos aro 15» en Express traía jugos en polvo de 15 g. El agente y el buscador dicen dónde sí lo venden.
+      No rige si la consulta nombra una ocasión («algo para el asado» en Licores) o un concepto amplio (`broad` en
+      taxonomy.toml: «picoteo»): ahí lo pedido son productos de varios tipos que su nombre no dice.
     - El foco no cede ante productos de otro concepto que calzan las palabras: esa coincidencia mira todo el texto y
       el stemming junta palabras («flores» calza con azúcar flor). Que el concepto de la consulta (keywords) y el de
       los productos (categoría) coincidan se asegura en la taxonomía.
@@ -478,7 +479,7 @@ def _focus(hits, result: RetrievalResult, capped: bool = False):
         return matching
     if result.unmet or capped:
         return []
-    if result.concept_in_vertical or _broad_request(result.query, concepts):
+    if _broad_request(result.query, concepts):
         return hits
     return [h for h in hits if _names_query(h.content, result.query)]
 
