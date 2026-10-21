@@ -124,6 +124,7 @@ def test_a_number_alone_does_not_show_another_concept_where_the_concept_is_sold(
     outcome = search_products(db, "conveniencia", "neumáticos aro 15", None, embedder)
 
     assert outcome.result.query_concepts == ["automotriz"] and outcome.result.concept_in_vertical
+    assert outcome.result.hits and "automotriz" not in {h.concept_id for h in outcome.result.hits}  # lo que se mira
     assert not outcome.result.unmet and outcome.products == []
 
 
@@ -133,7 +134,8 @@ def test_grouped_search_shows_the_tyres_where_they_are_sold(catalog):
     found = search_grouped(db, "neumáticos aro 15", embedder, current="conveniencia", limit=6)
 
     assert [g.vertical for g in found.groups] == ["mall"]
-    assert [p.entity_id for p in found.groups[0].products][:2] == ["99040", "99041"]
+    # Los neumáticos empatan en el coseno del HashEmbedder: el orden entre ellos no está fijo.
+    assert {"99040", "99041"} <= {p.entity_id for p in found.groups[0].products}
 
 
 @pytest.mark.parametrize(

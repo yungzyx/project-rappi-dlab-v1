@@ -1,7 +1,8 @@
 # Búsqueda: un número o una palabra suelta no basta para mostrar un producto (fase 1 de 4)
 
 **Objetivo:** que «neumáticos aro 15» en Express no muestre jugos en polvo Zuko «15 g». Si la vertical no tiene lo
-pedido, queda vacía (el vacío honesto) y la búsqueda agrupada muestra dónde sí se vende, como ya hace desde el PR #116.
+pedido, queda vacía (el vacío honesto) y la búsqueda agrupada muestra lo del concepto en las verticales que lo tienen,
+como ya hace desde el PR #116.
 
 ## Causa (base `rappi`, 21-10-2026, en solo lectura)
 
@@ -10,7 +11,8 @@ auto (cubreautos, cera, silicona), sobre el piso de «sin resultado» (`concept_
 (df 0) y «aro» está en 2 documentos, así que la léxica se llena con los 123 que dicen «15». La vectorial (e5) también
 pone arriba los nombres cortos con «15 g» o «x15». En la fusión (RRF) gana lo que está en las dos listas, y los ítems de
 `automotriz` quedan en los puestos 13, 18 y 25 aunque tengan el refuerzo por concepto: fuera de los 12 que mira
-`agent/tools._focus`.
+`agent/tools._focus` en la búsqueda agrupada (6 por grupo; `/search` de una vertical mira 20 y alcanza a dos
+cubreautos).
 
 En `_focus`, si nada de lo encontrado es del concepto pedido:
 
@@ -29,14 +31,16 @@ encontrado es del concepto pedido, solo se muestra lo que dice lo pedido en su n
 búsqueda. No hay consultas extra.
 
 Queda fuera, y se informa en el PR: las consultas que no nombran ningún concepto («colchón 2 plazas» en Turbo trae un
-ratchet y pilas «2 unidades»). Ahí decide τ, que en Turbo, Mall y Chocolatería está en el piso de la grilla o cerca.
+ratchet y pilas «2 unidades»; «sofá de tres cuerpos», pisco Tres Erres). Ahí decide τ (Turbo 0,79; Mall y Chocolatería
+en el piso de la grilla, 0,70).
 
 ## Pasos
 
 1. Tests que fallan (`tests/integration/test_search_out_of_place.py`, sobre `seed_demo`): una vertical que vende el
    concepto pedido, pero cuyos productos con el número de la consulta son de otro concepto («neumáticos aro 15» en
-   Express) no los muestra; lo legítimo sigue: «leche 1 litro», «cerveza pack 6» en Licores, «sándwiches» en Express,
-   «algo para el asado» en Licores. Además, la búsqueda agrupada sin el grupo de Express.
+   Express) no los muestra; lo legítimo sigue: «cerveza pack 6» en Licores, «pañales talla 3» en Farmacia y el súper,
+   «neumáticos aro 15» en el Mall (más los de #116: «sándwiches» en Express, «algo para el asado» en Licores). Además,
+   la búsqueda agrupada sin el grupo de Express. «leche 1 litro» y las demás legítimas se miden en la base real (paso 3).
 2. El arreglo en `_focus` y su docstring.
 3. Medición en la base real, en solo lectura: el barrido de 42 consultas fuera de lugar y 25 legítimas, el barrido de
    #116 (2 keywords por concepto × 8 verticales, con y sin una medida al final, más las búsquedas de ofertas por

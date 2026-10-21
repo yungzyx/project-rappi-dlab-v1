@@ -461,10 +461,11 @@ def _focus(hits, result: RetrievalResult, capped: bool = False):
     - Si nada de lo encontrado es del concepto pedido, solo se muestra lo que lo dice en su nombre (`_names_query`):
       «sándwiches» en Express trae los sándwiches rotulados como empanadas, pero «pañales» en restaurantes no trae el
       postre con «panal» que el stemming juntaba. Rige también si el vertical vende el concepto: lo que calza solo un
-      número o una medida de la consulta puede dejar fuera de lo encontrado los productos del concepto, y
-      «neumáticos aro 15» en Express traía jugos en polvo de 15 g. El agente y el buscador dicen dónde sí lo venden.
-      No rige si la consulta nombra una ocasión («algo para el asado» en Licores) o un concepto amplio (`broad` en
-      taxonomy.toml: «picoteo»): ahí lo pedido son productos de varios tipos que su nombre no dice.
+      número o una palabra de la descripción puede dejar fuera de lo encontrado los productos del concepto, y
+      «neumáticos aro 15» en Express traía jugos en polvo de 15 g. El buscador agrupado muestra las verticales donde
+      sí hay del concepto; el agente, además, busca por el nombre del concepto y dice dónde más está («También en»).
+      No rige si la consulta nombra una ocasión («algo para el asado» en Licores) o un concepto
+      amplio (`broad` en taxonomy.toml: «picoteo»): ahí lo pedido son productos de varios tipos que su nombre no dice.
     - El foco no cede ante productos de otro concepto que calzan las palabras: esa coincidencia mira todo el texto y
       el stemming junta palabras («flores» calza con azúcar flor). Que el concepto de la consulta (keywords) y el de
       los productos (categoría) coincidan se asegura en la taxonomía.
