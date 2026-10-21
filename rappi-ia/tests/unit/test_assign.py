@@ -150,6 +150,39 @@ def test_pastry_as_the_cuisine_of_the_place_does_not_label_its_dishes(matcher, c
     assert (ice.concept_id, ice.source) == ("helados", "seccion-nombre:Helados")
 
 
+@pytest.mark.parametrize(
+    "name",
+    [
+        "Tartaleta Frutos Mixtos",
+        "Pie de frambuesa",
+        "Pie de Maracuyá",
+        "Trozo Key Lime Pie",
+        "Trozo Pumpkin Pie",
+        "6 Churros azucarados",
+        "T.milhoja manj.crema framb.choc S/A",
+        "Torta Mil Hojas Manjar",
+        "Brazo de Reina Coco Mediano",
+        "Carrot Cake -Capricho M",
+    ],
+)
+def test_pastries_named_by_their_kind_are_pastry_without_the_cuisine(matcher, csv_maps, name):
+    """Lo que la cocina «Pastelería y Postres» dejó de etiquetar y su nombre dice: en la muestra de la base real
+    (21-10-2026) quedaban sin concepto pies, tartaletas, churros y milhojas, y un brazo de reina pasaba a pizza."""
+    sections, cuisine_map = csv_maps["seccion_menu"], csv_maps["cocina"]
+    a = assign_menu_item("27", name, "Dulces", ["Pastelería y Postres", "Pizzas"], sections, cuisine_map, matcher)
+    assert (a.concept_id, a.method) == ("pasteleria", "regla"), a
+
+
+def test_a_savory_pie_or_a_foot_is_not_pastry(matcher):
+    """«pie» no es keyword suelta: también es el pie de pollo y, en el catálogo, plantillas y cremas para pies."""
+    dish = assign_menu_item("28", "Pie de Pollo", "Fondos", [], {}, {}, matcher)
+    assert dish is None or dish.concept_id != "pasteleria"
+    insole = assign_catalog_item("29", "Plantilla Ortopédica Pie Plano T. 40 Al 46", "Otros", CATEGORIES, matcher)
+    assert insole.concept_id != "pasteleria"
+    query = concept_matcher(load_taxonomy(), for_queries=True)
+    assert query.best("crema para pies") is None or query.best("crema para pies").target != "pasteleria"
+
+
 TOBACCO = {"cigarrillos": MappedName("cigarrillos", "llm", 0.8, "v1")}
 
 

@@ -366,7 +366,9 @@ parent = "dulces"
 name = "Tortas y pastelería"
 emoji = "🎂"
 prepared = true
-keywords = ["torta", "pastel", "kuchen", "queque", "cupcake", "muffin", "dona", "donut", "croissant", "medialuna", "berlín", "berlin", "pie de limón", "tarta dulce", "cinnamon roll", "rollo de canela", "macarons", "pastelito", "calzones rotos"]
+# Pies y tartas por su sabor dulce: «pie» suelto es también un pie de pollo y, en el catálogo y las consultas, un pie
+# («Plantilla Ortopédica Pie Plano», «crema para pies»). Sin «palmera»: en el catálogo son pijamas y prendedores.
+keywords = ["torta", "pastel", "kuchen", "queque", "cupcake", "muffin", "dona", "donut", "croissant", "medialuna", "berlín", "berlin", "pie de limón", "tarta dulce", "cinnamon roll", "rollo de canela", "macarons", "pastelito", "calzones rotos", "tartaleta", "churro", "milhoja", "mil hojas", "brazo de reina", "carrot cake", "pie de maracuyá", "pie de manzana", "pie de frambuesa", "pie de nuez", "pie de berries", "pie de frutos", "lemon pie", "key lime pie", "apple pie", "pumpkin pie"]
 
 [[concept]]
 id = "untables-dulces"
