@@ -15,6 +15,19 @@ def load_page(name: str) -> dict:
     return extract_next_data((FIXTURES_DIR / f"{name}.html").read_text(encoding="utf-8"))
 
 
+def restaurant_block(data: dict) -> dict:
+    """El bloque del restaurante dentro del `__NEXT_DATA__` de su página."""
+    return next(v for k, v in data["props"]["pageProps"]["fallback"].items() if k.startswith('@"restaurant/'))
+
+
+def with_top_section(data: dict, products: list[dict], corridor_id: int = 99999) -> dict:
+    """La página del restaurante con un pasillo «Más vendidos» arriba que repite `products`, como lo manda Rappi: el
+    mismo plato, con su id y el corridorId del pasillo popular."""
+    copies = [{**p, "corridorId": corridor_id} for p in products]
+    restaurant_block(data)["corridors"].insert(0, {"name": "Más vendidos", "products": copies})
+    return data
+
+
 class FakeClient:
     """Sirve fixtures según la ruta. `unavailable`, `failing_once` y `failing` simulan tiendas caídas y errores
     (una vez o siempre); `blocked`, un rappi.cl que responde 403 a todo."""
