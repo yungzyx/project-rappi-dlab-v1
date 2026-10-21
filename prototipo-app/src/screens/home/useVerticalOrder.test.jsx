@@ -31,33 +31,37 @@ test('con la API caída: sin orden y sin personalizar', async () => {
   expect(result.current).toEqual({ order: null, personalized: false })
 })
 
-test('al olvidar (cambian las `resets`) pide otra vez y descarta la respuesta de la petición anterior', async () => {
+test('al olvidar (cambian las `resets`) queda el orden fijo sin pedir, y la respuesta de antes no lo pisa', async () => {
   let calls = 0
   const api = stubApi({
     'GET /profile/*': () => {
       calls += 1
-      // La primera tarda y es personal; la segunda llega antes y es la de una persona nueva.
+      // La primera tarda y es personal (de antes de olvidar); la segunda, al volver a la Home, es la de una persona nueva.
       return calls === 1 ? { slow: 300, body: fixture('profile-verticales') } : fixture('profile-verticales-nueva')
     },
   })
   let reset
-  function Probe({ onResult }) {
+  function Probe({ active, onResult }) {
     reset = useProfile().reset
-    onResult(useVerticalOrder())
+    onResult(useVerticalOrder(active))
     return null
   }
   let latest
-  render(
+  const tree = (active) => (
     <ProfileProvider>
-      <Probe onResult={(value) => (latest = value)} />
-    </ProfileProvider>,
+      <Probe active={active} onResult={(value) => (latest = value)} />
+    </ProfileProvider>
   )
+  const { rerender } = render(tree(true))
   await waitFor(() => expect(requests(api)).toBe(1))
   act(() => reset())
+  await new Promise((resolve) => setTimeout(resolve, 400)) // la primera ya contestó: es de antes de olvidar
+  expect(requests(api)).toBe(1) // el servidor puede no haber borrado todavía: pedir traería el orden de antes
+  expect(latest).toEqual({ order: null, personalized: false })
+  rerender(tree(false)) // si el borrado falló, la app no se recarga: al volver a la Home pide otra vez
+  rerender(tree(true))
   await waitFor(() => expect(requests(api)).toBe(2))
   await waitFor(() => expect(latest.order).not.toBeNull())
-  expect(latest.personalized).toBe(false)
-  await new Promise((resolve) => setTimeout(resolve, 400)) // la primera ya contestó: no pisa a la segunda
   expect(latest.personalized).toBe(false)
   expect(latest.order[0]).toBe('supermercado')
 })

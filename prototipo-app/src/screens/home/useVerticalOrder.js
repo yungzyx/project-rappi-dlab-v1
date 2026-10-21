@@ -7,10 +7,12 @@ import { useProfile } from '../../state/ProfileContext'
 
 /**
  * El orden de los 6 verticales de la Home del prototipo final, según lo que más usa la persona (`GET /profile/{id}/verticales`).
- * Pide al montar, cuando cambian las `resets` («Olvidar») y cada vez que la Home vuelve a estar arriba (`active`: queda
- * montada bajo las pantallas que se abren encima). Al volver, antes de pedir manda los eventos en cola (los toques a
- * los accesos), para que el orden ya los cuente. La respuesta de una petición anterior no pisa a la última, y mientras
- * llega la nueva se mantiene el orden que había (salvo tras «Olvidar», que no muestra el de antes).
+ * Pide al montar y cada vez que la Home vuelve a estar arriba (`active`: queda montada bajo las pantallas que se abren
+ * encima). Al volver, antes de pedir manda los eventos en cola (los toques a los accesos), para que el orden ya los
+ * cuente. La respuesta de una petición anterior no pisa a la última, y mientras llega la nueva se mantiene el orden que
+ * había. Tras «Olvidar» (cambian las `resets`) queda el orden fijo y no pide: el buscador olvida antes de que el
+ * servidor borre, y pedir ahí traía el orden de antes (la Home parpadeaba hasta recargarse). Si el borrado sale bien la
+ * app se recarga; si falla, pide al volver.
  * Sin API (o con error) `order` es null: la Home queda en el orden fijo y sin el texto. En la demo sin conexión pide
  * también cuando el «Panel de la demo» cambia el historial.
  */
@@ -46,7 +48,7 @@ export function useVerticalOrder(active = true) {
     return () => window.removeEventListener('rappi-demo-history', again)
   }, [])
 
-  const { data } = useApi(async () => ({ resets, reply: await homeVerticals(userId()) }), [resets, returns], {
+  const { data } = useApi(async () => ({ resets, reply: await homeVerticals(userId()) }), [returns], {
     keepPrevious: true,
   })
   if (data?.resets !== resets || !data.reply?.order) return { order: null, personalized: false }
