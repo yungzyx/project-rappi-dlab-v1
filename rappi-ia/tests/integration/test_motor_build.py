@@ -135,8 +135,9 @@ def test_build_motor_twice_replaces_rows(simulated):
 
 def test_build_synthetic_keeps_prototype_rows(simulated):
     db = simulated
-    start = datetime(2026, 9, 1, 15, tzinfo=UTC)
-    for day in range(4):  # una persona del prototipo con pedidos en septiembre
+    # El prototipo cuenta hasta hoy (tendencias de 28 días, afinidad de 180): los pedidos, en las últimas 4 semanas.
+    start = datetime.now(UTC) - timedelta(days=22)
+    for day in range(4):  # una persona del prototipo con un pedido por semana
         events.record_order(
             db, "p-1", f"s-{day}", f"c-{day}", "supermercado", [_line("1", None)], ts=start + timedelta(days=7 * day)
         )
