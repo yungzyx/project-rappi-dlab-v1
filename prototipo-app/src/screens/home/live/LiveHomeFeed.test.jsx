@@ -51,7 +51,9 @@ beforeEach(async () => {
       </demo.DemoProvider>
     )
   }
-  vi.useFakeTimers()
+  // A mediodía: «en silencio por hoy» guarda la fecha y los tests adelantan el reloj; con la hora real, un test que
+  // partía justo antes de la medianoche terminaba en otro día.
+  vi.useFakeTimers({ now: new Date(2026, 9, 21, 12) })
   // La Home pide su catálogo a la API (sin respuestas, esas secciones no se ven) y a Mochi sus ocasiones y ofertas.
   api = stubAgent()
 })
