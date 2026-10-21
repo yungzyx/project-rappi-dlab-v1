@@ -58,7 +58,7 @@ test('al olvidar (cambian las `resets`) queda el orden fijo sin pedir, y la resp
   await new Promise((resolve) => setTimeout(resolve, 400)) // la primera ya contestó: es de antes de olvidar
   expect(requests(api)).toBe(1) // el servidor puede no haber borrado todavía: pedir traería el orden de antes
   expect(latest).toEqual({ order: null, personalized: false })
-  rerender(tree(false)) // si el borrado falló, la app no se recarga: al volver a la Home pide otra vez
+  rerender(tree(false)) // si el borrado falló, la app no se recarga: al volver de otra pantalla pide otra vez
   rerender(tree(true))
   await waitFor(() => expect(requests(api)).toBe(2))
   await waitFor(() => expect(latest.order).not.toBeNull())

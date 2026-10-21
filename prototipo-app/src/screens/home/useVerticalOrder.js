@@ -12,7 +12,7 @@ import { useProfile } from '../../state/ProfileContext'
  * cuente. La respuesta de una petición anterior no pisa a la última, y mientras llega la nueva se mantiene el orden que
  * había. Tras «Olvidar» (cambian las `resets`) queda el orden fijo y no pide: el buscador olvida antes de que el
  * servidor borre, y pedir ahí traía el orden de antes (la Home parpadeaba hasta recargarse). Si el borrado sale bien la
- * app se recarga; si falla, pide al volver.
+ * app se recarga; si falla, pide al volver de otra pantalla (cerrar el buscador no cuenta: se abre sobre la Home).
  * Sin API (o con error) `order` es null: la Home queda en el orden fijo y sin el texto. En la demo sin conexión pide
  * también cuando el «Panel de la demo» cambia el historial.
  */
