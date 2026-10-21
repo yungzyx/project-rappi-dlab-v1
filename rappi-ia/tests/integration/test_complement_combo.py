@@ -7,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from owner_client import OwnerClient
+from rappi_ia.agent import tools
 from rappi_ia.agent.compose import TemplateComposer
 from rappi_ia.agent.rappi_agent import Context, RappiAgent
 from rappi_ia.agent.tools import suggest_complement
@@ -22,6 +23,14 @@ NOW = datetime.now(UTC)
 SUSHI_ROLL = "98005"  # un plato de sushi del restaurante de prueba
 PIZZA = {"entity_type": "menu_item", "entity_id": "98001"}  # una pizza del restaurante de prueba
 REST_TO_TURBO = {"kind": "combinacion", "id": "restaurantes→restaurantes+turbo", "source": "rappi"}
+ROTATION_MARGIN = tools.ROTATION_MARGIN
+
+
+@pytest.fixture(autouse=True)
+def without_alternation(monkeypatch):
+    """Estos tests miden la combinación y la compra cruzada: sin la alternancia entre los dos mejores complementos, que
+    depende del id de cada persona (`ROTATION_MARGIN`; sus tests están en test_complement_variety.py)."""
+    monkeypatch.setattr(tools, "ROTATION_MARGIN", -1.0)
 
 
 @pytest.fixture
@@ -91,9 +100,13 @@ def test_with_two_similar_complements_the_one_of_the_target_vertical_wins(demo):
     assert chosen.reason == "Porque llevas 🍕 pizza"  # la razón sigue hablando de lo que lleva la persona
 
 
-def test_with_the_three_groups_the_tie_goes_to_the_vertical_of_the_fine_step(demo):
+@pytest.mark.parametrize("alternation", [False, True])
+def test_with_the_three_groups_the_tie_goes_to_the_vertical_of_the_fine_step(demo, monkeypatch, alternation):
     """Quien ya pide en los tres grupos sigue subiendo dentro de Retail: el complemento de la vertical del paso fino
-    (aquí la chocolatería, la que más abre) gana el desempate."""
+    (aquí la chocolatería, la que más abre) gana el desempate. Con la alternancia, a u-tres le toca primero el segundo
+    de la pizza, justo los chocolates: la base dice igual que los eligió la combinación."""
+    if alternation:
+        monkeypatch.setattr(tools, "ROTATION_MARGIN", ROTATION_MARGIN)
     db, embedder = demo
     pizza_goes_with(db, {"cafe": 0.6, "chocolates": 0.55})  # el café solo está en el súper, que ya pide
     line = {"entity_type": "catalog_item", "entity_id": "91001", "concept_id": None, "unit_price": 1990}
@@ -172,6 +185,23 @@ def test_if_the_best_already_completes_the_combination_nothing_changes(demo):
     assert (chosen.concept, chosen.vertical, chosen.basis) == ("hielo", "turbo", [])
 
 
+def test_the_usual_first_that_completes_the_combination_beats_the_alternation(demo, monkeypatch):
+    """A u-maki le toca primero el segundo complemento de la pizza (el café), pero el primero de siempre (el hielo,
+    solo en Turbo) completa su combinación: va él."""
+    monkeypatch.setattr(tools, "ROTATION_MARGIN", ROTATION_MARGIN)
+    db, embedder = demo
+    pizza_goes_with(db, {"hielo": 0.6, "cafe": 0.55})
+    line = {"entity_type": "menu_item", "entity_id": SUSHI_ROLL, "concept_id": "sushi", "unit_price": 6990}
+    events.record_order(db, "u-maki", "s-1", "c-1", "restaurantes", [line], ts=NOW - timedelta(days=2))
+    db.commit()
+
+    chosen = suggest_complement(db, ["pizza"], "restaurantes", embedder, user_id="u-maki")
+
+    assert (chosen.concept, chosen.vertical, chosen.basis) == ("hielo", "turbo", [])
+    # u-nori, sin pedidos (sin paso del motor), es de la misma mitad: a ella le toca el café.
+    assert suggest_complement(db, ["pizza"], "restaurantes", embedder, user_id="u-nori").concept == "cafe"
+
+
 def test_without_a_step_of_the_motor_it_is_the_usual_order(demo):
     db, embedder = demo
     pizza_goes_with(db, {"cafe": 0.6, "hielo": 0.55})
@@ -194,6 +224,20 @@ def test_a_cross_sell_rule_from_the_source_is_a_candidate_and_says_so(demo):
     assert chosen.basis == [
         {"kind": "compra_cruzada", "id": "sushi→despensa-asiatica@turbo", "source": "poblacion:synthetic"}
     ]
+
+
+def test_a_cross_sell_rule_of_the_person_is_not_swapped_with_the_next_complement(demo, monkeypatch):
+    """Entre dos complementos que pesan parecido, a la mitad de las personas les toca primero el segundo
+    (`ROTATION_MARGIN`); una compra cruzada de la persona es suya y va primero igual."""
+    monkeypatch.setattr(tools, "ROTATION_MARGIN", ROTATION_MARGIN)
+    db, embedder = demo
+    # Sin la regla, a u-sushi le toca el segundo de la sushi: los postres antes que las bebidas asiáticas.
+    assert suggest_complement(db, ["sushi"], "restaurantes", embedder, user_id="u-sushi").concept == "postres"
+    rule(db, "sushi", "despensa-asiatica", "turbo", 2.65)  # peso 0,55: apenas sobre las bebidas asiáticas (0,5)
+
+    chosen = suggest_complement(db, ["sushi"], "restaurantes", embedder, user_id="u-sushi")
+
+    assert (chosen.concept, chosen.vertical) == ("despensa-asiatica", "turbo")
 
 
 def test_a_cross_sell_rule_is_only_searched_in_the_vertical_of_the_rule(demo):

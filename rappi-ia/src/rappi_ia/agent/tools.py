@@ -3,6 +3,7 @@
 Todo producto que el agente muestra pasa por aquí: sale de la base, con su precio vigente, nunca inventado.
 """
 
+import hashlib
 import re
 import unicodedata
 from dataclasses import dataclass, field
@@ -198,6 +199,7 @@ def search_remedies(
 SIMILAR_MARGIN = 0.1  # dos complementos cuyo peso difiere en menos que esto son parecidos: decide la combinación
 CROSS_LIFT_SPAN = 3  # peso de una compra cruzada: min(1, (lift − 1) / 3); con lift 4 o más pesa 1, lo máximo
 COMPLEMENT_REPEAT_DAYS = 7  # un complemento ofrecido en estos días y antes del último pedido cede su lugar
+ROTATION_MARGIN = 0.2  # con el segundo complemento a esto o menos del primero, a la mitad de las personas les toca él
 # De dónde viene un complemento ofrecido (`payload.origen` de su `suggestion_shown`): los momentos `carrito`,
 # `checkout` y `proximo_pedido` y lo que sugiere al preguntarle (`ask`). `mochi-<momento>` es el nombre histórico de
 # `agent-<momento>`.
@@ -246,7 +248,12 @@ def suggest_complement(
     y antes de su último pedido (`_recently_offered`) pasa al final: sale el siguiente mejor. Lo ofrecido desde ese
     pedido (la compra en curso) no cuenta: el complemento no cambia mientras se arma el mismo pedido. Si todos los
     candidatos con productos se ofrecieron hace poco, sale el mejor de siempre. La razón y la `basis` no cambian: dicen
-    por qué sale este complemento."""
+    por qué sale este complemento.
+
+    Con `user_id`, antes de todo eso, si los dos primeros pesan parecido (`_takes_second`), a la mitad de las personas
+    les toca primero el segundo: las gaseosas eran el primer complemento de toda la comida preparada. Lo personal le
+    gana a esa alternancia: si el primero trae un producto de una marca que compra, o si completa su combinación, va
+    primero (el desempate se mide desde el primero de siempre)."""
     taxonomy = load_taxonomy()
     sources = [c for c in source_concepts if c in taxonomy.concepts and not taxonomy.concepts[c].sensitive]
     if not sources:
@@ -326,25 +333,29 @@ def suggest_complement(
         return Suggestion(candidate.concept, candidate.source, vertical, reason, products, brand, basis)
 
     def choose(candidates: list[_Candidate]) -> Suggestion | None:
-        """El primer candidato con productos, con el desempate de la combinación."""
-        best = candidates[0]
+        """El primer candidato con productos, con el desempate de la combinación. El desempate se mide desde el primero
+        de siempre (`first`), no desde el que la alternancia (`_takes_second`) puso primero, y le gana a ella: si el de
+        siempre ya completa la combinación, va primero."""
+        first = min(candidates, key=lambda c: (-c.weight, c.concept))  # el orden de `candidates` sin la alternancia
         searched: dict[str, tuple[str, list[Product], str | None] | None] = {}  # lo ya buscado de un candidato
         # Los pesos son `real`: redondeados, 0,4 − 0,3 no queda bajo el margen por el error de coma flotante.
-        similar = [c for c in candidates[1:] if round(best.weight - c.weight, 6) < SIMILAR_MARGIN]
+        similar = [c for c in candidates if c is not first and round(first.weight - c.weight, 6) < SIMILAR_MARGIN]
         step = target_step(conn, user_id, population) if user_id is not None and similar else None
         if step is not None:
             # Un servicio no tiene productos.
             group = {step.vertical} if step.vertical not in SERVICES and offerable_vertical(step.vertical) else set()
-            for candidate in (best, *similar):
+            for candidate in (first, *similar):
                 if completing := [v for v in verticals_of(candidate) if v in group and v != current_vertical]:
                     break
-            # Si el primero ya completa la combinación, o ninguno la completa, el orden de siempre.
-            if completing and candidate is not best:
+            # Si el primero ya completa la combinación, va primero; si ninguno la completa, el orden de siempre.
+            if completing and candidate is first:
+                candidates = [first, *(c for c in candidates if c is not first)]
+            elif completing:
                 # Su marca gana al desempate: el primero con un producto de una marca que compra va igual primero.
                 if prefer_brands:
-                    usual = searched[best.concept] = search(best, verticals_of(best))
+                    usual = searched[first.concept] = search(first, verticals_of(first))
                     if usual is not None and usual[2] is not None:
-                        return suggestion(best, usual, [])
+                        return suggestion(first, usual, [])
                 # Primero en la vertical del paso; si ahí no hay productos, vuelve a su lugar de siempre.
                 if result := search(candidate, completing):
                     return suggestion(candidate, result, [step_signal(conn, step, population)])
@@ -366,6 +377,12 @@ def suggest_complement(
                 return suggestion(edge, result, [])
         return None
 
+    if user_id is not None and _takes_second(candidates, user_id):
+        best = candidates[0]
+        usual = search(best, verticals_of(best)) if prefer_brands else None
+        if usual is None or usual[2] is None:  # sin un producto de sus marcas en el primero
+            candidates = [candidates[1], best, *candidates[2:]]
+
     recent = _recently_offered(conn, user_id) if user_id is not None else set()
     fresh = [c for c in candidates if c.concept not in recent]
     # Primero sin lo ofrecido hace poco; si no queda nada o nada de eso tiene productos, el mejor de siempre.
@@ -373,6 +390,20 @@ def suggest_complement(
         if (chosen := choose(pool)) is not None:
             return chosen
     return None
+
+
+def _takes_second(candidates: list[_Candidate], user_id: str) -> bool:
+    """Si a la persona le toca primero el segundo complemento: cuando pesa `ROTATION_MARGIN` o menos que el primero, a
+    la mitad de las personas, siempre la misma para un mismo origen (md5 de la persona y el concepto de origen; `hash`
+    de Python cambia entre procesos). Las gaseosas (0,6 o 0,7) iban primero con toda la comida preparada, y con la
+    pizza, la hamburguesa o los sándwiches casi todos veían las mismas. Una compra cruzada de la persona no rota."""
+    if len(candidates) < 2:
+        return False
+    best, second = candidates[:2]
+    # Los pesos son `real`: redondeados, como en `choose`.
+    if best.pick or second.pick or round(best.weight - second.weight, 6) > ROTATION_MARGIN:
+        return False
+    return hashlib.md5(f"{user_id}|{best.source}".encode()).digest()[0] % 2 == 1
 
 
 def _recently_offered(conn: Connection, user_id: str) -> set[str]:
