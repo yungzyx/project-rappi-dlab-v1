@@ -58,6 +58,15 @@ def test_a_doubtful_cuisine_gives_no_concept(matcher):
     assert assign_menu_item("14", "Especial de la casa", "Promos", ["Americana"], SECTIONS, CUISINES, matcher) is None
 
 
+def test_the_most_confident_cuisine_of_the_place_wins(matcher):
+    """Las cocinas llegan por orden alfabético: en un local «Asiática, Sushi», Asiática (0,85) ganaba a Sushi (0,97) y
+    13.605 platos de la base real (21-10-2026; 5.933 después del kNN), casi todos rolls y piezas, quedaban como comida
+    asiática."""
+    cuisines = {"asiática": MappedName("asiatica", "curado", 0.85), "sushi": MappedName("sushi", "llm", 0.97)}
+    a = assign_menu_item("17", "70 Piezas Mixtas", "Promociones", ["Asiática", "Sushi"], {}, cuisines, matcher)
+    assert (a.concept_id, a.source) == ("sushi", "cocina:Sushi")
+
+
 def test_an_ingredient_in_a_dish_name_does_not_beat_the_section(matcher):
     """«Mechada palta mayo» es un sándwich aunque diga palta; «Phad Kee Maoo Vacuno», un plato asiático."""
     sections = {"sandwiches": MappedName("sandwiches", "llm", 0.9), "wok": MappedName("asiatica", "llm", 0.9)}
@@ -126,6 +135,19 @@ def test_hot_dog_sections_of_the_real_map_make_the_dish_a_sandwich(matcher, csv_
     tomaba la cocina del local (pizza, hamburguesa, pastelería)."""
     a = assign_menu_item("24", name, section, cuisines, csv_maps["seccion_menu"], csv_maps["cocina"], matcher)
     assert (a.concept_id, a.source) == ("sandwiches", f"seccion:{section}"), a
+
+
+def test_pastry_as_the_cuisine_of_the_place_does_not_label_its_dishes(matcher, csv_maps):
+    """Cafeterías, juguerías y heladerías también se rotulan «Pastelería y Postres»: como cocina del local, mandaba a
+    pastelería las milanesas de «Milas - El Golf» («Just Mila Xl»), té, papas fritas y batidos; en dos muestras de la
+    base real (21-10-2026) acertaba unos 4 de cada 10. Sin otra pista el plato queda sin concepto (decide el kNN), y la
+    sección, si nombra un plato, manda."""
+    sections, cuisine_map = csv_maps["seccion_menu"], csv_maps["cocina"]
+    milas = ["Desayunos", "Internacional", "Pastelería y Postres"]
+    assert assign_menu_item("25", "Just Mila Xl", "+ Milanesas Xl", milas, sections, cuisine_map, matcher) is None
+    pastry = ["Pastelería y Postres"]
+    ice = assign_menu_item("26", "Frutilla Sin Azúcar", "Helados", pastry, sections, cuisine_map, matcher)
+    assert (ice.concept_id, ice.source) == ("helados", "seccion-nombre:Helados")
 
 
 TOBACCO = {"cigarrillos": MappedName("cigarrillos", "llm", 0.8, "v1")}

@@ -353,11 +353,13 @@ def _from_menu_maps(
     mapped = section_map.get(_key(section)) if section else None
     if mapped and mapped.confidence >= MIN_MAP_CONFIDENCE:
         return _from_map("menu_item", item_id, mapped, f"seccion:{section}")
-    for cuisine in cuisines:
-        mapped = cuisine_map.get(_key(cuisine))
-        if mapped and mapped.confidence >= cuisine_min:
-            # La cocina solo dice qué tipo de local es: menos confianza que la sección o el nombre.
-            return _from_map("menu_item", item_id, mapped, f"cocina:{cuisine}", factor=0.8)
+    # La más confiable de las cocinas del local (llegan por orden alfabético: en un local «Asiática, Sushi» ganaba
+    # Asiática y sus rolls quedaban como comida asiática); a igual confianza, la primera.
+    found = [(m, c) for c in cuisines if (m := cuisine_map.get(_key(c))) and m.confidence >= cuisine_min]
+    if found:
+        mapped, cuisine = max(found, key=lambda pair: pair[0].confidence)
+        # La cocina solo dice qué tipo de local es: menos confianza que la sección o el nombre.
+        return _from_map("menu_item", item_id, mapped, f"cocina:{cuisine}", factor=0.8)
     return None
 
 

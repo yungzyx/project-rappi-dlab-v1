@@ -764,7 +764,7 @@ cocina,Pizzas,pizza,0.92,llm,acuerdo,Cocina pizzas,124
 cocina,Internacional,ninguno,0.6,llm,juez,"Arepas, pastelitos; faltaría comida venezolana/latina",108
 cocina,Desayunos,desayuno,0.55,llm,acuerdo,Cocina de desayunos,90
 cocina,Pescados y Mariscos,pescados-mariscos,0.7,llm,juez,"Cocina de pescados fritos, ceviche, camarones",76
-cocina,Pastelería y Postres,pasteleria,0.85,llm,acuerdo,Tortas y pastelería,46
+cocina,Pastelería y Postres,pasteleria,0.6,curado,precision-21-10,"También la listan cafeterías, juguerías y heladerías: como cocina del local acertaba unos 4 de cada 10 platos (milanesas, té, batidos)",46
 cocina,Asiática,asiatica,0.85,curado,precision-06-10,"Comida china, thai, india y japonesa: un local asiático no es una sushería",44
 cocina,Carnes,carnes,0.6,llm,juez,Cocina de carnes/parrilla; ejemplos mixtos,44
 cocina,Hamburguesa,hamburguesa,0.6,llm,acuerdo,Cocina de hamburguesas,44
