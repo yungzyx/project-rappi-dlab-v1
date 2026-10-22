@@ -1,22 +1,29 @@
-// «Prototipo MVP.html» (npm run demo:html): la app en un solo archivo que abre con doble clic (file://), sin la API.
-// Construye el modo demo (`vite build --mode demo`: la API simulada de src/api/offline/ y la muestra del catálogo) y
-// mete el JS, el CSS (con fuentes e imágenes ya en base64) y el ícono dentro del HTML. Las fotos de los productos
-// siguen siendo enlaces a images.rappi.cl: sin internet, la demo funciona pero sin fotos.
+// «Prototipo MVP.html» (npm run demo:html): la app en un solo archivo que abre con doble clic (file://), sin la API ni
+// internet. Primero baja las miniaturas de las fotos de la muestra (scripts/demo-photos.mjs, con caché local); después
+// construye el modo demo (`vite build --mode demo`: la API simulada de src/api/offline/, la muestra del catálogo y sus
+// fotos) y mete el JS, el CSS (con fuentes e imágenes ya en base64) y el ícono dentro del HTML.
 // Escribe dist-demo/Prototipo MVP.html y, con DEMO_HTML_COPY=<ruta>, también una copia ahí.
 import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { build } from 'vite'
+import { embedPhotos } from './demo-photos.mjs'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
 const DIST = `${ROOT}dist-demo/`
 const OUT = `${DIST}Prototipo MVP.html`
 const SNAPSHOT = `${ROOT}src/api/offline/snapshot.json`
+const PHOTOS = `${ROOT}src/api/offline/photos.json`
 const MAX_BYTES = 15 * 1024 * 1024
 
 if (!existsSync(SNAPSHOT)) {
   console.error('Falta la muestra del catálogo (src/api/offline/snapshot.json): corre antes `npm run demo:snapshot`.')
   process.exit(1)
 }
+
+console.log('Fotos de la muestra…')
+const photos = await embedPhotos(SNAPSHOT, PHOTOS)
+const mb = (bytes) => `${(bytes / 1024 / 1024).toFixed(1)} MB`
+console.log(`  ${photos.embedded} fotos adentro (${mb(photos.bytes)}); ${photos.missing} sin bajar, con el cuadro gris`)
 
 await build({ root: ROOT, mode: 'demo', logLevel: 'warn' })
 
@@ -54,7 +61,7 @@ for (const marker of ['src="./assets/', 'href="./assets/', 'manifest.webmanifest
 
 writeFileSync(OUT, html)
 const size = Buffer.byteLength(html)
-console.log(`Listo: ${OUT} (${(size / 1024 / 1024).toFixed(1)} MB)`)
+console.log(`Listo: ${OUT} (${mb(size)})`)
 if (size > MAX_BYTES) {
   console.error(`Pesa más de ${MAX_BYTES / 1024 / 1024} MB: achica la muestra (scripts/demo-snapshot.mjs).`)
   process.exitCode = 1

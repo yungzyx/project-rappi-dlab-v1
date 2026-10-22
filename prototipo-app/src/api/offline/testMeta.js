@@ -55,13 +55,34 @@ export const SCREENS = {
   restaurantes: 'restaurants',
 }
 
+// `keywords`, `alone` y `avoid` van normalizados, como los escribe scripts/demo-snapshot-meta.py.
 export const CONCEPTS = {
-  cafe: { name: 'Café', emoji: '☕', group: 'bebidas', offerable: true },
-  galletas: { name: 'Galletas', emoji: '🍪', group: 'dulces', offerable: true },
-  cerveza: { name: 'Cerveza', emoji: '🍺', group: 'alcohol', offerable: false },
-  panales: { name: 'Pañales', emoji: '👶', group: 'bebe', offerable: false },
+  cafe: {
+    name: 'Café',
+    emoji: '☕',
+    group: 'bebidas',
+    offerable: true,
+    keywords: ['cafe', 'espresso'],
+    avoid: ['taza'],
+  },
+  galletas: { name: 'Galletas', emoji: '🍪', group: 'dulces', offerable: true, keywords: ['galletas', 'galleta'] },
+  cerveza: {
+    name: 'Cerveza',
+    emoji: '🍺',
+    group: 'alcohol',
+    offerable: false,
+    keywords: ['cerveza'],
+    alone: ['chela'],
+  },
+  panales: { name: 'Pañales', emoji: '👶', group: 'bebe', offerable: false, keywords: ['panales'] },
   analgesicos: { name: 'Analgésicos', emoji: '💊', group: 'salud', offerable: false },
-  juguetes: { name: 'Juguetes', emoji: '🧸', group: 'juguetes', offerable: true },
+  juguetes: {
+    name: 'Juguetes',
+    emoji: '🧸',
+    group: 'juguetes',
+    offerable: true,
+    keywords: ['juguetes', 'juguete', 'peluche'],
+  },
 }
 
 export const SERVICES = {
@@ -75,6 +96,8 @@ export const META = {
   screen_verticals: SCREENS,
   concepts: CONCEPTS,
   services: SERVICES,
+  occasion_keywords: ['asado', 'carrete'],
+  filler_words: ['hola', 'quiero', 'busco'],
 }
 
 /** Un producto con lo que trae la API. */
