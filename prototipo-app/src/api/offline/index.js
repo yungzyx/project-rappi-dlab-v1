@@ -13,8 +13,8 @@
 // - rappi-ia/src/rappi_ia/offers/engine.py ......... vertical por probar, recompra, volver, complementos (offers.js)
 // - rappi-ia/src/rappi_ia/offers/winback.py y motor/model.py (replenishment) ... recompra y volver (winback.js)
 // - rappi-ia/src/rappi_ia/offers/guards.py ......... lo que el agente nunca ofrece (offers.js: offerableProduct)
-// - rappi-ia/src/rappi_ia/agent/tools.py ........... el foco de la búsqueda (_focus) y el complemento alternado
-//   (_takes_second) (search.js, offers.js: complementOf)
+// - rappi-ia/src/rappi_ia/agent/tools.py ........... el foco de la búsqueda (_focus, en search.js) y el complemento
+//   alternado (_takes_second, en offers.js: complementOf)
 // - rappi-ia/src/rappi_ia/agent/rappi_agent.py ..... «qué me recomiendas» (search.js: recommend)
 // - rappi-ia/src/rappi_ia/events/store.py .......... el perfil de intereses (index.js: interests)
 // - rappi-ia/src/rappi_ia/offers/profiles.py ....... los perfiles de gusto activos (tastes.js)
@@ -23,7 +23,7 @@
 // la demo se repite sin esperar su ritmo (offers.js: repeatOffer): es una demo, no evidencia.
 import { catalogRoute } from './catalog'
 import { contractArticles, homeVerticals } from './motor'
-import { complementOf, makeOffer } from './offers'
+import { makeOffer } from './offers'
 import { ask, backendVertical, search } from './search'
 import { loadSnapshot } from './snapshot'
 import { addEvents, addOrder, clearState, readState, updateState } from './state'
@@ -88,7 +88,8 @@ function recommendations(snapshot, state, now, query) {
   const rows = []
   const shown = new Set()
   for (const concept of mine.filter((c) => concepts[c].offerable).slice(0, 4)) {
-    const recorded = complementOf(snapshot, concept, state.userId)
+    // api/app.py busca el complemento sin la persona: aquí no se alterna.
+    const recorded = snapshot.complements[concept]
     const target = recorded?.reason?.concept
     if (!recorded || shown.has(target)) continue
     shown.add(target)

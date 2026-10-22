@@ -2,9 +2,9 @@
 // foto que la muestra puede mostrar y las deja como data URI en src/api/offline/photos.json, que la API simulada pone
 // en lugar de los enlaces (src/api/offline/snapshot.js). Así el HTML no pide nada a la red al abrirse.
 //
-// Las miniaturas las achica el propio CDN de Rappi (`?d=…&e=webp&q=…`): el lado menor que entrega es 128 px, y con
-// calidad 30 una foto de producto pesa ~1,5 kB. Las tiendas y restaurantes (portadas y logos, que se ven más grandes)
-// van a 256 px. Se bajan pocas a la vez y quedan en .demo-cache/fotos/ (fuera de git): un armado siguiente solo baja
+// Las miniaturas las achica el propio CDN de Rappi (`?d=…&e=webp&q=…`), que redondea el tamaño pedido hacia arriba a
+// los suyos: `d=100x100` da la más chica, de 128 px, y con calidad 30 una foto de producto pesa ~1,5 kB. Las tiendas y
+// restaurantes (portadas y logos, que se ven más grandes) piden `d=128x128`, que da 256 px. Se bajan pocas a la vez y quedan en .demo-cache/fotos/ (fuera de git): un armado siguiente solo baja
 // las nuevas. Una foto que no se puede bajar no entra (la app muestra el cuadro gris de siempre).
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'

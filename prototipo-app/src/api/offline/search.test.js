@@ -75,6 +75,22 @@ describe('«qué me recomiendas» (rappi_agent.py: _recommend)', () => {
     expect(reply.products).not.toContain(pharmacyCookies)
   })
 
+  test('si nombra algo, busca eso: «¿me recomiendas un café?» no es «qué me recomiendas»', () => {
+    const reply = recommend(['juguetes'], { message: '¿Me recomiendas un café?' })
+    expect(reply.text).toBe('Mira lo que encontré de «¿Me recomiendas un café?» en el súper.')
+    expect(reply.products).toEqual([coffee])
+  })
+
+  test('prueba hasta tres intereses', () => {
+    // Tres intereses que se pueden ofrecer pero no tienen productos en la muestra: el cuarto ya no se prueba.
+    const empty = Object.fromEntries(['a', 'b', 'c'].map((id) => [id, { name: id, emoji: '·', offerable: true }]))
+    const wider = { ...snapshot, meta: { ...META, concepts: { ...META.concepts, ...empty } } }
+    const reply = (interests) =>
+      ask(wider, { message: 'qué me recomiendas', mode: 'propuesta' }, { interests, userId: 'proto-1' })
+    expect(reply(['a', 'b', 'cafe']).products).toEqual([coffee])
+    expect(reply(['a', 'b', 'c', 'cafe'])).toBe(HELP)
+  })
+
   test('sin productos que Mochi pueda ofrecer de un interés prueba el siguiente; sin nada, los ejemplos', () => {
     expect(recommend(['cerveza', 'juguetes']).text).toBe(
       'Por tu interés en 🧸 juguetes 😉 Mira lo que encontré de «juguetes» en Rappi Mall.',

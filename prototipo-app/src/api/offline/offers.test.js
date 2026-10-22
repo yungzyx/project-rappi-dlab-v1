@@ -32,13 +32,31 @@ const beer = product(4, { name: 'Cerveza lata', concept: 'cerveza', vertical: 'l
 
 const turboCoffee = product(5, { name: 'Café Turbo', vertical: 'turbo' })
 const turboToy = product(6, { name: 'Pelota', concept: 'juguetes', vertical: 'turbo' })
+// La misma entidad en dos verticales, cada una con su tienda: el hielo se vende en Licores y en Express, y el café
+// también en Express.
+const ice = product(7, { name: 'Hielo 2 kg', concept: 'hielo', vertical: 'licores', store_id: 3 })
+const expressIce = { ...ice, vertical: 'conveniencia', store_id: 2 }
+const expressCoffee = { ...coffee, vertical: 'conveniencia', store_id: 2 }
+const pharmacyCookies = product(8, { name: 'Galletas sin azúcar', concept: 'galletas', vertical: 'farmacia' })
 
 function snapshotWith(fields = {}) {
-  const pool = [coffee, cookies, turboSnack, beer, turboCoffee, turboToy]
+  const pool = [
+    coffee,
+    cookies,
+    turboSnack,
+    beer,
+    turboCoffee,
+    turboToy,
+    expressIce,
+    ice,
+    expressCoffee,
+    pharmacyCookies,
+  ]
   return {
     meta: META,
     pool,
-    byEntity: new Map(pool.map((p) => [`${p.entity_type}:${p.entity_id}`, p])),
+    // Como decodeSnapshot: la primera copia de cada entidad (la del café, la del súper; la del hielo, la de Express).
+    byEntity: new Map([...pool].reverse().map((p) => [`${p.entity_type}:${p.entity_id}`, p])),
     toTry: {
       usual: { ...recordedStep('supermercado', [coffee]), reason: { text: '', basis: [] } },
       turbo: recordedStep('turbo', [turboSnack]),
@@ -145,6 +163,31 @@ describe('recompra', () => {
     expect(offer('recompra', state({ orders: stopped }))).toBeNull()
     const twice = [21, 20].map((days) => ago(days, order('supermercado', [line(coffee)])))
     expect(offer('recompra', state({ orders: twice }))).toBeNull()
+    // Dos pedidos, pero solo uno en las últimas dos semanas.
+    const apart = [60, 2].map((days) => ago(days, order('supermercado', [line(coffee)])))
+    expect(offer('recompra', state({ orders: apart }))).toBeNull()
+  })
+
+  test('el producto es la copia de la vertical donde lo pidió, con su tienda', () => {
+    const made = offer('recompra', state({ orders: [1, 0].map((d) => ago(d, order('conveniencia', [line(coffee)]))) }))
+    expect(made).toMatchObject({
+      products: [expressCoffee],
+      vertical: 'conveniencia',
+      actions: [{ route: ['express'], store_id: 2 }],
+    })
+  })
+
+  test('nunca en Licores ni Farmacia, aunque el producto se ofrezca en otra vertical', () => {
+    for (const vertical of ['licores', 'farmacia']) {
+      const p = vertical === 'licores' ? ice : pharmacyCookies
+      const demo = [1, 0].map((d) => ago(d, order(vertical, [line(p)])))
+      const weekly = [21, 14, 7].map((d) => ago(d, order(vertical, [line(p)])))
+      expect(offer('recompra', state({ orders: demo }))).toBeNull()
+      expect(offer('recompra', state({ orders: weekly }))).toBeNull()
+    }
+    // En Express, el mismo hielo sí.
+    const express = [1, 0].map((d) => ago(d, order('conveniencia', [line(ice)])))
+    expect(offer('recompra', state({ orders: express })).products).toEqual([expressIce])
   })
 
   test('un concepto en dos pedidos: «¿Repetimos…?» con el último producto comprado', () => {
@@ -235,8 +278,15 @@ describe('volver («¿Volvemos a…?»)', () => {
   })
 
   test('nunca Licores ni Farmacia, ni lo de hace más de 90 días', () => {
-    const beers = [60, 50, 40].map((days) => ago(days, order('licores', [line(beer)])))
-    expect(offer('volver', state({ orders: [...beers, ago(2, order('supermercado', [line(coffee)]))] }))).toBeNull()
+    const recent = ago(2, order('supermercado', [line(coffee)]))
+    for (const [vertical, p] of [
+      ['licores', ice],
+      ['farmacia', pharmacyCookies],
+    ]) {
+      // Un concepto que pedía con ritmo ahí y una vertical que dejó: ninguna de las dos.
+      const weekly = [45, 38, 31, 24].map((days) => ago(days, order(vertical, [line(p)])))
+      expect(offer('volver', state({ orders: [...weekly, recent] }))).toBeNull()
+    }
     const old = [120, 113, 106, 99].map((days) => ago(days, order('supermercado', [line(coffee)])))
     expect(offer('volver', state({ orders: old }))).toBeNull()
   })
@@ -285,6 +335,30 @@ describe('complemento alternado (agent/tools.py: _takes_second)', () => {
     })
     expect(made.products).toEqual([turboSnack])
   })
+})
+
+test('con las fotos del armado, cada una va como data URI; la que no se bajó, sin foto (el cuadro gris)', () => {
+  const raw = {
+    productFields: ['entity_type', 'entity_id', 'name', 'img'],
+    imgPrefix: 'https://images.rappi.cl/products/',
+    products: [
+      ['catalog_item', '7', 'Café', '~a.png'],
+      ['catalog_item', '8', 'Té', '~b.png'],
+      ['catalog_item', '9', 'Mate', 'https://otro.cdn.invalid/c.png'],
+    ],
+    catalog: { stores: [{ logo: 'https://images.rappi.cl/marketplace/t.png', name: 'Tienda' }] },
+    search: { cafe: { groups: [{ products: [{ $p: 0 }] }] } },
+  }
+  const photos = {
+    prefix: 'https://images.rappi.cl/',
+    photos: { 'products/a.png': 'data:image/webp;base64,AAA', 'marketplace/t.png': 'data:image/webp;base64,BBB' },
+  }
+  const snapshot = decodeSnapshot(raw, photos)
+  expect(snapshot.pool.map((p) => p.img)).toEqual(['data:image/webp;base64,AAA', null, null])
+  expect(snapshot.catalog.stores[0]).toEqual({ logo: 'data:image/webp;base64,BBB', name: 'Tienda' })
+  expect(snapshot.search.cafe.groups[0].products[0].img).toBe('data:image/webp;base64,AAA')
+  // Sin las fotos del armado, los enlaces de siempre.
+  expect(decodeSnapshot(raw).catalog.stores[0].logo).toBe('https://images.rappi.cl/marketplace/t.png')
 })
 
 test('decodeSnapshot arma los productos desde sus filas y los vuelve a poner en las respuestas', () => {

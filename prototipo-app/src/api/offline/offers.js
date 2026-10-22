@@ -132,24 +132,33 @@ const linesNewestFirst = (state) =>
     .sort((a, b) => b.ts - a.ts)
     .flatMap((order) => [...order.lines].reverse().map((line) => ({ line, order })))
 
-/** Un producto o plato de la muestra (los platos son de restaurantes) que pasa las guardias. */
+/** Lo que se pide en una vertical: platos en restaurantes, productos en las demás. */
+const kindOf = (vertical) => (vertical === 'restaurantes' ? 'menu_item' : 'catalog_item')
+
+/**
+ * La copia de una entidad en esa vertical (con su tienda y su precio de ahí: una entidad puede estar en varias), si está
+ * en la muestra y pasa las guardias (engine.py: _priced_in_vertical y _offerable_products).
+ */
 const offerableIn = (snapshot, vertical, entity) => {
-  const product = snapshot.byEntity.get(entityKey(entity.entity_type, entity.entity_id))
-  const kind = vertical === 'restaurantes' ? 'menu_item' : 'catalog_item'
-  return product?.entity_type === kind && offerableProduct(product, snapshot.meta.concepts) ? product : null
+  const product = snapshot.pool.find(
+    (p) =>
+      p.vertical === vertical &&
+      p.entity_type === entity.entity_type &&
+      String(p.entity_id) === String(entity.entity_id),
+  )
+  return product && offerableProduct(product, snapshot.meta.concepts) ? product : null
 }
 
-/** El último producto del concepto que compró, si está en la muestra; si no, el primero de la muestra del concepto en
- * esa vertical (engine.py: _repeat_product). */
+/** El último producto (o plato) del concepto que compró, si está en la muestra en esa vertical; si no, el primero de la
+ * muestra del concepto ahí (engine.py: _repeat_product). */
 function repeatProduct(snapshot, state, concept, vertical) {
-  for (const { line } of linesNewestFirst(state))
-    if (line.concept_id === concept) {
-      const product = offerableIn(snapshot, vertical, line)
-      if (product) return product
-      break
-    }
+  const kind = kindOf(vertical)
+  const last = linesNewestFirst(state).find(({ line }) => line.concept_id === concept && line.entity_type === kind)
+  const bought = last && offerableIn(snapshot, vertical, last.line)
+  if (bought) return bought
+  const { concepts } = snapshot.meta
   return snapshot.pool.find(
-    (p) => p.concept === concept && p.vertical === vertical && offerableIn(snapshot, vertical, p),
+    (p) => p.concept === concept && p.vertical === vertical && p.entity_type === kind && offerableProduct(p, concepts),
   )
 }
 
@@ -169,8 +178,8 @@ const repeatReply = (snapshot, moment, { text, why, basis, concept, vertical, pr
 /**
  * «¿Repetimos?» (engine.py: repeat_offer): un concepto que la persona pide con ritmo (tres días de compra o más) y le
  * toca entre hace un intervalo y dentro de dos días, el más atrasado primero. La demo no puede esperar días, así que un
- * concepto que todavía no tiene ritmo se repite con dos pedidos `propuesta` de las últimas dos semanas (más atrás, es
- * de «¿Volvemos a…?»). El producto es el último que compró del concepto.
+ * concepto que todavía no tiene ritmo se repite con dos pedidos `propuesta` en las últimas dos semanas. El producto es
+ * el último que compró del concepto.
  */
 export function repeatOffer(snapshot, state, now) {
   const { concepts, screen_verticals: screens } = snapshot.meta
@@ -178,7 +187,7 @@ export function repeatOffer(snapshot, state, now) {
   const rows = replenishment(state)
   const due = rows
     .filter((row) => repeatDue(row, today))
-    .sort((a, b) => a.dueOn - b.dueOn || a.concept.localeCompare(b.concept))
+    .sort((a, b) => a.dueOn - b.dueOn || (a.concept < b.concept ? -1 : 1))
   for (const row of due) {
     const concept = concepts[row.concept]
     if (!concept?.offerable || !offerableVertical(row.vertical, screens)) continue
@@ -195,28 +204,24 @@ export function repeatOffer(snapshot, state, now) {
     })
   }
   // Sin ritmo todavía (menos de tres días de compra: lo pedido en la demo).
-  const seen = new Map() // concepto → { orders, last: { line, order } }
+  const seen = new Map() // concepto → { orders, recent, last: { line, order } }
   for (const { line, order } of linesNewestFirst(state).reverse()) {
     if (!line.concept_id) continue
-    const entry = seen.get(line.concept_id) ?? { orders: new Map() }
+    const entry = seen.get(line.concept_id) ?? { orders: new Map(), recent: new Set() }
     entry.orders.set(order.order_id, order)
+    if (today - localDay(order.ts) < LAPSE_MIN_DAYS) entry.recent.add(order.order_id)
     entry.last = { line, order }
     seen.set(line.concept_id, entry)
   }
   const recent = [...seen]
-    .filter(
-      ([, e]) =>
-        e.orders.size >= 2 &&
-        orderDays([...e.orders.values()]).length < REPLENISH_MIN_ORDERS &&
-        today - localDay(e.last.order.ts) < LAPSE_MIN_DAYS,
-    )
+    .filter(([, e]) => e.recent.size >= 2 && orderDays([...e.orders.values()]).length < REPLENISH_MIN_ORDERS)
     .sort((a, b) => b[1].last.order.ts - a[1].last.order.ts)
   for (const [conceptId, entry] of recent) {
     const concept = concepts[conceptId]
     const { line, order } = entry.last
     const product = offerableIn(snapshot, order.vertical, line)
-    if (!concept?.offerable || !screens[order.vertical] || !product) continue
-    const values = { destino: concept.name.toLowerCase(), veces: entry.orders.size }
+    if (!concept?.offerable || !offerableVertical(order.vertical, screens) || !product) continue
+    const values = { destino: concept.name.toLowerCase(), veces: entry.recent.size }
     return repeatReply(snapshot, 'recompra', {
       text: fill(REPEAT_DEMO_TEXT, values),
       why: fill(REASON_REPEAT_DEMO, { ...values, hace: daysAgo(now, order.ts) }),
@@ -229,10 +234,13 @@ export function repeatOffer(snapshot, state, now) {
   return null
 }
 
-/** Lo último que compró en la vertical, con concepto, que está en la muestra y pasa las guardias (_last_bought_in). */
+const WINBACK_VERTICAL_PRODUCTS = 10 // engine.py: lo último que compró en la vertical, para encontrar uno a la venta
+
+/** Lo último que compró en la vertical que está en la muestra, tiene concepto y pasa las guardias (_last_bought_in). */
 const lastBoughtIn = (snapshot, state, vertical) =>
   linesNewestFirst(state)
-    .filter(({ order, line }) => order.vertical === vertical && line.concept_id)
+    .filter(({ order, line }) => order.vertical === vertical && line.entity_type === kindOf(vertical))
+    .slice(0, WINBACK_VERTICAL_PRODUCTS)
     .map(({ line }) => offerableIn(snapshot, vertical, line))
     .find((product) => product?.concept)
 

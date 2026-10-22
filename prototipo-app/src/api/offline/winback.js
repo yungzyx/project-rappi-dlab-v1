@@ -133,8 +133,7 @@ export function lapses(snapshot, state, now) {
   const rank = (l) =>
     l.kind === 'concepto' ? [0, -l.orders, l.days / Math.max(l.interval, 1), l.key] : [1, -l.orders, l.days, l.key]
   const compare = (a, b) => {
-    for (const [x, y] of rank(a).map((value, i) => [value, rank(b)[i]]))
-      if (x !== y) return typeof x === 'string' ? x.localeCompare(y) : x - y
+    for (const [x, y] of rank(a).map((value, i) => [value, rank(b)[i]])) if (x !== y) return x < y ? -1 : 1
     return 0
   }
   return found.sort(compare)

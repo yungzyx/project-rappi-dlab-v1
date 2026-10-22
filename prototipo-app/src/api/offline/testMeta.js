@@ -76,6 +76,7 @@ export const CONCEPTS = {
   },
   panales: { name: 'Pañales', emoji: '👶', group: 'bebe', offerable: false, keywords: ['panales'] },
   analgesicos: { name: 'Analgésicos', emoji: '💊', group: 'salud', offerable: false },
+  hielo: { name: 'Hielo', emoji: '🧊', group: 'bebidas', offerable: true, keywords: ['hielo'] },
   juguetes: {
     name: 'Juguetes',
     emoji: '🧸',

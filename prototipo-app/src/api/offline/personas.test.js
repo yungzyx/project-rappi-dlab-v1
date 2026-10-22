@@ -94,3 +94,14 @@ test('«Dejó de pedir su plato de siempre» y «Dejó Turbo hace 40 días» rec
   expect(offerFor('volver-plato', 'recompra')).toBeNull()
   expect(offerFor('volver-turbo', 'recompra')).toBeNull()
 })
+
+test('el plato de siempre es de un concepto de hábito y de un restaurante que está en la muestra', () => {
+  const dish = (id, concept, store) =>
+    product(id, { concept, vertical: 'restaurantes', entity_type: 'menu_item', store_id: store })
+  const pool = [dish(50, 'pizza', 7), dish(51, 'hamburguesa', 8), dish(52, 'sushi', 8)]
+  const withMenus = { ...snapshot, pool, catalog: { menus: { 8: {} }, stores: {} } }
+  const persona = personas(withMenus).find((p) => p.id === 'volver-plato')
+  const concepts = personaHistory(withMenus, persona, NOW).orders.map((o) => o.lines[0].concept_id)
+  // La pizza no tiene su restaurante en la muestra; la hamburguesa va antes en ella, pero el sushi, en los hábitos.
+  expect(concepts.slice(0, 4)).toEqual(['sushi', 'sushi', 'sushi', 'sushi'])
+})

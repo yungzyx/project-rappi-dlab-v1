@@ -367,12 +367,14 @@ function recommend(snapshot, body, { interests, userId }) {
 }
 
 /**
- * `POST /agent/ask`: «qué me recomiendas» con los intereses de la persona (`interests`, sus conceptos de mayor a menor);
- * lo demás, la respuesta grabada de esa pregunta o, si no hay, lo que calza en la muestra.
+ * `POST /agent/ask`: «qué me recomiendas» (sin nombrar qué) con los intereses de la persona (`interests`, sus conceptos
+ * de mayor a menor); lo demás, la respuesta grabada de esa pregunta o, si no hay, lo que calza en la muestra.
  */
 export function ask(snapshot, body, { interests = [], userId = null } = {}) {
   const message = String(body?.message ?? '')
-  if (asksRecommendation(message)) return recommend(snapshot, body, { interests, userId })
+  // Como en agent/understand.py, solo si no nombra algo: «¿me recomiendas un vino?» busca vino.
+  const named = detectConcepts(snapshot.meta, message).length || namesOccasion(snapshot.meta, message)
+  if (asksRecommendation(message) && !named) return recommend(snapshot, body, { interests, userId })
   const recorded = snapshot.ask[normalize(message)]
   if (recorded) return recorded
   const found = matchProducts(snapshot, message)
