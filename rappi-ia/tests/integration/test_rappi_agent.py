@@ -123,7 +123,7 @@ def test_unmet_by_cosine_shows_nothing_and_is_recorded(rappi_agent, monkeypatch)
     """Sin concepto nombrado, «sin resultado» lo decide el coseno bajo τ: antes se mostraban sus vecinos igual
     (arena para gato a quien pedía un pasaje de avión, que hoy va a RappiTravel) y la demanda no se anotaba."""
     agent, db = rappi_agent
-    monkeypatch.setattr(hybrid, "thresholds", lambda: {"supermercado": 0.99})
+    monkeypatch.setattr(hybrid, "UNNAMED_TAU", 0.99)  # sin concepto ni ocasión decide UNNAMED_TAU
 
     r = agent.reply(db, "kombucha de jengibre artesanal", Context(vertical="supermercado"))
 
@@ -142,7 +142,7 @@ def test_a_query_without_words_to_search_is_not_recorded_as_unmet(rappi_agent, m
     build_search_documents(db)
     build_concepts(db)
     embed_search_documents(db, agent.embedder)
-    monkeypatch.setattr(hybrid, "thresholds", lambda: {"supermercado": 0.99})
+    monkeypatch.setattr(hybrid, "UNNAMED_TAU", 0.99)  # sin concepto ni ocasión decide UNNAMED_TAU
 
     # «porfa» queda al final de la consulta limpia (solo se limpia el inicio) y no es algo que buscar.
     for text in ["té", "quiero té porfa"]:
@@ -156,7 +156,7 @@ def test_symptoms_are_not_recorded_as_unmet_demand(rappi_agent, monkeypatch):
     """Sin remedios para el síntoma se muestra lo de cuidarse: no mostrar lo pedido no es falta de surtido. «tengo
     tos» quedaba anotado como demanda no satisfecha por el coseno bajo τ."""
     agent, db = rappi_agent
-    monkeypatch.setattr(hybrid, "thresholds", lambda: {"supermercado": 0.99})
+    monkeypatch.setattr(hybrid, "UNNAMED_TAU", 0.99)  # sin concepto ni ocasión decide UNNAMED_TAU
 
     r = agent.reply(db, "tengo tos", Context(vertical="supermercado"))
 
@@ -366,6 +366,7 @@ def test_unlabeled_medicines_are_never_shown_for_symptoms_or_in_pharmacy(rappi_a
     build_concepts(db)
     embed_search_documents(db, agent.embedder)
     monkeypatch.setattr(hybrid, "thresholds", lambda: {"supermercado": 0.0, "farmacia": 0.0})  # sin «sin resultado»
+    monkeypatch.setattr(hybrid, "UNNAMED_TAU", 0.0)
 
     for text in ["tengo tos", "me duele la cabeza"]:
         r = agent.reply(db, text, Context(vertical="supermercado"))
@@ -588,7 +589,7 @@ def test_an_errand_opens_rappifavor(rappi_agent):
 def test_what_is_not_in_the_catalog_can_be_bought_with_rappifavor(rappi_agent, monkeypatch):
     """«No está en el catálogo» era el final: ahora RappiFavor lo compra en otra tienda (solo en «Propuesta»)."""
     agent, db = rappi_agent
-    monkeypatch.setattr(hybrid, "thresholds", lambda: {"supermercado": 0.99})
+    monkeypatch.setattr(hybrid, "UNNAMED_TAU", 0.99)  # sin concepto ni ocasión decide UNNAMED_TAU
     r = agent.reply(db, "kombucha de jengibre", Context(vertical="supermercado"))
     assert (
         r["unmet"] and {"label": "Pedirlo con RappiFavor", "route": ["favor"], "service": "rappifavor"} in r["actions"]
@@ -638,6 +639,7 @@ def test_words_that_only_ask_for_a_sensitive_concept_do_not_hide_what_was_asked(
     build_concepts(db)
     embed_search_documents(db, agent.embedder)
     monkeypatch.setattr(hybrid, "thresholds", lambda: {"mall": 0.0, "farmacia": 0.0})  # sin «sin resultado»
+    monkeypatch.setattr(hybrid, "UNNAMED_TAU", 0.0)
 
     oil = agent.reply(db, "lubricante wd-40", Context(vertical="mall"))
     assert [p["entity_id"] for p in oil["products"]] == ["900"] and not oil["age_notice"]

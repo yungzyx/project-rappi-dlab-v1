@@ -16,8 +16,11 @@ from rappi_ia.eval.search_eval import (
 )
 
 
-def run(query, tipo, cosine, vertical="licores", strict=0, names_concept=False, in_vertical=False):
-    return QueryRun(vertical, query, tipo, "hibrido", [1] * 10, strict, cosine, in_vertical, names_concept)
+def run(query, tipo, cosine, vertical="licores", strict=0, names_concept=False, in_vertical=False, names_occasion=True):
+    """Por defecto la consulta nombra una ocasión: sin concepto, es el caso en que decide el τ de la vertical."""
+    run = QueryRun(vertical, query, tipo, "hibrido", [1] * 10, strict, cosine, in_vertical, names_concept)
+    run.names_occasion = names_occasion
+    return run
 
 
 def test_calibrate_tau_ignores_negatives_that_do_not_depend_on_tau():
@@ -116,6 +119,40 @@ def test_run_queries_keeps_whether_the_query_had_words(monkeypatch):
     assert {r.has_words for r in run_queries(None, object(), queries)} == {False}
 
 
+def test_without_concept_or_occasion_the_tau_of_the_vertical_does_not_decide():
+    """Como la búsqueda: sin concepto ni ocasión decide el τ de la búsqueda agrupada (0,85). Esas consultas no calibran
+    el τ de la vertical, que solo decide en las que nombran una ocasión."""
+    sofa = run("sofá de tres cuerpos", "negativa", 0.821, vertical="turbo", names_occasion=False)
+    runs = [
+        sofa,
+        run("cuchuflis", "exacta", 0.86, vertical="turbo", names_occasion=False),
+        run("regalo para mi polola", "exacta", 0.80, vertical="turbo"),
+    ]
+    taus = {"turbo": 0.79}
+
+    assert calibrate_tau(runs) == {}
+    quality = unmet_quality(runs, taus)
+    assert (quality["detectadas"], quality["falsas_alarmas"]) == (1, 0)
+    assert negative_diagnosis([sofa], taus) == [
+        {
+            "vertical": "turbo",
+            "consulta": "sofá de tres cuerpos",
+            "detectada": True,
+            "causa": "sin concepto ni ocasión: coseno 0.821 < τ 0.85",
+            "desactualizada": False,
+        }
+    ]
+
+
+def test_run_queries_keeps_whether_the_query_names_an_occasion(monkeypatch):
+    monkeypatch.setattr(search_eval, "retrieve", lambda *args, **kwargs: _result(names_occasion=True))
+    outcome = SimpleNamespace(result=_result(names_occasion=True), products=[])
+    monkeypatch.setattr(search_eval, "search_products", lambda *args, **kwargs: outcome)
+    queries = [{"vertical": "mall", "query": "regalo para mi polola", "concepts": ["joyeria"], "tipo": "necesidad"}]
+
+    assert {r.names_occasion for r in run_queries(None, object(), queries)} == {True}
+
+
 def test_report_lists_the_cause_of_each_negative():
     runs = [run("neumáticos", "negativa", 0.83), run("pisco", "exacta", 0.95)]
     taus = {"licores": 0.8}
@@ -123,7 +160,7 @@ def test_report_lists_the_cause_of_each_negative():
     assert "| licores | neumáticos | no | coseno 0.830 ≥ τ 0.8 |" in report
 
 
-def _result(hits=(), unmet=False, query_concepts=(), has_words=True):
+def _result(hits=(), unmet=False, query_concepts=(), has_words=True, names_occasion=False):
     return SimpleNamespace(
         hits=list(hits),
         strict_lexical_matches=0,
@@ -132,6 +169,7 @@ def _result(hits=(), unmet=False, query_concepts=(), has_words=True):
         query_concepts=list(query_concepts),
         unmet=unmet,
         has_words=has_words,
+        names_occasion=names_occasion,
     )
 
 
