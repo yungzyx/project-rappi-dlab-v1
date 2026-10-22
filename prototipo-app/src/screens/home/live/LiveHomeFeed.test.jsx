@@ -13,6 +13,7 @@ vi.mock('../../../state/EventsContext', async (importOriginal) => ({
 // La memoria de la escena vive en el módulo (lo que dura la pestaña): cada test, una pestaña nueva.
 let HomeScreen
 let useOrders
+let useProfile
 let Providers
 let memory
 let useAssistant
@@ -31,6 +32,7 @@ beforeEach(async () => {
   const toast = await import('../../../components/Toast')
   const orders = await import('../../../state/OrdersContext')
   useOrders = orders.useOrders
+  useProfile = profile.useProfile
   memory = await import('../../../state/liveMemory')
   useAssistant = assistant.useAssistant
   HomeScreen = (await import('../HomeScreen')).default
@@ -513,6 +515,60 @@ describe('Home del prototipo final', () => {
       await advance(100)
       expect(repeatRequests()).toHaveLength(1)
       expect(repeatBlock(container)).toBeNull()
+    })
+    // El buscador olvida (sube la generación) antes de que el servidor borre: pedir ahí traía la misma oferta y dejaba
+    // otra `suggestion_shown`. Si el borrado sale bien la app se recarga; si falla, pide al volver a la Home.
+    const forgetTree = (active) => {
+      function Forget() {
+        forget = useProfile().reset
+        return null
+      }
+      return (
+        <Providers>
+          <Forget />
+          <div className="phone">
+            <div className="screen-wrap">
+              <HomeScreen push={vi.fn()} tab="home" setTab={vi.fn()} active={active} />
+            </div>
+          </div>
+        </Providers>
+      )
+    }
+    let forget
+
+    test('tras «Olvidar» no se vuelve a pedir ni a contar; si el borrado falla, pide al volver a la Home', async () => {
+      api = stubRepeat()
+      const { container, rerender } = render(forgetTree(true))
+      await advance(100)
+      expect(repeatRequests()).toHaveLength(1)
+      act(() => forget())
+      await advance(500)
+      expect(repeatRequests()).toHaveLength(1)
+      expect(tracked('suggestion_shown', 'agent-recompra')).toHaveLength(1)
+      expect(repeatBlock(container)).not.toBeNull() // sin cambio a la vista: el buscador está encima
+
+      rerender(forgetTree(false))
+      rerender(forgetTree(true))
+      await advance(100)
+      expect(repeatRequests()).toHaveLength(2)
+    })
+
+    test('la recompra que venía en camino al «Olvidar» ni se muestra ni se cuenta', async () => {
+      api = stubAgent({
+        'POST /agent/offer': (req) =>
+          req.body.moment === 'recompra'
+            ? { slow: 300, body: fixture('agent-offer-recompra') }
+            : OFFER_FIXTURES[req.body.moment]
+              ? fixture(OFFER_FIXTURES[req.body.moment])
+              : 204,
+      })
+      const { container } = render(forgetTree(true))
+      await advance(100)
+      act(() => forget())
+      await advance(500)
+      expect(repeatRequests()).toHaveLength(1)
+      expect(repeatBlock(container)).toBeNull()
+      expect(tracked('suggestion_shown', 'agent-recompra')).toEqual([])
     })
   })
 
