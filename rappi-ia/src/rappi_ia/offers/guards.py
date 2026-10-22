@@ -45,7 +45,9 @@ _ALCOHOL_NAMES = KeywordMatcher(("alcohol", word) for word in ALCOHOL_NAME_WORDS
 # alcohol («bife al vino», «pasas al ron», «Churrasco Kunstmann», un helado «Borgoña»): en una oferta, sobran; la
 # búsqueda y la pregunta no cambian. «austral» no está: es sobre todo merluza austral (47 platos), y la cerveza sale
 # por su sección. «mimosa» tampoco: en la base real del 14-10-2026 las dos que hay son sin alcohol (un jugo y una de
-# «Sin Alcohol»).
+# «Sin Alcohol»). Desde «tom collins», los cócteles que en la base real del 22-10-2026 se llamaban así sin otra palabra
+# de alcohol («Vaina», «Caipiroska» en «Bebidas», «Botella de Ramazzotti»): los vecinos del kNN pueden sacar un plato
+# del alcohol y aquí lo sigue bloqueando el nombre.
 MENU_ALCOHOL_NAME_WORDS = frozenset(
     {
         *("soju", "sangria", "michelada", "cerveza", "schop", "shop", "chela", "chelada", "vino", "pisco", "piscola"),
@@ -55,13 +57,17 @@ MENU_ALCOHOL_NAME_WORDS = frozenset(
         *("corona", "escudo", "guinness", "kunstmann", "heineken", "cristal", "stella artois"),
         *("budweiser", "cusquena"),
         *("cabernet", "carmenere", "merlot", "chardonnay", "sauvignon", "syrah", "malbec", "pinot", "cono sur"),
+        *("tom collins", "vaina", "algarrobina", "daikiri", "caipiroska", "bloody mary", "cuba libre", "kir royal"),
+        *("ruso blanco", "ruso negro", "cosmopolitan", "clavo oxidado", "ramazzotti"),
     }
 )
 # Palabras de trago que también nombran comida: (lo que en el nombre dice que es comida, conceptos de plato que lo
 # dicen). «Pizza Margarita» y la «Margarita Familiar» de una pizzería (concepto pizza) son pizzas; «Sour Cream», «Sweet
 # and Sour Roll», la «Sopa Hot Sour» y un roll «Tako Sour» no son un pisco sour; «Hamburguesa la Corona» y las
 # quesadillas «Corona Sacra» no son la cerveza; Negroni es también un salame y «cristal», un latte. Una piña colada es
-# también un jugo, un batido, un té de burbujas o un helado (10 de las 27 de la base real).
+# también un jugo, un batido, un té de burbujas o un helado (10 de las 27 de la base real). La vaina es también la de
+# los porotos y la de vainilla, la algarrobina un jarabe («Tres Leches Algarrobina») y «Combo Eros Ramazzotti», un combo
+# de paninos.
 _MENU_FOOD_SENSES: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "margarita": (("pizza", "pizzeta"), ("pizza",)),
     "sour": (("cream", "sweet", "hot", "roll", "papas"), ("salsas", "sushi", "pescados-mariscos", "sopas")),
@@ -72,6 +78,9 @@ _MENU_FOOD_SENSES: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
         ("sin alcohol", "virgin", "jugo", "smoothie", "shake", "milkshake", "tea", "helado"),
         ("jugos", "helados"),
     ),
+    "vaina": (("edamame", "vainilla", "en vaina", "con vaina", "sin vaina"), ()),
+    "algarrobina": (("tres leches", "torta", "helado", "postre"), ("postres", "pasteleria", "helados")),
+    "ramazzotti": (("eros",), ()),
 }
 _MENU_ALCOHOL_NAMES = KeywordMatcher(
     ((word if word in _MENU_FOOD_SENSES else "alcohol", word) for word in MENU_ALCOHOL_NAME_WORDS),
@@ -80,12 +89,12 @@ _MENU_ALCOHOL_NAMES = KeywordMatcher(
 # Secciones de un menú que son de tragos («Cervezas», «Vinos y Piscos», «Coctelería», «Bebidas Alcohólicas»): ningún
 # plato de ahí se ofrece, aunque su nombre no diga alcohol («Misiones de Rengo», «Sake Dry» en «Cervezas Japonesas y
 # Sake»). Una sección mezclada («Bebidas y Cervezas») se salta entera. «Cóctel» en singular es también comida para
-# picar en Chile («Cocktail», «Empanadas de Cóctel»): solo cuentan «cócteles», «cocktails» y «coctelería». Nada de
-# «chop» (19 «Chop Suey»). «Sin alcohol», «no alcohólicas» o «mocktails» la libran.
+# picar en Chile («Cocktail», «Empanadas de Cóctel»): solo cuentan «cócteles», «cocktails» y «coctelería» (también
+# «cockteleria»). Nada de «chop» (19 «Chop Suey»). «Sin alcohol», «no alcohólicas» o «mocktails» la libran.
 MENU_ALCOHOL_SECTION_WORDS = frozenset(
     {
         *("alcohol", "alcoholica", "alcoholico", "licor", "vino", "cerveza", "trago", "cocteles", "cocktails"),
-        *("cocteleria", "pisco", "espumante", "sour"),
+        *("cocteleria", "cockteleria", "pisco", "espumante", "sour"),
     }
 )
 _SOBER_SECTION = (

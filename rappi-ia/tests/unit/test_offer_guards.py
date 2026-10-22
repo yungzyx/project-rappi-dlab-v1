@@ -377,3 +377,42 @@ def test_vertical_to_try_never_offers_a_deal_whose_name_says_baby(monkeypatch):
     offered = engine._offerable_deals(NoBlockedStores(), "mall")
 
     assert [d["name"] for d in offered] == ["Set De Cocina De Madera"]
+
+
+@pytest.mark.parametrize(
+    ("name", "concept"),
+    [
+        ("Vaina 170 ml", "sandwiches"),
+        ("Tom Collins", None),
+        ("Algarrobina", "sushi"),
+        ("Caipiroska", "gaseosas"),
+        ("Daikiri Sabores 1 Litro App", "pizza"),
+        ("Cuba Libre", None),
+        ("Bloody Mary", None),
+        ("Kir Royal 170 ml", None),
+        ("Ruso Blanco 1 L", "pizza"),
+        ("COSMOPOLITAN", None),
+        ("Clavo Oxidado", None),
+        ("Botella de Ramazzotti", "gaseosas"),
+    ],
+)
+def test_the_menu_cocktails_without_an_alcohol_word_say_alcohol(name, concept):
+    """Los cócteles que la taxonomía reconoce por su nombre (o sus secciones, la vaina y la algarrobina): si los vecinos
+    del kNN los sacan del alcohol, el nombre los sigue bloqueando en una oferta (base real del 22-10-2026)."""
+    assert alcohol_in_name("menu_item", name, concept)
+
+
+@pytest.mark.parametrize(
+    ("name", "concept"),
+    [
+        ("Combo Eros Ramazzotti", None),
+        ("Edamame en vaina", "asiatica"),
+        ("Tres Leches Algarrobina", "postres"),
+    ],
+)
+def test_a_cocktail_word_with_another_sense_is_not_alcohol_in_a_menu(name, concept):
+    assert not alcohol_in_name("menu_item", name, concept)
+
+
+def test_a_cocktail_bar_spelled_with_ck_is_a_drinks_section():
+    assert alcohol_section("Cockteleria De Autor")

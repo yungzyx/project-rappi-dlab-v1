@@ -615,6 +615,15 @@ def test_food_in_an_aperitivo_section_is_not_alcohol(matcher, csv_maps, name, se
         ("Sour Catedral Pepino 1/2 Lt.", "Sour casero de pepino de 1/2 lt."),
         ("Pepino Tonic", "Gin, pepino y agua tónica"),
         ("Tomate Preparado", "Jugo de tomate con 5° de alcohol"),
+        # Sin una palabra de alcohol, también lo que dice ser una bebida: un volumen, una bebida, un trago.
+        ("Pepino Tonic", ""),
+        ("Pepino Ice 300 cc", ""),
+        ("Pepino Fresh", "Bebida alcohólica de la casa"),
+        ("Apio Frozen", "Trago de la casa"),
+        ("Tomate Punch", "Con jugo de tomate y limón"),
+        ("Chorizo Vermut", "Con vermut rosso"),
+        ("Vaina 170 ml", "Oporto, conac, licor de cacao, azucar, yema."),
+        ("Algarrobina 170 ml", "Pisco, leche, licor de cacao, azúcar y yema."),
     ],
 )
 def test_a_drink_or_an_unknown_dish_in_an_aperitivo_section_keeps_alcohol(matcher, csv_maps, name, description):
@@ -631,6 +640,9 @@ def test_a_drink_or_an_unknown_dish_in_an_aperitivo_section_keeps_alcohol(matche
         ("Chorizo Ibérico Laminado", "APERITIVOS & TRAGOS"),  # la guardia la ve como sección de tragos
         ("Papas Supremas", "Cervezas"),  # ni «aperitivo» ni «cóctel»: la sección decide
         ("Queso Mantecoso", "Cocteles"),  # «cócteles» en plural son tragos
+        ("Queso Brie", "Aperitivos y Whisky"),  # otra palabra de la sección dice alcohol
+        ("Queso Brie", "Aperitivo Spritz"),
+        ("Queso Brie", "Aperitivos y Aperol"),
     ],
 )
 def test_a_section_that_is_clearly_about_drinks_still_decides(matcher, csv_maps, name, section):
@@ -641,12 +653,10 @@ def test_a_section_that_is_clearly_about_drinks_still_decides(matcher, csv_maps,
 @pytest.mark.parametrize(
     ("name", "section", "concept"),
     [
-        ("Vaina", "Cockteleria Clasica", "cocteles"),
         ("Tom Collins", "Aperitivos", "cocteles"),
         ("Caipiriña con Sabor a Piña", "Aperitivos", "cocteles"),
         ("Daikiri Sabores 1 Litro App", "Deliverys", "cocteles"),
         ("Caipiroska", "Bebidas", "cocteles"),
-        ("Algarrobina 170 ml", "Aperitivos", "cocteles"),
         ("Kir Royal 170 ml", "Aperitivos", "cocteles"),
         ("Clavo Oxidado", "Cóctel y Tragos", "cocteles"),
         ("Botella de Ramazzotti", "Bebidas", "licores"),
@@ -660,10 +670,19 @@ def test_known_cocktails_are_alcohol_by_their_name(matcher, csv_maps, name, sect
     assert (a.concept_id, a.method) == (concept, "regla"), a
 
 
-def test_a_cocktail_bar_section_spelled_with_ck_is_a_drinks_section(matcher, csv_maps):
-    """«Cockteleria De Autor» (base real del 22-10-2026): «Hibistonic» y «Loica 75» (gin) quedaban sin concepto."""
-    a = assign_menu_item("96", "Hibistonic", "Cockteleria De Autor", [], csv_maps["seccion_menu"], {}, matcher)
-    assert (a.concept_id, a.source) == ("cocteles", "seccion-nombre:Cockteleria De Autor"), a
+def test_a_dish_without_a_description_is_read_as_one_without_it(matcher):
+    a = assign_menu_item("97", "Queso Brie", "Aperitivos", [], {}, {}, matcher, description=None)
+    assert a is None
+
+
+@pytest.mark.parametrize(
+    ("name", "section"), [("Hibistonic", "Cockteleria De Autor"), ("Vaina", "Cockteleria Clasica")]
+)
+def test_a_cocktail_bar_section_spelled_with_ck_is_a_drinks_section(matcher, csv_maps, name, section):
+    """Base real del 22-10-2026: «Hibistonic» y «Loica 75» (gin) quedaban sin concepto, y una «Vaina» de licor de
+    café."""
+    a = assign_menu_item("96", name, section, [], csv_maps["seccion_menu"], {}, matcher)
+    assert (a.concept_id, a.source) == ("cocteles", f"seccion-nombre:{section}"), a
 
 
 @pytest.mark.parametrize(
@@ -671,6 +690,7 @@ def test_a_cocktail_bar_section_spelled_with_ck_is_a_drinks_section(matcher, csv
     [
         ("Combo Eros Ramazzotti", "Combos", None),  # el cantante: un combo de paninos
         ("Tres Leches Algarrobina", "Postres", "postres"),  # la torta, con «tres leches» antes que el trago
+        ("Edamame en vaina", "Entradas", None),
     ],
 )
 def test_a_cocktail_word_with_another_sense_is_not_a_cocktail(matcher, csv_maps, name, section, concept):

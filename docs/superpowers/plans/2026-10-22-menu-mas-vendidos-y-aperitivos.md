@@ -53,6 +53,11 @@ guardia de secciones (`alcohol_section`) no ve «Aperitivos».
   «cola de mono» un sabor de té y helado).
 - Agregado tras la primera medición: el kNN no saca del alcohol a un plato que la sección puso ahí («Jengibre Sour»
   de «Aperitivos» pasaba a salsas y se podía ofrecer), y «cocktelería» (otra ortografía) es una sección de tragos.
+- Agregado tras la revisión de código: lo que sale de la sección debe no decir *bebida* (también una palabra de bebida,
+  un volumen o una palabra de sección de tragos de las guardias: «Pepino Tonic» no es comida), una sección es ambigua
+  solo si nada más en ella dice bebida («Aperitivos y Whisky» no lo es), los cócteles nuevos van también a las palabras
+  de alcohol de los platos en las guardias (si el kNN los saca del alcohol, el nombre los bloquea), y «vaina» y
+  «algarrobina» quedan solo en las guardias (en la taxonomía tocaban porotos, vainilla y un jarabe en las búsquedas).
 - Medición, en solo lectura: reglas y kNN en memoria con el código de main y con el de la rama sobre `rappi`; cada
   plato o producto que cambia de concepto se clasifica a mano; además, la lista completa de los platos de secciones
   de aperitivo, tragos o bar, y para todos los platos, cuáles pasan a poder ofrecerse (concepto, nombre y sección
