@@ -21,17 +21,6 @@ export const comboLabel = (combo) =>
     .map((group) => COMBO_GROUPS[group] ?? group)
     .join(' + ')
 
-const SERVICES = { favor: 'RappiFavor', travel: 'RappiTravel' }
-
-/** "restaurantes+turbo+mall" → "Restaurantes + Turbo + Rappi Mall": una combinación fina, vertical por vertical. */
-export const fineComboLabel = (combo) =>
-  combo === 'ninguna'
-    ? 'Ninguna'
-    : combo
-        .split('+')
-        .map((member) => SERVICES[member] ?? verticalLabel(member))
-        .join(' + ')
-
 export const SOURCE_LABELS = { synthetic: 'Simulados', prototype: 'Prototipo' }
 
 /** Nombre de una demanda no satisfecha: el concepto (con emoji) o, si no hay concepto, la consulta literal. */
@@ -46,21 +35,15 @@ const ENDPOINTS = {
   weekly: 'serie semanal',
   opportunities: 'demanda no satisfecha',
   trends: 'tendencias',
-  funnel: 'embudo',
-  cohorts: 'cohortes',
-  rhythm: 'ritmo de compra',
-  'at-risk': 'usuarios en riesgo',
+  'at-risk': 'personas en riesgo',
   suggestions: 'sugerencias',
-  'multi-vertical': 'retención multi-vertical',
-  affinity: 'afinidad',
   assortment: 'surtido vs demanda',
-  catalog: 'catálogo',
   services: 'servicios sin catálogo',
   offers: 'ofertas por momento',
+  volver: 'a quién invitar a volver',
   unmet: 'búsquedas sin resultado',
   combos: 'combinaciones de verticales',
   motor: 'motor',
-  home: 'accesos de la Home',
 }
 
 const MAX_LISTED = 3

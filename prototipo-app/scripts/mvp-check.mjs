@@ -17,9 +17,9 @@
 //     vertical y que haya una razón: el texto exacto depende de lo que haya aprendido el motor;
 //   con --expect-offline: la API está detenida y la app muestra «Sin conexión con <agente>»;
 //   con --panel <url del panel> (sin --app): corre después de las demás, con la API en marcha. Espera a que la API ya
-//     cuente lo que dejó el kit (una oferta aceptada en «Plan»), abre el panel en «Uso del MVP» con la fuente del
-//     prototipo y ve esa cifra ahí, con el rótulo «uso del MVP, pocas personas: no es evidencia» y sin el aviso de datos
-//     guardados (que taparía una API que no responde).
+//     cuente lo que dejó el kit (una oferta aceptada en «Plan»), abre el panel en «Mochi y búsquedas» con la fuente
+//     del prototipo y ve esa cifra en «Ofertas del agente por momento», con el rótulo «uso del MVP, pocas personas: no
+//     es evidencia» y sin el aviso de datos guardados (que taparía una API que no responde).
 // Con la API en marcha (sin --expect-offline) también falla ante un error de la página o de la consola, o una respuesta
 // 4xx/5xx, desde la primera carga; solo se ignoran las imágenes del catálogo de prueba, que no existen.
 // Sale con 0 si la revisión pasa y con 1 si no. Usa el Chrome instalado (playwright-core, sin descargar navegadores);
@@ -329,7 +329,7 @@ async function waitForMetric(api, name, ready, missing) {
   )
 }
 
-/** Abre «Uso del MVP» del panel con los datos del prototipo y ve lo que dejaron las revisiones anteriores. */
+/** Abre «Mochi y búsquedas» del panel con los datos del prototipo y ve lo que dejaron las revisiones anteriores. */
 async function checkPanel(page, panel, api) {
   const plan = await waitForMetric(
     api,
@@ -337,7 +337,7 @@ async function checkPanel(page, panel, api) {
     (data) => data.momentos.some((row) => row.momento === 'plan' && row.aceptadas >= 1),
     'una oferta aceptada del kit en «Plan»',
   )
-  await page.goto(`${panel}/?vista=mvp&fuente=prototipo`, { timeout: TIMEOUT_MS })
+  await page.goto(`${panel}/?vista=mochi&fuente=prototipo`, { timeout: TIMEOUT_MS })
   const offers = page.getByRole('table', { name: 'Ofertas del agente por momento' })
   await step(page, 'ver la tabla «Ofertas del agente por momento»', () => offers.waitFor())
   const accepted = await step(page, 'leer las ofertas aceptadas de «Plan»', async () => {

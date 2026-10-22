@@ -49,6 +49,12 @@
   animation-delay: 180ms;
 }
 
+@keyframes grow-y {
+  from {
+    transform: scaleY(0);
+  }
+}
+
 .brand .eyebrow {
   color: var(--brand-ink);
 }
@@ -317,6 +323,10 @@
 
 .site-footer p + p {
   margin-top: var(--space-2);
+}
+
+.site-footer a {
+  color: var(--brand-ink);
 }
 
 @media (max-width: 760px) {

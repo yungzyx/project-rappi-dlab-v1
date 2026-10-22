@@ -5,14 +5,15 @@ import { Icon } from '../Icon.jsx'
 const MESSAGES = {
   synthetic: (
     <>
-      <strong>Usuarios y eventos SIMULADOS:</strong> muestran la mecánica del panel, no evidencia. El catálogo sí es
-      real (muestra pública de rappi.cl).
+      <strong>Usuarios y eventos SIMULADOS:</strong> muestran la mecánica del panel, no evidencia. Son reales la tabla
+      de combinaciones que compartió Rappi y los ítems del catálogo (muestra pública de rappi.cl).
     </>
   ),
   prototype: (
     <>
       <strong>Usuarios y eventos del PROTOTIPO:</strong> pruebas hechas en la app de demostración, no clientes reales;
-      con tan pocos datos varias métricas quedan vacías. El catálogo sí es real (muestra pública de rappi.cl).
+      con tan pocos datos varias métricas quedan vacías. Son reales la tabla de combinaciones que compartió Rappi y los
+      ítems del catálogo (muestra pública de rappi.cl).
     </>
   ),
 }

@@ -1,10 +1,11 @@
 import { Icon } from './Icon.jsx'
 
 // Procedencia de cada bloque. Lo simulado va rayado en ámbar; lo real, sólido. Nunca solo por color: siempre con texto.
+// «Dato de Rappi» es la tabla de combinaciones que compartió Rappi (cohortes ene a jun 2026): real, pero agregada.
 const KINDS = {
   synthetic: { className: 'badge--simulated', icon: 'flask', label: 'Simulado' },
   prototype: { className: 'badge--prototype', icon: 'flask', label: 'Prototipo' },
-  real: { className: 'badge--real', icon: 'check', label: 'Real · rappi.cl' },
+  rappi: { className: 'badge--real', icon: 'check', label: 'Dato de Rappi' },
   'demand-synthetic': { className: 'badge--simulated', icon: 'flask', label: 'Demanda simulada' },
   'demand-prototype': { className: 'badge--prototype', icon: 'flask', label: 'Demanda del prototipo' },
 }

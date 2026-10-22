@@ -1,0 +1,94 @@
+import { Async } from '../../components/Async.jsx'
+import { ProvenanceBadge } from '../../components/ProvenanceBadge.jsx'
+import { SourceNote } from '../../components/SourceNote.jsx'
+import { useAnalytics, useAnalyticsMany } from '../../lib/useAnalytics.js'
+import { DecisionBody, DecisionCard } from './DecisionCard.jsx'
+import { churnDecision, crossSellDecision, demandDecision, mochiDecision } from './decisions.js'
+import { Pulse } from './Pulse.jsx'
+import './overview.css'
+
+function CrossSell({ source }) {
+  return <DecisionBody decision={crossSellDecision(useAnalytics('combos', source))} />
+}
+
+function Churn({ source }) {
+  const [kpis, winback] = useAnalyticsMany(['kpis', 'volver'], source)
+  return <DecisionBody decision={churnDecision(kpis, winback)} />
+}
+
+function Mochi({ source }) {
+  const [offers, suggestions] = useAnalyticsMany(['offers', 'suggestions'], source)
+  return <DecisionBody decision={mochiDecision(offers, suggestions)} />
+}
+
+function Demand({ source }) {
+  const [kpis, weekly, opportunities, unmet] = useAnalyticsMany(['kpis', 'weekly', 'opportunities', 'unmet'], source)
+  return <DecisionBody decision={demandDecision({ kpis, weekly, asOf: kpis.as_of, opportunities, unmet })} />
+}
+
+/** La vista principal: las 4 preguntas que hay que decidir, cada una con enlace a su detalle, y cómo va el negocio. */
+export function OverviewView({ source, onNavigate }) {
+  return (
+    <div className="view">
+      <section className="section" aria-labelledby="que-decidir">
+        <div className="section-head">
+          <h2 id="que-decidir">Qué decidir</h2>
+          <p>
+            Cuatro preguntas para la gerencia y RappiAds, cada una con su cifra, su comparación y una acción sugerida.
+            Ninguna acción se escala sin un grupo de control.
+          </p>
+        </div>
+        <div className="decisions">
+          <DecisionCard
+            id="decision-venta-cruzada"
+            question="¿Dónde está la venta cruzada?"
+            badge="rappi"
+            linkLabel="Ver la escalera"
+            onOpen={() => onNavigate('clientes', 'venta-cruzada')}
+          >
+            <CrossSell source={source} />
+          </DecisionCard>
+          <DecisionCard
+            id="decision-perdiendo"
+            question="¿A quién estamos perdiendo?"
+            badge={source}
+            linkLabel="Ver a quién y qué le ofrecemos"
+            onOpen={() => onNavigate('clientes', 'perdiendo')}
+          >
+            <Churn source={source} />
+          </DecisionCard>
+          <DecisionCard
+            id="decision-mochi"
+            question="¿Funciona lo que ofrece Mochi?"
+            badge={source}
+            linkLabel="Ver las ofertas"
+            onOpen={() => onNavigate('mochi', 'ofertas')}
+          >
+            <Mochi source={source} />
+          </DecisionCard>
+          <DecisionCard
+            id="decision-busquedas"
+            question="¿Qué buscan y no encuentran?"
+            badge={source}
+            linkLabel="Ver las búsquedas"
+            onOpen={() => onNavigate('mochi', 'busquedas')}
+          >
+            <Demand source={source} />
+          </DecisionCard>
+        </div>
+      </section>
+
+      <section className="section" aria-labelledby="como-va">
+        <div className="section-head">
+          <h2 id="como-va">Cómo va</h2>
+          <p>La última semana completa contra la de hace 4 semanas. Rojo solo si empeora.</p>
+          <ProvenanceBadge kind={source} />
+        </div>
+        <SourceNote source={source} />
+        <Async>
+          <Pulse source={source} />
+        </Async>
+      </section>
+    </div>
+  )
+}

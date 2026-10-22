@@ -204,13 +204,13 @@ Una demo cerrada en un servidor Linux con Docker Compose: Caddy con TLS y una pu
 
 ## Panel de negocio
 
-[`dashboard-empresa/`](dashboard-empresa/) es el panel para la empresa y forma parte del MVP: lee las métricas de la API (`/analytics`) y `make mvp` lo levanta junto a la app. Convierte la conducta de compra y lo que la gente pide en decisiones: tendencias por concepto, demanda no satisfecha, usuarios en riesgo, rendimiento de las sugerencias cruzadas y salud del catálogo. En **Entre verticales** muestra además **Combinaciones de verticales** (la tabla de Rappi junto a la misma tabla medida con los datos propios) y el **Motor** (pesos y evaluación). Se elige la fuente de los datos y nunca se mezclan:
+[`dashboard-empresa/`](dashboard-empresa/) es el panel para la empresa y forma parte del MVP: lee las métricas de la API (`/analytics`) y `make mvp` lo levanta junto a la app. Está pensado para la gerencia general y RappiAds, en tres vistas alrededor de cuatro preguntas, cada una con su cifra, su comparación y una acción sugerida: **Resumen** (dónde está la venta cruzada, a quién estamos perdiendo, si funciona lo que ofrece Mochi y qué buscan y no encuentran, más cómo va el negocio), **Retención y venta cruzada** (la escalera de la tabla de Rappi y a quién invitar a volver) y **Mochi y búsquedas** (ofertas por momento, sugerencias entre verticales, el motor contra una regla simple y la demanda no satisfecha). Se elige la fuente de los datos y nunca se mezclan:
 
-- **Simulados** (por defecto): usuarios, eventos y pedidos de un generador con semilla. Muestran la mecánica del panel, no un resultado. La pestaña Catálogo es real (muestra pública de rappi.cl).
-- **Prototipo**: lo que la gente hizo en la app del MVP, con la vista **Uso del MVP** en cuatro secciones: las ofertas del agente por momento (plan, carro, antes de pagar, próximo pedido, sin resultado, vertical por probar, recompra, volver a pedir, perfil de gusto, pregunta y «Para ti»), a quién invitar a volver («¿Volvemos a …?»: cuántas personas dejaron algo que pedían con ritmo), las búsquedas sin resultado por vertical y concepto, y los **Accesos de la Home** (los toques con los que la Home aprende el orden). Es uso de pocas personas y el panel lo rotula «uso del MVP, pocas personas: no es evidencia». Sin nombres ni textos: personas contadas, nunca nombradas.
+- **Simulados** (por defecto): usuarios, eventos y pedidos de un generador con semilla. Muestran la mecánica del panel, no un resultado. La tabla de Rappi y los ítems del catálogo sí son reales.
+- **Prototipo**: lo que la gente hizo en la app del MVP: las ofertas de Mochi por momento (plan, carro, antes de pagar, próximo pedido, sin resultado, vertical por probar, recompra, volver a pedir, perfil de gusto, pregunta y «Para ti»), a quién invitar a volver («¿Volvemos a …?») y las búsquedas sin resultado por vertical y concepto. Es uso de pocas personas y el panel lo rotula «uso del MVP, pocas personas: no es evidencia» en cada sección. Sin nombres ni textos: personas contadas, nunca nombradas.
 
 ```bash
-make mvp   # panel en http://localhost:5175/?vista=mvp&fuente=prototipo (sin la API, «Uso del MVP» no muestra cifras: dice «La API no responde»)
+make mvp   # panel en http://localhost:5175/?vista=mochi&fuente=prototipo (sin la API, lo del prototipo no muestra cifras: dice «La API no responde»)
 ```
 
 La misma carpeta trae una página de presentación de la propuesta (`http://localhost:5175/presentacion.html`).

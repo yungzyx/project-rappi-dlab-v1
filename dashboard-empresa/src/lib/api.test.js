@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { apiUrl, getFallbacks, loadAnalytics, refreshSource, retryConnection, subscribeConnection } from './api.js'
 import savedKpis from '../fixtures/kpis.synthetic.json'
 import savedWeekly from '../fixtures/weekly.synthetic.json'
-import savedCatalog from '../fixtures/catalog.json'
+import savedSuggestions from '../fixtures/suggestions.synthetic.json'
 import savedOffers from '../fixtures/offers.synthetic.json'
 
 const jsonResponse = (body, status = 200) => ({ ok: status < 400, status, json: async () => body })
@@ -87,10 +87,10 @@ describe('loadAnalytics', () => {
       vi.fn(async () => jsonResponse({ detail: 'boom' }, 500)),
     )
 
-    const result = await loadAnalytics('catalog')
+    const result = await loadAnalytics('suggestions', 'synthetic')
 
-    expect(result).toEqual({ data: savedCatalog.data, offline: true, saved: savedCatalog.guardado })
-    expect(getFallbacks()[0]).toMatchObject({ name: 'catalog', reason: 'respondió 500' })
+    expect(result).toEqual({ data: savedSuggestions.data, offline: true, saved: savedSuggestions.guardado })
+    expect(getFallbacks()[0]).toMatchObject({ name: 'suggestions', reason: 'respondió 500' })
   })
 
   test('descarta una respuesta de otra fuente (nunca mezcla simulados con prototipo)', async () => {
@@ -99,7 +99,7 @@ describe('loadAnalytics', () => {
       vi.fn(async () => jsonResponse({ source: 'prototype', data: [{ x: 1 }] })),
     )
 
-    const result = await loadAnalytics('funnel', 'synthetic')
+    const result = await loadAnalytics('trends', 'synthetic')
 
     expect(result.offline).toBe(true)
     expect(result.data).not.toEqual([{ x: 1 }])
@@ -124,7 +124,7 @@ describe('loadAnalytics', () => {
       vi.fn(async () => jsonResponse({ source: 'synthetic', data: [{ x: 1 }] })),
     )
 
-    await expect(loadAnalytics('funnel', 'prototype')).rejects.toThrow('La API no responde')
+    await expect(loadAnalytics('trends', 'prototype')).rejects.toThrow('La API no responde')
   })
 
   test('lo guardado trae su origen y su fecha, y quedan en el aviso', async () => {
@@ -195,13 +195,13 @@ describe('loadAnalytics', () => {
       vi.fn(async () => Promise.reject(new TypeError('Failed to fetch'))),
     )
     await loadAnalytics('suggestions', 'synthetic')
-    await loadAnalytics('catalog')
+    await loadAnalytics('kpis', 'synthetic')
     const listener = vi.fn()
     const unsubscribe = subscribeConnection(listener)
 
     refreshSource('synthetic')
 
-    expect(getFallbacks().map((fallback) => fallback.key)).toEqual(['catalog'])
+    expect(getFallbacks()).toEqual([])
     expect(listener).toHaveBeenCalledTimes(1)
     unsubscribe()
   })

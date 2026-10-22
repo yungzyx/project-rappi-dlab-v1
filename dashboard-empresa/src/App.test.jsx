@@ -11,30 +11,33 @@ describe('App', () => {
 
   afterEach(resetApi)
 
-  test('el aviso de datos simulados es permanente y las pestañas se recorren con el teclado', async () => {
+  test('three views, the simulated notice is permanent and the tabs work with the keyboard', async () => {
     serveFixtures()
     await renderWithData(<App />)
 
     expect(screen.getByText('Usuarios y eventos SIMULADOS:')).toBeTruthy()
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+      'Resumen',
+      'Retención y venta cruzada',
+      'Mochi y búsquedas',
+    ])
     const summaryTab = screen.getByRole('tab', { name: 'Resumen' })
     expect(summaryTab.getAttribute('aria-selected')).toBe('true')
 
-    fireEvent.keyDown(summaryTab, { key: 'ArrowRight' })
-    const opportunitiesTab = screen.getByRole('tab', { name: 'Oportunidades' })
-    expect(opportunitiesTab.getAttribute('aria-selected')).toBe('true')
-    expect(document.activeElement).toBe(opportunitiesTab)
-    expect(screen.getByRole('tabpanel').id).toBe('panel-oportunidades')
-    expect(window.location.search).toContain('vista=oportunidades')
+    await act(async () => fireEvent.keyDown(summaryTab, { key: 'ArrowRight' }))
+    const customersTab = screen.getByRole('tab', { name: 'Retención y venta cruzada' })
+    expect(customersTab.getAttribute('aria-selected')).toBe('true')
+    expect(document.activeElement).toBe(customersTab)
+    expect(screen.getByRole('tabpanel').id).toBe('panel-clientes')
+    expect(window.location.search).toContain('vista=clientes')
 
-    fireEvent.keyDown(opportunitiesTab, { key: 'End' })
-    expect(screen.getByRole('tab', { name: 'Uso del MVP' }).getAttribute('aria-selected')).toBe('true')
-    await act(async () => fireEvent.keyDown(screen.getByRole('tab', { name: 'Uso del MVP' }), { key: 'ArrowLeft' }))
-    expect(screen.getByRole('tab', { name: 'Catálogo (real)' }).getAttribute('aria-selected')).toBe('true')
-    expect(await screen.findByText('Salud del catálogo')).toBeTruthy()
+    await act(async () => fireEvent.keyDown(customersTab, { key: 'End' }))
+    expect(screen.getByRole('tab', { name: 'Mochi y búsquedas' }).getAttribute('aria-selected')).toBe('true')
+    expect(await screen.findByRole('heading', { name: 'Lo que ofrece Mochi' })).toBeTruthy()
     expect(screen.getByText('Usuarios y eventos SIMULADOS:')).toBeTruthy()
   })
 
-  test('el pie avisa que es una demo no oficial y enlaza la presentación bajo la base del sitio', async () => {
+  test('the footer says it is an unofficial demo and links the presentation under the site base', async () => {
     serveFixtures()
     await renderWithData(<App />)
 
@@ -44,7 +47,7 @@ describe('App', () => {
     )
   })
 
-  test('solo la pestaña activa tiene aria-controls (los demás paneles no existen en el DOM)', async () => {
+  test('only the active tab has aria-controls (the other panels are not in the DOM)', async () => {
     serveFixtures()
     await renderWithData(<App />)
 
@@ -53,18 +56,38 @@ describe('App', () => {
     expect(document.getElementById('panel-resumen')).toBe(screen.getByRole('tabpanel'))
   })
 
-  test('un estado vacío es texto estático: no se anuncia como región viva', async () => {
-    window.history.replaceState(null, '', '/?vista=mvp&fuente=simulados')
+  test.each([
+    ['mvp', 'mochi'],
+    ['oportunidades', 'mochi'],
+    ['catalogo', 'mochi'],
+    ['frecuencia', 'clientes'],
+    ['verticales', 'clientes'],
+    ['otra', 'resumen'],
+  ])('an old link (?vista=%s) opens the view that has its content (%s)', async (old, view) => {
+    window.history.replaceState(null, '', `/?vista=${old}&fuente=prototipo`)
     serveFixtures()
     await renderWithData(<App />)
 
-    const empty = (await screen.findByText('Los datos simulados no registran el momento de la oferta')).closest(
-      '.state',
-    )
-    expect(empty.getAttribute('role')).toBeNull()
+    expect(screen.getByRole('tabpanel').id).toBe(`panel-${view}`)
+    expect(window.location.search).toBe(`?vista=${view}&fuente=prototipo`)
   })
 
-  test('cambiar a Prototipo cambia el aviso y la URL', async () => {
+  test('a decision links to its detail: the view changes and the section heading gets the focus', async () => {
+    serveFixtures()
+    await renderWithData(<App />)
+
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Ver la escalera' })))
+
+    expect(screen.getByRole('tabpanel').id).toBe('panel-clientes')
+    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Dónde está la venta cruzada' }))
+
+    await act(async () => fireEvent.click(screen.getByRole('tab', { name: 'Resumen' })))
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Ver las búsquedas' })))
+    expect(screen.getByRole('tabpanel').id).toBe('panel-mochi')
+    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Qué buscan y no encuentran' }))
+  })
+
+  test('switching to Prototipo changes the notice and the URL', async () => {
     serveFixtures()
     await renderWithData(<App />)
 
@@ -72,14 +95,18 @@ describe('App', () => {
 
     expect(screen.getByText('Usuarios y eventos del PROTOTIPO:')).toBeTruthy()
     expect(window.location.search).toContain('fuente=prototipo')
-    expect(await screen.findByText('Sin señales suficientes')).toBeTruthy()
+    expect(
+      await screen.findByText(
+        'Nadie pasó el doble de su ritmo sin pedir: el ritmo necesita al menos dos compras por persona.',
+      ),
+    ).toBeTruthy()
   })
 
-  test('«Actualizar» trae lo nuevo del prototipo sin recargar la página', async () => {
-    window.history.replaceState(null, '', '/?vista=verticales&fuente=prototipo')
+  test('«Actualizar» brings what is new in the prototype without reloading the page', async () => {
+    window.history.replaceState(null, '', '/?vista=mochi&fuente=prototipo')
     serveFixtures()
     await renderWithData(<App />)
-    expect(await screen.findByText('Sin sugerencias que evaluar')).toBeTruthy()
+    expect(await screen.findByText('Sin sugerencias entre verticales que evaluar')).toBeTruthy()
 
     // Mientras tanto se hace la demo en el prototipo: la API ya cuenta la sugerencia mostrada.
     const fixtures = globalThis.fetch
@@ -104,15 +131,26 @@ describe('App', () => {
     )
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Actualizar' })))
 
-    expect(await screen.findByText('sugerencias cruzadas mostradas')).toBeTruthy()
-    expect(screen.queryByText('Sin sugerencias que evaluar')).toBeNull()
+    expect(await screen.findByRole('table', { name: 'Sugerencias entre verticales' })).toBeTruthy()
+    expect(screen.queryByText('Sin sugerencias entre verticales que evaluar')).toBeNull()
   })
 
-  test('con la API caída usa los datos guardados y lo avisa', async () => {
+  test('an empty state is static text: it is not announced as a live region', async () => {
+    window.history.replaceState(null, '', '/?vista=mochi&fuente=simulados')
+    serveFixtures()
+    await renderWithData(<App />)
+
+    const empty = (await screen.findByText('Los datos simulados no registran el momento de la oferta')).closest(
+      '.state',
+    )
+    expect(empty.getAttribute('role')).toBeNull()
+  })
+
+  test('with the API down it uses the saved data and says so', async () => {
     apiDown()
     await renderWithData(<App />)
 
     expect(await screen.findByText('Modo sin conexión (datos guardados):')).toBeTruthy()
-    expect(await screen.findByText('3 decisiones que salen de los datos')).toBeTruthy()
+    expect(await screen.findByText('62,6%')).toBeTruthy()
   })
 })

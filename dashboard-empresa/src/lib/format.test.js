@@ -59,6 +59,7 @@ describe('porcentajes', () => {
   test('formatPoints usa puntos porcentuales', () => {
     expect(formatPoints(10.94)).toBe('+10,9 pp')
     expect(formatPoints(-2.5)).toBe('−2,5 pp')
+    expect(formatPoints(35.2, 0)).toBe('+35 pp')
   })
 })
 

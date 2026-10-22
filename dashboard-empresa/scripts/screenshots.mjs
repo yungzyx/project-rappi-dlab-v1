@@ -13,9 +13,9 @@ const CHROME_PATH = process.env.CHROME_PATH
 const CHROME_CHANNEL = process.env.PLAYWRIGHT_CHANNEL || 'chrome'
 const PORT = 5198
 const BASE = `http://localhost:${PORT}/`
-const LOAD_TIMEOUT_MS = 45_000 // /analytics/weekly tarda ~8 s
+const LOAD_TIMEOUT_MS = 45_000 // margen para una base fría (hoy /analytics/weekly responde en menos de 1 s)
 
-const VIEWS = ['resumen', 'oportunidades', 'frecuencia', 'verticales', 'catalogo']
+const VIEWS = ['resumen', 'clientes', 'mochi']
 const VIEWPORTS = [
   { name: 'escritorio', options: { viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 } },
   {

@@ -20,11 +20,6 @@
   white-space: nowrap;
 }
 
-/* Dentro de un sub-bloque con su propia regla de 2px, la tabla usa 1px para no doblarla */
-.card .data-table th {
-  border-bottom: 1px solid var(--ink);
-}
-
 /* Separador fuerte entre grupos de filas (p. ej. donde cambia el estado o se cruza un umbral) */
 .data-table tr.is-group-start td {
   border-top: 1px solid var(--line-strong);
@@ -73,6 +68,10 @@
 .cell-sub {
   font-size: var(--text-xs);
   color: var(--ink-3);
+}
+
+.cell-stack .chip {
+  justify-self: start;
 }
 
 .cell-bar {
@@ -170,14 +169,6 @@
   animation: grow-x var(--duration-enter) var(--ease-out) both;
 }
 
-.meter--warn > span {
-  background: var(--warn);
-}
-
-.meter--muted > span {
-  background: var(--deemph);
-}
-
 @keyframes grow-x {
   from {
     transform: scaleX(0);
@@ -209,58 +200,6 @@
   height: 14px;
 }
 
-/* ---------- Lista rankeada con barra (etiqueta | barra | valor) ---------- */
-.rank-list {
-  display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(56px, 1fr) auto;
-  column-gap: var(--space-3);
-  list-style: none;
-}
-
-/* Subgrid: todas las filas comparten columnas, así las barras parten del mismo x aunque cambie el ancho del valor. */
-.rank-row {
-  display: grid;
-  grid-column: 1 / -1;
-  grid-template-columns: subgrid;
-  align-items: center;
-  padding-block: 9px;
-  border-bottom: 1px solid var(--line);
-  transition: background var(--duration-fast);
-}
-
-.rank-row:last-child {
-  border-bottom: 0;
-}
-
-.rank-row:hover {
-  background: linear-gradient(90deg, transparent, var(--surface-sunken) 12%, var(--surface-sunken) 88%, transparent);
-}
-
-.rank-label {
-  display: grid;
-  gap: 1px;
-  min-width: 0;
-  font-size: var(--text-sm);
-  font-weight: 500;
-}
-
-.rank-label > span:first-child {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 8px;
-}
-
-.rank-value {
-  justify-self: end;
-  font-size: var(--text-sm);
-  white-space: nowrap;
-}
-
-.rank {
-  color: var(--ink-3);
-}
-
 .chip--warn {
   color: var(--warn-ink);
   background: color-mix(in srgb, var(--warn) 16%, transparent);
@@ -270,11 +209,6 @@
   display: block;
   min-width: 180px;
   max-width: 34ch;
-  color: var(--ink-2);
-}
-
-.table-summary {
-  font-size: var(--text-sm);
   color: var(--ink-2);
 }
 
@@ -289,4 +223,46 @@
 
 .table-warning svg {
   margin-top: 2px;
+}
+
+/* ---------- Cifras de una sección (lista de definiciones) ---------- */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr));
+  gap: var(--space-4) var(--space-6);
+  padding-block: var(--space-4);
+  border-bottom: 1px solid var(--line);
+}
+
+.stats > div {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+}
+
+.stats dt {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.stats dd {
+  font-size: clamp(1.5rem, 1.25rem + 0.6vw, 1.875rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.stats p {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+/* Rótulo de las secciones con datos del prototipo */
+.mvp-note {
+  font-size: var(--text-sm);
+}
+
+.mvp-note strong {
+  font-weight: 700;
 }

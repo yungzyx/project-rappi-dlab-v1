@@ -9,7 +9,7 @@ describe('describeFallbacks', () => {
   })
 
   test('resume listas largas y no repite motivos', () => {
-    const fallbacks = ['kpis', 'trends', 'funnel', 'cohorts', 'catalog'].map((name) => ({
+    const fallbacks = ['kpis', 'trends', 'offers', 'combos', 'motor'].map((name) => ({
       name,
       reason: 'no responde',
     }))
