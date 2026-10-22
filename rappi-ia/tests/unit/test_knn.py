@@ -148,3 +148,13 @@ def test_neighbors_still_fix_a_dish_that_only_names_a_drink():
     dish = ItemText("menu_item", "1", "Margarita Familiar")
     rule = Assignment("menu_item", "1", "cocteles", "regla", 0.7, None, "nombre:margarita")
     assert _decide(rule, dish, *_neighbors(["pizza"] * 15), MODEL).concept_id == "pizza"
+
+
+def test_neighbors_never_take_a_dish_out_of_the_alcohol_its_section_gave():
+    """«Jengibre Sour» de una sección «Aperitivos» (base real del 22-10-2026) pasaba de licores a salsas, y «sour» con
+    salsas es la salsa agridulce para las guardias: se podía ofrecer. Lo que la sección deja en alcohol ya pasó por la
+    comida que la sección no decide (`assign._solid_food`)."""
+    dish = ItemText("menu_item", "1", "Jengibre Sour. Bebida de jengibre con un toque ácido, ideal como aperitivo.")
+    section = Assignment("menu_item", "1", "licores", "regla", 0.7, None, "seccion-nombre:Aperitivos")
+    assert _decide(section, dish, *_neighbors(["salsas"] * 15), MODEL) == section
+    assert _decide(section, dish, *_neighbors(["pisco"] * 15), MODEL).concept_id == "pisco"  # entre alcoholes, sí

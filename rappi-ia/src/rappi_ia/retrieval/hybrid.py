@@ -3,7 +3,8 @@
 - Los filtros duros (precio máximo, tipo de entidad) van dentro de cada recuperador, antes de fusionar, para que un
   tope de precio no deje la lista vacía por haber filtrado después.
 - "Sin resultado" (demanda no satisfecha) exige las tres condiciones de docs/diseno-ia.md §1: nada calza todas las
-  palabras, el coseno máximo queda bajo τ del vertical y ningún ítem del vertical comparte concepto con la consulta.
+  palabras, el coseno máximo queda bajo τ y ningún ítem del vertical comparte concepto con la consulta. El τ es el del
+  vertical si la consulta nombra una ocasión, y UNNAMED_TAU si no nombra concepto ni ocasión.
 """
 
 import json
@@ -16,14 +17,22 @@ from rappi_scraper.storage.search import VERTICALS
 
 from ..catalog.cache import cached, cached_many
 from ..concepts.assign import concept_matcher
-from ..concepts.taxonomy import load_taxonomy
+from ..concepts.matcher import KeywordMatcher
+from ..concepts.taxonomy import Occasion, load_taxonomy
 from ..embeddings.base import TextEmbedder, to_pgvector
-from ..text import FILLER_WORDS, tokens
+from ..text import FILLER_WORDS, normalize, tokens
 
 RRF_K = 60  # constante estándar de Reciprocal Rank Fusion
 CANDIDATES = 200  # tamaño del pool de cada recuperador
 CONCEPT_BONUS = 0.5 / (RRF_K + 1)  # medio "primer lugar" extra si el ítem comparte concepto con la consulta
 DEFAULT_TAU = 0.82  # coseno e5 mínimo para considerar que hay algo parecido; se calibra por vertical (eval)
+# El τ de una consulta que no nombra concepto ni ocasión, en una vertical o en todas (agent/grouped_search: si ninguna
+# vertical calza todas las palabras, solo entra una con este coseno). El τ de cada vertical (0,79 en Turbo, 0,70 en el
+# Mall y las chocolaterías) dejaba pasar vecinos sin relación: «sofá de tres cuerpos» en Turbo traía pisco Tres Erres
+# (0,821) y «xyzzy» un pastillero y libros. Calibrado con e5 en la base real: las negativas sin concepto ni ocasión de
+# eval/queries.json llegan a 0,847 («refrigerador 300 litros» en Licores). Con una ocasión («regalo para mi polola»)
+# sigue el τ de la vertical: lo pedido son productos que su nombre no dice, y ahí los vecinos vectoriales sirven.
+UNNAMED_TAU = 0.85
 MIN_CONCEPT_ITEMS = 3  # bajo esto (o bajo 0,05% del vertical) el concepto se considera ausente: surtido testimonial
 MIN_CONCEPT_SHARE = 0.0005
 THRESHOLDS_FILE = Path(__file__).resolve().parents[1] / "eval" / "thresholds.json"
@@ -64,6 +73,7 @@ class RetrievalResult:
     # Ítems del concepto nombrado con más surtido en el vertical sobre los documentos del vertical (None si la consulta
     # no nombra ninguno): agent/tools._focus no muestra lo rotulado con un concepto que el vertical casi no tiene.
     concept_share: float | None = None
+    names_occasion: bool = False  # sin concepto nombrado, si nombra una ocasión: decide el τ del vertical (`_unmet`)
 
 
 def thresholds() -> dict[str, float]:
@@ -152,6 +162,7 @@ def retrieve(
     concept_here = bool(query_concepts) and concept_items >= _concept_floor(doc_count)
     if words is None:
         words = has_words(conn, query)
+    occasion = not query_concepts and named_occasion(query) is not None
     unmet, reason = _unmet(
         vertical,
         strict,
@@ -160,10 +171,11 @@ def retrieve(
         bool(query_concepts),
         has_vectors=embedder is not None,
         has_words=words,
+        names_occasion=occasion,
     )
     share = concept_items / doc_count if query_concepts and doc_count else None
     return RetrievalResult(
-        vertical, query, hits, query_concepts, strict, max_cosine, concept_here, unmet, reason, words, share
+        vertical, query, hits, query_concepts, strict, max_cosine, concept_here, unmet, reason, words, share, occasion
     )
 
 
@@ -184,6 +196,19 @@ def _matcher():
     if _MATCHER is None:
         _MATCHER = concept_matcher(load_taxonomy(), for_queries=True)
     return _MATCHER
+
+
+_OCCASIONS = None
+
+
+def named_occasion(q: str) -> Occasion | None:
+    """La ocasión que nombra la consulta («algo para el carrete»), con las keywords de taxonomy.toml."""
+    global _OCCASIONS
+    taxonomy = load_taxonomy()
+    if _OCCASIONS is None:
+        _OCCASIONS = KeywordMatcher((o.id, kw) for o in taxonomy.occasions.values() for kw in o.keywords)
+    match = _OCCASIONS.best(normalize(q))
+    return taxonomy.occasions[match.target] if match else None
 
 
 _PRICE = "price_min"  # columna generada desde metadata (migración 013), con índice (vertical, price_min)
@@ -457,12 +482,15 @@ def _unmet(
     names_concept: bool,
     has_vectors: bool,
     has_words: bool = True,
+    names_occasion: bool = False,
 ) -> tuple[bool, str | None]:
     """Sin resultado = nada calza todas las palabras Y (el concepto nombrado no está en el vertical, o bien,
     si la consulta no nombra un concepto, el coseno máximo queda bajo τ).
 
     Con e5 los cosenos se concentran (0,78–0,90), así que cuando la consulta nombra un concepto, su presencia
     en el vertical es mejor señal que el coseno ("pizza" en Rappi Mall: no hay; aunque el coseno sea 0,82).
+    Sin concepto, τ es el del vertical si la consulta nombra una ocasión, y si no, UNNAMED_TAU: el del vertical no
+    separa («sofá de tres cuerpos» en Turbo, 0,821, contra «cuchuflis» con un error de tipeo, 0,843).
     Sin palabras que buscar («té» es stopword), que nada calce no dice nada y el coseno solo no basta: no se marca.
     """
     if strict > 0:
@@ -476,8 +504,9 @@ def _unmet(
         )
     if not has_words:
         return False, None
-    tau = thresholds().get(vertical, DEFAULT_TAU)
+    tau = thresholds().get(vertical, DEFAULT_TAU) if names_occasion else UNNAMED_TAU
     if not has_vectors or max_cosine is None or max_cosine < tau:
         cosine = f"{max_cosine:.3f}" if max_cosine is not None else "sin vectores"
-        return True, f"sin coincidencia léxica ni concepto; coseno máx {cosine} < τ {tau}"
+        occasion = "" if names_occasion else " ni ocasión"
+        return True, f"sin coincidencia léxica ni concepto{occasion}; coseno máx {cosine} < τ {tau}"
     return False, None

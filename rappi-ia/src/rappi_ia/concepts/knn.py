@@ -17,7 +17,7 @@ import numpy as np
 from psycopg import Connection
 
 from ..embeddings.base import TextEmbedder, to_pgvector
-from .assign import Assignment, dish_name_concepts, refinable_by_name
+from .assign import SECTION_NAME, Assignment, dish_name_concepts, refinable_by_name
 from .taxonomy import keeps_guarded, keeps_sensitive, sensitive_concepts
 
 log = logging.getLogger(__name__)
@@ -164,6 +164,16 @@ def _decide(
     # palabras con otro sentido («Pizza Margarita», «Hamburguesa Cebolla al Vino Tinto») y las ofertas lo bloquean por
     # el nombre y la sección (offers/guards.py).
     if current and item.entity_type == "catalog_item" and keeps_guarded(current.concept_id, best):
+        return current
+    # Salvo un plato que la sección puso en alcohol: la guardia no ve las secciones «Aperitivos», y «Jengibre Sour»
+    # pasaba a salsas («sour» con salsas es la salsa agridulce para las guardias). La comida de esas secciones ya no
+    # llega a alcohol por la sección (`assign._solid_food`); lo que queda es un trago o algo que no se reconoce.
+    if (
+        current
+        and item.entity_type == "menu_item"
+        and current.source.startswith(SECTION_NAME)
+        and keeps_guarded(current.concept_id, best)
+    ):
         return current
     # El nombre de un plato que nombra un plato o su proteína («Pollo asado + Bebida», «Pescado frito») manda: los
     # combos con bebida se parecen entre sí y los vecinos los mandaban a sushi o a platos listos.
