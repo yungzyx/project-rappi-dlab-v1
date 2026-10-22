@@ -137,15 +137,16 @@ Las cifras vigentes (catálogo, búsqueda, precisión de conceptos y de la capa 
 
 ### Búsqueda
 
-**Set:** 124 consultas positivas en los 8 verticales y 41 negativas (al menos 5 por vertical, verificadas contra el catálogo completo), en [`src/rappi_ia/eval/queries.json`](src/rappi_ia/eval/queries.json). La relevancia se juzga automáticamente por concepto: un resultado es relevante si su concepto es uno de los esperados para la consulta. El reporte trae la comparación pareada completa (léxico, vectorial, híbrido y la ablación sin refuerzo por concepto), por tipo de consulta y por vertical.
+**Set:** 131 consultas positivas en los 8 verticales y 58 negativas (al menos 5 por vertical, verificadas contra el catálogo completo el 29-09 y el 22-10), en [`src/rappi_ia/eval/queries.json`](src/rappi_ia/eval/queries.json). La relevancia se juzga automáticamente por concepto: un resultado es relevante si su concepto es uno de los esperados para la consulta. El reporte trae la comparación pareada completa (léxico, vectorial, híbrido y la ablación sin refuerzo por concepto), por tipo de consulta y por vertical.
 
-**"Sin resultado"** (demanda no satisfecha), sobre las 41 consultas negativas y con los τ de `src/rappi_ia/eval/thresholds.json`. El reporte dice por qué se detecta o no cada una. Las cifras del reporte son de la búsqueda (`retrieve`); Mochi anota la demanda cuando la búsqueda la marca y no muestra ningún producto. Desde el 18-10-2026 tampoco muestra los pocos productos de un concepto con surtido testimonial bajo el 1 % del vertical (solían ser otra cosa con su etiqueta, como un cable HDMI para «televisor 55 pulgadas» en Turbo), así que las dos cifras casi coinciden.
+**"Sin resultado"** (demanda no satisfecha), sobre las 58 consultas negativas y con los τ de `src/rappi_ia/eval/thresholds.json`. El reporte dice por qué se detecta o no cada una. Las cifras del reporte son de la búsqueda (`retrieve`); Mochi anota la demanda cuando la búsqueda la marca y no muestra ningún producto. Desde el 18-10-2026 tampoco muestra los pocos productos de un concepto con surtido testimonial bajo el 1 % del vertical (solían ser otra cosa con su etiqueta, como un cable HDMI para «televisor 55 pulgadas» en Turbo), así que las dos cifras casi coinciden.
 
 - **Regla:** es un "sin resultado" cuando nada calza todas las palabras y, además, se cumple la condición que corresponda:
   - si la consulta nombra un concepto, ese concepto no tiene surtido real en el vertical;
-  - si no nombra ninguno, el coseno queda bajo τ (una consulta sin palabras que buscar, como «té», que es stopword, o «quiero té porfa», no se marca).
-- **Coincidencias casuales:** "pizza familiar" encuentra un horno para pizza en Mall y "neumáticos" un renovador de neumáticos en conveniencia. Es un límite real de la regla léxica estricta.
-- **Límite conocido:** un iPhone en el súper no cuenta como "sin resultado", porque hay accesorios del mismo concepto (celulares).
+  - si no nombra ninguno, el coseno queda bajo τ: el del vertical si nombra una ocasión («regalo para mi polola»), y 0,85 (`UNNAMED_TAU`, el de la búsqueda agrupada) si no nombra concepto ni ocasión. Con el τ del vertical, «sofá de tres cuerpos» en Turbo (0,821 ≥ 0,79) mostraba pisco Tres Erres. Una consulta sin palabras que buscar, como «té», que es stopword, o «quiero té porfa», no se marca.
+- **Coincidencias casuales:** "pizza familiar" encuentra un horno para pizza en Mall. Es un límite real de la regla léxica estricta.
+- **Límite conocido:** "neumáticos" y "televisor 55 pulgadas" en conveniencia y "bicicleta aro 29" en el súper no cuentan como "sin resultado", porque el vertical tiene el concepto para otra cosa (artículos para el auto, una antena, bicicletas de equilibrio para niños).
+- **Costo de la regla sin concepto ni ocasión:** un error de tipeo que no nombra concepto («cervezaaaa», «nutela») ya no muestra los vecinos vectoriales en una vertical, como ya pasaba en la búsqueda agrupada.
 
 **Salvedades:**
 
