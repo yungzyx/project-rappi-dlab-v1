@@ -85,7 +85,7 @@ cd rappi-ia
 DATABASE_URL=postgresql:///rappi_staging .venv/bin/python -m rappi_ia migrate
 DATABASE_URL=postgresql:///rappi_staging HF_HUB_OFFLINE=1 API_PREWARM=0 \
   .venv/bin/python -m uvicorn rappi_ia.api.app:app --host 127.0.0.1 --port 8020
-# 2. En otra terminal: la muestra (~1,6 MB) y el HTML (~15 MB, con las fotos), con una copia en el Escritorio
+# 2. En otra terminal: la muestra (~1,6 MB) y el HTML (~14,5 MB, con las fotos), con una copia en el Escritorio
 cd prototipo-app
 SNAPSHOT_ALLOW_WRITES=1 DEMO_API_URL=http://127.0.0.1:8020 npm run demo:snapshot
 DEMO_HTML_COPY="$HOME/Desktop/Prototipo MVP.html" npm run demo:html
