@@ -51,6 +51,22 @@ def test_build_concepts_is_idempotent_and_drops_stale_rules(db):
     assert ids == ["100", "500", "501"]
 
 
+def test_the_description_of_a_dish_reaches_the_aperitivo_rule(db):
+    """En una sección «Aperitivos», un plato con nombre de comida sale del alcohol solo si la descripción tampoco lo
+    dice: la descripción tiene que llegar desde la base."""
+    add_store(db, 3, "restaurantes", "Bar")
+    add_dish(db, 600, "Queso Mantecoso Laminado", 3, "Aperitivos")
+    add_dish(db, 601, "Pepino Tonic", 3, "Aperitivos")
+    db.execute("UPDATE menu_items SET description = 'Gin, pepino y agua tónica' WHERE item_id = 601")
+    db.commit()
+
+    build_concepts(db)
+
+    rows = dict(db.execute("SELECT entity_id, concept_id FROM item_concepts").fetchall())
+    assert "600" not in rows
+    assert rows["601"] == "licores"
+
+
 def test_coverage_report_by_vertical(db):
     _seed(db)
     build_concepts(db)

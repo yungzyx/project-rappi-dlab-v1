@@ -288,6 +288,55 @@ def test_menu_hides_dishes_without_a_price_and_the_sections_they_empty(seeded):
     assert names == ["Lo más pedido", "Pizzas", "Postres"]  # la sección que se quedó sin platos no sale
 
 
+def _add_best_sellers(conn, store_id: int, items: dict[int, list[int]]) -> None:
+    """Como guarda el scraper un menú con «Más vendidos» (migración 040): la sección va primera y cada plato repetido
+    queda una vez, con su sección propia en `section_id` y las demás en `extra_section_ids`."""
+    conn.execute("UPDATE menu_sections SET position = position + 1 WHERE store_id = %s", (store_id,))
+    conn.execute(
+        "INSERT INTO menu_sections (store_id, section_id, name, position) VALUES (%s, 99, 'Más vendidos', 0)",
+        (store_id,),
+    )
+    for item_id, extra in items.items():
+        conn.execute("UPDATE menu_items SET extra_section_ids = %s WHERE item_id = %s", (extra, item_id))
+
+
+def test_menu_lists_a_repeated_dish_in_every_section_it_is_in(seeded):
+    # 98003 (bebida) y 98002 (pizza, popular) también están en «Más vendidos».
+    _add_best_sellers(seeded, PIZZERIA, {98003: [99], 98002: [99]})
+
+    menu = restaurant_menu(seeded, PIZZERIA)
+    sections = [(s["name"], [i["entity_id"] for i in s["items"]]) for s in menu["sections"]]
+
+    assert sections == [
+        ("Lo más pedido", ["98002", "98004"]),  # el popular, una sola vez aunque esté en dos secciones
+        ("Más vendidos", ["98002", "98003"]),
+        ("Pizzas", ["98001", "98002"]),
+        ("Bebidas", ["98003"]),
+        ("Postres", ["98004"]),
+    ]
+
+
+def test_menu_never_repeats_a_dish_within_a_section(seeded):
+    # Un arreglo con repetidos, con la sección propia del plato (Pizzas es la 1) y con una sección que ya no existe.
+    _add_best_sellers(seeded, PIZZERIA, {98001: [99, 99, 1, 12345]})
+
+    menu = restaurant_menu(seeded, PIZZERIA)
+    by_section = {s["name"]: [i["entity_id"] for i in s["items"]] for s in menu["sections"]}
+
+    assert by_section["Más vendidos"] == ["98001"]
+    assert by_section["Pizzas"] == ["98001", "98002"]
+    assert len(by_section) == 5  # la sección que no existe no suma nada
+
+
+def test_best_sellers_without_a_priced_dish_do_not_show(seeded):
+    _add_best_sellers(seeded, PIZZERIA, {98003: [99]})
+    seeded.execute("UPDATE menu_price_snapshots SET price = NULL WHERE item_id = 98003")
+
+    names = [s["name"] for s in restaurant_menu(seeded, PIZZERIA)["sections"]]
+
+    assert names == ["Lo más pedido", "Pizzas", "Postres"]
+
+
 def test_menu_of_something_that_is_not_a_listed_restaurant_is_none(seeded):
     for store_id in (999_999, 9101, ICE_CREAM, -1, 2**63):
         assert restaurant_menu(seeded, store_id) is None, store_id
