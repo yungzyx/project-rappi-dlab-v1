@@ -118,7 +118,7 @@ function OpenButton() {
   )
 }
 
-async function renderPanel({ push = () => {}, vertical, open = null } = {}) {
+async function renderPanel({ push = () => {}, vertical, open = null, settle = true } = {}) {
   render(
     <DemoProvider>
       <ProfileProvider>
@@ -136,7 +136,7 @@ async function renderPanel({ push = () => {}, vertical, open = null } = {}) {
   )
   screen.getByText('abrir').focus() // como al tocarlo: el foco queda en quien abrió el asistente
   fireEvent.click(screen.getByText(open ? 'abrir con búsqueda' : 'abrir'))
-  await runUntilIdle()
+  if (settle) await runUntilIdle()
 }
 
 beforeAll(() => {
@@ -1015,6 +1015,69 @@ describe('barra del carrito dentro del panel', () => {
     await runUntilIdle()
     fireEvent.click(screen.getAllByLabelText(/^Agregar /)[0])
     expect(document.querySelector('.assistant.has-cart')).toBeTruthy()
+  })
+})
+
+// Lo de abajo del saludo no debe moverse mientras el panel carga (los «escribiendo…» miden menos que el saludo y su
+// «Para ti»): espera sin verse hasta el saludo y aparece con él, ya en su lugar.
+describe('al abrir, nada se mueve', () => {
+  test('hasta el saludo, lo de abajo de «escribiendo…» espera sin verse y aparece con él', async () => {
+    stubCatalog({ '/recommendations': { slow: 1000, body: fixture('recommendations') } })
+    await renderPanel({ settle: false })
+    await advance(600)
+    const panel = screen.getByRole('dialog')
+    expect(document.querySelector('.agent-msg-typing')).toBeTruthy()
+    expect(panel.classList.contains('is-waiting')).toBe(true)
+
+    await runUntilIdle()
+    expect(bubbles()[0]).toMatch(/Soy Mochi/)
+    expect(panel.classList.contains('is-waiting')).toBe(false)
+  })
+
+  test('los resultados de una búsqueda no esperan el saludo', async () => {
+    stubCatalog({ '/recommendations': { slow: 1000, body: fixture('recommendations') } })
+    await renderPanel({ open: 'búsqueda', settle: false })
+    await advance(100)
+    expect(document.querySelector('.agent-msg-typing')).toBeNull() // con búsqueda no se ve la franja de Mochi
+    expect(screen.getByRole('dialog').classList.contains('is-waiting')).toBe(false)
+  })
+
+  test('el saludo espera también lo aprendido: «Aprendiendo de ti» aparece con él', async () => {
+    api.profile.mockReturnValue(
+      new Promise((resolve) =>
+        setTimeout(() => resolve({ interests: [{ concept: 'pizza', label: '🍕 Pizza' }] }), 1500),
+      ),
+    )
+    await renderPanel({ settle: false })
+    await advance(1000)
+    expect(document.querySelector('.agent-msg-typing')).toBeTruthy()
+    expect(screen.getByRole('dialog').classList.contains('is-waiting')).toBe(true)
+
+    await runUntilIdle()
+    expect(bubbles()[0]).toMatch(/Soy Mochi/)
+    expect(screen.getByText('🍕 Pizza')).toBeTruthy()
+    expect(screen.getByRole('dialog').classList.contains('is-waiting')).toBe(false)
+  })
+
+  test('el saludo espera también el perfil de gusto: el perfil y su escalera aparecen con él', async () => {
+    // Conceptos propios: lo mostrado se recuerda en la pestaña y los tests del perfil cuentan los de la fixture.
+    const ladder = fixture('agent-offer-perfil')
+    for (const step of ladder.escalera)
+      for (const product of step.products) product.concept = `${product.concept}-espera`
+    stubCatalog({
+      'GET /profile/*': fixture('profile-gustos'),
+      'POST /agent/offer': (req) => (req.body.moment === 'perfil' ? { slow: 1500, body: ladder } : 204),
+    })
+    await renderPanel({ settle: false })
+    await advance(1000)
+    expect(document.querySelector('.agent-msg-typing')).toBeTruthy()
+    expect(screen.getByRole('dialog').classList.contains('is-waiting')).toBe(true)
+
+    await runUntilIdle()
+    expect(bubbles()[0]).toMatch(/Soy Mochi/)
+    expect(screen.getByRole('region', { name: 'Tu perfil' })).toBeTruthy()
+    expect(screen.getByRole('region', { name: 'Para ti en otras verticales' })).toBeTruthy()
+    expect(screen.getByRole('dialog').classList.contains('is-waiting')).toBe(false)
   })
 })
 

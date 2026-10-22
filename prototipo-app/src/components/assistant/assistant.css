@@ -116,6 +116,15 @@
   animation-delay: 390ms;
 }
 
+/* Hasta la primera respuesta solo se ve el encabezado de Mochi; el resto espera sin verse ni animarse y aparece con el
+   saludo */
+.assistant.is-waiting .agent-card > :not(.agent-card-head),
+.assistant.is-waiting .taste-ladder,
+.assistant.is-waiting .agent-block {
+  visibility: hidden;
+  animation: none;
+}
+
 /* ---------- Franja de Mochi: lo que sabe de ti, su respuesta y los botones ---------- */
 .agent-card {
   position: relative;
@@ -291,8 +300,23 @@
   animation-delay: 0.3s;
 }
 
+/* Lo que falta escribir: invisible, pero ya ocupa su lugar en la burbuja */
+.agent-msg-rest::after {
+  content: attr(data-rest);
+  visibility: hidden;
+}
+
 .agent-msg-extras {
   margin-top: 8px;
+}
+
+/* Hasta que termina el texto, las tarjetas y los botones ya ocupan su lugar, sin verse ni animarse */
+.agent-msg-extras.is-pending {
+  visibility: hidden;
+}
+
+.agent-msg-extras.is-pending * {
+  animation: none;
 }
 
 .agent-msg-reason {

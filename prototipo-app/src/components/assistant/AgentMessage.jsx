@@ -9,7 +9,12 @@ import { useProductSheet } from '../../state/ProductSheetContext'
 const CHARS_PER_SECOND = 70
 const TICK_MS = 30
 
-/** Texto que aparece letra por letra, como si el asistente lo estuviera escribiendo (entero con «reducir movimiento»). */
+/**
+ * Texto que aparece letra por letra, como si el asistente lo estuviera escribiendo (entero con «reducir movimiento»).
+ * Lo que falta va invisible detrás (`data-rest`, que pinta el CSS): la burbuja mide desde el principio lo que medirá al
+ * terminar y las palabras no saltan de línea, así que lo de abajo no se mueve. No es texto de la página: el lector de
+ * pantalla oye la respuesta entera en el anunciador del panel.
+ */
 function StreamText({ text, animate, onDone }) {
   const reduce = useReducedMotion()
   const [typed, setCount] = useState(animate ? 0 : text.length)
@@ -38,7 +43,12 @@ function StreamText({ text, animate, onDone }) {
     return () => clearTimeout(timer)
   }, [count, text])
 
-  return <>{text.slice(0, count)}</>
+  return (
+    <>
+      {text.slice(0, count)}
+      {count < text.length && <span className="agent-msg-rest" data-rest={text.slice(count)} />}
+    </>
+  )
 }
 
 function ProductCards({ products, onOpenProduct, delay = 0 }) {
@@ -143,68 +153,63 @@ export default function AgentMessage({ message, onStreamDone, onOpenProduct, onO
         <div className="agent-msg-bubble">
           <StreamText text={message.text} animate={message.animate} onDone={done} />
         </div>
-        {revealed && (
-          <div className="agent-msg-extras">
-            {message.reason && <p className="agent-msg-reason">{message.reason}</p>}
-            {message.products?.length > 0 && <ProductCards products={message.products} onOpenProduct={onOpenProduct} />}
-            {message.offerReason && <OfferWhy reason={message.offerReason} />}
-            {message.suggestion?.products?.length > 0 && (
-              <div className="agent-msg-suggestion">
-                <p className="agent-msg-reason">
-                  <span className="agent-msg-suggestion-tag">
-                    {message.suggestion.verticalLabel ? `De ${message.suggestion.verticalLabel}` : 'De otra tienda'}
-                  </span>{' '}
-                  {message.suggestion.question} {message.suggestion.reason}
-                </p>
-                <ProductCards products={message.suggestion.products} onOpenProduct={onOpenProduct} delay={180} />
-                {message.suggestion.route && message.suggestion.verticalLabel && (
-                  <button
-                    type="button"
-                    className="agent-msg-action tap"
-                    onClick={() => onAction({ route: message.suggestion.route })}
-                  >
-                    Ver más en {message.suggestion.verticalLabel} →
-                  </button>
-                )}
-              </div>
-            )}
-            {message.alsoIn?.verticals?.length > 0 && <AlsoIn alsoIn={message.alsoIn} onAction={onAction} />}
-            {message.stores?.length > 0 && (
-              <div className="agent-msg-stores">
-                {message.stores.map((store, i) => (
-                  <button
-                    key={store.name}
-                    type="button"
-                    className="agent-msg-store tap"
-                    style={{ animationDelay: `${120 + i * 60}ms` }}
-                    onClick={() => onOpenStore(store)}
-                  >
-                    <Img src={store.img} className={store.logo ? 'is-logo' : undefined} />
-                    <span>
-                      <strong>{store.name}</strong>
-                      {store.eta && <small>{store.eta}</small>}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-            {message.retry && (
-              <button type="button" className="agent-msg-action tap" onClick={onRetry}>
-                Reintentar
-              </button>
-            )}
-            {message.actions?.map((action) => (
-              <button
-                key={action.label}
-                type="button"
-                className="agent-msg-action tap"
-                onClick={() => onAction(action)}
-              >
-                {action.label} →
-              </button>
-            ))}
-          </div>
-        )}
+        {/* Lo de abajo ocupa su lugar desde el principio (al aparecer no empuja el panel), pero no se ve ni se toca
+            hasta que termina el texto. */}
+        <div className={`agent-msg-extras${revealed ? '' : ' is-pending'}`} inert={!revealed}>
+          {message.reason && <p className="agent-msg-reason">{message.reason}</p>}
+          {message.products?.length > 0 && <ProductCards products={message.products} onOpenProduct={onOpenProduct} />}
+          {message.offerReason && <OfferWhy reason={message.offerReason} />}
+          {message.suggestion?.products?.length > 0 && (
+            <div className="agent-msg-suggestion">
+              <p className="agent-msg-reason">
+                <span className="agent-msg-suggestion-tag">
+                  {message.suggestion.verticalLabel ? `De ${message.suggestion.verticalLabel}` : 'De otra tienda'}
+                </span>{' '}
+                {message.suggestion.question} {message.suggestion.reason}
+              </p>
+              <ProductCards products={message.suggestion.products} onOpenProduct={onOpenProduct} delay={180} />
+              {message.suggestion.route && message.suggestion.verticalLabel && (
+                <button
+                  type="button"
+                  className="agent-msg-action tap"
+                  onClick={() => onAction({ route: message.suggestion.route })}
+                >
+                  Ver más en {message.suggestion.verticalLabel} →
+                </button>
+              )}
+            </div>
+          )}
+          {message.alsoIn?.verticals?.length > 0 && <AlsoIn alsoIn={message.alsoIn} onAction={onAction} />}
+          {message.stores?.length > 0 && (
+            <div className="agent-msg-stores">
+              {message.stores.map((store, i) => (
+                <button
+                  key={store.name}
+                  type="button"
+                  className="agent-msg-store tap"
+                  style={{ animationDelay: `${120 + i * 60}ms` }}
+                  onClick={() => onOpenStore(store)}
+                >
+                  <Img src={store.img} className={store.logo ? 'is-logo' : undefined} />
+                  <span>
+                    <strong>{store.name}</strong>
+                    {store.eta && <small>{store.eta}</small>}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+          {message.retry && (
+            <button type="button" className="agent-msg-action tap" onClick={onRetry}>
+              Reintentar
+            </button>
+          )}
+          {message.actions?.map((action) => (
+            <button key={action.label} type="button" className="agent-msg-action tap" onClick={() => onAction(action)}>
+              {action.label} →
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   )
