@@ -39,12 +39,19 @@ AMBIGUOUS_SECTION_WORDS = frozenset({"aperitivo", "aperitivos", "coctel", "cockt
 # tragos («Mango Sour», «Piña Colada», «Ruso Blanco», la yema de la «Vaina»).
 SOLID_FOOD_CONCEPTS = frozenset({"quesos", "fiambres", "verduras"})
 # Lo que dice que un plato es una bebida aunque no diga alcohol: un trago con nombre de verdura («Pepino Tonic», «Apio
-# Frozen») no es comida. Palabras sueltas y un volumen («300 cc», «1/2 Lt», «Medio litro»).
+# Frozen», «Jarra de Pepino») no es comida. Palabras sueltas y un volumen («300 cc», «1/2 Lt», «16 oz»). Que una comida
+# quede como alcohol por una de ellas («Queso con galletas soda») es la dirección segura.
 DRINK_WORDS = KeywordMatcher(
     ("bebida", word)
-    for word in ("bebida", "jugo", "limonada", "batido", "tonic", "tonica", "fizz", "mule", "punch", "ponche", "frozen")
+    for word in (
+        *("bebida", "jugo", "limonada", "batido", "tonic", "tonica", "fizz", "mule", "punch", "ponche", "frozen"),
+        *("ice", "fresh", "smash", "cooler", "highball", "soda", "ginger", "shot", "clerico", "jarra", "botella"),
+        *("copa", "vaso", "bar", "rhum", "destilado"),
+    )
 )
-LIQUID_VOLUME = re.compile(r"\d\s*(?:ml|cc|c\.c|lts?|l|litros?)\b|\b(?:ml|cc|lts?|litros?)\b", re.IGNORECASE)
+LIQUID_VOLUME = re.compile(
+    r"\d\s*(?:ml|cc|c\.c|c/c|cm3|oz|lts?|l|litros?)\b|\b(?:ml|cc|cm3|oz|lts?|litros?)\b", re.IGNORECASE
+)
 # La cocina del local es la pista más débil: solo cuenta con un mapeo muy confiable (Sushi → sushi). Con mapeos
 # dudosos (Americana → pizza, Asiática → sushi) acertaba el 62 %.
 CUISINE_MIN_CONFIDENCE = 0.85

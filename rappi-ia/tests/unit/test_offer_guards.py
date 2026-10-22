@@ -394,6 +394,8 @@ def test_vertical_to_try_never_offers_a_deal_whose_name_says_baby(monkeypatch):
         ("COSMOPOLITAN", None),
         ("Clavo Oxidado", None),
         ("Botella de Ramazzotti", "gaseosas"),
+        ("Algarrobina 170 ml", "postres"),  # solo la frase dice comida, no el concepto que puso el kNN
+        ("Vaina de vainilla 170 ml", "postres"),
     ],
 )
 def test_the_menu_cocktails_without_an_alcohol_word_say_alcohol(name, concept):

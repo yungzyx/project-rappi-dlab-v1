@@ -624,6 +624,11 @@ def test_food_in_an_aperitivo_section_is_not_alcohol(matcher, csv_maps, name, se
         ("Chorizo Vermut", "Con vermut rosso"),
         ("Vaina 170 ml", "Oporto, conac, licor de cacao, azucar, yema."),
         ("Algarrobina 170 ml", "Pisco, leche, licor de cacao, azúcar y yema."),
+        ("Pepino Ice", ""),
+        ("Jarra de Pepino", ""),
+        ("Tomate Bloody", "Con rhum"),
+        ("Pepino Smash 16 oz", ""),
+        ("Apio Cooler", "Destilado de agave y apio"),
     ],
 )
 def test_a_drink_or_an_unknown_dish_in_an_aperitivo_section_keeps_alcohol(matcher, csv_maps, name, description):
@@ -643,6 +648,7 @@ def test_a_drink_or_an_unknown_dish_in_an_aperitivo_section_keeps_alcohol(matche
         ("Queso Brie", "Aperitivos y Whisky"),  # otra palabra de la sección dice alcohol
         ("Queso Brie", "Aperitivo Spritz"),
         ("Queso Brie", "Aperitivos y Aperol"),
+        ("Tomate Picante", "Cocktail Bar"),
     ],
 )
 def test_a_section_that_is_clearly_about_drinks_still_decides(matcher, csv_maps, name, section):

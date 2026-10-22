@@ -66,8 +66,8 @@ MENU_ALCOHOL_NAME_WORDS = frozenset(
 # and Sour Roll», la «Sopa Hot Sour» y un roll «Tako Sour» no son un pisco sour; «Hamburguesa la Corona» y las
 # quesadillas «Corona Sacra» no son la cerveza; Negroni es también un salame y «cristal», un latte. Una piña colada es
 # también un jugo, un batido, un té de burbujas o un helado (10 de las 27 de la base real). La vaina es también la de
-# los porotos y la de vainilla, la algarrobina un jarabe («Tres Leches Algarrobina») y «Combo Eros Ramazzotti», un combo
-# de paninos.
+# los porotos, la algarrobina un jarabe («Tres Leches Algarrobina») y «Combo Eros Ramazzotti», un combo de paninos: solo
+# los libra la frase, no el concepto (un trago de algarrobina que el kNN pone en postres sigue siendo un trago).
 _MENU_FOOD_SENSES: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "margarita": (("pizza", "pizzeta"), ("pizza",)),
     "sour": (("cream", "sweet", "hot", "roll", "papas"), ("salsas", "sushi", "pescados-mariscos", "sopas")),
@@ -78,8 +78,8 @@ _MENU_FOOD_SENSES: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
         ("sin alcohol", "virgin", "jugo", "smoothie", "shake", "milkshake", "tea", "helado"),
         ("jugos", "helados"),
     ),
-    "vaina": (("edamame", "vainilla", "en vaina", "con vaina", "sin vaina"), ()),
-    "algarrobina": (("tres leches", "torta", "helado", "postre"), ("postres", "pasteleria", "helados")),
+    "vaina": (("edamame", "en vaina", "con vaina", "sin vaina"), ()),
+    "algarrobina": (("tres leches", "torta", "helado", "postre"), ()),
     "ramazzotti": (("eros",), ()),
 }
 _MENU_ALCOHOL_NAMES = KeywordMatcher(
