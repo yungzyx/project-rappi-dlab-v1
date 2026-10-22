@@ -132,8 +132,8 @@ def test_unmet_does_not_depend_on_the_price_cap(catalog, monkeypatch):
     mide sin el filtro de precio. Antes, con tope, lo que el vertical sí tiene a otro precio quedaba «sin resultado»."""
     embedder = HashEmbedder()
     embed_search_documents(catalog, embedder)
-    monkeypatch.setattr(hybrid, "thresholds", lambda: {"licores": 0.2})
-    query = "torobayo xyz"  # sin concepto ni coincidencia estricta: decide el coseno
+    monkeypatch.setattr(hybrid, "UNNAMED_TAU", 0.2)
+    query = "torobayo xyz"  # sin concepto, ocasión ni coincidencia estricta: decide el coseno contra UNNAMED_TAU
 
     free = retrieve(catalog, "licores", query, embedder)
     capped = retrieve(catalog, "licores", query, embedder, filters=Filters(price_max=2000))
