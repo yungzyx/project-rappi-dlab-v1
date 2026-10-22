@@ -85,7 +85,7 @@ cd rappi-ia
 DATABASE_URL=postgresql:///rappi_staging .venv/bin/python -m rappi_ia migrate
 DATABASE_URL=postgresql:///rappi_staging HF_HUB_OFFLINE=1 API_PREWARM=0 \
   .venv/bin/python -m uvicorn rappi_ia.api.app:app --host 127.0.0.1 --port 8020
-# 2. En otra terminal: la muestra (~1,6 MB) y el HTML (~4 MB), con una copia en el Escritorio
+# 2. En otra terminal: la muestra (~1,6 MB) y el HTML (~15 MB, con las fotos), con una copia en el Escritorio
 cd prototipo-app
 SNAPSHOT_ALLOW_WRITES=1 DEMO_API_URL=http://127.0.0.1:8020 npm run demo:snapshot
 DEMO_HTML_COPY="$HOME/Desktop/Prototipo MVP.html" npm run demo:html
@@ -93,7 +93,7 @@ DEMO_HTML_COPY="$HOME/Desktop/Prototipo MVP.html" npm run demo:html
 
 `demo:snapshot` muestra la API que va a usar antes de escribir nada y se niega con el puerto 8000 (la API de `make mvp`, sobre `rappi`) o con un host que no sea de este equipo; `SNAPSHOT_ALLOW_MAIN_API=1` lo permite, solo si esa API corre sobre una copia.
 
-Con la muestra ya grabada, `npm run demo:html` basta para volver a armar el HTML tras un cambio en la app.
+`demo:html` baja primero una miniatura de cada foto de la muestra (~5.200) del CDN de Rappi, 4 a la vez y con pausa: la primera vez tarda unos 30 minutos; después quedan en `.demo-cache/` y solo baja las nuevas. Las mete en el HTML como data URI (`src/api/offline/photos.json`); una foto que no se puede bajar queda con el cuadro gris. Con la muestra ya grabada, `npm run demo:html` basta para volver a armar el HTML tras un cambio en la app.
 
 ## Modo demo: Rappi hoy y Prototipo final
 

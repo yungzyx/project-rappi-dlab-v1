@@ -27,7 +27,7 @@ const STORES_PER_VERTICAL = 3
 const AISLES_PER_STORE = 6
 const TURBO_AISLES = 14 // la tienda de la pantalla Turbo: más pasillos, es la que más se recorre
 const RESTAURANTS = 16
-const CUISINES = ['Pizzas', 'Hamburguesa', 'Sushi', 'Experiencias Culinarias']
+const CUISINES = ['Pizzas', 'Hamburguesa', 'Experiencias Culinarias']
 const DEAL_VERTICALS = ['supermercado', 'licores', 'conveniencia', 'mall', 'chocolateria', 'turbo', 'farmacia']
 // Las ideas del buscador (SearchSections) y búsquedas comunes; cada una se graba tal cual responde la API.
 const QUERIES = [
