@@ -170,15 +170,16 @@ def catalog_items_for_assignment(conn: Connection) -> list[tuple[str, str, str |
     ).fetchall()
 
 
-def menu_items_for_assignment(conn: Connection) -> list[tuple[str, str, str | None, list[str]]]:
-    """(id, nombre, sección, cocinas del restaurante)."""
+def menu_items_for_assignment(conn: Connection) -> list[tuple[str, str, str | None, list[str], str]]:
+    """(id, nombre, sección, cocinas del restaurante, descripción)."""
     return conn.execute(
         """SELECT mi.item_id::text, mi.name, ms.name,
-                  coalesce(array_agg(rc.cuisine ORDER BY rc.cuisine) FILTER (WHERE rc.cuisine IS NOT NULL), '{}')
+                  coalesce(array_agg(rc.cuisine ORDER BY rc.cuisine) FILTER (WHERE rc.cuisine IS NOT NULL), '{}'),
+                  coalesce(mi.description, '')
            FROM menu_items mi
            LEFT JOIN menu_sections ms ON ms.store_id = mi.store_id AND ms.section_id = mi.section_id
            LEFT JOIN restaurant_cuisines rc ON rc.store_id = mi.store_id
-           GROUP BY mi.item_id, mi.name, ms.name"""
+           GROUP BY mi.item_id, mi.name, ms.name, mi.description"""
     ).fetchall()
 
 

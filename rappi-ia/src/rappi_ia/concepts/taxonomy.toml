@@ -206,7 +206,9 @@ parent = "alcohol"
 name = "Licores y aperitivos"
 emoji = "🍹"
 age_restricted = true
-keywords = ["licor", "crema de licor", "aperitivo", "aperol", "campari", "fernet", "jägermeister", "jagermeister", "baileys", "amaretto", "cognac", "coñac", "brandy", "aguardiente", "vermouth", "martini", "anís", "araucano", "manzanilla licor", "soju", "makgeolli"]
+keywords = ["licor", "crema de licor", "aperitivo", "aperol", "campari", "fernet", "jägermeister", "jagermeister", "baileys", "amaretto", "amareto", "cognac", "coñac", "brandy", "aguardiente", "vermouth", "martini", "anís", "araucano", "manzanilla licor", "soju", "makgeolli", "ramazzotti"]
+# «Combo Eros Ramazzotti» es un combo de paninos con el nombre del cantante.
+avoid = ["eros ramazzotti"]
 
 [[concept]]
 id = "cocteles"
@@ -214,7 +216,12 @@ parent = "alcohol"
 name = "Cócteles listos"
 emoji = "🍹"
 age_restricted = true
-keywords = ["cóctel", "coctel", "cocktail", "hard seltzer", "seltzer", "mojito", "margarita", "spritz", "ready to drink"]
+# «cocktelería» es una sección de tragos con otra ortografía. Desde «tom collins», los cócteles que los menús nombran
+# sin decir alcohol («Vaina», «Algarrobina»; base real del 22-10-2026). Fuera, los que en los menús o en el catálogo son
+# otra cosa: «mule» (tazones de cobre), «negroni» (salames y tomates), «chilcano» (una sopa), «manhattan»
+# (hamburguesas), «cola de mono» (té y helado), «piña colada» (jugos y helados), «terremoto» y «michelada» (helados,
+# salsas; las guardias de ofertas ya los bloquean por el nombre).
+keywords = ["cóctel", "coctel", "cocktail", "cocktelería", "hard seltzer", "seltzer", "mojito", "margarita", "spritz", "ready to drink", "tom collins", "vaina", "algarrobina", "daiquiri", "daikiri", "caipiriña", "caipirinha", "caipiroska", "bloody mary", "cuba libre", "kir royal", "ruso blanco", "ruso negro", "cosmopolitan", "clavo oxidado"]
 # Score es una marca de energéticas: «Score Mojito» no es un mojito.
 avoid = ["score"]
 

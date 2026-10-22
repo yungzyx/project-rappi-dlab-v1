@@ -51,6 +51,8 @@ guardia de secciones (`alcohol_section`) no ve «Aperitivos».
   la taxonomía, elegidas con la base (un nombre que en el catálogo o en los menús es otra cosa no entra: «mule» son
   tazones de cobre, «negroni» es una marca de salames y tomates, «chilcano» es una sopa, «manhattan» una hamburguesa,
   «cola de mono» un sabor de té y helado).
+- Agregado tras la primera medición: el kNN no saca del alcohol a un plato que la sección puso ahí («Jengibre Sour»
+  de «Aperitivos» pasaba a salsas y se podía ofrecer), y «cocktelería» (otra ortografía) es una sección de tragos.
 - Medición, en solo lectura: reglas y kNN en memoria con el código de main y con el de la rama sobre `rappi`; cada
   plato o producto que cambia de concepto se clasifica a mano; además, la lista completa de los platos de secciones
   de aperitivo, tragos o bar, y para todos los platos, cuáles pasan a poder ofrecerse (concepto, nombre y sección

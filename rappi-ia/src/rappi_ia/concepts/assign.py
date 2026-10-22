@@ -19,6 +19,7 @@ import re
 from dataclasses import dataclass, replace
 from functools import cache
 
+from ..offers.guards import alcohol_in_name, alcohol_section
 from ..text import FILLER_WORDS, tokens
 from .matcher import KeywordMatcher, Match
 from .taxonomy import Concept, Taxonomy, guarded_concepts, keeps_sensitive, load_taxonomy
@@ -28,6 +29,15 @@ RULE_CONFIDENCE = 0.7  # confianza de una regla por palabra clave sobre el nombr
 # Lo que un nombre de plato impone sobre su sección. Sin «frescos»: un ingrediente en el nombre («Mechada palta mayo»,
 # «Phad Kee Maoo Vacuno») no dice qué plato es; la sección sí (juicio de precisión del 06-10-2026).
 MENU_GROUPS = frozenset({"alcohol", "bebidas", "snacks", "dulces", "despensa", "comida"})
+# Procedencia de un concepto que dio el nombre de la sección del plato (`_from_section_name`).
+SECTION_NAME = "seccion-nombre:"
+# Palabras que llevan una sección a alcohol y que en un menú chileno también son comida: «Aperitivos» es la comida para
+# picar o el trago de antes de comer, y «Cocktail» en singular, comida de fiesta («Emp. queso horno cocktail»). En
+# plural, «cócteles» son tragos.
+AMBIGUOUS_SECTION_WORDS = frozenset({"aperitivo", "aperitivos", "coctel", "cocktail"})
+# Lo que dice que un plato de esas secciones es comida sólida. Sin frutas, lácteos ni huevos: también están en los
+# tragos («Mango Sour», «Piña Colada», «Ruso Blanco», la yema de la «Vaina»).
+SOLID_FOOD_CONCEPTS = frozenset({"quesos", "fiambres", "verduras"})
 # La cocina del local es la pista más débil: solo cuenta con un mapeo muy confiable (Sushi → sushi). Con mapeos
 # dudosos (Americana → pizza, Asiática → sushi) acertaba el 62 %.
 CUISINE_MIN_CONFIDENCE = 0.85
@@ -258,6 +268,7 @@ def assign_menu_item(
     section_map: dict[str, MappedName],
     cuisine_map: dict[str, MappedName],
     matcher: KeywordMatcher,
+    description: str = "",
 ) -> Assignment | None:
     by_name = _from_rule("menu_item", item_id, name, matcher, exclude=NAME_REFINES_CONCEPTS)
     if by_name and by_name.concept_id in INGREDIENT_CONCEPTS:
@@ -269,7 +280,7 @@ def assign_menu_item(
         return mapped
     if by_name and by_name.concept_id in _food_concepts():
         return by_name
-    by_section = _from_section_name(item_id, section, matcher)
+    by_section = _from_section_name(item_id, section, matcher, name, description)
     if by_section or by_name is None:
         return by_section
     # Un nombre que no es comida («Aros de Calamar» → joyería) en un local de cocina conocida: la cocina, aunque sea
@@ -277,12 +288,51 @@ def assign_menu_item(
     return _from_menu_maps(item_id, None, cuisines, {}, cuisine_map, MIN_MAP_CONFIDENCE) or by_name
 
 
-def _from_section_name(item_id: str, section: str | None, matcher: KeywordMatcher) -> Assignment | None:
-    """Una sección sin mapeo que nombra un plato («Empanadas de Horno», «Pizzas Familiares») dice qué son sus platos."""
+def _from_section_name(
+    item_id: str, section: str | None, matcher: KeywordMatcher, name: str = "", description: str = ""
+) -> Assignment | None:
+    """Una sección sin mapeo que nombra un plato («Empanadas de Horno», «Pizzas Familiares») dice qué son sus platos.
+    Salvo en una sección que dice alcohol con una palabra que también es comida (`_ambiguous_alcohol`), para un plato
+    que es comida sólida y no dice alcohol (`_solid_food`): «Queso Brie» en «Aperitivo» no es un licor. Lo demás de esas
+    secciones sigue con su alcohol: traen cócteles que no dicen serlo («Primavera», «Bitter Batido») y que solo el
+    concepto protege de las ofertas, porque la guardia de secciones no ve «Aperitivos»."""
     match = matcher.best(section, NAME_REFINES_CONCEPTS) if section else None
     if match is None or match.target not in _food_concepts() or match.target in INGREDIENT_CONCEPTS:
         return None
-    return Assignment("menu_item", item_id, match.target, "regla", RULE_CONFIDENCE, None, f"seccion-nombre:{section}")
+    if _ambiguous_alcohol(section, match) and _solid_food(name, description, matcher):
+        return None
+    return Assignment("menu_item", item_id, match.target, "regla", RULE_CONFIDENCE, None, f"{SECTION_NAME}{section}")
+
+
+def _ambiguous_alcohol(section: str, match: Match) -> bool:
+    """Si la sección dice alcohol solo por una palabra que también es comida (`AMBIGUOUS_SECTION_WORDS`) y las guardias
+    de ofertas no la ven como de tragos («Aperitivos & Tragos» sí lo es)."""
+    return (
+        load_taxonomy().concepts[match.target].parent == "alcohol"
+        and tokens(section)[match.position] in AMBIGUOUS_SECTION_WORDS
+        and not alcohol_section(section)
+    )
+
+
+def _solid_food(name: str, description: str, matcher: KeywordMatcher) -> bool:
+    """Si el nombre del plato dice comida sólida (`SOLID_FOOD_CONCEPTS`: «Queso», «Chorizo», «Papas») y ni el nombre ni
+    la descripción dicen alcohol (`_says_alcohol`). «Pepino Tonic» con gin en la descripción es un trago."""
+    found = matcher.best(name)
+    return (
+        found is not None
+        and found.target in SOLID_FOOD_CONCEPTS
+        and not any(_says_alcohol(text, matcher) for text in (name, description))
+    )
+
+
+def _says_alcohol(text: str, matcher: KeywordMatcher) -> bool:
+    """Una keyword de alcohol de la taxonomía, una palabra de alcohol de las guardias de menús («sour», «schop»,
+    «michelada») o una graduación. Sin las palabras ambiguas (`AMBIGUOUS_SECTION_WORDS`): «Emp. queso horno cocktail»
+    es una empanada de fiesta e «ideal como aperitivo» describe también comida."""
+    words = " ".join(word for word in tokens(text) if word not in AMBIGUOUS_SECTION_WORDS)
+    return bool(
+        matcher.best(words, exclude=_not_alcohol()) or alcohol_strength(text) or alcohol_in_name("menu_item", text)
+    )
 
 
 @cache

@@ -31,8 +31,10 @@ def build_concepts(conn: Connection, embedder: TextEmbedder | None = None) -> di
         if assignment:
             assignments.append(assignment)
     catalog_assigned = len(assignments)
-    for item_id, name, section, cuisines in store.menu_items_for_assignment(conn):
-        assignment = assign_menu_item(item_id, name, section, cuisines, maps["seccion_menu"], maps["cocina"], matcher)
+    for item_id, name, section, cuisines, description in store.menu_items_for_assignment(conn):
+        assignment = assign_menu_item(
+            item_id, name, section, cuisines, maps["seccion_menu"], maps["cocina"], matcher, description
+        )
         if assignment:
             assignments.append(assignment)
 
