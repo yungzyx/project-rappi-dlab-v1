@@ -7,7 +7,26 @@ import { addEvents, readState, writeState } from './state'
 const DAY_MS = 86_400_000
 const ALL_CATALOG = ['restaurantes', 'turbo', 'supermercado', 'conveniencia', 'mall', 'chocolateria']
 
-/** Las personas del panel: con qué verticales pidió (`orders`), qué abrió (`opens`) o qué perfil de gusto tiene. */
+// «¿Volvemos a…?» necesita semanas de historial: un plato pedido cada 7 días hasta hace 24 (y pedidos recientes en
+// otras verticales), o Turbo en 3 días hasta hace 40 mientras sigue pidiendo en restaurantes (offers/winback.py).
+const HABIT_CONCEPTS = ['sushi', 'pizza', 'hamburguesa', 'empanadas']
+const STOPPED_DISH = [
+  ...[45, 38, 31, 24].map((days) => ['restaurantes', days, 'habito']),
+  ['turbo', 3],
+  ['supermercado', 1],
+]
+const STOPPED_TURBO = [
+  ['turbo', 60],
+  ['turbo', 50],
+  ['turbo', 40],
+  ['restaurantes', 6],
+  ['restaurantes', 2],
+]
+
+/**
+ * Las personas del panel: con qué verticales pidió (`orders`, uno cada dos días, o `plan`: `[vertical, hace cuántos
+ * días, clave]`, donde la misma clave repite el producto), qué abrió (`opens`) o qué perfil de gusto tiene.
+ */
 export function personas(snapshot) {
   const tastes = Object.entries(snapshot.meta.profiles ?? {})
     .filter(([id]) => snapshot.tastes?.[id])
@@ -28,19 +47,35 @@ export function personas(snapshot) {
       orders: ['restaurantes', 'farmacia'],
       opens: Array.from({ length: 6 }, () => 'farmacia'),
     },
+    { id: 'volver-plato', label: 'Dejó de pedir su plato de siempre', plan: STOPPED_DISH, habit: HABIT_CONCEPTS },
+    { id: 'volver-turbo', label: 'Dejó Turbo hace 40 días', plan: STOPPED_TURBO },
     ...tastes,
   ]
 }
 
+/** Si la tienda o el restaurante del producto está en la muestra (su «Ver producto» abre algo). */
+const inSample = (snapshot, p) =>
+  Boolean(
+    p.entity_type === 'menu_item' ? snapshot.catalog?.menus?.[p.store_id] : snapshot.catalog?.stores?.[p.store_id],
+  )
+
 /**
  * Un producto de la muestra para un pedido de esa vertical: el primero con concepto que el agente puede ofrecer, de un
- * concepto que la persona no pidió ya (`used`): si no, dos pedidos del mismo concepto ya serían un «¿Repetimos?».
+ * concepto que la persona no pidió ya (`used`): si no, dos pedidos del mismo concepto ya serían un «¿Repetimos?». Mejor
+ * de una tienda que la muestra tiene, y de los conceptos de `prefer` si hay.
  */
-function sampleOf(snapshot, vertical, used) {
+function sampleOf(snapshot, vertical, used, prefer = []) {
   const { concepts } = snapshot.meta
   const ofVertical = snapshot.pool.filter((p) => p.vertical === vertical && p.concept && p.store_id)
   const fresh = ofVertical.filter((p) => !used.has(p.concept))
-  const found = fresh.find((p) => offerableProduct(p, concepts)) ?? fresh[0] ?? ofVertical[0]
+  const good = fresh.filter((p) => offerableProduct(p, concepts))
+  const shown = good.filter((p) => inSample(snapshot, p))
+  const found =
+    prefer.map((c) => shown.find((p) => p.concept === c)).find(Boolean) ??
+    shown[0] ??
+    good[0] ??
+    fresh[0] ??
+    ofVertical[0]
   if (found) used.add(found.concept)
   return found
 }
@@ -62,13 +97,21 @@ const orderOf = (product, ts, i) => ({
   ],
 })
 
-/** El historial de una persona (`{ orders, events }`): pedidos de los últimos días, uno cada dos días. */
+/** El historial de una persona (`{ orders, events }`): sus pedidos (uno cada dos días, salvo con `plan`) y toques. */
 export function personaHistory(snapshot, persona, now = Date.now()) {
   const used = new Set()
-  const products = persona.taste
-    ? snapshot.tastes[persona.taste].seed
-    : (persona.orders ?? []).map((vertical) => sampleOf(snapshot, vertical, used)).filter(Boolean)
-  const orders = products.map((product, i) => orderOf(product, now - (products.length - i) * 2 * DAY_MS, i))
+  const byKey = new Map()
+  const plan = persona.taste
+    ? snapshot.tastes[persona.taste].seed.map((product, i, all) => [product, (all.length - i) * 2])
+    : (persona.plan ?? (persona.orders ?? []).map((vertical, i, all) => [vertical, (all.length - i) * 2])).map(
+        ([vertical, days, key]) => {
+          if (key && !byKey.has(key)) byKey.set(key, sampleOf(snapshot, vertical, used, persona.habit))
+          return [key ? byKey.get(key) : sampleOf(snapshot, vertical, used), days]
+        },
+      )
+  const orders = plan
+    .filter(([product]) => product)
+    .map(([product, days], i) => orderOf(product, now - days * DAY_MS, i))
   const events = (persona.opens ?? []).map((vertical, i) => ({
     type: 'vertical_open',
     ts: now - (i + 1) * 3_600_000,

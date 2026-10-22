@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest'
 import { homeVerticals, targetStep } from './motor'
+import { makeOffer } from './offers'
 import { ladderReadout, personaHistory, personas } from './personas'
 import { profileOffer, tastesReply } from './tastes'
 import { COMBOS, LABELS, META, product } from './testMeta'
@@ -64,4 +65,43 @@ test('una persona de la escalera pide un concepto distinto en cada vertical (sin
   const all = personas(withClash).find((p) => p.id === 'todo')
   const concepts = personaHistory(withClash, all, NOW).orders.map((o) => o.lines[0].concept_id)
   expect(concepts).toEqual(['c0', 'c1', 'c2', 'c3', 'c4', 'c5'])
+})
+
+test('«Dejó de pedir su plato de siempre» y «Dejó Turbo hace 40 días» reciben «¿Volvemos a…?» y no «¿Repetimos?»', () => {
+  const dishes = [
+    product(30, { name: 'Roll de salmón', concept: 'sushi', vertical: 'restaurantes', entity_type: 'menu_item' }),
+    product(31, { name: 'Pizza napolitana', concept: 'pizza', vertical: 'restaurantes', entity_type: 'menu_item' }),
+  ]
+  const turbo = ['cafe', 'galletas', 'juguetes'].map((concept, i) => product(32 + i, { concept, vertical: 'turbo' }))
+  const pool = [...dishes, ...turbo, product(40, { concept: 'galletas' })]
+  const habits = { ...snapshot, pool, byEntity: new Map(pool.map((p) => [`${p.entity_type}:${p.entity_id}`, p])) }
+  const offerFor = (id, moment) => {
+    const history = personaHistory(
+      habits,
+      personas(habits).find((p) => p.id === id),
+      NOW,
+    )
+    return makeOffer(habits, { userId: 'proto-test', ...history }, NOW, { moment })
+  }
+  expect(offerFor('volver-plato', 'volver')).toMatchObject({
+    text: '¿Volvemos a sushi? La última vez que pediste sushi fue hace 24 días.',
+    products: [dishes[0]],
+  })
+  expect(offerFor('volver-turbo', 'volver')).toMatchObject({
+    text: '¿Volvemos a Turbo? Tu último pedido ahí fue hace 40 días.',
+    products: [turbo[2]],
+  })
+  expect(offerFor('volver-plato', 'recompra')).toBeNull()
+  expect(offerFor('volver-turbo', 'recompra')).toBeNull()
+})
+
+test('el plato de siempre es de un concepto de hábito y de un restaurante que está en la muestra', () => {
+  const dish = (id, concept, store) =>
+    product(id, { concept, vertical: 'restaurantes', entity_type: 'menu_item', store_id: store })
+  const pool = [dish(50, 'pizza', 7), dish(51, 'hamburguesa', 8), dish(52, 'sushi', 8)]
+  const withMenus = { ...snapshot, pool, catalog: { menus: { 8: {} }, stores: {} } }
+  const persona = personas(withMenus).find((p) => p.id === 'volver-plato')
+  const concepts = personaHistory(withMenus, persona, NOW).orders.map((o) => o.lines[0].concept_id)
+  // La pizza no tiene su restaurante en la muestra; la hamburguesa va antes en ella, pero el sushi, en los hábitos.
+  expect(concepts.slice(0, 4)).toEqual(['sushi', 'sushi', 'sushi', 'sushi'])
 })

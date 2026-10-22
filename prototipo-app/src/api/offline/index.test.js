@@ -53,7 +53,7 @@ test('la sesión, los eventos y los pedidos ordenan la Home; «Rappi hoy» no; �
 
 test('una oferta sin nada que decir es un 204; una ruta desconocida, un 404', () => {
   expect(call('POST', '/agent/offer', { moment: 'recompra', context: {} })).toEqual({ status: 204, body: null })
-  // «¿Volvemos a…?» necesita semanas sin pedir algo: sin conexión nunca hay
+  // «¿Volvemos a…?» necesita semanas de pedidos (el panel de la demo siembra personas con ellas)
   expect(call('POST', '/agent/offer', { moment: 'volver', context: {} })).toEqual({ status: 204, body: null })
   expect(call('GET', '/analytics/kpis').status).toBe(404)
   expect(call('GET', '/health').body).toMatchObject({ ok: true, documentos: 3 })
