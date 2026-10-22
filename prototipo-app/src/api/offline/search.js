@@ -139,7 +139,7 @@ export function detectConcepts(meta, q) {
   return keywordMatches(index.alone, content).slice(0, 1)
 }
 
-/** Si la consulta nombra una ocasión («algo para el carrete»: agent/tools.py, named_occasion). */
+/** Si la consulta nombra una ocasión («algo para el carrete»: retrieval/hybrid.py, named_occasion). */
 const namesOccasion = (meta, q) => keywordMatches(indexOf(meta).occasions, normalize(q).split(' ')).length > 0
 
 // Palabras que el nombre de un producto no necesita repetir (agent/tools.py: _NAME_SKIP).

@@ -90,6 +90,9 @@ describe('guardias (offers/guards.py)', () => {
     expect(offerableProduct({ ...coffee, concept: 'panales' }, CONCEPTS)).toBe(false)
     expect(offerableProduct({ ...coffee, name: 'Soju uva verde' }, CONCEPTS)).toBe(false)
     expect(offerableProduct({ ...coffee, name: 'Galletas de Vino' }, CONCEPTS)).toBe(false)
+    // Los cócteles que un menú nombra sin decir alcohol (#130), aunque su concepto sea otro.
+    expect(offerableProduct({ ...coffee, name: 'Tom Collins' }, CONCEPTS)).toBe(false)
+    expect(offerableProduct({ ...coffee, name: 'Clavo oxidado de la casa' }, CONCEPTS)).toBe(false)
     expect(offerableProduct({ ...coffee, name: 'Juguete para Bebés', concept: 'juguetes' }, CONCEPTS)).toBe(false)
     // Palabra entera: «ron» no está en «ronda», ni «gin» en «ginger».
     expect(offerableProduct({ ...coffee, name: 'Galletas Ronda ginger' }, CONCEPTS)).toBe(true)

@@ -19,11 +19,15 @@ import {
 } from './winback'
 
 // offers/guards.py: palabras de un nombre que dicen alcohol o bebé aunque la tienda no lo marque (palabra entera, con
-// su plural). La lista de los platos es más larga en el backend; aquí basta con la del catálogo más los tragos.
+// su plural). La lista de los platos es más larga en el backend; aquí basta con la del catálogo más los tragos que no
+// son también comida. Los que sí («vaina», «algarrobina», «margarita», «sour»…) el backend los libra por la frase o el
+// concepto del plato; aquí los cubre el concepto (cócteles y licores no se ofrecen).
 const ALCOHOL_WORDS = [
   ...['soju', 'makgeolli', 'umeshu', 'cerveza', 'vino', 'whisky', 'pisco', 'ron', 'vodka', 'gin', 'tequila'],
   ...['licor', 'aperitivo', 'espumante', 'champagne', 'sidra', 'sangria', 'michelada', 'schop', 'piscola'],
-  ...['mojito', 'terremoto', 'spritz', 'negroni', 'caipirinha', 'daiquiri'],
+  ...['mojito', 'terremoto', 'spritz', 'negroni', 'caipirinha', 'daiquiri', 'daikiri', 'caipiroska'],
+  ...['tom collins', 'bloody mary', 'cuba libre', 'kir royal', 'ruso blanco', 'ruso negro', 'cosmopolitan'],
+  ...['clavo oxidado'],
 ]
 const BABY_WORDS = ['bebe', 'guagua']
 const wordsIn = (list) => new RegExp(`\\b(?:${list.join('|')})(?:s|es)?\\b`)
