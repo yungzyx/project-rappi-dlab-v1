@@ -13,7 +13,8 @@ const DIST = `${ROOT}dist-demo/`
 const OUT = `${DIST}Prototipo MVP.html`
 const SNAPSHOT = `${ROOT}src/api/offline/snapshot.json`
 const PHOTOS = `${ROOT}src/api/offline/photos.json`
-const MAX_BYTES = 15 * 1024 * 1024
+// En MB como los cuenta el Finder (1 MB = 10⁶ bytes): el tope es lo que la persona ve junto al archivo.
+const MAX_BYTES = 15_000_000
 
 if (!existsSync(SNAPSHOT)) {
   console.error('Falta la muestra del catálogo (src/api/offline/snapshot.json): corre antes `npm run demo:snapshot`.')
@@ -22,7 +23,7 @@ if (!existsSync(SNAPSHOT)) {
 
 console.log('Fotos de la muestra…')
 const photos = await embedPhotos(SNAPSHOT, PHOTOS)
-const mb = (bytes) => `${(bytes / 1024 / 1024).toFixed(1)} MB`
+const mb = (bytes) => `${(bytes / 1e6).toFixed(1)} MB`
 console.log(`  ${photos.embedded} fotos adentro (${mb(photos.bytes)}); ${photos.missing} sin bajar, con el cuadro gris`)
 
 await build({ root: ROOT, mode: 'demo', logLevel: 'warn' })
@@ -63,7 +64,7 @@ writeFileSync(OUT, html)
 const size = Buffer.byteLength(html)
 console.log(`Listo: ${OUT} (${mb(size)})`)
 if (size > MAX_BYTES) {
-  console.error(`Pesa más de ${MAX_BYTES / 1024 / 1024} MB: achica la muestra (scripts/demo-snapshot.mjs).`)
+  console.error(`Pesa más de ${mb(MAX_BYTES)}: achica la muestra (scripts/demo-snapshot.mjs).`)
   process.exitCode = 1
 }
 if (process.env.DEMO_HTML_COPY) {
