@@ -281,15 +281,24 @@ export default function LiveHomeFeed({ push, active = true }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active])
 
+  // La generación del perfil vigente, para lo que llega después de pedirlo.
+  const generationNow = useRef(profile.resets)
+  useEffect(() => {
+    generationNow.current = profile.resets
+  }, [profile.resets])
+
   // «¿Repetimos?» se pide cada vez que la Home vuelve a estar arriba (un pedido nuevo cambia lo que le toca). Si no hay
   // (204), «¿Volvemos a…?», una vez por pestaña y por pedido: la API mantiene la misma invitación una semana, así que se
   // guarda para que no cambie ni desaparezca al volver a la Home; un pedido nuevo (o «Olvidar») la vuelve a pedir, para
   // no invitar a volver a lo que se acaba de comprar. La recompra siempre gana. Sin ninguna, sin red o con una API que no
   // conoce el momento, no hay bloque; en silencio, o si ya dijeron «Después», no se pide.
+  // Tras «Olvidar» no pide (como useVerticalOrder): el buscador olvida antes de que el servidor borre, y pedir ahí traía
+  // la misma oferta y otra `suggestion_shown`; lo que venía en camino tampoco se muestra ni se cuenta. Si el borrado sale
+  // bien la app se recarga; si falla, pide al volver a la Home.
   useEffect(() => {
     if (!active || silent() || session.repeatLater) return undefined
     let current = true
-    const generation = profile.resets
+    const generation = generationNow.current
     const key = `${generation}|${lastOrder}`
     const winback = () => {
       if (session.winback?.key === key) return session.winback.offer
@@ -303,7 +312,7 @@ export default function LiveHomeFeed({ push, active = true }) {
       .then((made) => (made?.products.length ? made : winback()))
       .then(
         (made) => {
-          if (!current) return
+          if (!current || generation !== generationNow.current) return
           const shown = made?.products.length ? made : null
           if (shown)
             noteShown(events.track, shown.products, {
@@ -319,7 +328,7 @@ export default function LiveHomeFeed({ push, active = true }) {
     return () => {
       current = false
     }
-  }, [active, events.track, profile.resets, lastOrder])
+  }, [active, events.track, lastOrder])
 
   // «Después» deja el bloque para otra vez. En «¿Volvemos a…?» se registra el descarte (con su tipo, como la mostrada):
   // con dos, la API deja de ofrecer esa invitación.

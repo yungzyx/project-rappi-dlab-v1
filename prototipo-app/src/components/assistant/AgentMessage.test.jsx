@@ -1,5 +1,5 @@
 import { StrictMode } from 'react'
-import { cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { toMessage } from '../../api/client'
 import { fixture, stubApi } from '../../api/testing'
@@ -56,5 +56,51 @@ describe('reducir movimiento', () => {
     const response = fixture('agent-ask')
     mount(response, { animate: true })
     expect(screen.queryByText(response.text)).toBeNull()
+  })
+})
+
+// Lo que el panel tiene debajo de la respuesta no debe moverse mientras se escribe: la respuesta ocupa desde el primer
+// render el lugar que tendrá al terminar.
+describe('mientras se escribe, nada se mueve', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener() {}, removeEventListener() {} }))
+  })
+  afterEach(() => vi.useRealTimers())
+  /** Hasta que no quedan temporizadores: el texto ya se escribió entero. */
+  const finishTyping = async () => {
+    for (let i = 0; i < 100 && vi.getTimerCount() > 0; i++) await act(() => vi.advanceTimersByTimeAsync(250))
+  }
+
+  test('la burbuja reserva el texto entero: lo que falta escribir va invisible, sin ser texto de la página', async () => {
+    const response = fixture('agent-ask')
+    const { container } = mount(response, { animate: true })
+    const bubble = container.querySelector('.agent-msg-bubble')
+    const rest = () => bubble.querySelector('.agent-msg-rest')
+    expect(bubble.textContent).toBe('')
+    expect(rest().dataset.rest).toBe(response.text)
+
+    await act(() => vi.advanceTimersByTimeAsync(200))
+    expect(bubble.textContent.length).toBeGreaterThan(0)
+    expect(bubble.textContent + rest().dataset.rest).toBe(response.text)
+
+    await finishTyping()
+    expect(bubble.textContent).toBe(response.text)
+    expect(rest()).toBeNull()
+  })
+
+  test('las tarjetas ocupan su lugar desde el principio, pero no se ven ni se tocan hasta terminar el texto', async () => {
+    const response = fixture('agent-ask')
+    const { container } = mount(response, { animate: true })
+    const extras = container.querySelector('.agent-msg-extras')
+    expect(extras.classList.contains('is-pending')).toBe(true)
+    const add = () => screen.getAllByRole('button', { name: /^Agregar / })
+    expect(add().length).toBeGreaterThanOrEqual(response.products.length) // también las de la sugerencia
+    expect(add().every((button) => extras.contains(button))).toBe(true)
+    expect(extras.hasAttribute('inert')).toBe(true) // el navegador no los muestra al lector de pantalla ni al foco
+
+    await finishTyping()
+    expect(extras.classList.contains('is-pending')).toBe(false)
+    expect(extras.hasAttribute('inert')).toBe(false)
   })
 })
