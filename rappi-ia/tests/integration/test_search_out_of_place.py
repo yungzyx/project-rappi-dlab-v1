@@ -12,8 +12,12 @@ from rappi_ia.concepts.pipeline import build_concepts
 from rappi_ia.demo.seed import seed_demo
 from rappi_ia.embeddings.base import HashEmbedder
 from rappi_ia.embeddings.text_store import embed_search_documents
+from rappi_ia.retrieval import hybrid
 
-EXPRESS, TURBO, LIQUOR, MALL, PASTRY = 9201, 9301, 9401, 9601, 9806  # tiendas de `seed_demo`
+EXPRESS, TURBO, LIQUOR, MALL, CHOCOLATE, PASTRY = 9201, 9301, 9401, 9601, 9701, 9806  # tiendas de `seed_demo`
+# τ de cada vertical bajo los cosenos del HashEmbedder, como en la base real el 0,79 de Turbo queda bajo el 0,821 de
+# «sofá de tres cuerpos»: con el τ de la vertical, esas consultas no eran «sin resultado».
+LOW_TAUS = {"turbo": 0.05, "mall": 0.05, "chocolateria": 0.05}
 
 
 def _price(db, store_id: int, product_id: int, price: int) -> None:
@@ -80,6 +84,19 @@ def catalog(db):
     ]:
         add_product(db, pid, name, MALL, "Accesorios para exterior")
         _price(db, MALL, pid, 49990)
+    # Consultas que no nombran concepto ni ocasión, como en la base real: en Turbo, lo que calza «tres» o «colchón»
+    # sin ser lo pedido (un pisco Tres Erres, un yogur «colchón de frutas», un ratchet «2»). De control, un nombre de
+    # producto y una marca sin concepto que sí se venden, y un regalo en una chocolatería.
+    for pid, name, store, category in [
+        (99050, "Tres Erres Pisco Especial 35° 1 L (prueba)", TURBO, "Piscos"),
+        (99051, "Pack 2 ratchet 1 pulgada (prueba)", TURBO, None),
+        (99052, "Yogur griego colchón de frutas papaya (prueba)", TURBO, "Yogures"),
+        (99053, "Cuchuflíes rellenos de manjar 6 unidades (prueba)", TURBO, "Galletas"),
+        (99054, "Kinetic Sand arena mágica neón 227 g (prueba)", MALL, "Juguetes"),
+        (99055, "Caja de regalo con bombones surtidos (prueba)", CHOCOLATE, "Bombones"),
+    ]:
+        add_product(db, pid, name, store, category)
+        _price(db, store, pid, 3990)
     add_dish(db, 99101, "Panal de miel con crema (prueba)", PASTRY, "Postres")
     db.execute(
         """INSERT INTO menu_price_snapshots (run_id, item_id, price)
@@ -175,6 +192,47 @@ def test_a_plural_query_finds_the_singular_name(catalog):
 
     assert outcome.result.query_concepts == ["frutas"] and not outcome.result.concept_in_vertical
     assert [p.entity_id for p in outcome.products] == ["99006"]
+
+
+@pytest.mark.parametrize(
+    ("query", "unrelated"),
+    [
+        ("sofá de tres cuerpos", "99050"),  # el pisco Tres Erres calza «tres»
+        ("colchón 2 plazas", "99052"),  # el yogur «colchón de frutas» calza «colchón»
+    ],
+)
+def test_without_concept_or_occasion_the_vertical_tau_is_not_enough(catalog, monkeypatch, query, unrelated):
+    """En la base real, «sofá de tres cuerpos» en Turbo traía pisco Tres Erres (coseno 0,821, τ de Turbo 0,79) y
+    «colchón 2 plazas» un ratchet y pilas «2 unidades» (0,824). Si la consulta no nombra concepto ni ocasión y nada
+    calza todas sus palabras, el τ es el de la búsqueda agrupada (0,85), no el de la vertical."""
+    db, embedder = catalog
+    monkeypatch.setattr(hybrid, "thresholds", lambda: LOW_TAUS)
+
+    outcome = search_products(db, "turbo", query, None, embedder)
+
+    result = outcome.result
+    assert result.query_concepts == [] and result.strict_lexical_matches == 0
+    assert unrelated in {h.entity_id for h in result.hits}  # lo encontrado: lo que calza una palabra suelta
+    assert LOW_TAUS["turbo"] <= result.max_cosine < 0.85  # el τ de la vertical lo dejaba pasar
+    assert result.unmet and outcome.products == []
+
+
+@pytest.mark.parametrize(
+    ("vertical", "query", "product"),
+    [
+        ("turbo", "cuchuflíes", "99053"),  # un nombre de producto sin concepto: calza todas sus palabras
+        ("mall", "kinetic sand", "99054"),  # una marca sin concepto
+        ("chocolateria", "regalo para mi polola", "99055"),  # una ocasión sin concepto: decide el τ de la vertical
+    ],
+)
+def test_a_query_without_concept_still_finds_what_the_vertical_sells(catalog, monkeypatch, vertical, query, product):
+    db, embedder = catalog
+    monkeypatch.setattr(hybrid, "thresholds", lambda: LOW_TAUS)
+
+    outcome = search_products(db, vertical, query, None, embedder)
+
+    assert outcome.result.query_concepts == [] and not outcome.result.unmet
+    assert product in [p.entity_id for p in outcome.products]
 
 
 @pytest.mark.parametrize(

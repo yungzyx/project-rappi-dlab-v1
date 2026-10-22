@@ -12,8 +12,7 @@ from psycopg import Connection
 from rappi_scraper.storage.search import MIN_PRICE
 
 from .. import config
-from ..concepts.matcher import KeywordMatcher
-from ..concepts.taxonomy import Occasion, load_taxonomy
+from ..concepts.taxonomy import load_taxonomy
 from ..embeddings.base import TextEmbedder
 from ..motor.combos import SERVICES
 from ..motor.predict import step_signal, target_step
@@ -26,7 +25,7 @@ from ..offers.guards import (
     offerable_vertical,
     unofferable_subverticals,
 )
-from ..retrieval.hybrid import Filters, RetrievalResult, retrieve
+from ..retrieval.hybrid import Filters, RetrievalResult, named_occasion, retrieve
 from ..text import FILLER_WORDS, LEAFLET_WARNINGS, normalize, tokens
 from .verticals import ranked_verticals
 
@@ -484,7 +483,8 @@ def _focus(hits, result: RetrievalResult, capped: bool = False):
     """Si la consulta nombra conceptos (`result.query_concepts`), solo esos: pedir cigarrillos no debe traer cerveza.
 
     - "Sin resultado" no muestra nada, nombre o no un concepto: mostrar una pizza a quien pidió kebab, o los vecinos
-      de un coseno bajo τ, sería inventar una respuesta (y la demanda no se anotaría). Tampoco los pocos productos de
+      de un coseno bajo τ (sin concepto ni ocasión, el de la búsqueda agrupada: «sofá de tres cuerpos» en Turbo traía
+      pisco Tres Erres), sería inventar una respuesta (y la demanda no se anotaría). Tampoco los pocos productos de
       un concepto que el vertical casi no tiene (bajo TESTIMONIAL_SHARE), que suelen ser otra cosa con su etiqueta: un
       cable HDMI para «televisor 55 pulgadas» en Turbo, un pack de regalo para «cerveza en lata» en el Mall.
     - Con tope de precio (`capped`), si nada del concepto pedido cabe bajo el tope tampoco se muestra otra cosa:
@@ -514,19 +514,6 @@ def _focus(hits, result: RetrievalResult, capped: bool = False):
     if _broad_request(result.query, concepts):
         return hits
     return [h for h in hits if _names_query(h.content, result.query)]
-
-
-_OCCASIONS = None
-
-
-def named_occasion(q: str) -> Occasion | None:
-    """La ocasión que nombra la consulta («algo para el carrete»), con las keywords de taxonomy.toml."""
-    global _OCCASIONS
-    taxonomy = load_taxonomy()
-    if _OCCASIONS is None:
-        _OCCASIONS = KeywordMatcher((o.id, kw) for o in taxonomy.occasions.values() for kw in o.keywords)
-    match = _OCCASIONS.best(normalize(q))
-    return taxonomy.occasions[match.target] if match else None
 
 
 def _broad_request(query: str, concepts: list[str]) -> bool:

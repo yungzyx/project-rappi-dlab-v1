@@ -18,17 +18,12 @@ from rappi_scraper.storage.search import VERTICALS
 
 from ..concepts.taxonomy import load_taxonomy
 from ..embeddings.base import MemoizedQueryEmbedder, TextEmbedder
-from ..retrieval.hybrid import detect_concepts, has_words
+from ..retrieval.hybrid import UNNAMED_TAU, detect_concepts, has_words, named_occasion
 from .rappi_agent import PROTOTYPE_VERTICALS
-from .tools import Product, named_occasion, search_products
+from .tools import Product, search_products
 from .verticals import ranked_verticals
 
 TYPICAL_VERTICALS = 3  # con un concepto detectado, las verticales donde es más típico
-# Sin concepto ni ocasión, la consulta va a las 8 verticales y el τ de cada una (calibrado buscando solo en ella; 0,70
-# en el Mall y las chocolaterías) deja pasar vecinos sin relación: «xyzzy» traía un pastillero y libros. Si ninguna
-# vertical calza todas las palabras, una vertical solo entra con este coseno. Calibrado con e5 en la base real: las
-# negativas sin concepto de eval/queries.json llegan a 0,840 («sofá de tres cuerpos») y la basura a 0,801.
-ALL_VERTICALS_TAU = 0.85
 
 # Verticales que se buscan a la vez además de la de la conexión del request: cada una ocupa una conexión más del pool
 # (API_POOL_MAX, 10 por defecto) y un hilo mientras dura la búsqueda. Una consulta va a 3 o 4 verticales con concepto y
@@ -135,9 +130,9 @@ def search_each[T, V](
 
 
 def _related(outcomes: list) -> list:
-    """Sin concepto: las verticales que calzan todas las palabras; si ninguna, las de coseno ≥ ALL_VERTICALS_TAU."""
+    """Sin concepto: las verticales que calzan todas las palabras; si ninguna, las de coseno ≥ UNNAMED_TAU."""
     exact = [o for o in outcomes if o[1].result.strict_lexical_matches]
-    return exact or [o for o in outcomes if (o[1].result.max_cosine or 0.0) >= ALL_VERTICALS_TAU]
+    return exact or [o for o in outcomes if (o[1].result.max_cosine or 0.0) >= UNNAMED_TAU]
 
 
 def search_grouped(
@@ -153,7 +148,7 @@ def search_grouped(
     """Productos por vertical, con `limit` por grupo y solo los grupos que traen algo. Con un concepto detectado el
     orden es el de sus verticales típicas. Una ocasión sin concepto nombrado («algo para el carrete») se busca como
     el agente: sus conceptos (sin los sensibles: una ocasión no los nombra), en sus verticales típicas. Sin ninguno de
-    los dos, solo las verticales que calzan todas las palabras o, si ninguna, las muy cercanas (ALL_VERTICALS_TAU):
+    los dos, solo las verticales que calzan todas las palabras o, si ninguna, las muy cercanas (UNNAMED_TAU):
     primero las que calzan y luego por la cercanía vectorial. La pantalla actual (`current`), si trae productos, va
     siempre primero (el resto conserva su orden); sin productos, no aparece. `unmet` solo si ningún grupo trae
     productos. Con `spare` (las conexiones extra de la API), las verticales se buscan a la vez (`search_each`); el
@@ -187,5 +182,5 @@ def search_grouped(
     reason = next((o.result.unmet_reason for _, o in searched if o.result.unmet_reason), None)
     if reason is None and not concepts:
         best = max((o.result.max_cosine or 0.0 for _, o in searched), default=0.0)
-        reason = f"sin coincidencia léxica ni concepto; coseno máx {best:.3f} < τ {ALL_VERTICALS_TAU} en todas"
+        reason = f"sin coincidencia léxica ni concepto ni ocasión; coseno máx {best:.3f} < τ {UNNAMED_TAU} en todas"
     return GroupedResult(q, [], unmet=True, unmet_reason=reason)

@@ -220,7 +220,7 @@ def test_vertical_search_is_unchanged(client):
 
 
 def test_grouped_search_without_a_concept_is_unmet_for_nonsense_although_low_tau_verticals_pass(db):
-    embedder = _fixed_cosine(db, 0.8)  # sobre el τ del Mall, las chocolaterías y Turbo; bajo el de todas a la vez
+    embedder = _fixed_cosine(db, 0.8)  # sobre el τ del Mall, las chocolaterías y Turbo; bajo UNNAMED_TAU
 
     for query in ("xyzzy", "asdfgh"):
         result = search_grouped(db, query, embedder, current=None, limit=6)
