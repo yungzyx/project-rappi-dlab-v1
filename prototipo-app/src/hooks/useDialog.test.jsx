@@ -114,4 +114,18 @@ describe('useDialog con diálogos apilados', () => {
     expect(onClosePanel).toHaveBeenCalledTimes(1)
     expect(onCloseHidden).not.toHaveBeenCalled()
   })
+
+  test('Tab no cuenta los controles que no se pueden alcanzar (inertes u ocultos): del último visible vuelve al primero', () => {
+    render(
+      <Dialog name="panel" onClose={vi.fn()}>
+        <div inert>
+          <button type="button">esperando</button>
+        </div>
+      </Dialog>,
+    )
+    const [first, second] = [screen.getByText('panel uno'), screen.getByText('panel dos')]
+    second.focus()
+    expect(fireEvent.keyDown(second, { key: 'Tab' })).toBe(false) // si no, el navegador saltaría el inerte y saldría
+    expect(document.activeElement).toBe(first)
+  })
 })
