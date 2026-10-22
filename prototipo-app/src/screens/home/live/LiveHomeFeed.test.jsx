@@ -938,6 +938,22 @@ describe('Home del prototipo final', () => {
     expect(container.querySelector('.live-bubble p').textContent).toBe(POKE_LINE)
   })
 
+  test('«¿Por qué?» y los botones del globo ocupan su lugar mientras escribe, sin verse hasta terminar', async () => {
+    const { container } = await renderHome()
+    await advance(900 + 3400)
+    fireEvent.click(screen.getByRole('button', { name: /^Mochi:/ }))
+    await advance(400) // llegó la oferta y empezó a escribir
+    const more = () => container.querySelector('.live-bubble-more')
+    expect(container.querySelector('.live-bubble-rest')).not.toBeNull()
+    expect(more().classList.contains('is-pending')).toBe(true)
+    expect(more().getAttribute('aria-hidden')).toBe('true')
+    expect(within(more()).getAllByRole('button', { hidden: true }).length).toBeGreaterThan(0)
+
+    await advance(3000) // termina de escribir
+    expect(more().classList.contains('is-pending')).toBe(false)
+    expect(within(more()).getByRole('button', { name: '¿Por qué?' })).toBeTruthy()
+  })
+
   test('«Repetir escena» vuelve a saludar', async () => {
     const { container } = await renderHome()
     await advance(900 + 3400 + 6000)

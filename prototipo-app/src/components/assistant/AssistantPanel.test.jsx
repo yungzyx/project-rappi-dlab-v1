@@ -1059,6 +1059,19 @@ describe('al abrir, nada se mueve', () => {
     expect(screen.getByRole('dialog').classList.contains('is-waiting')).toBe(false)
   })
 
+  test('si lo aprendido tarda más que el tope, el saludo sale igual con «Para ti» si ya llegó', async () => {
+    const data = fixture('recommendations')
+    data.rows = data.rows.slice(0, 1)
+    data.rows[0].concept = 'jugos-tope' // propio: lo mostrado se recuerda en la pestaña
+    stubCatalog({ '/recommendations': data })
+    api.profile.mockReturnValue(new Promise((resolve) => setTimeout(() => resolve({ interests: [] }), 8000)))
+    await renderPanel({ settle: false })
+    for (let ms = 0; ms < 5000; ms += 250) await advance(250) // el tope del saludo son 3 s; después se escribe
+    expect(bubbles()[0]).toMatch(/Soy Mochi/)
+    expect(document.querySelector('.agent-msg-products')).not.toBeNull()
+    expect(screen.getByRole('dialog').classList.contains('is-waiting')).toBe(false)
+  })
+
   test('el saludo espera también el perfil de gusto: el perfil y su escalera aparecen con él', async () => {
     // Conceptos propios: lo mostrado se recuerda en la pestaña y los tests del perfil cuentan los de la fixture.
     const ladder = fixture('agent-offer-perfil')

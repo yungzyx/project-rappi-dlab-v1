@@ -18,6 +18,10 @@ const stack = []
 const isLive = (root) => Boolean(root?.isConnected) && !root.closest('[inert], [hidden]')
 const topDialog = () => stack.findLast(isLive)
 
+// Un control inerte u oculto (lo que espera el saludo de Mochi) no cuenta como el primero ni el último: el navegador lo
+// salta, y desde el último que sí se alcanza el Tab saldría del diálogo.
+const reachable = (el) => !el.closest('[inert]') && el.checkVisibility?.({ visibilityProperty: true }) !== false
+
 /**
  * Diálogo modal usable con teclado y VoiceOver (WCAG 2.1.2 y 2.4.3): al abrir, el foco entra (a `[data-autofocus]`
  * o al primer control); Escape cierra; Tab no sale del diálogo; al cerrar, el foco vuelve a quien lo abrió.
@@ -44,7 +48,7 @@ export function useDialog(ref, open, onClose) {
         return
       }
       if (event.key !== 'Tab' || !root) return
-      const items = [...root.querySelectorAll(FOCUSABLE)]
+      const items = [...root.querySelectorAll(FOCUSABLE)].filter(reachable)
       if (!items.length) return
       const first = items[0]
       const last = items[items.length - 1]

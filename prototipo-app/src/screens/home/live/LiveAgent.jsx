@@ -25,9 +25,11 @@ function useTypewriter(text, reduceMotion) {
     if (!text || reduceMotion) return undefined
     const timer = setInterval(
       () =>
-        setProgress((prev) =>
-          prev.text === text ? { text, count: Math.min(prev.count + 1, text.length) } : { text, count: 1 },
-        ),
+        setProgress((prev) => {
+          if (prev.text !== text) return { text, count: 1 }
+          // Ya escrita: el mismo estado, así no vuelve a pintar el globo cada 16 ms mientras sigue a la vista.
+          return prev.count >= text.length ? prev : { text, count: prev.count + 1 }
+        }),
       TYPE_MS,
     )
     return () => clearInterval(timer)
@@ -164,19 +166,28 @@ const LiveAgent = forwardRef(function LiveAgent(
               {shown}
               {!done && <span className="live-bubble-rest" data-rest={say.text.slice(shown.length)} />}
             </p>
-            {say.why && done && <OfferWhy reason={say.why} onToggle={onWhyToggle} />}
-            {say.actions?.length > 0 && done && (
-              <div className="live-bubble-actions">
-                {say.actions.map((action, i) => (
-                  <button
-                    key={action.label}
-                    type="button"
-                    className={i === 0 ? 'live-chip is-primary tap' : 'live-chip tap'}
-                    onClick={action.onClick}
-                  >
-                    {action.label}
-                  </button>
-                ))}
+            {/* «¿Por qué?» y los botones también ocupan su lugar desde el principio (el globo no crece al terminar),
+                pero no se ven ni se tocan hasta que termina de escribir. */}
+            {(say.why || say.actions?.length > 0) && (
+              <div
+                className={done ? 'live-bubble-more' : 'live-bubble-more is-pending'}
+                aria-hidden={!done || undefined}
+              >
+                {say.why && <OfferWhy reason={say.why} onToggle={onWhyToggle} />}
+                {say.actions?.length > 0 && (
+                  <div className="live-bubble-actions">
+                    {say.actions.map((action, i) => (
+                      <button
+                        key={action.label}
+                        type="button"
+                        className={i === 0 ? 'live-chip is-primary tap' : 'live-chip tap'}
+                        onClick={action.onClick}
+                      >
+                        {action.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>

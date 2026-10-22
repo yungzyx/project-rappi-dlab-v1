@@ -470,6 +470,15 @@
   visibility: hidden;
 }
 
+/* Hasta que termina de escribir, «¿Por qué?» y los botones ya ocupan su lugar, sin verse ni animarse */
+.live-bubble-more.is-pending {
+  visibility: hidden;
+}
+
+.live-bubble-more.is-pending * {
+  animation: none;
+}
+
 /* Abajo en la pantalla, el globo crece hacia arriba desde la cabeza de Mochi */
 .live-agent.is-low .live-bubble {
   top: auto;

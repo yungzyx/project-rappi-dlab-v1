@@ -30,7 +30,7 @@ import './assistant.css'
 const OPEN_MS = 380
 const CLOSE_MS = 280
 const MIN_TYPING_MS = 450
-const FOR_YOU_WAIT_MS = 3000 // lo que el saludo espera «Para ti»; si tarda más, sale sin él
+const FOR_YOU_WAIT_MS = 3000 // lo que el saludo espera lo que se pide al abrir; después sale con lo que haya de «Para ti»
 
 const DISCOVER_ROWS = 3
 
@@ -227,8 +227,12 @@ export default function AssistantPanel({ push, vertical, depth = 1 }) {
    */
   const greet = (rows, others) => {
     ask(async () => {
-      const waited = new Promise((resolve) => later(() => resolve([]), FOR_YOU_WAIT_MS))
-      const [row] = await Promise.race([Promise.all([rows, ...others]).then(([list]) => list), waited])
+      // Al tope sale con «Para ti» si ya llegó, aunque lo demás siga en camino.
+      let arrived = []
+      rows.then((list) => (arrived = list))
+      const waited = new Promise((resolve) => later(() => resolve(arrived), FOR_YOU_WAIT_MS))
+      const all = Promise.allSettled([rows, ...others]).then(([list]) => list.value ?? [])
+      const [row] = await Promise.race([all, waited])
       if (!row) return { text: GREETING }
       const shown = { origin: 'para-ti', concept: row.concept, generation: profile.resets, kind: row.kind }
       noteShown(events.track, row.products, shown)
@@ -375,9 +379,10 @@ export default function AssistantPanel({ push, vertical, depth = 1 }) {
   const lastAnswer = messages.findLast((m) => m.from === 'bot' && !m.typing)
   const announcement = lastAnswer?.text ?? ''
 
-  // Hasta la primera respuesta (el saludo, que espera lo que se pide al abrir), solo se ve el encabezado de Mochi: el saludo
-  // mide más que «escribiendo…», y lo aprendido, el perfil y «Para ti» llegan de a uno; cada cosa empujaba lo de abajo.
-  // El resto aparece con el saludo, ya en su lugar. Los resultados de una búsqueda no esperan.
+  // Hasta la primera respuesta (el saludo, que espera lo que se pide al abrir), solo se ven el encabezado de Mochi y su
+  // «escribiendo…»: el saludo mide más, y lo aprendido, el perfil y «Para ti» llegan de a uno; cada cosa empujaba lo de
+  // abajo. El resto aparece con el saludo, ya en su lugar (a lo más tras FOR_YOU_WAIT_MS). Los resultados de una
+  // búsqueda no esperan.
   const waiting = !search.hasQuery && !messages.some((m) => m.from === 'bot' && !m.typing)
   const style = { transitionDuration: `${phase === 'closing' ? CLOSE_MS : OPEN_MS}ms` }
   // Lo aprendido viene de rappi-ia (conceptos, sin sensibles); sin perfil del servidor no se muestra.
