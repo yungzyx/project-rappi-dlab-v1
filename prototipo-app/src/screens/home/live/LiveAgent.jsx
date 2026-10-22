@@ -3,6 +3,7 @@ import { AGENT_NAME } from '../../../agent/name'
 import Mascot from '../../../components/assistant/Mascot'
 import OfferWhy from '../../../components/assistant/OfferWhy'
 import { rectInPhone } from '../../../state/AssistantContext'
+import { typedEnd } from '../../../utils/typed'
 
 const SIZE = 84 // ancho de la mascota de cuerpo entero (alto = 1,2 × ancho)
 const HEIGHT = SIZE * 1.2
@@ -34,7 +35,7 @@ function useTypewriter(text, reduceMotion) {
   if (!text) return { shown: '', done: true }
   if (reduceMotion) return { shown: text, done: true }
   const count = progress.text === text ? progress.count : 0
-  return { shown: text.slice(0, count), done: count >= text.length }
+  return { shown: text.slice(0, typedEnd(text, count)), done: count >= text.length }
 }
 
 /**
@@ -157,7 +158,12 @@ const LiveAgent = forwardRef(function LiveAgent(
       <div className={classes.join(' ')} style={style} data-at={target ?? undefined}>
         {say && !away && (
           <div className="live-bubble">
-            <p aria-hidden="true">{shown}</p>
+            {/* Lo que falta va invisible detrás (`data-rest`, que pinta el CSS): el globo mide desde la primera letra lo
+                que medirá al terminar, y su borde no se corre con cada letra. */}
+            <p aria-hidden="true">
+              {shown}
+              {!done && <span className="live-bubble-rest" data-rest={say.text.slice(shown.length)} />}
+            </p>
             {say.why && done && <OfferWhy reason={say.why} onToggle={onWhyToggle} />}
             {say.actions?.length > 0 && done && (
               <div className="live-bubble-actions">

@@ -175,6 +175,20 @@ describe('Home del prototipo final', () => {
     expect(screen.queryByRole('button', { name: '¡Sí, tráelos!' })).toBeNull()
   })
 
+  test('el globo mide desde la primera letra lo que medirá al terminar: lo que falta va invisible', async () => {
+    const { container } = await renderHome()
+    await advance(900 + 200) // entra y empieza a saludar
+    const said = container.querySelector('.live-bubble p')
+    const rest = () => said.querySelector('.live-bubble-rest')
+    expect(said.textContent.length).toBeGreaterThan(0)
+    expect(said.textContent + rest().dataset.rest).toBe(
+      '¡Hola! Ahora vivo en tu Home 👋 Pídeme ideas o prueba una vertical nueva.',
+    )
+
+    await advance(2000) // terminó de escribir
+    expect(rest()).toBeNull()
+  })
+
   test('las listas de la API van en los bloques de siempre; si fallan, la Home sigue igual', async () => {
     stubApi({
       '/catalog/home': fixture('catalog-home'),

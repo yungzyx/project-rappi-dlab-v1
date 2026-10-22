@@ -464,6 +464,12 @@
   animation: live-bubble-in 360ms var(--live-spring);
 }
 
+/* Lo que falta escribir: invisible, pero ya ocupa su lugar en el globo */
+.live-bubble-rest::after {
+  content: attr(data-rest);
+  visibility: hidden;
+}
+
 /* Abajo en la pantalla, el globo crece hacia arriba desde la cabeza de Mochi */
 .live-agent.is-low .live-bubble {
   top: auto;

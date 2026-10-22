@@ -5,6 +5,7 @@ import Img from '../Img'
 import OfferWhy from './OfferWhy'
 import { useReducedMotion } from '../../hooks/useReducedMotion'
 import { useProductSheet } from '../../state/ProductSheetContext'
+import { typedEnd } from '../../utils/typed'
 
 const CHARS_PER_SECOND = 70
 const TICK_MS = 30
@@ -43,10 +44,11 @@ function StreamText({ text, animate, onDone }) {
     return () => clearTimeout(timer)
   }, [count, text])
 
+  const end = typedEnd(text, count)
   return (
     <>
-      {text.slice(0, count)}
-      {count < text.length && <span className="agent-msg-rest" data-rest={text.slice(count)} />}
+      {text.slice(0, end)}
+      {end < text.length && <span className="agent-msg-rest" data-rest={text.slice(end)} />}
     </>
   )
 }
