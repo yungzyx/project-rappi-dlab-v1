@@ -113,3 +113,21 @@ Endpoints que el panel deja de pedir (siguen en la API): `funnel`, `cohorts`, `r
 4. Documentación: `dashboard-empresa/README.md`, `README.md`, `CLAUDE.md`, `docs/demo.md`, `docs/instalacion.md`,
    `docs/diseno-ia.md` §5, `docs/contexto-y-problema.md`, `docs/README.md` y una fila en `docs/decisiones.md`.
 5. Revisión de código y de diseño con un subagente; PR contra main con capturas y esta tabla.
+
+## 7. Después de la revisión de diseño (23-10)
+
+Lo que cambió con la revisión de un subagente (capturas de antes y después a 1280, 768 y 390 px, claro y oscuro):
+
+- La acción de Mochi nombra una sugerencia ganadora solo entre las de 50 o más mostradas (con 11 ganaba el azar) y
+  muestra sus cuentas («24 de 86»). Con datos del prototipo la acción se llama «Para revisar en el MVP».
+- «Pp» pasa a «puntos»; «Retención M+1», a «vuelven al mes siguiente»; las ventanas van en el título («Frecuencia (30
+  días)»); los momentos de las ofertas llevan una línea que dice dónde se hacen.
+- La escalera dice «correlación, no efecto» en su bajada, la leyenda ya no sugiere causa («Quienes además usan el
+  grupo siguiente») y suma los pedidos por usuario de una y otra combinación. En el teléfono, el eje calza con los
+  puntos (la columna de la diferencia tiene el mismo ancho en filas y eje).
+- El motor: la primera fila aclara que no mide venta cruzada, y la diferencia sale de las cifras que se muestran.
+- La demanda «sumar comercios» pide revisar primero el buscador.
+- Bajo 900 px las tablas pasan a tarjetas; en el teléfono las pestañas usan nombres cortos.
+
+Y el panel en un solo HTML («Panel Rappi.html», `npm run panel:snapshot` y `npm run panel:html`): las respuestas de una
+API sobre `rappi_staging` grabadas en el archivo, que abre con doble clic sin la API ni internet.

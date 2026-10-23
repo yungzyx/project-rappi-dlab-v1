@@ -16,7 +16,7 @@ describe('App', () => {
     await renderWithData(<App />)
 
     expect(screen.getByText('Usuarios y eventos SIMULADOS:')).toBeTruthy()
-    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+    expect(screen.getAllByRole('tab').map((tab) => tab.getAttribute('aria-label'))).toEqual([
       'Resumen',
       'Retención y venta cruzada',
       'Mochi y búsquedas',

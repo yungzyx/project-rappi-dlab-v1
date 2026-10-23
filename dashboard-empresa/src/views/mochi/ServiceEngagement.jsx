@@ -16,12 +16,10 @@ const COLUMNS = [
   },
   {
     key: 'ganchos',
-    header: 'Gancho aceptado',
+    header: 'Producto sugerido junto, aceptado',
     numeric: true,
     render: (row) =>
-      row.ganchos_mostrados
-        ? `${formatNumber(row.ganchos_aceptados)} de ${formatNumber(row.ganchos_mostrados)}`
-        : 'no tiene',
+      row.ganchos_mostrados ? `${formatNumber(row.ganchos_aceptados)} de ${formatNumber(row.ganchos_mostrados)}` : '—',
   },
 ]
 

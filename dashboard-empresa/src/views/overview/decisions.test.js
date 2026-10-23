@@ -14,9 +14,9 @@ describe('crossSellDecision', () => {
     const decision = crossSellDecision(combos.data)
 
     expect(decision.figure).toBe('62,6%')
-    expect(decision.unit).toBe('de los usuarios de Rappi solo pide en Restaurantes')
+    expect(decision.unit).toBe('de los usuarios de Rappi (739.000) solo pide en Restaurantes')
     expect(decision.context).toBe(
-      'Vuelven al mes siguiente el 47%; quienes además piden en Turbo, el 82% (+35 pp). Es una correlación, no un efecto.',
+      'Vuelven al mes siguiente el 47%; quienes además piden en Turbo, el 82% (+35 puntos). Es una correlación, no un efecto.',
     )
     expect(decision.action).toMatch(/^Que Mochi ofrezca Turbo a quien solo pide en Restaurantes/)
     expect(decision.action).toMatch(/grupo de control\.$/)
@@ -32,8 +32,8 @@ describe('churnDecision', () => {
     const decision = churnDecision({ en_riesgo: 280, perdidos: 564 }, { califican: 137 })
 
     expect(decision.figure).toBe('280')
-    expect(decision.context).toMatch(/otras 564 ya se perdieron/)
-    expect(decision.action).toMatch(/a las 137 personas que califican hoy/)
+    expect(decision.context).toMatch(/Otras 564 pasaron el triple y se dan por perdidas/)
+    expect(decision.action).toMatch(/hoy califican 137 personas que dejaron algo que pedían con ritmo/)
   })
 
   test('without anyone to invite back, the reminder in their rhythm', () => {
@@ -64,7 +64,9 @@ describe('mochiDecision', () => {
     const decision = mochiDecision(offers, [])
 
     expect(decision.figure).toBe('2,0%') // 4 de 202
-    expect(decision.context).toBe('Por momento: «Pregunta» acepta el 7,7% y «Plan», el 0,0%.')
+    expect(decision.context).toBe(
+      '4 aceptadas de 202 mostradas a 25 personas. Por momento: «Pregunta» acepta el 7,7% y «Plan», el 0,0%.',
+    )
     expect(decision.action).toBe('Revisar «Plan»: 68 mostradas y ninguna aceptada.')
   })
 
@@ -88,7 +90,9 @@ describe('mochiDecision', () => {
     expect(decision.context).toBe(
       '813 aceptadas de 3.578 mostradas a 1.601 personas. De las sugerencias entre verticales aceptadas, el 60,0% termina en pedido.',
     )
-    expect(decision.action).toBe('Empujar ☕ Café en Turbo: la sugerencia entre verticales que más se acepta (40,0%).')
+    expect(decision.action).toBe(
+      'Empujar ☕ Café en Turbo: la sugerencia entre verticales que más se acepta (20 de 50, 40,0%).',
+    )
   })
 
   test('under 10 shown only the counts', () => {
@@ -146,7 +150,7 @@ describe('demandDecision', () => {
     expect(decision.context).toBe(
       'Lo que más falta: 🇵🇪 Comida peruana en Restaurantes, 708 personas (+31% en 4 semanas).',
     )
-    expect(decision.action).toBe('Oportunidad: sumar comercios o categoría.')
+    expect(decision.action).toMatch(/^Revisar primero el buscador .*sumar comercios\.$/)
   })
 
   test('without grouped demand (prototype), the top unmet search; without weeks, the 30-day rate', () => {

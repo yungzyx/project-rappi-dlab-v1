@@ -82,7 +82,8 @@
   min-width: 120px;
 }
 
-@media (max-width: 640px) {
+/* Bajo 900 px las tablas pasan a tarjetas: la de demanda (7 columnas) escondía la acción tras un scroll lateral */
+@media (max-width: 900px) {
   .table-wrap {
     overflow: visible;
   }

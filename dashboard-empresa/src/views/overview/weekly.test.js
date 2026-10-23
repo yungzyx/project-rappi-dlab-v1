@@ -35,7 +35,7 @@ describe('weeklySeries', () => {
 
     expect(latest.value).toBe(25.5)
     expect(change).toBeCloseTo(-4.5)
-    expect(formatChange(change)).toBe('−4,5 pp')
+    expect(formatChange(change)).toBe('−4,5 puntos')
   })
 
   test('sin 5 semanas completas no hay cambio que mostrar', () => {

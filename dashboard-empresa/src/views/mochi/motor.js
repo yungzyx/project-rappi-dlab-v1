@@ -13,8 +13,9 @@ export function motorRows(evaluation) {
   const rows = [
     {
       key: 'proximo',
-      decides: 'Qué vertical proponer primero',
-      metric: 'la primera que propone es una que la persona pidió',
+      decides: 'Qué vertical poner primero',
+      metric:
+        'la primera es una donde pidió en las 4 semanas siguientes (cuenta las que ya usaba: no mide venta cruzada)',
       motor: pct(next.combinado.hit1),
       base: pct(next.orden_fijo.hit1),
       baseLabel: 'Orden fijo',
@@ -22,7 +23,7 @@ export function motorRows(evaluation) {
     {
       key: 'cruzada',
       decides: 'Qué producto de otra vertical ofrecer',
-      metric: 'de 3 ofrecidos, los que pidió después sin que se los sugirieran',
+      metric: 'de 3 productos ofrecidos, los que pidió después sin que se los sugirieran',
       motor: pct(cross.mezcla.precision3),
       base: pct(cross.lo_mas_pedido.precision3),
       baseLabel: 'Lo más pedido',
@@ -38,5 +39,10 @@ export function motorRows(evaluation) {
       baseLabel: 'La que más se suma',
     })
   }
-  return rows.map((row) => ({ ...row, gap: row.motor === null || row.base === null ? null : row.motor - row.base }))
+  // La diferencia sale de las cifras redondeadas que se muestran: 96,6 − 84,0 = 12,6, no 12,7.
+  const shown = (value) => Math.round(value * 10) / 10
+  return rows.map((row) => ({
+    ...row,
+    gap: row.motor === null || row.base === null ? null : shown(shown(row.motor) - shown(row.base)),
+  }))
 }

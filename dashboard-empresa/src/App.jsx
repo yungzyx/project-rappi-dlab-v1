@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { ProvenanceBadge } from './components/ProvenanceBadge.jsx'
 import { Header } from './components/shell/Header.jsx'
 import { ProvenanceBanner } from './components/shell/ProvenanceBanner.jsx'
 import { Tabs } from './components/shell/Tabs.jsx'
-import { API_URL, refreshSource, retryConnection } from './lib/api.js'
+import { API_URL, refreshSource, retryConnection, SNAPSHOT_INFO } from './lib/api.js'
+import { formatDate } from './lib/format.js'
 import { useFallbacks } from './lib/useAnalytics.js'
 import { useUrlState } from './lib/useUrlState.js'
 import { CustomersView } from './views/customers/CustomersView.jsx'
@@ -14,10 +15,13 @@ import { OverviewView } from './views/overview/OverviewView.jsx'
 // gerencia y RappiAds, y un detalle para cada público.
 export const VIEWS = [
   { id: 'resumen', label: 'Resumen', View: OverviewView },
-  { id: 'clientes', label: 'Retención y venta cruzada', View: CustomersView },
-  { id: 'mochi', label: 'Mochi y búsquedas', View: MochiView },
+  { id: 'clientes', label: 'Retención y venta cruzada', short: 'Clientes', View: CustomersView },
+  { id: 'mochi', label: 'Mochi y búsquedas', short: 'Mochi', View: MochiView },
 ]
 const VIEW_IDS = VIEWS.map((view) => view.id)
+
+// «Ver cómo funciona»: solo en el panel en un solo HTML (VITE_PANEL_DEMO, `npm run panel:html`), como la demo de la app.
+const DemoTour = import.meta.env.VITE_PANEL_DEMO === '1' ? lazy(() => import('./demo/DemoTour.jsx')) : null
 
 export default function App() {
   const [{ view, source }, setUrlState] = useUrlState(VIEW_IDS)
@@ -40,13 +44,14 @@ export default function App() {
     if (window.scrollY > top) window.scrollTo({ top })
   }
 
+  // También tras recargar los datos: la demostración vuelve a pintar la vista y lleva a la sección que cambió.
   useEffect(() => {
     const target = anchor.current && document.getElementById(anchor.current)
     anchor.current = null
     if (!target) return
     target.scrollIntoView?.({ block: 'start' })
     target.focus({ preventScroll: true })
-  }, [view])
+  }, [view, reloadKey])
 
   const retry = () => {
     retryConnection()
@@ -78,13 +83,36 @@ export default function App() {
       <main ref={main} id={`panel-${view}`} role="tabpanel" aria-labelledby={`tab-${view}`} className="container">
         <View key={`${view}-${source}-${reloadKey}`} source={source} onNavigate={selectView} />
       </main>
+      {DemoTour && (
+        <Suspense fallback={null}>
+          <DemoTour
+            onShow={(target) => {
+              // El recorrido es del prototipo: lleva a esa fuente y a la sección que cambia; al cerrar, solo repinta.
+              if (target) {
+                anchor.current = target.section
+                setUrlState({ view: target.view, source: 'prototype' })
+              }
+              setReloadKey((key) => key + 1)
+            }}
+          />
+        </Suspense>
+      )}
       <footer className="site-footer">
         <div className="container">
-          <p>
-            Definiciones de cada métrica: <span className="mono">docs/diseno-ia.md §5</span>. Datos de la API de
-            rappi-ia en <span className="mono">{API_URL}</span>.{' '}
-            <a href={`${import.meta.env.BASE_URL}presentacion.html`}>Presentación de la propuesta</a>.
-          </p>
+          {SNAPSHOT_INFO ? (
+            // El archivo suelto no lleva la presentación ni habla con una API.
+            <p>
+              Definiciones de cada métrica: <span className="mono">docs/diseno-ia.md §5</span>. Datos grabados el{' '}
+              {formatDate(SNAPSHOT_INFO.fecha)} desde la API de rappi-ia sobre una copia de la base (
+              {SNAPSHOT_INFO.base}).
+            </p>
+          ) : (
+            <p>
+              Definiciones de cada métrica: <span className="mono">docs/diseno-ia.md §5</span>. Datos de la API de
+              rappi-ia en <span className="mono">{API_URL}</span>.{' '}
+              <a href={`${import.meta.env.BASE_URL}presentacion.html`}>Presentación de la propuesta</a>.
+            </p>
+          )}
           <p>Demo no oficial · prototipo independiente, no afiliado a Rappi.</p>
           <p>
             Personas con id seudónimo; las listas por persona nunca muestran conceptos sensibles. Ninguna palanca se

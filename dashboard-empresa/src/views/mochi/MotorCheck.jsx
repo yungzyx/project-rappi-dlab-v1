@@ -32,8 +32,7 @@ const COLUMNS = [
     key: 'gap',
     header: 'Diferencia',
     numeric: true,
-    render: (row) =>
-      row.gap === null ? '—' : <Delta value={row.gap} format={(value) => formatPoints(value)} goodWhen="up" />,
+    render: (row) => (row.gap === null ? '—' : <Delta value={row.gap} format={formatPoints} goodWhen="up" />),
   },
 ]
 
@@ -62,8 +61,8 @@ export function MotorCheck({ data, source }) {
         rowKey={(row) => row.key}
       />
       <p className="cell-sub">
-        Prueba por fechas: entrena, valida y prueba en tramos separados; {formatNumber(people)} personas en la prueba.
-        Corrida del {formatDate(data.fecha)}.
+        Se mide con pedidos posteriores a los que usó para aprender: {formatNumber(people)} personas. Corrida del{' '}
+        {formatDate(data.fecha)}.
         {source === 'synthetic' && ' Sobre datos simulados prueba la mecánica del motor, no su efecto.'}
       </p>
     </>

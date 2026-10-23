@@ -48,11 +48,11 @@ export function formatSignedPct(value, decimals = 0) {
   return `${sign}${formatNumber(value, decimals)}%`
 }
 
-/** Diferencia en puntos porcentuales: 10.9 → "+10,9 pp"; con 0 decimales, 35 → "+35 pp". */
+/** Diferencia en puntos porcentuales, con la palabra («pp» no lo lee cualquiera): 10.9 → "+10,9 puntos". */
 export function formatPoints(value, decimals = 1) {
   if (isMissing(value)) return EMPTY
   const sign = value > 0 ? '+' : ''
-  return `${sign}${formatNumber(value, decimals)} pp`
+  return `${sign}${formatNumber(value, decimals)} puntos`
 }
 
 /** Toma la fecha de un ISO ("2026-09-26" o "2026-09-26T23:58:56-03:00") sin pasar por la zona horaria del navegador. */

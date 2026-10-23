@@ -17,14 +17,14 @@ const RAPPI_COLUMNS = [
   { key: 'pct_pedidos', header: '% pedidos', numeric: true, render: (row) => formatPct(row.pct_pedidos) },
   {
     key: 'pedidos',
-    header: 'Pedidos/usuario',
+    header: 'Pedidos por usuario',
     numeric: true,
     render: (row) => formatNumber(row.pedidos_por_usuario, 1),
   },
-  { key: 'retencion', header: 'Retención M+1', numeric: true, render: retention },
+  { key: 'retencion', header: 'Vuelven al mes siguiente', numeric: true, render: retention },
   {
     key: 'gasto',
-    header: 'Gasto/usuario (moneda de la fuente)',
+    header: 'Gasto por usuario (moneda de la fuente)',
     numeric: true,
     render: (row) => formatNumber(row.gasto_por_usuario),
   },
@@ -41,7 +41,8 @@ function Step({ step, toX, ticks }) {
     <li className="ladder-row">
       <p className="visually-hidden">
         {startLabel(step.from.combo)}, {formatPct(step.from.pct_usuarios)} de los usuarios: vuelve al mes siguiente el{' '}
-        {formatPct(step.fromPct, 0)}; con {added}, el {formatPct(step.toPct, 0)}.
+        {formatPct(step.fromPct, 0)}; quienes además usan {added}, el {formatPct(step.toPct, 0)}. Pedidos por usuario:{' '}
+        {formatNumber(step.from.pedidos_por_usuario, 1)} y {formatNumber(step.to.pedidos_por_usuario, 1)}.
       </p>
       <div className="ladder-label" aria-hidden="true">
         <strong>{startLabel(step.from.combo)}</strong>
@@ -62,6 +63,9 @@ function Step({ step, toX, ticks }) {
       <p className="ladder-gain" aria-hidden="true">
         <strong>{formatPoints(step.gain, 0)}</strong>
         <span>con {added}</span>
+        <span>
+          {formatNumber(step.from.pedidos_por_usuario, 1)} → {formatNumber(step.to.pedidos_por_usuario, 1)} pedidos
+        </span>
       </p>
     </li>
   )
@@ -85,11 +89,11 @@ export function RetentionLadder({ rappi }) {
       <div className="legend">
         <span className="legend-item">
           <span className="ladder-key ladder-key--from" />
-          Retención al mes siguiente
+          Hoy: vuelven al mes siguiente
         </span>
         <span className="legend-item">
           <span className="ladder-key ladder-key--to" />
-          Sumando un grupo
+          Quienes además usan el grupo siguiente
         </span>
       </div>
       <ol className="ladder-rows">

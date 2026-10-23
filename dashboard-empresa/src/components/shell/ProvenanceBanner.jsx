@@ -1,4 +1,5 @@
-import { API_URL } from '../../lib/api.js'
+import { API_URL, SNAPSHOT_INFO } from '../../lib/api.js'
+import { formatDate } from '../../lib/format.js'
 import { describeFallbacks, describeOrigins } from '../../lib/labels.js'
 import { Icon } from '../Icon.jsx'
 
@@ -28,6 +29,18 @@ export function ProvenanceBanner({ source, fallbacks, onRetry }) {
           <p>{MESSAGES[source]}</p>
         </div>
       </div>
+      {SNAPSHOT_INFO && (
+        <div className="provenance-row provenance-row--offline">
+          <div className="container provenance-inner">
+            <Icon name="offline" />
+            <p>
+              <strong>Foto sin conexión:</strong> respuestas de la API de rappi-ia grabadas el{' '}
+              {formatDate(SNAPSHOT_INFO.fecha)} desde una copia de la base ({SNAPSHOT_INFO.base}). No se actualizan; la
+              procedencia de cada bloque sigue valiendo.
+            </p>
+          </div>
+        </div>
+      )}
       {fallbacks.length > 0 && (
         <div className="provenance-row provenance-row--offline" role="status">
           <div className="container provenance-inner">

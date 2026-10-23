@@ -12,6 +12,8 @@ const cells = (row) =>
     .getAllByRole('cell')
     .map((cell) => cell.textContent)
 const bodyRows = (table) => within(table).getAllByRole('row').slice(1)
+// El momento va en negrita y debajo dice dónde se hace la oferta.
+const momentName = (row) => within(row).getAllByRole('cell')[0].querySelector('strong').textContent
 const offersWith = (momentos, personas = 1) => ({ offers: { source: 'prototype', data: { personas, momentos } } })
 
 describe('MochiView', () => {
@@ -29,8 +31,12 @@ describe('MochiView', () => {
 
     const offers = await screen.findByRole('table', { name: 'Ofertas del agente por momento' })
     const [plan, cart] = bodyRows(offers)
-    expect(cells(plan)).toEqual(['Plan', '1', '1', '—'])
-    expect(cells(cart)[0]).toBe('Carro')
+    expect(momentName(plan)).toBe('Plan')
+    expect(cells(plan).slice(1)).toEqual(['1', '1', '—'])
+    expect(momentName(cart)).toBe('Carro')
+    // Lo que busca `make mvp-check`: la fila cuyo nombre empieza con «Plan ».
+    expect(within(offers).getByRole('row', { name: /^Plan / })).toBe(plan)
+    expect(within(plan).getByText('Un kit para una ocasión que la persona elige (carrete, asado)')).toBeTruthy()
   })
 
   test('each moment has its Spanish label, and a rate the backend computes is shown', async () => {
@@ -46,7 +52,7 @@ describe('MochiView', () => {
     await renderWithData(<MochiView source="prototype" />)
 
     const offers = await screen.findByRole('table', { name: 'Ofertas del agente por momento' })
-    expect(bodyRows(offers).map((row) => cells(row)[0])).toEqual([
+    expect(bodyRows(offers).map(momentName)).toEqual([
       'Antes de pagar',
       'Perfil de gusto',
       'Recompra',
@@ -71,7 +77,7 @@ describe('MochiView', () => {
     expect(await screen.findByText('Los datos simulados no registran el momento de la oferta')).toBeTruthy()
     expect(screen.queryByRole('table', { name: 'Ofertas del agente por momento' })).toBeNull()
     const suggestions = screen.getByRole('table', { name: 'Sugerencias entre verticales' })
-    expect(cells(bodyRows(suggestions)[0])).toEqual(['🍺 Cervezaen Licores', '1.705', '24,1%', '300'])
+    expect(cells(bodyRows(suggestions)[0])).toEqual(['🍺 Cervezaen Licores', '411 de 1.705', '24,1%', '300 (73%)'])
     expect(bodyRows(suggestions)).toHaveLength(8)
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Ver las 30' })))
     expect(bodyRows(suggestions)).toHaveLength(30)
@@ -118,7 +124,7 @@ describe('MochiView', () => {
 
     const motor = screen.getByRole('table', { name: 'El motor contra una regla simple' })
     const [next] = bodyRows(motor)
-    expect(cells(next).slice(1)).toEqual(['96,6%', '84,0%Orden fijo', '+12,7 pp'])
+    expect(cells(next).slice(1)).toEqual(['96,6%', '84,0%Orden fijo', '+12,6 puntos'])
     expect(screen.getByText(/prueba la mecánica del motor, no su efecto/)).toBeTruthy()
     resetApi()
 
@@ -135,7 +141,7 @@ describe('MochiView', () => {
     expect(within(bodyRows(demand)[0]).getByText('🇵🇪 Comida peruana')).toBeTruthy()
     const rising = screen.getByRole('table', { name: 'Conceptos que suben' })
     expect(bodyRows(rising).length).toBeLessThanOrEqual(5)
-    expect(within(rising).getAllByText('sin oferta').length).toBeGreaterThan(0) // la comida peruana sube sin oferta
+    expect(within(rising).getAllByText('sin surtido').length).toBeGreaterThan(0) // la comida peruana sube sin surtido
     const thin = screen.getByRole('table', { name: 'Poco surtido para lo que se busca' })
     expect(cells(bodyRows(thin)[0])[0]).toBe('🚗 Autoen Rappi Mall')
   })

@@ -21,6 +21,24 @@ const MOMENTS = {
 
 export const momentLabel = (moment) => MOMENTS[moment] ?? moment
 
+// Dónde se hace cada oferta, en una línea: es el «en qué momento» que necesita RappiAds.
+const MOMENT_HINTS = {
+  plan: 'Un kit para una ocasión que la persona elige (carrete, asado)',
+  carrito: 'Un complemento al agregar algo al carro',
+  checkout: 'Algo que falta, antes de pagar',
+  proximo_pedido: 'Para el próximo pedido, en el seguimiento',
+  sin_resultado: 'Cuando una búsqueda no encontró nada',
+  vertical_por_probar: 'Una vertical que la persona todavía no usa',
+  recompra: '«¿Repetimos?» cuando le toca según su ciclo',
+  volver: '«¿Volvemos a…?» a algo que dejó de pedir',
+  perfil: 'Los peldaños de su perfil de gusto',
+  pregunta: 'Al preguntarle a Mochi',
+  para_ti: 'En «Para ti», al abrir el buscador',
+  sin_momento: 'Sin registro de dónde se hizo',
+}
+
+export const momentHint = (moment) => MOMENT_HINTS[moment] ?? null
+
 const sum = (rows, key) => rows.reduce((total, row) => total + (row[key] ?? 0), 0)
 
 // Una tasa necesita el mínimo en su denominador: con 4 aceptadas, «50% llega a pedido» no dice nada.
@@ -63,11 +81,14 @@ export function suggestionTotals(rows) {
   }
 }
 
-/** La sugerencia (concepto y vertical) que más se acepta entre las que tienen tasa, o null. */
+/** Para nombrar una ganadora hacen falta más casos que para mostrar una tasa: con 11 mostradas gana el azar. */
+export const MIN_SHOWN_FOR_TOP = 50
+
+/** La sugerencia (concepto y vertical) que más se acepta entre las que tienen 50 o más mostradas, o null. */
 export function topSuggestion(rows) {
   return (
     rows
-      .filter((row) => row.mostradas >= MIN_SHOWN_FOR_RATE && row.aceptacion_pct !== null)
+      .filter((row) => row.mostradas >= MIN_SHOWN_FOR_TOP && row.aceptacion_pct !== null)
       .sort((a, b) => b.aceptacion_pct - a.aceptacion_pct || b.mostradas - a.mostradas)[0] ?? null
   )
 }

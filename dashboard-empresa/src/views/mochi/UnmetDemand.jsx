@@ -13,7 +13,7 @@ function Growth({ row }) {
 }
 
 function WhereItExists({ value }) {
-  if (!value) return <span className="cell-sub">En ningún otro vertical</span>
+  if (!value) return <span className="cell-sub">En ninguna otra vertical</span>
   return <span className="cell-list">{value.split(', ').map(verticalLabel).join(', ')}</span>
 }
 

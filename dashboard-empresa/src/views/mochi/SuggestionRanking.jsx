@@ -4,12 +4,14 @@ import { Meter } from '../../components/Meter.jsx'
 import { EmptyState } from '../../components/States.jsx'
 import { formatNumber, formatPct } from '../../lib/format.js'
 import { verticalLabel } from '../../lib/labels.js'
+import { MIN_SHOWN_FOR_RATE } from './offers.js'
 
 const PREVIEW_ROWS = 8
 
 /**
- * Sugerencias entre verticales (al preguntarle a Mochi y en «Para ti») por concepto y vertical: cuántas se mostraron,
- * qué parte se aceptó y cuántas llegaron a un pedido. Primero las más mostradas; el resto, a pedido.
+ * Sugerencias entre verticales (al preguntarle a Mochi y en «Para ti») por concepto y vertical: cuántas se aceptaron de
+ * las mostradas y cuántas llegaron a un pedido. Primero las más mostradas; el resto, a pedido. Incluye lo que la persona
+ * pidió al preguntarle (una cerveza, si la pidió): Mochi no propone alcohol por su cuenta, y la nota lo dice.
  */
 export function SuggestionRanking({ rows }) {
   const [expanded, setExpanded] = useState(false)
@@ -33,10 +35,15 @@ export function SuggestionRanking({ rows }) {
         </span>
       ),
     },
-    { key: 'mostradas', header: 'Mostradas', numeric: true, render: (row) => formatNumber(row.mostradas) },
+    {
+      key: 'aceptadas',
+      header: 'Aceptadas',
+      numeric: true,
+      render: (row) => `${formatNumber(row.aceptadas)} de ${formatNumber(row.mostradas)}`,
+    },
     {
       key: 'aceptacion',
-      header: 'Aceptación',
+      header: 'Tasa',
       numeric: true,
       render: (row) => (
         <span className="cell-bar">
@@ -45,7 +52,16 @@ export function SuggestionRanking({ rows }) {
         </span>
       ),
     },
-    { key: 'convertidas', header: 'Llegaron a pedido', numeric: true, render: (row) => formatNumber(row.convertidas) },
+    {
+      key: 'convertidas',
+      header: 'Llegaron a pedido',
+      numeric: true,
+      // La parte de las aceptadas, con el mismo mínimo que la tasa: con 4 aceptadas un % no dice nada.
+      render: (row) =>
+        row.aceptadas >= MIN_SHOWN_FOR_RATE
+          ? `${formatNumber(row.convertidas)} (${formatPct((row.convertidas * 100) / row.aceptadas, 0)})`
+          : formatNumber(row.convertidas),
+    },
   ]
   return (
     <>
@@ -55,6 +71,9 @@ export function SuggestionRanking({ rows }) {
         rows={expanded ? sorted : sorted.slice(0, PREVIEW_ROWS)}
         rowKey={(row) => `${row.concepto}-${row.vertical}`}
       />
+      <p className="cell-sub">
+        Incluye lo que la persona pidió al preguntarle: Mochi no propone por su cuenta alcohol, Farmacia, bebé ni salud.
+      </p>
       {sorted.length > PREVIEW_ROWS && (
         <div className="view-switch">
           <button type="button" className="text-button" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>

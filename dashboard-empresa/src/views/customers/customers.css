@@ -135,21 +135,17 @@
 
 .ladder-axis-track span {
   position: absolute;
-  font-size: 11px;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
   color: var(--ink-3);
   transform: translateX(-50%);
 }
 
-/* La primera marca va alineada a su izquierda: centrada se saldría del borde en angosto */
-.ladder-axis-track span:first-child {
-  transform: none;
-}
-
 @media (max-width: 640px) {
+  /* La columna de la diferencia tiene el mismo ancho en las filas y en el eje: si no, las marcas no calzan */
   .ladder-rows,
   .ladder-axis {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) 104px;
     column-gap: var(--space-4);
   }
 

@@ -58,6 +58,8 @@ La URL de la API se cambia con `VITE_API_URL`, por ejemplo `VITE_API_URL=http://
 | `npm run build` | Build de producción en `dist/` |
 | `npm run fixtures` | Vuelve a guardar las respuestas de la API en `src/fixtures/` (correr tras `make synth` o una actualización del catálogo). Las ofertas por momento, a quién invitar a volver, las búsquedas sin resultado, las combinaciones y el motor no pasan por aquí: las escribe `make contract` en `rappi-ia/` y el CI falla si quedan desactualizadas |
 | `npm run screenshots` | Regenera `docs/screenshots/` con el Chrome instalado y un Vite propio en el 5198 |
+| `npm run panel:snapshot` | Graba las respuestas que lee el panel (solo GET) desde una API sobre una copia de la base, en `snapshot/panel.json` (ignorada en git). Ver [Panel en un solo HTML](#panel-en-un-solo-html) |
+| `npm run panel:html` | Arma `dist-html/Panel Rappi.html`: el panel con esas respuestas adentro, que abre con doble clic sin la API ni internet |
 
 Tests: las cifras vigentes están en [README.md#resultados](../README.md#resultados) (fila «Calidad»). CI en GitHub Actions: lint, tests y build.
 
@@ -71,10 +73,11 @@ Arriba se elige la fuente de usuarios y eventos: **Simulados** o **Prototipo** (
 
 - **Venta cruzada** (dato de Rappi): la combinación donde están más usuarios (hoy, solo Restaurantes) y cuánto más vuelve quien suma el grupo siguiente. Acción: que Mochi lo ofrezca como «vertical por probar» y medirlo contra un grupo de control.
 - **A quién estamos perdiendo:** las personas en riesgo según su propio ritmo, con las perdidas como comparación. Acción: «¿Volvemos a…?» a quienes califican; fuera de la app, solo con consentimiento.
-- **Mochi:** la aceptación de sus ofertas, con el momento que más y el que menos acepta (o, en simulados, cuánto de lo aceptado llega a pedido). Acción: revisar el momento que no convierte o dar espacio al que más acepta.
-- **Búsquedas:** el % sin resultado de la última semana contra 4 semanas antes y lo que más falta. Acción: la que da la API para esa demanda.
+- **Mochi:** la aceptación de sus ofertas, con sus cuentas y el momento que más y el que menos acepta (o, en simulados, cuánto de lo aceptado llega a pedido). Acción: revisar el momento que no convierte, dar espacio al que más acepta o empujar la sugerencia que más se acepta (solo entre las de 50 o más mostradas: con menos gana el azar).
+- Con la fuente del prototipo la acción se llama «Para revisar en el MVP»: esos datos no son evidencia.
+- **Búsquedas:** el % sin resultado de la última semana contra 4 semanas antes y lo que más falta. Acción: la que da la API para esa demanda; si es «sumar comercios», primero revisar el buscador (un sinónimo o una categoría que falta).
 
-**Cómo va:** cinco indicadores. Personas activas, pedidos y abandono de carrito con su cambio contra 4 semanas antes y la tendencia de 12 semanas; frecuencia y el % que pide en 2 o más verticales, con lo que los explica. La serie semanal completa queda a un clic.
+**Cómo va:** cinco indicadores. Personas activas, pedidos y abandono de carrito con su cambio contra 4 semanas antes y la tendencia de 12 semanas (la línea aparece desde 5 semanas completas); frecuencia (30 días) y el % que pide en 2 o más verticales (60 días), con lo que los explica. La serie semanal completa queda a un clic. Las diferencias de tasas van en «puntos» (puntos porcentuales).
 
 ![Resumen: qué decidir y cómo va](docs/screenshots/1-resumen-escritorio-claro.jpg)
 
@@ -84,7 +87,7 @@ Arriba se elige la fuente de usuarios y eventos: **Simulados** o **Prototipo** (
 
 Para la gerencia.
 
-- **Dónde está la venta cruzada:** la tabla de Rappi como gráfico de pesas. Cada fila es una combinación (Solo Restaurantes, Restaurantes + Turbo…), con la parte de los usuarios que está ahí, la retención al mes siguiente y la de la combinación con un grupo más que más retiene, y la diferencia en puntos. *Ver tabla* muestra la tabla completa de Rappi con su total. Es una correlación, no un efecto: quien pide mucho usa más verticales y además vuelve más.
+- **Dónde está la venta cruzada:** la tabla de Rappi como gráfico de pesas. Cada fila es una combinación (Solo Restaurantes, Restaurantes + Turbo…), con la parte de los usuarios que está ahí, cuántos vuelven al mes siguiente, cuántos vuelven entre quienes además usan el grupo siguiente que más retiene, la diferencia en puntos y los pedidos por usuario de una y otra. *Ver tabla* muestra la tabla completa de Rappi con su total. Es una correlación, no un efecto: quien pide mucho usa más verticales y además vuelve más.
 - **A quién estamos perdiendo:** en riesgo (el doble de su ritmo sin pedir, mínimo 21 días), perdidas (el triple, mínimo 45), cuántas califican para «¿Volvemos a…?» (por un concepto o por una vertical que dejaron) y a cuántas les toca «¿Repetimos?». Debajo, las personas que entrega la API (hasta 100, primero las en riesgo más atrasadas) agrupadas por lo que más pedían, con cuántas aceptan avisos; la lista con id seudónimo queda a un clic. El concepto top nunca es sensible.
 
 ![Retención y venta cruzada: la escalera de Rappi y a quién estamos perdiendo](docs/screenshots/2-clientes-escritorio-claro.jpg)
@@ -95,7 +98,7 @@ Para la gerencia.
 
 Para RappiAds.
 
-- **Lo que ofrece Mochi:** ofertas mostradas, la tasa de aceptación y cuánto de lo aceptado entre verticales llega a pedido. Debajo, lado a lado: las **ofertas por momento** (en un plan, con el carro armado, antes de pagar, para el próximo pedido, cuando una búsqueda no encontró nada, para probar otro vertical, en la recompra, al volver a pedir, en un perfil de gusto, al preguntarle o en «Para ti»), las **sugerencias entre verticales** que más se muestran con su aceptación y sus pedidos, los **servicios sin catálogo** (RappiTravel y RappiFavor: ofrecidos, abiertos y el gancho del catálogo aceptado) y **el motor contra una regla simple** (próximo vertical contra el orden fijo, compra cruzada contra lo más pedido y el paso de la escalera contra la vertical que más se suma, en el tramo de prueba de su evaluación por fechas). Aceptada: la oferta se agregó al carro (también en la recompra, aunque su botón sea «Ver producto»). La tasa aparece desde 10 mostradas, o desde 10 aceptadas para lo que llega a pedido; antes, solo las cuentas. El simulador no guarda el momento de la oferta, y el panel lo dice en vez de inventar una tabla.
+- **Lo que ofrece Mochi:** ofertas mostradas, la tasa de aceptación y cuánto de lo aceptado entre verticales llega a pedido. Debajo, lado a lado: las **ofertas por momento**, cada una con una línea que dice dónde se hace (en un plan, con el carro armado, antes de pagar, para el próximo pedido, cuando una búsqueda no encontró nada, para probar otro vertical, en la recompra, al volver a pedir, en un perfil de gusto, al preguntarle o en «Para ti»), las **sugerencias entre verticales** que más se muestran («411 de 1.705» aceptadas, la tasa y cuántas llegaron a pedido; incluyen lo que la persona pidió al preguntarle, y Mochi no propone alcohol por su cuenta), los **servicios sin catálogo** (RappiTravel y RappiFavor: ofrecidos, abiertos y el gancho del catálogo aceptado) y **el motor contra una regla simple** (próximo vertical contra el orden fijo, compra cruzada contra lo más pedido y el paso de la escalera contra la vertical que más se suma, en el tramo de prueba de su evaluación por fechas). Aceptada: la oferta se agregó al carro (también en la recompra, aunque su botón sea «Ver producto»). La tasa aparece desde 10 mostradas, o desde 10 aceptadas para lo que llega a pedido; antes, solo las cuentas. El simulador no guarda el momento de la oferta: con los simulados el panel lo dice en una línea y las sugerencias ocupan todo el ancho.
 - **Qué buscan y no encuentran:** la demanda no satisfecha agrupada por concepto y vertical (5 o más personas), con su crecimiento, dónde existe y la acción sugerida; si ninguna llega a ese mínimo (lo normal con el prototipo), las búsquedas sin resultado por vertical y concepto, nunca con el texto que escribió cada persona. Al lado, **lo que sube** (señales de interés, 4 semanas contra las 4 anteriores, con «sin oferta» si además es demanda no satisfecha) y **poco surtido** (más personas buscando que ítems en la muestra pública).
 
 `make mvp-check` abre esta vista con la fuente del prototipo (puerto 5185) y comprueba que «Ofertas del agente por momento» muestra lo que dejaron las revisiones anteriores (qué revisa, en [docs/instalacion.md](../docs/instalacion.md#5-el-mvp)).
@@ -113,12 +116,35 @@ Todas las vistas tienen versión móvil (sin scroll horizontal; las tablas pasan
 
 *Resumen en móvil y Retención y venta cruzada en tema oscuro.*
 
+## Panel en un solo HTML
+
+«Panel Rappi.html» es el panel en un archivo que abre con doble clic, sin la API ni internet, y funciona como el de verdad: las tres vistas, las dos fuentes, los enlaces del Resumen, las tablas con «Ver tabla» y «Ver las N», y el tema claro u oscuro, todo con las respuestas de la API grabadas adentro (con las fuentes y los íconos). Se arma en dos pasos, desde una API propia sobre una **copia** de la base (`rappi_staging`), nunca sobre `rappi` ni en el puerto 8000:
+
+```bash
+cd rappi-ia
+DATABASE_URL=postgresql:///rappi_staging HF_HUB_OFFLINE=1 API_PREWARM=0 .venv/bin/python -m uvicorn rappi_ia.api.app:app --host 127.0.0.1 --port 8020
+```
+
+```bash
+cd dashboard-empresa
+PANEL_API_URL=http://127.0.0.1:8020 npm run panel:snapshot
+PANEL_HTML_COPY="$HOME/Desktop/Panel Rappi.html" npm run panel:html
+```
+
+`panel:snapshot` solo pide (GET) las métricas de `src/lib/metrics.js` con las dos fuentes y se niega al puerto 8000 y a hosts de otro equipo. `panel:html` construye el modo `panel-html` (las respuestas llegan por el módulo `virtual:panel-snapshot` de `vite.config.js`; en la app normal ese módulo vale `null`, así la foto nunca entra en `dist/`) y mete el JS, el CSS, el tema y el ícono en el HTML (~0,6 MB).
+
+Se ve todo lo del panel con las dos fuentes, los rótulos de procedencia de siempre y un aviso fijo «Foto sin conexión» con la fecha y la base de donde salió.
+
+**«Ver cómo funciona».** Un botón abajo a la derecha abre un recorrido corto de una persona nueva en el prototipo: Mochi le ofrece el kit «Carrete» (momento «Plan»), lo acepta, paga el pedido y busca algo que no hay. Cada paso suma ese evento a las respuestas grabadas de la fuente del prototipo, en memoria (`src/demo/tour.js`), y lleva a la sección que cambia: «Plan» suma una mostrada y después una aceptada, la frecuencia de 30 días cuenta el pedido y «Qué buscan y no encuentran» suma una búsqueda sin resultado. La tarjeta dice siempre «Demostración: eventos de ejemplo sobre la foto grabada, no son datos reales», y al cerrarla todo vuelve a la foto. Solo entra en este armado (`VITE_PANEL_DEMO`, como `VITE_OFFLINE_DEMO` en la app): el panel con la API no la trae.
+
+No se puede: actualizar (no hay API; el botón no aparece), ver la presentación de la propuesta (no viaja en el archivo) ni ver nada más nuevo que la foto.
+
 ## Cómo se lee
 
-- **Cada número con su contexto.** Una comparación (la combinación siguiente, las perdidas, la regla simple), la tendencia de 4 semanas o lo que lo explica. Rojo solo para lo que empeora y verde para lo que mejora, siempre con flecha y texto; la demanda que crece va en gris, porque no es un resultado bueno ni malo.
-- **Color con significado.** El naranja Rappi para magnitud y para lo que se propone; el gris para el contexto (en la escalera, la retención de hoy); el ámbar rayado marca lo simulado.
+- **Cada número con su contexto.** Una comparación (la combinación siguiente, las perdidas, la regla simple), la tendencia de 4 semanas o lo que lo explica. Las tasas aparecen desde 10 casos en su denominador; antes, solo las cuentas. Rojo solo para lo que empeora y verde para lo que mejora, siempre con flecha y texto; la demanda que crece va en gris, porque no es un resultado bueno ni malo.
+- **Color con significado.** El naranja Rappi para magnitud y para lo que se propone; el gris para el contexto (en la escalera, la retención de hoy), validado con la skill dataviz (contraste de 3:1 con el fondo y separable del naranja con daltonismo); el ámbar rayado marca lo simulado.
 - **Todo valor se puede leer sin el gráfico.** La escalera tiene su tabla (*Ver tabla*) y su descripción para lectores de pantalla; la serie semanal, su tabla.
-- **Accesibilidad.** Pestañas accesibles (← → Inicio Fin); los enlaces del Resumen llevan el foco al título de la sección; respeto de `prefers-reduced-motion`.
+- **Accesibilidad.** Pestañas accesibles (← → Inicio Fin; en el teléfono, con nombres cortos: Resumen, Clientes y Mochi); los enlaces del Resumen llevan el foco al título de la sección; bajo 900 px las tablas pasan a tarjetas; respeto de `prefers-reduced-motion`.
 
 ## Estructura
 
@@ -126,7 +152,7 @@ Todas las vistas tienen versión móvil (sin scroll horizontal; las tablas pasan
 src/
 ├── App.jsx                 pestañas, fuente, aviso de procedencia, enlaces a una sección
 ├── presentacion.js         página de presentación de la propuesta (con presentacion.html y public/presentacion/)
-├── lib/                    api.js (API + respaldo), format.js (es-CL), labels.js, hooks
+├── lib/                    api.js (API, respaldo y foto), metrics.js (lo que lee el panel), format.js (es-CL), labels.js, hooks
 ├── components/             tabla, insignias, cifras, estados vacío/carga/error
 │   ├── charts/             chispa de tendencia (SVG propio, sin librerías)
 │   └── shell/              encabezado, selector de fuente, tema, pestañas
@@ -134,10 +160,11 @@ src/
 │   ├── overview/           Resumen: las 4 decisiones (decisions.js) y cómo va (weekly.js)
 │   ├── customers/          Retención y venta cruzada: la escalera (ladder.js) y el rescate (audiences.js)
 │   └── mochi/              Mochi y búsquedas: ofertas (offers.js), motor (motor.js) y demanda (demand.js)
+├── demo/                   «Ver cómo funciona» (solo en el panel en un solo HTML): el recorrido (tour.js) y su tarjeta
 ├── fixtures/               respuestas guardadas de la API (tests y modo sin conexión)
 ├── styles/                 estilos
 └── test/                   API falsa para los tests de render
-scripts/                    update-fixtures.mjs, screenshots.mjs
+scripts/                    update-fixtures.mjs, screenshots.mjs, panel-snapshot.mjs y panel-html.mjs (el HTML suelto)
 docs/screenshots/           capturas (en git solo las 5 que usa este README, comprimidas)
 ```
 

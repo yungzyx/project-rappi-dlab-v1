@@ -6,6 +6,8 @@ import { useAnalyticsMany } from '../../lib/useAnalytics.js'
 import { COMPARE_WEEKS, isPartialWeek, WEEKLY_SERIES, weeklySeries } from './weekly.js'
 
 const SPARK_WEEKS = 12
+// Con menos semanas la línea dibuja el arranque del MVP, no una tendencia.
+const MIN_SPARK_WEEKS = 5
 const series = (key) => WEEKLY_SERIES.find((item) => item.key === key)
 
 /** Un indicador semanal: la última semana completa, su cambio contra 4 semanas antes y la tendencia de 12 semanas. */
@@ -29,10 +31,12 @@ function WeeklyTile({ rows, item, asOf }) {
           suffix={`vs hace ${COMPARE_WEEKS} semanas`}
         />
       )}
-      <Sparkline
-        values={complete.map((point) => point.value)}
-        label={`${item.title}, últimas ${complete.length} semanas completas`}
-      />
+      {complete.length >= MIN_SPARK_WEEKS && (
+        <Sparkline
+          values={complete.map((point) => point.value)}
+          label={`${item.title}, últimas ${complete.length} semanas completas`}
+        />
+      )}
     </article>
   )
 }
@@ -78,13 +82,13 @@ export function Pulse({ source }) {
         <WeeklyTile rows={rows} item={series('usuarios_activos')} asOf={kpis.as_of} />
         <WeeklyTile rows={rows} item={series('pedidos')} asOf={kpis.as_of} />
         <KpiTile
-          title="Frecuencia"
+          title="Frecuencia (30 días)"
           value={formatNumber(kpis.frecuencia, 2)}
           unit="pedidos por persona activa"
           context={`${formatNumber(kpis.pedidos_30d)} pedidos de ${formatNumber(kpis.usuarios_activos)} personas en 30 días.`}
         />
         <KpiTile
-          title="Piden en 2 o más verticales"
+          title="Piden en 2 o más verticales (60 días)"
           value={formatPct(kpis.multi_vertical_pct)}
           unit="de quienes pidieron en 60 días"
           context="Es la palanca: en la tabla de Rappi, quien combina verticales vuelve más."

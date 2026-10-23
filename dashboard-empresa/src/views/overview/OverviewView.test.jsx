@@ -24,7 +24,7 @@ describe('OverviewView', () => {
 
     const churn = decision('¿A quién estamos perdiendo?')
     expect(within(churn).getByText('230')).toBeTruthy()
-    expect(within(churn).getByText(/otras 254 ya se perdieron/)).toBeTruthy()
+    expect(within(churn).getByText(/Otras 254 pasaron el triple/)).toBeTruthy()
     expect(within(churn).getByText('Simulado')).toBeTruthy()
 
     const mochi = decision('¿Funciona lo que ofrece Mochi?')
@@ -32,11 +32,11 @@ describe('OverviewView', () => {
 
     const demand = decision('¿Qué buscan y no encuentran?')
     expect(within(demand).getByText('26,9%')).toBeTruthy() // la última semana completa al corte
-    expect(within(demand).getByText('+8,6 pp')).toBeTruthy()
+    expect(within(demand).getByText('+8,6 puntos')).toBeTruthy()
     expect(
       within(demand).getByText(/🇵🇪 Comida peruana en Restaurantes, 721 personas \(\+42% en 4 semanas\)/),
     ).toBeTruthy()
-    expect(within(demand).getByText('Oportunidad: sumar comercios o categoría.')).toBeTruthy()
+    expect(within(demand).getByText(/^Revisar primero el buscador/)).toBeTruthy()
 
     expect(screen.getAllByText('Acción sugerida')).toHaveLength(4)
     expect(screen.queryByText(NOT_EVIDENCE)).toBeNull()
@@ -50,7 +50,7 @@ describe('OverviewView', () => {
     expect(within(active).getByText('560')).toBeTruthy()
     expect(within(active).getByText('−12%')).toBeTruthy()
     expect(within(active).getByRole('img', { name: 'Personas activas, últimas 12 semanas completas' })).toBeTruthy()
-    expect(within(screen.getByRole('article', { name: 'Frecuencia' })).getByText('2,34')).toBeTruthy()
+    expect(within(screen.getByRole('article', { name: 'Frecuencia (30 días)' })).getByText('2,34')).toBeTruthy()
     expect(screen.getByRole('table', { name: 'Serie semanal' })).toBeTruthy()
     expect(screen.getByText('Ver la serie semanal completa')).toBeTruthy()
   })

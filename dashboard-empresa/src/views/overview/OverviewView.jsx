@@ -8,22 +8,24 @@ import { Pulse } from './Pulse.jsx'
 import './overview.css'
 
 function CrossSell({ source }) {
-  return <DecisionBody decision={crossSellDecision(useAnalytics('combos', source))} />
+  return <DecisionBody decision={crossSellDecision(useAnalytics('combos', source))} source="rappi" />
 }
 
 function Churn({ source }) {
   const [kpis, winback] = useAnalyticsMany(['kpis', 'volver'], source)
-  return <DecisionBody decision={churnDecision(kpis, winback)} />
+  return <DecisionBody decision={churnDecision(kpis, winback)} source={source} />
 }
 
 function Mochi({ source }) {
   const [offers, suggestions] = useAnalyticsMany(['offers', 'suggestions'], source)
-  return <DecisionBody decision={mochiDecision(offers, suggestions)} />
+  return <DecisionBody decision={mochiDecision(offers, suggestions)} source={source} />
 }
 
 function Demand({ source }) {
   const [kpis, weekly, opportunities, unmet] = useAnalyticsMany(['kpis', 'weekly', 'opportunities', 'unmet'], source)
-  return <DecisionBody decision={demandDecision({ kpis, weekly, asOf: kpis.as_of, opportunities, unmet })} />
+  return (
+    <DecisionBody decision={demandDecision({ kpis, weekly, asOf: kpis.as_of, opportunities, unmet })} source={source} />
+  )
 }
 
 /** La vista principal: las 4 preguntas que hay que decidir, cada una con enlace a su detalle, y cómo va el negocio. */
@@ -33,10 +35,7 @@ export function OverviewView({ source, onNavigate }) {
       <section className="section" aria-labelledby="que-decidir">
         <div className="section-head">
           <h2 id="que-decidir">Qué decidir</h2>
-          <p>
-            Cuatro preguntas para la gerencia y RappiAds, cada una con su cifra, su comparación y una acción sugerida.
-            Ninguna acción se escala sin un grupo de control.
-          </p>
+          <p>Cada pregunta con su cifra, su comparación y una acción. Ninguna se escala sin un grupo de control.</p>
         </div>
         <div className="decisions">
           <DecisionCard

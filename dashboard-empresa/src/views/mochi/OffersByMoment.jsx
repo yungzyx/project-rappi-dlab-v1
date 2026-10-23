@@ -2,7 +2,7 @@ import { DataTable } from '../../components/DataTable.jsx'
 import { Meter } from '../../components/Meter.jsx'
 import { EmptyState } from '../../components/States.jsx'
 import { formatNumber, formatPct } from '../../lib/format.js'
-import { MIN_SHOWN_FOR_RATE, momentLabel } from './offers.js'
+import { MIN_SHOWN_FOR_RATE, momentHint, momentLabel } from './offers.js'
 
 /**
  * Ofertas de Mochi por momento (dónde se hizo la oferta). La tasa llega vacía (—) con menos mostradas que el mínimo:
@@ -19,12 +19,24 @@ export function OffersByMoment({ data, source }) {
   if (source === 'synthetic' && momentos.every((row) => row.momento === 'sin_momento')) {
     return (
       <EmptyState title="Los datos simulados no registran el momento de la oferta">
-        Solo el prototipo guarda dónde se hizo cada oferta. Las sugerencias entre verticales, al lado, sí tienen datos.
+        Solo el prototipo guarda dónde se hizo cada oferta; las sugerencias entre verticales, abajo, sí tienen datos.
       </EmptyState>
     )
   }
   const columns = [
-    { key: 'momento', header: 'Momento', primary: true, render: (row) => momentLabel(row.momento) },
+    {
+      key: 'momento',
+      header: 'Momento',
+      primary: true,
+      render: (row) => (
+        // El espacio separa el momento de su descripción en el nombre de la fila («Plan Un kit…»): `make mvp-check`
+        // busca la fila que empieza con «Plan ».
+        <span className="cell-stack">
+          <strong>{momentLabel(row.momento)}</strong>{' '}
+          {momentHint(row.momento) && <span className="cell-sub">{momentHint(row.momento)}</span>}
+        </span>
+      ),
+    },
     { key: 'mostradas', header: 'Mostradas', numeric: true, render: (row) => formatNumber(row.mostradas) },
     { key: 'aceptadas', header: 'Aceptadas', numeric: true, render: (row) => formatNumber(row.aceptadas) },
     {

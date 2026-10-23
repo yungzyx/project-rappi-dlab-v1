@@ -13,9 +13,9 @@ describe('motorRows', () => {
 
     expect(rows.map((row) => row.key)).toEqual(['proximo', 'cruzada', 'paso'])
     expect(rows[0].motor).toBeCloseTo(96.63)
-    expect(rows[0].gap).toBeCloseTo(12.67)
+    expect(rows[0].gap).toBe(12.6) // de las cifras que se muestran: 96,6 − 84,0
     expect(rows[1].gap).toBe(0)
-    expect(rows[2].gap).toBeCloseTo(-1.35)
+    expect(rows[2].gap).toBe(-1.4) // 58,1 − 59,5
     expect(rows[2].baseLabel).toBe('La que más se suma')
   })
 

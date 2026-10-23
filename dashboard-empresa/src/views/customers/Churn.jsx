@@ -27,7 +27,12 @@ function Audiences({ rows }) {
       ),
     },
     { key: 'atRisk', header: 'En riesgo', numeric: true, render: (row) => formatNumber(row.atRisk) },
-    { key: 'consent', header: 'Aceptan avisos', numeric: true, render: (row) => formatNumber(row.withConsent) },
+    {
+      key: 'consent',
+      header: 'Aceptan avisos',
+      numeric: true,
+      render: (row) => `${formatNumber(row.withConsent)} de ${formatNumber(row.people)}`,
+    },
   ].filter((column) => column.key !== 'atRisk' || rows.some((row) => row.estado !== 'en_riesgo'))
   return (
     <>
@@ -62,11 +67,15 @@ export function Churn({ source }) {
             value: formatNumber(kpis.en_riesgo),
             note: 'Pasaron el doble de su ritmo sin pedir (mínimo 21 días). Todavía se pueden recuperar.',
           },
-          { label: 'Perdidas', value: formatNumber(kpis.perdidos), note: 'El triple de su ritmo (mínimo 45 días).' },
+          {
+            label: 'Perdidas',
+            value: formatNumber(kpis.perdidos),
+            note: 'Pasaron el triple de su ritmo sin pedir (mínimo 45 días).',
+          },
           {
             label: 'Califican para «¿Volvemos a…?»',
             value: formatNumber(winback.califican),
-            note: `${formatNumber(winback.por_concepto)} por un concepto y ${formatNumber(winback.por_vertical)} por una vertical que dejaron de pedir.`,
+            note: `Dejaron algo que pedían con ritmo: ${formatNumber(winback.por_concepto)} un concepto y ${formatNumber(winback.por_vertical)} una vertical. Es otra regla que la del riesgo.`,
           },
           {
             label: 'Les toca «¿Repetimos?»',
@@ -87,8 +96,8 @@ export function Churn({ source }) {
           <h3 className="subhead">Qué pedían y cómo llegarles</h3>
           <p className="block-note">
             Con aviso aceptado: recordatorio en su ritmo con lo que más pedían y un complemento. Sin aviso: solo Mochi
-            en la app. Son las {formatNumber(rows.length)} personas que entrega la API de{' '}
-            {formatNumber(kpis.en_riesgo + kpis.perdidos)}, primero las en riesgo más atrasadas respecto de su ritmo.
+            en la app. Muestra de {formatNumber(rows.length)} de las {formatNumber(kpis.en_riesgo + kpis.perdidos)},
+            primero las en riesgo más atrasadas respecto de su ritmo.
           </p>
           {shownAtRisk === 0 && kpis.en_riesgo > 0 && (
             <p className="table-warning status status--warn">

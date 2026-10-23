@@ -53,12 +53,42 @@ function OfferStats({ source }) {
   )
 }
 
-function Offers({ source }) {
-  return <OffersByMoment data={useAnalytics('offers', source)} source={source} />
-}
-
 function Suggestions({ source }) {
   return <SuggestionRanking rows={useAnalytics('suggestions', source)} />
+}
+
+/**
+ * Por momento y entre verticales, lado a lado. Con los simulados no hay momentos (el simulador no los guarda): el aviso
+ * va en una línea y las sugerencias ocupan todo el ancho, sin dejar un hueco al lado.
+ */
+function OffersAndSuggestions({ source }) {
+  const offers = useAnalytics('offers', source)
+  const suggestions = (
+    <div className="pair-item">
+      <h3 className="subhead">Entre verticales: qué se acepta</h3>
+      <Async>
+        <Suggestions source={source} />
+      </Async>
+    </div>
+  )
+  const noMoments = offers.momentos.length > 0 && offers.momentos.every((row) => row.momento === 'sin_momento')
+  if (source === 'synthetic' && noMoments) {
+    return (
+      <>
+        <OffersByMoment data={offers} source={source} />
+        {suggestions}
+      </>
+    )
+  }
+  return (
+    <div className="pair">
+      <div className="pair-item">
+        <h3 className="subhead">Por momento</h3>
+        <OffersByMoment data={offers} source={source} />
+      </div>
+      {suggestions}
+    </div>
+  )
 }
 
 function Services({ source }) {
@@ -95,13 +125,13 @@ function Rising({ source }) {
       render: (row) => (
         <span className="cell-stack">
           <strong>{row.concepto}</strong>
-          {unmet.has(row.concept_id) && <span className="chip chip--warn">sin oferta</span>}
+          {unmet.has(row.concept_id) && <span className="chip chip--warn">sin surtido</span>}
         </span>
       ),
     },
     {
       key: 'senales',
-      header: 'Señales',
+      header: 'Interés: ahora vs antes',
       numeric: true,
       render: (row) => `${formatNumber(row.recientes)} vs ${formatNumber(row.anteriores)}`,
     },
@@ -119,8 +149,8 @@ function Thin({ source }) {
   const rows = thinAssortment(useAnalytics('assortment', source))
   if (!rows.length) {
     return (
-      <EmptyState title="Ningún concepto tiene más personas buscando que ítems">
-        Se compara con los ítems reales de la muestra pública.
+      <EmptyState title="Ningún concepto tiene más personas buscando que productos">
+        Se compara con los productos reales de la muestra pública.
       </EmptyState>
     )
   }
@@ -136,9 +166,14 @@ function Thin({ source }) {
         </span>
       ),
     },
-    { key: 'buscan', header: 'Buscan', numeric: true, render: (row) => formatNumber(row.usuarios_que_buscan) },
-    { key: 'items', header: 'Ítems', numeric: true, render: (row) => formatNumber(row.items_en_catalogo) },
-    { key: 'ratio', header: 'Por ítem', numeric: true, render: (row) => formatNumber(row.usuarios_por_item, 1) },
+    { key: 'buscan', header: 'Personas', numeric: true, render: (row) => formatNumber(row.usuarios_que_buscan) },
+    { key: 'items', header: 'Productos', numeric: true, render: (row) => formatNumber(row.items_en_catalogo) },
+    {
+      key: 'ratio',
+      header: 'Personas por producto',
+      numeric: true,
+      render: (row) => formatNumber(row.usuarios_por_item, 1),
+    },
   ]
   return (
     <DataTable
@@ -160,8 +195,8 @@ export function MochiView({ source }) {
             Lo que ofrece Mochi
           </h2>
           <p>
-            Aceptada: la oferta se agregó al carro. Por momento (dónde se hizo la oferta) y por sugerencia entre
-            verticales; la tasa aparece desde 10 mostradas.
+            A quién le ofrece qué, en qué momento y con qué resultado. Aceptada: la oferta se agregó al carro; la tasa
+            aparece desde 10 mostradas.
           </p>
           <ProvenanceBadge kind={source} />
         </div>
@@ -170,19 +205,10 @@ export function MochiView({ source }) {
           <Async fallback={null}>
             <OfferStats source={source} />
           </Async>
+          <Async>
+            <OffersAndSuggestions source={source} />
+          </Async>
           <div className="pair">
-            <div className="pair-item">
-              <h3 className="subhead">Por momento</h3>
-              <Async>
-                <Offers source={source} />
-              </Async>
-            </div>
-            <div className="pair-item">
-              <h3 className="subhead">Entre verticales: qué se acepta</h3>
-              <Async>
-                <Suggestions source={source} />
-              </Async>
-            </div>
             <div className="pair-item">
               <h3 className="subhead">Servicios sin catálogo</h3>
               <Async>
@@ -219,7 +245,10 @@ export function MochiView({ source }) {
           <div className="pair">
             <div className="pair-item">
               <h3 className="subhead">Lo que sube</h3>
-              <p className="cell-sub">Señales de interés de las últimas 4 semanas contra las 4 anteriores.</p>
+              <p className="cell-sub">
+                Búsquedas, preguntas a Mochi y agregados al carro: últimas 4 semanas contra las 4 anteriores. Lo que
+                sube y tiene surtido es campaña con horario; lo que sube «sin surtido», demanda que cubrir.
+              </p>
               <Async>
                 <Rising source={source} />
               </Async>
@@ -227,7 +256,7 @@ export function MochiView({ source }) {
             <div className="pair-item">
               <h3 className="subhead">Poco surtido para lo que se busca</h3>
               <p className="cell-sub">
-                Más personas buscando que ítems en el catálogo; los ítems son reales (muestra pública).
+                Más personas buscando que productos en el catálogo; los productos son reales (muestra pública).
               </p>
               <Async>
                 <Thin source={source} />

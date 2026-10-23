@@ -30,9 +30,9 @@ export function CustomersView({ source }) {
             Dónde está la venta cruzada
           </h2>
           <p>
-            En la tabla que compartió Rappi, quien combina grupos de verticales vuelve más al mes siguiente. Cada fila:
-            la retención de una combinación y la de la combinación con un grupo más que más retiene. Arriba, donde están
-            más usuarios.
+            En la tabla que compartió Rappi, quien combina grupos de verticales vuelve más al mes siguiente y pide más.
+            Es una correlación, no un efecto. Cada fila: cuántos vuelven en una combinación y en la combinación con un
+            grupo más que más retiene; arriba, donde están más usuarios.
           </p>
           <ProvenanceBadge kind="rappi" />
         </div>

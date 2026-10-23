@@ -24,7 +24,7 @@ export function crossSellDecision(combos) {
   const single = !step.from.combo.includes('+')
   return {
     figure: formatPct(step.from.pct_usuarios),
-    unit: single ? `de los usuarios de Rappi solo pide en ${from}` : `de los usuarios de Rappi pide en ${from}`,
+    unit: `de los usuarios de Rappi (${formatNumber(step.from.usuarios)}) ${single ? 'solo pide' : 'pide'} en ${from}`,
     context: `Vuelven al mes siguiente el ${formatPct(step.fromPct, 0)}; quienes además piden en ${added}, el ${formatPct(step.toPct, 0)} (${formatPoints(step.gain, 0)}). Es una correlación, no un efecto.`,
     action: `Que Mochi ofrezca ${added} a quien ${single ? 'solo ' : ''}pide en ${from} («vertical por probar») y medirlo contra un grupo de control.`,
   }
@@ -44,10 +44,10 @@ export function churnDecision(kpis, winback) {
   return {
     figure: formatNumber(atRisk),
     unit: `${atRisk === 1 ? 'persona' : 'personas'} en riesgo, según su propio ritmo`,
-    context: `Pasaron el doble de su ritmo sin pedir y todavía se pueden recuperar; otras ${formatNumber(lost)} ya se perdieron (el triple).`,
+    context: `Pasaron el doble de su ritmo sin pedir y todavía se pueden recuperar. Otras ${formatNumber(lost)} pasaron el triple y se dan por perdidas.`,
     action:
       winback.califican > 0
-        ? `Invitar a volver con «¿Volvemos a…?» de Mochi a las ${people(winback.califican)} que califican hoy; fuera de la app, solo a quien aceptó avisos.`
+        ? `Invitar a volver con «¿Volvemos a…?» de Mochi: hoy califican ${people(winback.califican)} que dejaron algo que pedían con ritmo. Fuera de la app, solo a quien aceptó avisos.`
         : 'Recordarles su concepto top en su ritmo; fuera de la app, solo a quien aceptó avisos.',
   }
 }
@@ -67,9 +67,10 @@ export function mochiDecision(offers, suggestions) {
   }
   const { best, worst } = momentExtremes(offers.momentos)
   const cross = suggestionTotals(suggestions)
-  let context = `${formatNumber(totals.accepted)} aceptadas de ${formatNumber(totals.shown)} mostradas a ${people(offers.personas)}.`
+  const accepted = `${formatNumber(totals.accepted)} ${totals.accepted === 1 ? 'aceptada' : 'aceptadas'}`
+  let context = `${accepted} de ${formatNumber(totals.shown)} mostradas a ${people(offers.personas)}.`
   if (best && worst) {
-    context = `Por momento: «${momentLabel(best.momento)}» acepta el ${formatPct(best.aceptacion_pct)} y «${momentLabel(worst.momento)}», el ${formatPct(worst.aceptacion_pct)}.`
+    context += ` Por momento: «${momentLabel(best.momento)}» acepta el ${formatPct(best.aceptacion_pct)} y «${momentLabel(worst.momento)}», el ${formatPct(worst.aceptacion_pct)}.`
   } else if (cross.convertRate !== null) {
     context += ` De las sugerencias entre verticales aceptadas, el ${formatPct(cross.convertRate)} termina en pedido.`
   }
@@ -90,9 +91,20 @@ function mochiAction(moments, worst, best, suggestions) {
   if (best && worst) return `Dar más espacio a «${momentLabel(best.momento)}», el momento que más acepta.`
   const top = topSuggestion(suggestions)
   if (top) {
-    return `Empujar ${top.concepto} en ${verticalLabel(top.vertical)}: la sugerencia entre verticales que más se acepta (${formatPct(top.aceptacion_pct)}).`
+    return `Empujar ${top.concepto} en ${verticalLabel(top.vertical)}: la sugerencia entre verticales que más se acepta (${formatNumber(top.aceptadas)} de ${formatNumber(top.mostradas)}, ${formatPct(top.aceptacion_pct)}).`
   }
   return null
+}
+
+/**
+ * La acción de la API para una demanda. «Sumar comercios» va después de descartar al buscador: que no aparezca puede ser
+ * un sinónimo o una categoría que falta, no que no haya comercios.
+ */
+function demandAction(apiAction) {
+  if (apiAction.startsWith('Oportunidad')) {
+    return 'Revisar primero el buscador (un sinónimo o una categoría que falta); si de verdad no hay oferta, sumar comercios.'
+  }
+  return `${apiAction}.`
 }
 
 function growthText(row) {
@@ -126,7 +138,7 @@ export function demandDecision({ kpis, weekly, asOf, opportunities, unmet }) {
     return {
       ...base,
       context: `Lo que más falta: ${demandLabel(top)} en ${verticalLabel(top.vertical)}, ${people(top.usuarios)} (${growthText(top)}).`,
-      action: `${top.accion}.`,
+      action: demandAction(top.accion),
     }
   }
   const [row] = unmet.por_vertical

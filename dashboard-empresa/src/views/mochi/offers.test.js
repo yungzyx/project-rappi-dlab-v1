@@ -61,11 +61,11 @@ describe('offers', () => {
     expect(suggestionTotals([{ mostradas: 40, aceptadas: 4, convertidas: 2 }]).convertRate).toBeNull()
   })
 
-  test('the top suggestion needs 10 shown', () => {
+  test('the top suggestion needs 50 shown: a small one wins by chance', () => {
     const rows = [
-      { concepto: 'A', mostradas: 9, aceptacion_pct: 90 },
-      { concepto: 'B', mostradas: 40, aceptacion_pct: 30 },
-      { concepto: 'C', mostradas: 12, aceptacion_pct: 35 },
+      { concepto: 'A', mostradas: 11, aceptacion_pct: 63.6 },
+      { concepto: 'B', mostradas: 400, aceptacion_pct: 30 },
+      { concepto: 'C', mostradas: 86, aceptacion_pct: 35 },
     ]
 
     expect(topSuggestion(rows).concepto).toBe('C')

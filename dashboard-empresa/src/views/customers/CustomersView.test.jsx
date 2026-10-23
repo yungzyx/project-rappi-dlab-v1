@@ -21,11 +21,11 @@ describe('CustomersView', () => {
     expect(within(ladder).getByText('Dato de Rappi')).toBeTruthy()
     expect(
       within(ladder).getByText(
-        'Solo Restaurantes, 62,6% de los usuarios: vuelve al mes siguiente el 47%; con Turbo, el 82%.',
+        'Solo Restaurantes, 62,6% de los usuarios: vuelve al mes siguiente el 47%; quienes además usan Turbo, el 82%. Pedidos por usuario: 1,9 y 5,5.',
       ),
     ).toBeTruthy()
     expect(within(ladder).getAllByRole('listitem')).toHaveLength(6)
-    expect(within(ladder).getByText(/Es una correlación, no un efecto\./)).toBeTruthy()
+    expect(within(ladder).getAllByText(/Es una correlación, no un efecto\./).length).toBeGreaterThan(0)
   })
 
   test('the ladder table is the full Rappi table with its total', async () => {
@@ -56,7 +56,7 @@ describe('CustomersView', () => {
     expect(within(first).getAllByRole('cell')[1].textContent).toBe('17')
     // todas las de la lista están en riesgo: la columna «En riesgo» repetiría «Personas»
     expect(within(audiences).queryByRole('columnheader', { name: 'En riesgo' })).toBeNull()
-    expect(within(losing).getByText(/Son las 100 personas que entrega la API de 484/)).toBeTruthy()
+    expect(within(losing).getByText(/Muestra de 100 de las 484/)).toBeTruthy()
     expect(within(losing).queryByText(NOT_EVIDENCE)).toBeNull()
   })
 
@@ -86,7 +86,7 @@ describe('CustomersView', () => {
     const cells = within(within(audiences).getAllByRole('row')[1])
       .getAllByRole('cell')
       .map((cell) => cell.textContent)
-    expect(cells).toEqual(['🍕 Pizza', '2', '1', '1'])
+    expect(cells).toEqual(['🍕 Pizza', '2', '1', '1 de 2'])
   })
 
   test('with the prototype: nobody at risk yet, with the MVP label', async () => {
