@@ -1,18 +1,20 @@
-import { API_URL } from '../../lib/api.js'
+import { API_URL, SNAPSHOT_INFO } from '../../lib/api.js'
+import { formatDate } from '../../lib/format.js'
 import { describeFallbacks, describeOrigins } from '../../lib/labels.js'
 import { Icon } from '../Icon.jsx'
 
 const MESSAGES = {
   synthetic: (
     <>
-      <strong>Usuarios y eventos SIMULADOS:</strong> muestran la mecánica del panel, no evidencia. El catálogo sí es
-      real (muestra pública de rappi.cl).
+      <strong>Usuarios y eventos SIMULADOS:</strong> muestran la mecánica del panel, no evidencia. Son reales la tabla
+      de combinaciones que compartió Rappi y los ítems del catálogo (muestra pública de rappi.cl).
     </>
   ),
   prototype: (
     <>
       <strong>Usuarios y eventos del PROTOTIPO:</strong> pruebas hechas en la app de demostración, no clientes reales;
-      con tan pocos datos varias métricas quedan vacías. El catálogo sí es real (muestra pública de rappi.cl).
+      con tan pocos datos varias métricas quedan vacías. Son reales la tabla de combinaciones que compartió Rappi y los
+      ítems del catálogo (muestra pública de rappi.cl).
     </>
   ),
 }
@@ -27,6 +29,18 @@ export function ProvenanceBanner({ source, fallbacks, onRetry }) {
           <p>{MESSAGES[source]}</p>
         </div>
       </div>
+      {SNAPSHOT_INFO && (
+        <div className="provenance-row provenance-row--offline">
+          <div className="container provenance-inner">
+            <Icon name="offline" />
+            <p>
+              <strong>Foto sin conexión:</strong> respuestas de la API de rappi-ia grabadas el{' '}
+              {formatDate(SNAPSHOT_INFO.fecha)} desde una copia de la base ({SNAPSHOT_INFO.base}). No se actualizan; la
+              procedencia de cada bloque sigue valiendo.
+            </p>
+          </div>
+        </div>
+      )}
       {fallbacks.length > 0 && (
         <div className="provenance-row provenance-row--offline" role="status">
           <div className="container provenance-inner">

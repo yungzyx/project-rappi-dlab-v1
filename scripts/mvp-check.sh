@@ -12,8 +12,8 @@
 #      queda primero con el texto «Ordenadas según lo que más usas»;
 #   5. combinación: una persona nueva pide en Restaurantes, vuelve a la Home y toca a Mochi: la oferta es de Turbo (el
 #      siguiente peldaño de la escalera de combinaciones) y su «¿Por qué?» muestra la razón;
-#   6. panel: «Uso del MVP» del panel (fuente prototipo) muestra lo que dejó la revisión 3 (una oferta aceptada en
-#      «Plan») con el rótulo «uso del MVP, pocas personas: no es evidencia». Corre después de las demás, con la API
+#   6. panel: «Mochi y búsquedas» del panel (fuente prototipo) muestra lo que dejó la revisión 3 (una oferta aceptada
+#      en «Plan») con el rótulo «uso del MVP, pocas personas: no es evidencia». Corre después de las demás, con la API
 #      todavía en marcha;
 #   7. sin API: se detiene la API y la app muestra «Sin conexión con Mochi».
 set -euo pipefail

@@ -4,8 +4,8 @@ dist*/
 docs/screenshots/*
 !docs/screenshots/1-resumen-escritorio-claro.jpg
 !docs/screenshots/1-resumen-movil-claro.jpg
-!docs/screenshots/2-oportunidades-escritorio-claro.jpg
-!docs/screenshots/3-frecuencia-escritorio-claro.jpg
-!docs/screenshots/3-frecuencia-escritorio-oscuro.jpg
-!docs/screenshots/4-verticales-escritorio-claro.jpg
-!docs/screenshots/5-catalogo-escritorio-claro.jpg
+!docs/screenshots/2-clientes-escritorio-claro.jpg
+!docs/screenshots/2-clientes-escritorio-oscuro.jpg
+!docs/screenshots/3-mochi-escritorio-claro.jpg
+# La foto de la API para el panel en un solo HTML (npm run panel:snapshot): lleva datos de una base, no se versiona
+snapshot/

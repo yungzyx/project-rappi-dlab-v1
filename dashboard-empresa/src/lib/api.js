@@ -1,7 +1,10 @@
-// Cliente de la API de rappi-ia para el panel. Si una consulta de datos simulados o del catálogo falla o tarda
-// demasiado, usa la respuesta guardada en src/fixtures (npm run fixtures, make contract) y la anota, con el origen y la
-// fecha que trae el archivo, para avisar que el panel está en modo sin conexión. El uso del MVP (fuente prototipo) no
-// tiene respaldo: sin la base viva no hay nada honesto que mostrar.
+// Cliente de la API de rappi-ia para el panel. Si una consulta de datos simulados falla o tarda demasiado, usa la
+// respuesta guardada en src/fixtures (npm run fixtures, make contract) y la anota, con el origen y la fecha que trae el
+// archivo, para avisar que el panel está en modo sin conexión. El uso del MVP (fuente prototipo) no tiene respaldo: sin
+// la base viva no hay nada honesto que mostrar. En el panel en un solo HTML (npm run panel:html) no hay API: las
+// respuestas vienen grabadas en el archivo (`virtual:panel-snapshot`, ver vite.config.js), cada una con su fuente.
+import snapshot from 'virtual:panel-snapshot'
+
 /**
  * Dónde está la API (la misma regla que la app): `VITE_API_URL` manda, sin la barra final. Sin ella: en el build de
  * producción, el mismo origen bajo `/api`; en desarrollo, el host desde donde se abrió la página en el puerto 8000.
@@ -23,20 +26,34 @@ export const API_URL = apiUrl(import.meta.env, typeof window !== 'undefined' ? w
 const TIMEOUT_MS = 30_000
 
 export const SOURCES = ['synthetic', 'prototype']
-export const CATALOG = 'catalog'
-const CATALOG_SOURCE = 'catalogo_real'
 
-// Solo las respuestas que usa el panel (concepts.json y health.json quedan como referencia de la API).
-const savedResponses = import.meta.glob(['../fixtures/catalog.json', '../fixtures/*.{synthetic,prototype}.json'], {
-  import: 'default',
-})
+// Solo las respuestas que usa el panel (concepts.json y health.json quedan como referencia de la API). El HTML suelto
+// no las necesita (no tiene API que pueda fallar) y no las lleva.
+const savedResponses =
+  import.meta.env.MODE === 'panel-html'
+    ? {}
+    : import.meta.glob('../fixtures/*.{synthetic,prototype}.json', { import: 'default' })
+
+/** De cuándo y de qué base son las respuestas grabadas (`{ fecha, base }`), o null con la API en vivo. */
+export const SNAPSHOT_INFO = snapshot?.grabado ?? null
+
+// «Ver cómo funciona» (src/demo/): respuestas de ejemplo que pisan a las grabadas mientras dura la demostración.
+let demoResponses = {}
+
+/** Solo en el HTML suelto: pone las respuestas de la demostración (`{}` vuelve a la foto) y olvida lo cargado. */
+export function setDemoResponses(responses) {
+  demoResponses = responses
+  cache.clear()
+}
+
+/** Si lo que se ve trae eventos de ejemplo de la demostración (para rotularlo en cada sección del prototipo). */
+export const isDemoActive = () => Object.keys(demoResponses).length > 0
 
 const cache = new Map()
 const listeners = new Set()
 let fallbacks = [] // [{ key, name, reason }]; se reemplaza (nunca se muta) para useSyncExternalStore
 
 function describeRequest(name, source) {
-  if (name === CATALOG) return { key: CATALOG, name, path: '/analytics/catalog', expected: CATALOG_SOURCE }
   if (!SOURCES.includes(source)) throw new Error(`Fuente desconocida: ${source}`)
   return { key: `${name}.${source}`, name, path: `/analytics/${name}?source=${source}`, expected: source }
 }
@@ -78,6 +95,13 @@ function reasonFor(error) {
 
 const PROTOTYPE_OFFLINE_MESSAGE = 'La API no responde: el uso del MVP solo se ve con la base viva.'
 
+/** Del panel en un solo HTML: la respuesta grabada, validada contra la fuente pedida igual que una en vivo. */
+async function loadFromSnapshot({ key, name, expected }) {
+  const body = demoResponses[key] ?? snapshot.respuestas[key]
+  if (!body) throw new Error(`Este archivo no trae «${name}»: se grabó sin esa consulta.`)
+  return { data: dataFrom(body, expected, name), offline: false, saved: null }
+}
+
 /** `isCurrent` dice si esta petición sigue siendo la de la caché: una vieja que falla tarde no ensucia el aviso. */
 async function loadWithFallback(request, isCurrent) {
   try {
@@ -93,13 +117,15 @@ async function loadWithFallback(request, isCurrent) {
 
 /**
  * Promesa (en caché por métrica y fuente) con `{ data, offline, saved }`; `saved` es el `guardado` del archivo
- * (`{ origen, fecha }`) cuando se usó una respuesta guardada. `name` es una métrica de /analytics o 'catalog'.
+ * (`{ origen, fecha }`) cuando se usó una respuesta guardada. `name` es una métrica de /analytics.
  * Con la fuente prototipo, si la API falla la promesa se rechaza.
  */
 export function loadAnalytics(name, source) {
   const request = describeRequest(name, source)
   if (!cache.has(request.key)) {
-    const promise = loadWithFallback(request, () => cache.get(request.key) === promise)
+    const promise = snapshot
+      ? loadFromSnapshot(request)
+      : loadWithFallback(request, () => cache.get(request.key) === promise)
     promise.catch(() => {}) // quien la lea la ve rechazada; las que nadie alcanza a leer no son un error sin atender
     cache.set(request.key, promise)
   }
