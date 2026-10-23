@@ -84,11 +84,19 @@ export function suggestionTotals(rows) {
 /** Para nombrar una ganadora hacen falta más casos que para mostrar una tasa: con 11 mostradas gana el azar. */
 export const MIN_SHOWN_FOR_TOP = 50
 
-/** La sugerencia (concepto y vertical) que más se acepta entre las que tienen 50 o más mostradas, o null. */
+// Verticales que Mochi no propone por su cuenta (offers/guards.py): sus filas son respuestas a lo que la persona pidió y
+// no pueden ser la sugerencia que el panel recomienda empujar.
+const NOT_PROPOSED = new Set(['licores', 'farmacia'])
+
+/**
+ * La sugerencia (concepto y vertical) que más se acepta entre las que tienen 50 o más mostradas, o null. Nunca una de
+ * Licores ni de Farmacia: el panel no recomienda empujar lo que Mochi no ofrece por su cuenta.
+ */
 export function topSuggestion(rows) {
   return (
     rows
       .filter((row) => row.mostradas >= MIN_SHOWN_FOR_TOP && row.aceptacion_pct !== null)
+      .filter((row) => !NOT_PROPOSED.has(row.vertical))
       .sort((a, b) => b.aceptacion_pct - a.aceptacion_pct || b.mostradas - a.mostradas)[0] ?? null
   )
 }

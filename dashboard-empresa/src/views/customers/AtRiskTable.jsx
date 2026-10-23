@@ -15,7 +15,7 @@ const COLUMNS = [
   { key: 'avisos', header: 'Acepta avisos', render: (row) => (row.consiente_avisos ? 'Sí' : 'No') },
   {
     key: 'accion',
-    header: 'Acción sugerida',
+    header: 'Acción',
     wide: true,
     render: (row) => <span className="action-cell">{row.accion}</span>,
   },

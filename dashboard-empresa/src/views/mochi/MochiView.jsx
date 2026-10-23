@@ -99,11 +99,18 @@ function Motor({ source }) {
   return <MotorCheck data={useAnalytics('motor', source)} source={source} />
 }
 
-/** La demanda agrupada (5 o más personas, con su acción) o, si no llega a ese mínimo, las búsquedas sin resultado. */
+/**
+ * Las cuentas de búsquedas sin resultado y, debajo, la demanda agrupada (5 o más personas, con su acción) o, si ninguna
+ * llega a ese mínimo, las búsquedas sin resultado por vertical y concepto.
+ */
 function Unmet({ source }) {
   const [opportunities, unmet] = useAnalyticsMany(['opportunities', 'unmet'], source)
-  if (opportunities.length) return <UnmetDemand rows={opportunities} />
-  return <UnmetSearches data={unmet} />
+  return (
+    <>
+      <UnmetSearches data={unmet} table={!opportunities.length} />
+      {opportunities.length > 0 && <UnmetDemand rows={opportunities} />}
+    </>
+  )
 }
 
 function Rising({ source }) {

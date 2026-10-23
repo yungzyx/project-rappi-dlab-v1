@@ -55,7 +55,7 @@ export function UnmetDemand({ rows }) {
     { key: 'existe_en', header: 'Dónde existe', render: (row) => <WhereItExists value={row.existe_en} /> },
     {
       key: 'accion',
-      header: 'Acción sugerida',
+      header: 'Acción',
       wide: true,
       render: (row) => <span className="action-cell">{row.accion}</span>,
     },

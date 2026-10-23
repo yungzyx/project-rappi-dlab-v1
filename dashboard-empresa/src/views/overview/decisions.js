@@ -1,6 +1,6 @@
 // Las 4 preguntas del Resumen, cada una con su cifra, su contexto (comparación o tendencia) y una acción sugerida.
 // Funciones puras sobre las respuestas de /analytics: `{ figure, unit, context, delta?, action? }`.
-import { formatNumber, formatPct, formatPoints, formatSignedPct } from '../../lib/format.js'
+import { formatDate, formatNumber, formatPct, formatPoints, formatSignedPct } from '../../lib/format.js'
 import { comboLabel, demandLabel, verticalLabel } from '../../lib/labels.js'
 import { biggestStep } from '../customers/ladder.js'
 import {
@@ -47,7 +47,7 @@ export function churnDecision(kpis, winback) {
     context: `Pasaron el doble de su ritmo sin pedir y todavía se pueden recuperar. Otras ${formatNumber(lost)} pasaron el triple y se dan por perdidas.`,
     action:
       winback.califican > 0
-        ? `Invitar a volver con «¿Volvemos a…?» de Mochi: hoy califican ${people(winback.califican)} que dejaron algo que pedían con ritmo. Fuera de la app, solo a quien aceptó avisos.`
+        ? `Invitar a volver con «¿Volvemos a…?» de Mochi: ${winback.dia ? `al ${formatDate(winback.dia)}` : 'hoy'} califican ${people(winback.califican)} que dejaron algo que pedían con ritmo. Fuera de la app, solo a quien aceptó avisos.`
         : 'Recordarles su concepto top en su ritmo; fuera de la app, solo a quien aceptó avisos.',
   }
 }

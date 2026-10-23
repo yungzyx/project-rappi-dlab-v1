@@ -37,7 +37,7 @@ export default function App() {
   const selectView = (id, section) => {
     setUrlState((state) => ({ ...state, view: id }))
     if (section) {
-      anchor.current = section
+      anchor.current = { id: section, focus: true }
       return
     }
     // Al cambiar de vista desde abajo, se vuelve al comienzo del contenido (bajo la barra fija).
@@ -48,16 +48,18 @@ export default function App() {
   // También tras recargar los datos: la demostración vuelve a pintar la vista y lleva a la sección que cambió. Lo que
   // está más arriba puede seguir cargando y empujar la sección hacia abajo: se vuelve a llevar arriba cuando termina
   // (hasta ~2 s; si la persona se mueve antes, no se la interrumpe).
+  // El enlace de una decisión pasa el foco al título; la demostración solo desplaza (el foco sigue en su tarjeta).
   useEffect(() => {
-    const target = anchor.current && document.getElementById(anchor.current)
+    const pending = anchor.current
     anchor.current = null
+    const target = pending && document.getElementById(pending.id)
     if (!target) return undefined
     target.scrollIntoView?.({ block: 'start' })
-    target.focus({ preventScroll: true })
+    if (pending.focus) target.focus({ preventScroll: true })
     let frames = 0
     let frame
     const settle = () => {
-      if (document.activeElement !== target) return
+      if (pending.focus && document.activeElement !== target) return
       if (main.current?.querySelector('.state--loading') && frames < 120) {
         frames += 1
         frame = requestAnimationFrame(settle)
@@ -103,7 +105,7 @@ export default function App() {
             onShow={(target) => {
               // El recorrido es del prototipo: lleva a esa fuente y a la sección que cambia; al cerrar, solo repinta.
               if (target) {
-                anchor.current = target.section
+                anchor.current = { id: target.section, focus: false }
                 setUrlState({ view: target.view, source: 'prototype' })
               }
               setReloadKey((key) => key + 1)

@@ -71,4 +71,14 @@ describe('offers', () => {
     expect(topSuggestion(rows).concepto).toBe('C')
     expect(topSuggestion([])).toBeNull()
   })
+
+  test('the top suggestion is never from Licores or Farmacia, even with the best rate', () => {
+    const rows = [
+      { concepto: '🍺 Cerveza', vertical: 'licores', mostradas: 900, aceptacion_pct: 40 },
+      { concepto: '🧷 Pañales', vertical: 'farmacia', mostradas: 300, aceptacion_pct: 38 },
+      { concepto: '🥨 Snacks salados', vertical: 'conveniencia', mostradas: 200, aceptacion_pct: 32.6 },
+    ]
+
+    expect(topSuggestion(rows).concepto).toBe('🥨 Snacks salados')
+  })
 })

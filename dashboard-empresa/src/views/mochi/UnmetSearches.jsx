@@ -15,8 +15,11 @@ const COLUMNS = [
   { key: 'sin_resultado', header: 'Sin resultado', numeric: true, render: (row) => formatNumber(row.sin_resultado) },
 ]
 
-/** Búsquedas que no encontraron nada, por vertical y concepto. Nunca el texto buscado (la API no lo entrega). */
-export function UnmetSearches({ data }) {
+/**
+ * Búsquedas que no encontraron nada: las cuentas y, con `table`, por vertical y concepto. Nunca el texto buscado (la API
+ * no lo entrega).
+ */
+export function UnmetSearches({ data, table = true }) {
   const { personas, busquedas, sin_resultado: unmet, por_vertical: rows } = data
   if (!busquedas) {
     return <EmptyState title="Todavía no hay búsquedas">Aparecen cuando alguien busca en la app.</EmptyState>
@@ -33,7 +36,7 @@ export function UnmetSearches({ data }) {
           { label: 'Personas que buscaron', value: formatNumber(personas) },
         ]}
       />
-      {rows.length > 0 && (
+      {table && rows.length > 0 && (
         <DataTable
           caption="Búsquedas sin resultado por vertical y concepto"
           columns={COLUMNS}
@@ -41,7 +44,7 @@ export function UnmetSearches({ data }) {
           rowKey={(row) => `${row.vertical}/${row.concepto ?? ''}`}
         />
       )}
-      {rows.length > 0 && (
+      {table && rows.length > 0 && (
         <p className="cell-sub">Hasta 20 filas, por vertical y concepto; nunca el texto que escribió la persona.</p>
       )}
     </>

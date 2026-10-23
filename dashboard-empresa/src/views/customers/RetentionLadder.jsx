@@ -52,7 +52,7 @@ function Step({ step, toX, ticks }) {
         {ticks.map((tick) => (
           <span key={tick} className="ladder-tick" style={{ left: `${toX(tick)}%` }} />
         ))}
-        <span className="ladder-link" style={{ left: `${from}%`, width: `${to - from}%` }} />
+        <span className="ladder-link" style={{ left: `${Math.min(from, to)}%`, width: `${Math.abs(to - from)}%` }} />
         <span className="ladder-dot ladder-dot--from" style={{ left: `${from}%` }}>
           <span className="ladder-value ladder-value--from">{formatPct(step.fromPct, 0)}</span>
         </span>

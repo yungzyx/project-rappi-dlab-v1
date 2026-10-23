@@ -44,6 +44,6 @@ export function biggestStep(rows) {
 
 /** Dominio del eje de retención: desde la decena bajo el menor valor (con aire) hasta 100%. */
 export function retentionDomain(steps) {
-  const lowest = Math.min(100, ...steps.map((step) => step.fromPct))
+  const lowest = Math.min(100, ...steps.flatMap((step) => [step.fromPct, step.toPct]))
   return [Math.max(0, Math.floor((lowest - 5) / 10) * 10), 100]
 }

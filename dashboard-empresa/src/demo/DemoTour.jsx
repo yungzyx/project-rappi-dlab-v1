@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import snapshot from 'virtual:panel-snapshot'
 import { Icon } from '../components/Icon.jsx'
 import { setDemoResponses } from '../lib/api.js'
@@ -25,6 +25,9 @@ const HIGHLIGHT_MS = 1800
  */
 export default function DemoTour({ onShow }) {
   const [step, setStep] = useState(null) // null: cerrada · 0: inicio · 1…N: pasos · N + 1: final
+  const launch = useRef(null)
+  const advance = useRef(null)
+  const open = useRef(false)
   const stop = step === null ? null : step === 0 ? INTRO : (TOUR[step - 1] ?? OUTRO)
 
   const go = (next) => {
@@ -34,7 +37,18 @@ export default function DemoTour({ onShow }) {
     onShow(target ? { view: target.view, section: target.section } : null)
   }
 
-  // Escape cierra la demostración desde cualquier parte: cada paso pasa el foco al título de la sección.
+  // Al abrir, el foco va al botón que avanza (el que abrió desaparece); al cerrar, vuelve a «Ver cómo funciona».
+  useEffect(() => {
+    if (step === null) {
+      if (open.current) launch.current?.focus()
+      open.current = false
+    } else if (!open.current) {
+      open.current = true
+      advance.current?.focus()
+    }
+  }, [step])
+
+  // Escape cierra la demostración desde cualquier parte de la página.
   useEffect(() => {
     if (step === null) return undefined
     const close = (event) => {
@@ -58,7 +72,7 @@ export default function DemoTour({ onShow }) {
 
   if (step === null) {
     return (
-      <button type="button" className="demo-launch" onClick={() => go(0)}>
+      <button type="button" className="demo-launch" ref={launch} onClick={() => go(0)}>
         <Icon name="chart" />
         Ver cómo funciona
       </button>
@@ -88,15 +102,10 @@ export default function DemoTour({ onShow }) {
         <button type="button" className="link-button" onClick={() => go(null)}>
           Cerrar
         </button>
-        {last ? (
-          <button type="button" className="demo-next" onClick={() => go(0)}>
-            Repetir
-          </button>
-        ) : (
-          <button type="button" className="demo-next" onClick={() => go(step + 1)}>
-            {step === 0 ? 'Empezar' : step === TOUR.length ? 'Terminar' : 'Siguiente'}
-          </button>
-        )}
+        {/* Un solo botón que avanza: así el foco no se pierde al pasar de un paso a otro ni al final. */}
+        <button type="button" className="demo-next" ref={advance} onClick={() => go(last ? 0 : step + 1)}>
+          {last ? 'Repetir' : step === 0 ? 'Empezar' : step === TOUR.length ? 'Terminar' : 'Siguiente'}
+        </button>
       </div>
     </aside>
   )

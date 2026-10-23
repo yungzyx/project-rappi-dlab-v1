@@ -131,7 +131,7 @@ PANEL_API_URL=http://127.0.0.1:8020 npm run panel:snapshot
 PANEL_HTML_COPY="$HOME/Desktop/Panel Rappi.html" npm run panel:html
 ```
 
-`panel:snapshot` solo pide (GET) las métricas de `src/lib/metrics.js` con las dos fuentes y se niega al puerto 8000 y a hosts de otro equipo. `panel:html` construye el modo `panel-html` (las respuestas llegan por el módulo `virtual:panel-snapshot` de `vite.config.js`; en la app normal ese módulo vale `null`, así la foto nunca entra en `dist/`) y mete el JS, el CSS, el tema y el ícono en el HTML (~0,6 MB).
+`panel:snapshot` solo pide (GET) las métricas de `src/lib/metrics.js` con las dos fuentes y se niega al puerto 8000 y a hosts de otro equipo. La API no dice sobre qué base corre: el nombre que muestra el archivo es el que declara `PANEL_SNAPSHOT_BASE` (por defecto, `rappi_staging`), y quien graba responde por él. `panel:html` construye el modo `panel-html` (las respuestas llegan por el módulo `virtual:panel-snapshot` de `vite.config.js`; en la app normal ese módulo vale `null`, así la foto nunca entra en `dist/`) y mete el JS, el CSS, el tema y el ícono en el HTML (~0,6 MB).
 
 Se ve todo lo del panel con las dos fuentes, los rótulos de procedencia de siempre y un aviso fijo «Foto sin conexión» con la fecha y la base de donde salió.
 

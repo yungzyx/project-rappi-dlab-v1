@@ -17,7 +17,7 @@ vi.mock('virtual:panel-snapshot', async () => {
   }
   respuestas['kpis.synthetic'] = { ...kpis, data: { ...kpis.data, usuarios_activos: 4242 } }
   respuestas['trends.prototype'] = { source: 'synthetic', data: [] } // de la otra fuente: no se muestra
-  delete respuestas['weekly.prototype']
+  delete respuestas['assortment.prototype'] // una respuesta que falta en la foto
   return { default: { grabado: { fecha: '2026-10-23', base: 'rappi_staging' }, respuestas } }
 })
 
@@ -42,7 +42,7 @@ describe('panel en un solo HTML', () => {
 
   test('a recorded answer from the other source is refused, and a missing one says so', async () => {
     await expect(loadAnalytics('trends', 'prototype')).rejects.toThrow('Se esperaba la fuente prototype')
-    await expect(loadAnalytics('weekly', 'prototype')).rejects.toThrow('Este archivo no trae «weekly»')
+    await expect(loadAnalytics('assortment', 'prototype')).rejects.toThrow('Este archivo no trae «assortment»')
   })
 
   test('the shell says it is a photo: date and copy of the base, no refresh and no presentation link', async () => {
@@ -83,6 +83,8 @@ describe('Ver cómo funciona', () => {
     expect(within(tour).getByText('Eventos de ejemplo sobre la foto grabada: no son datos reales.')).toBeTruthy()
     expect(window.location.search).toBe('?vista=mochi&fuente=prototipo')
     expect(await planRow()).toEqual(['1', '1']) // lo grabado: 1 mostrada, 1 aceptada
+    const advance = within(tour).getByRole('button', { name: 'Empezar' })
+    expect(document.activeElement).toBe(advance) // el foco queda en la tarjeta, no en el título de la sección
 
     expect(screen.queryByText(/con eventos de ejemplo de la demostración/)).toBeNull() // todavía es la foto
 
@@ -94,9 +96,23 @@ describe('Ver cómo funciona', () => {
 
     await act(async () => fireEvent.click(within(tour).getByRole('button', { name: 'Siguiente' })))
     expect(await planRow()).toEqual(['2', '2'])
+    expect(document.activeElement).toBe(advance)
+
+    // Paso 3: el pedido cuenta en la frecuencia de 30 días del Resumen.
+    await act(async () => fireEvent.click(within(tour).getByRole('button', { name: 'Siguiente' })))
+    expect(window.location.search).toBe('?vista=resumen&fuente=prototipo')
+    const frequency = await screen.findByRole('article', { name: 'Frecuencia (30 días)' })
+    expect(within(frequency).getByText(/4 pedidos de 7 personas/)).toBeTruthy() // lo grabado: 3 de 6
+
+    // Paso 4: una búsqueda sin resultado más en «Qué buscan y no encuentran»; el botón ya dice «Terminar».
+    await act(async () => fireEvent.click(within(tour).getByRole('button', { name: 'Siguiente' })))
+    expect(within(tour).getByRole('button', { name: 'Terminar' })).toBe(advance)
+    expect(window.location.search).toBe('?vista=mochi&fuente=prototipo')
+    expect(await screen.findByText('2 de 2')).toBeTruthy() // lo grabado: 1 de 1
 
     await act(async () => fireEvent.keyDown(document.body, { key: 'Escape' })) // Escape cierra desde cualquier parte
     expect(screen.queryByRole('complementary', { name: 'Ver cómo funciona' })).toBeNull()
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Ver cómo funciona' }))
     expect(await planRow()).toEqual(['1', '1'])
     expect(globalThis.fetch).not.toHaveBeenCalled()
   })

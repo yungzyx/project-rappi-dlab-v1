@@ -40,6 +40,8 @@ describe('ladderSteps', () => {
 
   test('the axis starts at the tens below the lowest value and ends at 100%', () => {
     expect(retentionDomain(ladderSteps(rappi))).toEqual([30, 100])
-    expect(retentionDomain([{ fromPct: 3 }])).toEqual([0, 100])
+    expect(retentionDomain([{ fromPct: 3, toPct: 10 }])).toEqual([0, 100])
+    // Un paso que baja también cabe en el eje.
+    expect(retentionDomain([{ fromPct: 60, toPct: 42 }])).toEqual([30, 100])
   })
 })

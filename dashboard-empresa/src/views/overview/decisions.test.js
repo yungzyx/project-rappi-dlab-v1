@@ -34,6 +34,10 @@ describe('churnDecision', () => {
     expect(decision.figure).toBe('280')
     expect(decision.context).toMatch(/Otras 564 pasaron el triple y se dan por perdidas/)
     expect(decision.action).toMatch(/hoy califican 137 personas que dejaron algo que pedían con ritmo/)
+    // Con datos simulados, la fecha del último pedido simulado y no «hoy».
+    expect(churnDecision({ en_riesgo: 1, perdidos: 0 }, { califican: 2, dia: '2026-10-17' }).action).toMatch(
+      /al 17-10-2026 califican 2 personas/,
+    )
   })
 
   test('without anyone to invite back, the reminder in their rhythm', () => {
