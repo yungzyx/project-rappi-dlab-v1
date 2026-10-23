@@ -7,8 +7,10 @@ import { churnDecision, crossSellDecision, demandDecision, mochiDecision } from 
 import { Pulse } from './Pulse.jsx'
 import './overview.css'
 
-function CrossSell({ source }) {
-  return <DecisionBody decision={crossSellDecision(useAnalytics('combos', source))} source="rappi" />
+// La tabla de Rappi viene en /analytics/combos con cualquier fuente: se lee con la simulada, que tiene respaldo sin
+// conexión (con la del prototipo y la API caída, el dato de Rappi no tiene por qué caerse).
+function CrossSell() {
+  return <DecisionBody decision={crossSellDecision(useAnalytics('combos', 'synthetic'))} source="rappi" />
 }
 
 function Churn({ source }) {
@@ -45,7 +47,7 @@ export function OverviewView({ source, onNavigate }) {
             linkLabel="Ver la escalera"
             onOpen={() => onNavigate('clientes', 'venta-cruzada')}
           >
-            <CrossSell source={source} />
+            <CrossSell />
           </DecisionCard>
           <DecisionCard
             id="decision-perdiendo"

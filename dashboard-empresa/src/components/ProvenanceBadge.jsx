@@ -6,8 +6,6 @@ const KINDS = {
   synthetic: { className: 'badge--simulated', icon: 'flask', label: 'Simulado' },
   prototype: { className: 'badge--prototype', icon: 'flask', label: 'Prototipo' },
   rappi: { className: 'badge--real', icon: 'check', label: 'Dato de Rappi' },
-  'demand-synthetic': { className: 'badge--simulated', icon: 'flask', label: 'Demanda simulada' },
-  'demand-prototype': { className: 'badge--prototype', icon: 'flask', label: 'Demanda del prototipo' },
 }
 
 export function ProvenanceBadge({ kind }) {

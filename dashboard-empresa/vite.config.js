@@ -31,14 +31,10 @@ const HTML_BUILD = {
   rolldownOptions: { input: { panel: 'index.html' }, output: { codeSplitting: false } },
 }
 
-// En ese armado entra además «Ver cómo funciona» (src/demo/): fuera de él, App ni siquiera importa su código.
-const HTML_ENV = { 'import.meta.env.VITE_PANEL_DEMO': JSON.stringify('1') }
-
 export default defineConfig(({ mode }) => ({
   // Bajo una subruta (p. ej. PANEL_BASE=/panel/ detrás de un proxy); por defecto, la raíz. El HTML suelto, relativo.
   base: mode === 'panel-html' ? './' : (process.env.PANEL_BASE ?? '/'),
   plugins: [react(), panelSnapshot(mode)],
-  define: mode === 'panel-html' ? HTML_ENV : {},
   server: { port: 5175 },
   // Dos páginas: el panel (index.html) y la presentación estática (presentacion.html).
   build:

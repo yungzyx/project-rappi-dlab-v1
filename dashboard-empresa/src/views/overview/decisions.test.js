@@ -148,7 +148,7 @@ describe('demandDecision', () => {
     expect(decision.figure).toBe('14,0%')
     expect(decision.delta).toEqual({ value: 4, goodWhen: 'down', suffix: 'vs hace 4 semanas' })
     expect(decision.context).toBe(
-      'Lo que más falta: 🇵🇪 Comida peruana en Restaurantes, 708 personas (+31% en 4 semanas).',
+      'Lo que más falta: 🇵🇪 Comida peruana en Restaurantes, 708 personas en total (+31% en las últimas 4 semanas).',
     )
     expect(decision.action).toMatch(/^Revisar primero el buscador .*sumar comercios\.$/)
   })
@@ -168,7 +168,9 @@ describe('demandDecision', () => {
   test('nothing missing', () => {
     const decision = demandDecision({ kpis, weekly: [], asOf: null, opportunities: [], unmet: { por_vertical: [] } })
 
-    expect(decision.context).toBe('Ninguna búsqueda de esta fuente quedó sin resultado.')
+    expect(decision.context).toBe(
+      'Ninguna búsqueda sin resultado que se pueda mostrar (los conceptos sensibles no se muestran).',
+    )
     expect(decision.action).toBeUndefined()
   })
 })

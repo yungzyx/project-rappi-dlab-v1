@@ -267,3 +267,34 @@
 .mvp-note strong {
   font-weight: 700;
 }
+
+.mvp-note-demo {
+  font-weight: 600;
+  color: var(--sim-ink);
+}
+
+/* ---------- Lo que queda a un clic (la serie semanal, la lista de personas) ---------- */
+.disclosure {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.disclosure > summary {
+  justify-self: end;
+  list-style: none;
+  cursor: pointer;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--brand-ink);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.disclosure > summary:hover {
+  text-decoration-thickness: 2px;
+}

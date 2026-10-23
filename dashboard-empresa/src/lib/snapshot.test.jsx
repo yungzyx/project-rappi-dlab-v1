@@ -22,7 +22,7 @@ vi.mock('virtual:panel-snapshot', async () => {
 })
 
 const { loadAnalytics, SNAPSHOT_INFO } = await import('./api.js')
-vi.stubEnv('VITE_PANEL_DEMO', '1') // el armado del HTML suelto trae «Ver cómo funciona»; se lee al cargar App
+vi.stubEnv('MODE', 'panel-html') // el armado del HTML suelto trae «Ver cómo funciona»; se lee al cargar App
 const { default: App } = await import('../App.jsx')
 
 describe('panel en un solo HTML', () => {
@@ -84,14 +84,18 @@ describe('Ver cómo funciona', () => {
     expect(window.location.search).toBe('?vista=mochi&fuente=prototipo')
     expect(await planRow()).toEqual(['1', '1']) // lo grabado: 1 mostrada, 1 aceptada
 
+    expect(screen.queryByText(/con eventos de ejemplo de la demostración/)).toBeNull() // todavía es la foto
+
     await act(async () => fireEvent.click(within(tour).getByRole('button', { name: 'Empezar' })))
     expect(within(tour).getByText('Paso 1 de 4')).toBeTruthy()
     expect(await planRow()).toEqual(['2', '1'])
+    // Cada sección del prototipo dice que trae eventos de ejemplo, no solo la tarjeta.
+    expect(screen.getAllByText(/con eventos de ejemplo de la demostración: no son datos reales/)).toHaveLength(2)
 
     await act(async () => fireEvent.click(within(tour).getByRole('button', { name: 'Siguiente' })))
     expect(await planRow()).toEqual(['2', '2'])
 
-    await act(async () => fireEvent.click(within(tour).getByRole('button', { name: 'Cerrar' })))
+    await act(async () => fireEvent.keyDown(document.body, { key: 'Escape' })) // Escape cierra desde cualquier parte
     expect(screen.queryByRole('complementary', { name: 'Ver cómo funciona' })).toBeNull()
     expect(await planRow()).toEqual(['1', '1'])
     expect(globalThis.fetch).not.toHaveBeenCalled()

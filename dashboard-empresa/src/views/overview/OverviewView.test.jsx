@@ -34,11 +34,15 @@ describe('OverviewView', () => {
     expect(within(demand).getByText('26,9%')).toBeTruthy() // la última semana completa al corte
     expect(within(demand).getByText('+8,6 puntos')).toBeTruthy()
     expect(
-      within(demand).getByText(/🇵🇪 Comida peruana en Restaurantes, 721 personas \(\+42% en 4 semanas\)/),
+      within(demand).getByText(
+        /🇵🇪 Comida peruana en Restaurantes, 721 personas en total \(\+42% en las últimas 4 semanas\)/,
+      ),
     ).toBeTruthy()
     expect(within(demand).getByText(/^Revisar primero el buscador/)).toBeTruthy()
 
-    expect(screen.getAllByText('Acción sugerida')).toHaveLength(4)
+    // Solo la del dato de Rappi es una sugerencia; con datos simulados, un ejemplo de la mecánica.
+    expect(within(decision('¿Dónde está la venta cruzada?')).getByText('Acción sugerida')).toBeTruthy()
+    expect(screen.getAllByText('Ejemplo de acción (datos simulados)')).toHaveLength(3)
     expect(screen.queryByText(NOT_EVIDENCE)).toBeNull()
   })
 

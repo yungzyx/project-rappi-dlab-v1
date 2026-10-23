@@ -6,8 +6,9 @@ import { Churn } from './Churn.jsx'
 import { RetentionLadder } from './RetentionLadder.jsx'
 import './customers.css'
 
-function Ladder({ source }) {
-  const { rappi } = useAnalytics('combos', source)
+// La tabla de Rappi no depende de la fuente: se lee con la simulada, que tiene respaldo sin conexión.
+function Ladder() {
+  const { rappi } = useAnalytics('combos', 'synthetic')
   return (
     <>
       <RetentionLadder rappi={rappi} />
@@ -38,7 +39,7 @@ export function CustomersView({ source }) {
         </div>
         <div className="block">
           <Async>
-            <Ladder source={source} />
+            <Ladder />
           </Async>
         </div>
       </section>

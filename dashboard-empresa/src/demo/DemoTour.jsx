@@ -34,6 +34,16 @@ export default function DemoTour({ onShow }) {
     onShow(target ? { view: target.view, section: target.section } : null)
   }
 
+  // Escape cierra la demostración desde cualquier parte: cada paso pasa el foco al título de la sección.
+  useEffect(() => {
+    if (step === null) return undefined
+    const close = (event) => {
+      if (event.key === 'Escape') go(null)
+    }
+    document.addEventListener('keydown', close)
+    return () => document.removeEventListener('keydown', close)
+  })
+
   // Marca un momento la sección que cambió.
   useEffect(() => {
     const section = stop?.section && document.getElementById(stop.section)?.closest('section')
@@ -57,11 +67,7 @@ export default function DemoTour({ onShow }) {
 
   const last = step === TOUR.length + 1
   return (
-    <aside
-      className="demo-tour"
-      aria-label="Ver cómo funciona"
-      onKeyDown={(event) => event.key === 'Escape' && go(null)}
-    >
+    <aside className="demo-tour" aria-label="Ver cómo funciona">
       <header className="demo-tour-head">
         <span className="badge badge--simulated">
           <Icon name="flask" />

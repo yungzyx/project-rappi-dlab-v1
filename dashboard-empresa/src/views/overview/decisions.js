@@ -110,7 +110,7 @@ function demandAction(apiAction) {
 function growthText(row) {
   if (row.recientes === 0) return 'sin búsquedas en 4 semanas'
   if (row.crecimiento_pct === null || row.crecimiento_pct === undefined) return 'nueva en 4 semanas'
-  return `${formatSignedPct(row.crecimiento_pct)} en 4 semanas`
+  return `${formatSignedPct(row.crecimiento_pct)} en las últimas 4 semanas`
 }
 
 /**
@@ -137,7 +137,7 @@ export function demandDecision({ kpis, weekly, asOf, opportunities, unmet }) {
   if (top) {
     return {
       ...base,
-      context: `Lo que más falta: ${demandLabel(top)} en ${verticalLabel(top.vertical)}, ${people(top.usuarios)} (${growthText(top)}).`,
+      context: `Lo que más falta: ${demandLabel(top)} en ${verticalLabel(top.vertical)}, ${people(top.usuarios)} en total (${growthText(top)}).`,
       action: demandAction(top.accion),
     }
   }
@@ -151,5 +151,9 @@ export function demandDecision({ kpis, weekly, asOf, opportunities, unmet }) {
       action: 'Revisar si falta el producto o el sinónimo antes de salir a buscar comercios.',
     }
   }
-  return { ...base, context: 'Ninguna búsqueda de esta fuente quedó sin resultado.' }
+  // `unmet` y `opportunities` no muestran conceptos sensibles; el % sí los cuenta: puede haber sin resultado y nada que mostrar.
+  return {
+    ...base,
+    context: 'Ninguna búsqueda sin resultado que se pueda mostrar (los conceptos sensibles no se muestran).',
+  }
 }

@@ -1,13 +1,15 @@
 // Graba las respuestas que lee el panel (npm run panel:snapshot) en snapshot/panel.json, para armarlo en un solo HTML
 // que abre sin la API ni internet (npm run panel:html). Solo pide (GET): no escribe nada en la base.
 //
-// La API debe correr sobre una COPIA de la base, nunca sobre `rappi`: el archivo lleva lo que la gente hizo en la app
-// (contado, nunca nombrado) y se comparte suelto. Desde rappi-ia:
+// La API debe correr sobre una COPIA de la base, nunca sobre `rappi`: el archivo se comparte suelto y lleva lo que la
+// gente hizo en la app (cuentas y, en la lista de riesgo, personas con id seudónimo y su concepto top no sensible).
+// Desde rappi-ia:
 //   DATABASE_URL=postgresql:///rappi_staging HF_HUB_OFFLINE=1 API_PREWARM=0 \
 //     .venv/bin/python -m uvicorn rappi_ia.api.app:app --host 127.0.0.1 --port 8020
 //   PANEL_API_URL=http://127.0.0.1:8020 npm run panel:snapshot
-// Se niega a usar el puerto 8000 (la API de `make mvp`, sobre `rappi`) o un host que no sea de este equipo. El nombre de
-// la base que se muestra en el archivo es PANEL_SNAPSHOT_BASE (por defecto, rappi_staging).
+// Se niega a usar el puerto 8000 (la API de `make mvp`, sobre `rappi`) o un host que no sea de este equipo. La API no
+// dice sobre qué base corre: el nombre que muestra el archivo es el que declara PANEL_SNAPSHOT_BASE (por defecto,
+// rappi_staging), y quien graba responde por él.
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { PANEL_METRICS } from '../src/lib/metrics.js'

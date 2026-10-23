@@ -27,8 +27,12 @@ const TIMEOUT_MS = 30_000
 
 export const SOURCES = ['synthetic', 'prototype']
 
-// Solo las respuestas que usa el panel (concepts.json y health.json quedan como referencia de la API).
-const savedResponses = import.meta.glob('../fixtures/*.{synthetic,prototype}.json', { import: 'default' })
+// Solo las respuestas que usa el panel (concepts.json y health.json quedan como referencia de la API). El HTML suelto
+// no las necesita (no tiene API que pueda fallar) y no las lleva.
+const savedResponses =
+  import.meta.env.MODE === 'panel-html'
+    ? {}
+    : import.meta.glob('../fixtures/*.{synthetic,prototype}.json', { import: 'default' })
 
 /** De cuándo y de qué base son las respuestas grabadas (`{ fecha, base }`), o null con la API en vivo. */
 export const SNAPSHOT_INFO = snapshot?.grabado ?? null
@@ -41,6 +45,9 @@ export function setDemoResponses(responses) {
   demoResponses = responses
   cache.clear()
 }
+
+/** Si lo que se ve trae eventos de ejemplo de la demostración (para rotularlo en cada sección del prototipo). */
+export const isDemoActive = () => Object.keys(demoResponses).length > 0
 
 const cache = new Map()
 const listeners = new Set()
