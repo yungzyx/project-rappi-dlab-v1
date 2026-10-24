@@ -433,22 +433,23 @@ def test_the_most_ordered_dishes_skip_one_without_concept_whose_description_name
 
     add_store(db, 22, "restaurantes", "Barbazul")
     db.execute("INSERT INTO scrape_runs (run_id, kind, status) VALUES (999, 'restaurants', 'done')")
-    for item_id, name, description, concept in (
-        (971, "Mal paso", "Whiskey con coca-cola", None),
-        (972, "Papas Deli", "Papas fritas", None),
-        (973, "Café irlandés", "Café, whiskey y crema chantilly", "cafe"),  # un concepto de bebida no lo dice
-        (974, "Risotto Deli", "Risotto de hongos al vino blanco", "pastas"),  # uno de comida, sí
-        (975, "Combinado", "C&oacute;ctel de la casa", None),  # la descripción llega con entidades HTML
+    for item_id, name, description in (
+        (971, "Mal paso", "Whiskey con coca-cola"),
+        (972, "Papas Deli", "Papas fritas"),
+        (973, "Café irlandés", "Café, whiskey y crema chantilly"),  # concepto cafe: uno de bebida no lo dice
+        (974, "Risotto Deli", "Risotto de hongos al vino blanco"),  # concepto pastas: uno de comida, sí
+        (975, "Combinado", "C&oacute;ctel de la casa"),  # la descripción llega con entidades HTML
     ):
         add_dish(db, item_id, name, 22, "Combos")
         db.execute("UPDATE menu_items SET description = %s WHERE item_id = %s", (description, item_id))
         db.execute("INSERT INTO menu_price_snapshots (run_id, item_id, price) VALUES (999, %s, 5990)", (item_id,))
-        if concept:
-            db.execute(
-                """INSERT INTO item_concepts (entity_type, entity_id, concept_id, method, confidence)
-                   VALUES ('menu_item', %s, %s, 'regla', 1)""",
-                (str(item_id), concept),
-            )
+    stock(db, HashEmbedder(), [])  # la taxonomía en la base
+    db.execute("DELETE FROM item_concepts WHERE entity_type = 'menu_item' AND entity_id IN ('971', '972', '975')")
+    db.execute(
+        """INSERT INTO item_concepts (entity_type, entity_id, concept_id, method, confidence)
+           VALUES ('menu_item', '973', 'cafe', 'regla', 1), ('menu_item', '974', 'pastas', 'regla', 1)
+           ON CONFLICT (entity_type, entity_id) DO UPDATE SET concept_id = EXCLUDED.concept_id"""
+    )
 
     found = _priced_in_vertical(db, "restaurantes", ["971", "972", "973", "974", "975"])
     assert set(found) == {"972", "974"}
