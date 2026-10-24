@@ -13,6 +13,9 @@
 // - rappi-ia/src/rappi_ia/offers/engine.py ......... vertical por probar, recompra, volver, complementos (offers.js)
 // - rappi-ia/src/rappi_ia/offers/winback.py y motor/model.py (replenishment) ... recompra y volver (winback.js)
 // - rappi-ia/src/rappi_ia/offers/guards.py ......... lo que el agente nunca ofrece (offers.js: offerableProduct)
+// - rappi-ia/src/rappi_ia/offers/featured.py ....... lo que se puede destacar (offers.js: featuredProduct; sus reglas,
+//   offers/destacado.toml, llegan en meta.featured) y, con engine.py (_typical_first), lo que piden las personas del
+//   panel (personas.js: sampleOf)
 // - rappi-ia/src/rappi_ia/agent/tools.py ........... el foco de la búsqueda (_focus, en search.js) y el complemento
 //   alternado (_takes_second, en offers.js: complementOf)
 // - rappi-ia/src/rappi_ia/agent/rappi_agent.py ..... «qué me recomiendas» (search.js: recommend) y el texto del consejo

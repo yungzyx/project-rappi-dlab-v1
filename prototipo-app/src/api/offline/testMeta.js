@@ -4,7 +4,9 @@
 //   decreciente] y [servicios]) y, de motor/combos.py, FINE_ORDER, SERVICES y OWN_SIGNALS_ONLY;
 // - LABELS: VERTICAL_LABELS de rappi-ia/src/rappi_ia/agent/tools.py;
 // - SCREENS: SCREEN_VERTICALS de rappi-ia/src/rappi_ia/agent/grouped_search.py;
-// - SERVICES: id, nombre y ruta de RappiFavor y RappiTravel en concepts/taxonomy.toml (el `pitch` está acortado).
+// - SERVICES: id, nombre y ruta de RappiFavor y RappiTravel en concepts/taxonomy.toml (el `pitch` está acortado);
+// - FEATURED: rappi-ia/src/rappi_ia/offers/destacado.toml (precio mínimo, conceptos fuera y, acortadas, secciones de
+//   relleno, en palabras como las escribe scripts/demo-snapshot-meta.py).
 // CONCEPTS y los productos son inventados (con los grupos y la marca `offerable` que daría offers/guards.py).
 
 export const COMBOS = {
@@ -91,8 +93,15 @@ export const SERVICES = {
   travel: { id: 'rappitravel', name: 'RappiTravel', pitch: 'vuelos y hoteles', route: 'travel' },
 }
 
+export const FEATURED = {
+  min_main_price: 3000,
+  not_main: ['cafe', 'helados', 'pasteleria', 'postres'],
+  side_sections: [['agregados'], ['extras'], ['bebidas'], ['salsas']],
+}
+
 export const META = {
   combos: COMBOS,
+  featured: FEATURED,
   vertical_labels: LABELS,
   screen_verticals: SCREENS,
   concepts: CONCEPTS,
