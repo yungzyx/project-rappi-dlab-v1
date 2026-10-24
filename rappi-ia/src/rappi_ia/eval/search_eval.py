@@ -76,10 +76,11 @@ def run_queries(
                 continue
             shown_unmet = None
             if mode == SHOWN:
-                # Como /search: los conceptos los detecta la consulta. El agente registra la demanda solo sin
+                # Como /search: los conceptos los detecta la consulta (y si queda «sin resultado», se corrigen los
+                # errores de tipeo y se vuelve a buscar: retrieval/spelling.py). El agente registra la demanda solo sin
                 # productos, y nunca por síntomas: ahí los medicamentos se ocultan por la regla 6d, no por falta de
                 # surtido.
-                outcome = search_products(conn, q["vertical"], q["query"], None, embedder, k=K)
+                outcome = search_products(conn, q["vertical"], q["query"], None, embedder, k=K, correct=True)
                 result = outcome.result
                 items = [(p.entity_type, p.entity_id, p.name, p.concept, p.store) for p in outcome.products]
                 symptom = understander.understand(conn, q["query"], q["vertical"]).symptom

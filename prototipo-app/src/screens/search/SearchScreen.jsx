@@ -7,7 +7,7 @@ import '../../components/search/search.css'
 
 /** Buscador (funcionalidad agregada): busca en vivo en el catálogo de todas las verticales, agrupado por vertical. */
 export default function SearchScreen({ back, push, params }) {
-  const { query, setQuery, data, loading, error, retry, hasQuery, logSearch, pick } = useSearch({
+  const { query, setQuery, data, loading, error, retry, hasQuery, logSearch, pick, searchExact } = useSearch({
     initial: params.query ?? '',
     vertical: params.vertical,
   })
@@ -53,6 +53,7 @@ export default function SearchScreen({ back, push, params }) {
         error={error}
         onRetry={retry}
         onOpenProduct={openProduct}
+        onSearchExact={searchExact}
       />
     </div>
   )

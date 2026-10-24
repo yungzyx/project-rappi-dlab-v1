@@ -390,6 +390,91 @@ def test_an_offer_never_brings_a_dish_from_a_drinks_section(db):
     assert "Gyozas de cerdo" in offered("gyozas", True)
 
 
+def test_an_offer_never_brings_a_dish_without_concept_whose_description_names_alcohol(db):
+    """En la base real, los cócteles de «Barra Barbazul» no tienen concepto ni dicen alcohol en el nombre ni en la
+    sección: solo la descripción. Un concepto de bebida tampoco lo dice («Gautama Jack», gaseosas); uno de comida sí
+    (un risotto al vino blanco se ofrece)."""
+    embedder = HashEmbedder()
+    add_store(db, 22, "restaurantes", "Barbazul")
+    db.execute("INSERT INTO scrape_runs (run_id, kind, status) VALUES (999, 'restaurants', 'done')")
+    for item_id, name, section, description in (
+        (961, "Electric Lemonade Deli", "Barra Barbazul", "Vodka ron gin blue curacao jugo de limón y sprite. 475cc"),
+        (962, "Limonada Deli", "Barra Barbazul", "Jugo de limón, menta y jarabe de azúcar. 475cc"),
+        (963, "Risotto Deli", "Fondos", "Risotto de hongos al vino blanco"),
+        (964, "Gautama Jack", "Bebidas", "Ron havana dorado, leche de coco, maracuya y naranja"),
+    ):
+        add_dish(db, item_id, name, 22, section)
+        db.execute("UPDATE menu_items SET description = %s WHERE item_id = %s", (description, item_id))
+        db.execute("INSERT INTO menu_price_snapshots (run_id, item_id, price) VALUES (999, %s, 5990)", (item_id,))
+    stock(db, embedder, [])
+    db.execute("DELETE FROM item_concepts WHERE entity_type = 'menu_item' AND entity_id IN ('961', '962')")
+    db.execute(
+        """INSERT INTO item_concepts (entity_type, entity_id, concept_id, method, confidence)
+           VALUES ('menu_item', '963', 'pastas', 'regla', 1), ('menu_item', '964', 'gaseosas', 'regla', 1)
+           ON CONFLICT (entity_type, entity_id) DO UPDATE SET concept_id = EXCLUDED.concept_id"""
+    )
+    build_search_documents(db)
+    embed_search_documents(db, embedder)
+
+    def offered(query, offer):
+        return {p.name for p in search_products(db, "restaurantes", query, [], embedder, offer=offer).products}
+
+    assert "Electric Lemonade Deli" in offered("electric lemonade deli", False)  # la búsqueda no cambia
+    assert "Electric Lemonade Deli" not in offered("electric lemonade deli", True)
+    assert "Limonada Deli" in offered("limonada deli", True)
+    assert "Risotto Deli" in offered("risotto deli", True)
+    assert "Gautama Jack" in offered("gautama jack", False)
+    assert "Gautama Jack" not in offered("gautama jack", True)
+
+
+def test_the_most_ordered_dishes_skip_one_without_concept_whose_description_names_alcohol(db):
+    """«Lo más pedido» en restaurantes (`most_ordered`) no pasa por la búsqueda de ofertas."""
+    from rappi_ia.offers.engine import _priced_in_vertical
+
+    add_store(db, 22, "restaurantes", "Barbazul")
+    db.execute("INSERT INTO scrape_runs (run_id, kind, status) VALUES (999, 'restaurants', 'done')")
+    for item_id, name, description in (
+        (971, "Mal paso", "Whiskey con coca-cola"),
+        (972, "Papas Deli", "Papas fritas"),
+        (973, "Café irlandés", "Café, whiskey y crema chantilly"),  # concepto cafe: uno de bebida no lo dice
+        (974, "Risotto Deli", "Risotto de hongos al vino blanco"),  # concepto pastas: uno de comida, sí
+        (975, "Combinado", "C&oacute;ctel de la casa"),  # la descripción llega con entidades HTML
+    ):
+        add_dish(db, item_id, name, 22, "Combos")
+        db.execute("UPDATE menu_items SET description = %s WHERE item_id = %s", (description, item_id))
+        db.execute("INSERT INTO menu_price_snapshots (run_id, item_id, price) VALUES (999, %s, 5990)", (item_id,))
+    stock(db, HashEmbedder(), [])  # la taxonomía en la base
+    db.execute("DELETE FROM item_concepts WHERE entity_type = 'menu_item' AND entity_id IN ('971', '972', '975')")
+    db.execute(
+        """INSERT INTO item_concepts (entity_type, entity_id, concept_id, method, confidence)
+           VALUES ('menu_item', '973', 'cafe', 'regla', 1), ('menu_item', '974', 'pastas', 'regla', 1)
+           ON CONFLICT (entity_type, entity_id) DO UPDATE SET concept_id = EXCLUDED.concept_id"""
+    )
+
+    found = _priced_in_vertical(db, "restaurantes", ["971", "972", "973", "974", "975"])
+    assert set(found) == {"972", "974"}
+
+
+def test_vertical_to_try_never_offers_a_popular_drink_whose_description_names_alcohol(demo):
+    """Los platos populares (`_popular_dishes`) tampoco pasan por la búsqueda de ofertas: un café con concepto `cafe`
+    cuya descripción dice whiskey no se muestra."""
+    from rappi_ia.offers.engine import _popular_dishes
+
+    db, _ = demo
+    db.execute(
+        """UPDATE item_concepts SET concept_id = 'cafe'
+           WHERE entity_type = 'menu_item' AND entity_id = '98004'"""
+    )
+    db.execute("REFRESH MATERIALIZED VIEW concept_assortment")
+    cache.clear()
+    assert "Tiramisú individual (prueba)" in {d["name"] for d in _popular_dishes(db)}
+
+    db.execute("UPDATE menu_items SET description = 'Café, whiskey y crema' WHERE item_id = 98004")
+    cache.clear()
+
+    assert "Tiramisú individual (prueba)" not in {d["name"] for d in _popular_dishes(db)}
+
+
 def test_vertical_to_try_never_offers_a_popular_dish_from_a_drinks_section(demo):
     from rappi_ia.offers.engine import _popular_dishes
 

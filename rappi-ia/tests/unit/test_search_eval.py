@@ -211,8 +211,8 @@ def test_shown_row_judges_the_products_the_user_sees(monkeypatch):
     hits = [_hit(str(i), "galletas") for i in range(9)] + [_hit("9", "golosinas")]
     calls = []
 
-    def fake_search_products(conn, vertical, query, concepts, embedder, k):
-        calls.append((vertical, query, concepts, k))
+    def fake_search_products(conn, vertical, query, concepts, embedder, k, correct=False):
+        calls.append((vertical, query, concepts, k, correct))
         return SimpleNamespace(
             result=_result(hits, query_concepts=["golosinas"]), products=[_product("9", "golosinas")]
         )
@@ -223,7 +223,8 @@ def test_shown_row_judges_the_products_the_user_sees(monkeypatch):
 
     runs = {r.mode: r for r in run_queries(None, object(), [query])}
 
-    assert calls == [("chocolateria", "alfajores", None, 10)]  # como /search: la consulta detecta sus conceptos
+    # Como /search: la consulta detecta sus conceptos y, si nada calza, se corrigen los errores de tipeo.
+    assert calls == [("chocolateria", "alfajores", None, 10, True)]
     assert runs["hibrido"].relevance == [1] * 10
     assert runs[SHOWN].relevance == [1]
     assert runs[SHOWN].items == [

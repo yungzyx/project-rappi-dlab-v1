@@ -210,8 +210,10 @@ def build_search_documents(conn: Connection) -> dict[str, int]:
         conn.execute("ANALYZE staged_documents")
         counts["escritos"] = conn.execute(_UPSERT).rowcount
         counts["eliminados"] = conn.execute(_DELETE_STALE).rowcount
+        # El vocabulario con que rappi-ia corrige errores de tipeo sale de estos mismos documentos (migración 041).
+        conn.execute("SELECT refresh_search_vocabulary()")
         # Estadísticas al día: /health de la API estima con ellas cuántos documentos hay, y el planificador también.
-        conn.execute("ANALYZE search_documents")
+        conn.execute("ANALYZE search_documents, search_vocabulary")
     return counts
 
 

@@ -75,6 +75,7 @@ CONTRACT: tuple[Example, ...] = (
     Example("catalog-home", "GET", "/catalog/home"),
     Example("search-grouped", "GET", "/search?q=cerveza"),
     Example("search-grouped-unmet", "GET", "/search?q=xyzzy"),
+    Example("search-grouped-corrected", "GET", "/search?q=cervezaaaa"),
     Example(
         "agent-ask",
         "POST",
