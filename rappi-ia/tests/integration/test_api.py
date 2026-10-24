@@ -224,6 +224,19 @@ def test_search_honours_mode_and_detects_query_concepts(client, monkeypatch):
     assert client.get("/search", params={"q": "cerveza", "vertical": "licores", "mode": "otro"}).status_code == 400
 
 
+def test_search_corrects_typos_unless_asked_to_search_as_written(client):
+    """«cervezaaaa» no calza nada: /search corrige, vuelve a buscar y dice qué buscó; `correct=false` busca tal cual."""
+    found = client.get("/search", params={"q": "cervezaaaa", "vertical": "licores"}).json()
+    assert found["corrected_query"] == "cerveza" and found["products"] and not found["unmet"]
+
+    exact = client.get("/search", params={"q": "cervezaaaa", "vertical": "licores", "correct": "false"}).json()
+    assert exact["corrected_query"] is None and exact["products"] == [] and exact["unmet"]
+
+    grouped = client.get("/search", params={"q": "cervezaaaa"}).json()
+    assert grouped["corrected_query"] == "cerveza" and grouped["groups"]
+    assert client.get("/search", params={"q": "cerveza", "vertical": "licores"}).json()["corrected_query"] is None
+
+
 def test_search_and_analytics(client):
     found = client.get("/search", params={"q": "cerveza", "vertical": "liquor", "price_max": 2000}).json()
     assert {p["entity_id"] for p in found["products"]} == {"200", "202"}

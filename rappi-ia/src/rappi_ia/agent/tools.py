@@ -26,6 +26,7 @@ from ..offers.guards import (
     unofferable_subverticals,
 )
 from ..retrieval.hybrid import Filters, RetrievalResult, named_occasion, retrieve
+from ..retrieval.spelling import correct_query
 from ..text import FILLER_WORDS, LEAFLET_WARNINGS, normalize, tokens
 from .verticals import ranked_verticals
 
@@ -90,6 +91,7 @@ class SearchOutcome:
     result: RetrievalResult
     products: list[Product]
     cheapest_without_filter: Product | None = None
+    corrected_query: str | None = None  # con `correct`, la consulta corregida que se buscó (retrieval/spelling.py)
 
 
 @dataclass
@@ -120,13 +122,37 @@ def search_products(
     offer: bool = False,
     adult_ok: bool = False,
     words: bool | None = None,
+    correct: bool = False,
 ) -> SearchOutcome:
     """Con `concepts=None`, los conceptos los detecta la búsqueda en la consulta (endpoint /search). Con `symptom` (o
     en farmacia) no se muestra lo que no tiene concepto: podría ser un medicamento sin categoría mapeada. Con `offer`,
     la búsqueda es de una oferta del agente y solo trae lo que puede proponer por su cuenta: nada +18 ni de tiendas
     Farmacia, Sex shop o Smoking shop (offers/guards.py); el concepto y la vertical los elige quien llama. `adult_ok`
     deja pasar lo +18 en una oferta: solo para el kit de una ocasión que la persona eligió (alcohol con su marca).
-    `words`: si a la consulta le queda alguna palabra (`retrieval.hybrid.has_words`), si quien llama ya lo sabe."""
+    `words`: si a la consulta le queda alguna palabra (`retrieval.hybrid.has_words`), si quien llama ya lo sabe.
+    Con `correct` (/search), si nada calza todas las palabras, corrige los errores de tipeo (`retrieval.spelling`) y
+    vuelve a buscar: si así algo calza todas las palabras y hay productos, devuelve eso con `corrected_query`; si no, lo
+    de la consulta tal cual."""
+    found = _search_products(
+        conn, vertical, query, concepts, embedder, price_max, k, mode, symptom, offer, adult_ok, words
+    )
+    if not correct or found.result.strict_lexical_matches:
+        return found
+    fixed = correct_query(conn, query, vertical)
+    if fixed is None:
+        return found
+    again = _search_products(
+        conn, vertical, fixed, concepts, embedder, price_max, k, mode, symptom, offer, adult_ok, None
+    )
+    if not again.result.strict_lexical_matches or not again.products:
+        return found
+    again.corrected_query = fixed
+    return again
+
+
+def _search_products(
+    conn, vertical, query, concepts, embedder, price_max, k, mode, symptom, offer, adult_ok, words
+) -> SearchOutcome:
     result = retrieve(
         conn, vertical, query, embedder, k=k * 2, filters=Filters(price_max), mode=mode, concepts=concepts, words=words
     )
