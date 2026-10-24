@@ -47,6 +47,23 @@ export function offerableProduct(product, concepts) {
   return !(product.entity_type !== 'menu_item' && BABY_NAME.test(name))
 }
 
+/**
+ * Si el producto se puede destacar (offers/featured.py, con las reglas de offers/destacado.toml que trae
+ * `meta.featured`): con foto y, si es un plato, uno principal (desde el precio mínimo, de un concepto que es plato y sin
+ * un nombre de relleno, como «Salsa de ajo»). La muestra no trae la sección del menú ni la comuna del local: esas dos
+ * reglas ya las aplicó la API en lo que grabó.
+ */
+export function featuredProduct(product, featured) {
+  if (!product?.img) return false
+  if (product.entity_type !== 'menu_item' || !featured) return true
+  const first = normalize(product.name).split(' ')[0]
+  return (
+    !featured.side_names.includes(first) &&
+    (product.price_value ?? 0) >= featured.min_main_price &&
+    !featured.not_main.includes(product.concept)
+  )
+}
+
 const TO_TRY_TEXT = 'Aún no pides en {vertical}: mira estas ofertas.'
 const REASON_TO_TRY = 'Porque aún no pides en {vertical}.'
 const REASON_SERVICE = {

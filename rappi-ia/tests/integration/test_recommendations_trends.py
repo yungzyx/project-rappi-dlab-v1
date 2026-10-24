@@ -112,3 +112,52 @@ def test_not_the_current_vertical_nor_one_already_shown_and_only_with_room(clien
     assert [(row.get("kind"), row["vertical"]) for row in rows[1:]] == [("lo_mas_pedido", "supermercado")]
 
     assert len(for_you(client, vertical="turbo", limit=1)) == 1  # sin filas libres, nada más
+
+
+def dish_trends(db, ids):
+    for rank, entity_id in enumerate(ids, start=1):
+        db.execute(
+            """INSERT INTO trends (data_source, scope, vertical, item_key, entity_type, entity_id, orders_now, rank)
+               VALUES ('synthetic', 'producto', 'restaurantes', %s, 'menu_item', %s, %s, %s)""",
+            (f"menu_item:{entity_id}", entity_id, 100 - rank, rank),
+        )
+    db.commit()
+
+
+def new_dish(db, item_id, name, store_id, section, price, concept):
+    """Un plato con foto, precio y concepto en un local que puede ser nuevo."""
+    run_id = db.execute("SELECT max(run_id) FROM scrape_runs WHERE kind = 'restaurants'").fetchone()[0]
+    db.execute(
+        "INSERT INTO menu_sections (store_id, section_id, name, position) VALUES (%s, %s, %s, 9)",
+        (store_id, item_id, section),
+    )
+    db.execute(
+        """INSERT INTO menu_items (item_id, rappi_item_id, store_id, section_id, name, image_url)
+                  VALUES (%s, %s, %s, %s, %s, 'https://imagenes.prueba.invalid/plato.png')""",
+        (item_id, item_id, store_id, item_id, name),
+    )
+    db.execute(
+        "INSERT INTO menu_price_snapshots (run_id, item_id, price, is_available) VALUES (%s, %s, %s, true)",
+        (run_id, item_id, price),
+    )
+    db.execute(
+        """INSERT INTO item_concepts (entity_type, entity_id, concept_id, method, confidence, source)
+                  VALUES ('menu_item', %s, %s, 'llm', 0.7, 'cocina:Pizzas')""",
+        (str(item_id), concept),
+    )
+
+
+def test_the_most_ordered_dishes_are_main_dishes_with_photo_from_the_city_one_per_concept(client, db):
+    # El chicle de la caja de una pizzería (concepto pizza por la cocina del local), una pizza de otra ciudad, el roll
+    # sin foto y el tiramisú de la sección de postres no son «lo más pedido en restaurantes»; tres pizzas tampoco.
+    new_dish(db, 98101, "Chicle refrescante (prueba)", 9801, "Para llevar", 650, "pizza")
+    db.execute("""INSERT INTO stores (store_id, name, store_type, city, path)
+                  VALUES (9899, 'Pizzería de prueba - Rancagua', 'restaurant', 'Rancagua', '/tiendas/9899')""")
+    new_dish(db, 98102, "Pizza napolitana familiar (prueba)", 9899, "Pizzas", 9990, "pizza")
+    dish_trends(db, ["98101", "98102", "98001", "98002", "98005", "98004", "98006", "98007"])
+
+    rows = for_you(client)
+
+    assert [row["vertical"] for row in rows] == ["restaurantes"]
+    assert [p["entity_id"] for p in rows[0]["products"]] == ["98001", "98006", "98007"]
+    assert [p["concept"] for p in rows[0]["products"]] == ["pizza", "sushi", "hamburguesa"]

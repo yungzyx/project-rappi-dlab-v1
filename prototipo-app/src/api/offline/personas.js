@@ -1,7 +1,7 @@
 // El panel de la demo sin conexión: personas listas (un historial de pedidos y toques que se siembra en la API
 // simulada), «+1 visita» para mover la Home y la lectura de la escalera. Solo existe en «Prototipo MVP.html».
 import { currentFine, NONE_COMBO, targetStep } from './motor'
-import { offerableProduct } from './offers'
+import { featuredProduct, offerableProduct } from './offers'
 import { addEvents, readState, writeState } from './state'
 
 const DAY_MS = 86_400_000
@@ -59,16 +59,25 @@ const inSample = (snapshot, p) =>
     p.entity_type === 'menu_item' ? snapshot.catalog?.menus?.[p.store_id] : snapshot.catalog?.stores?.[p.store_id],
   )
 
+// offers/engine.py (FOOD_VERTICALS y FOOD_GROUPS de `_typical_first`): en las verticales de comida, primero la comida.
+const FOOD_VERTICALS = ['supermercado', 'conveniencia', 'turbo']
+const FOOD_GROUPS = ['bebidas', 'snacks', 'dulces', 'despensa', 'frescos', 'comida']
+
 /**
  * Un producto de la muestra para un pedido de esa vertical: el primero con concepto que el agente puede ofrecer, de un
  * concepto que la persona no pidió ya (`used`): si no, dos pedidos del mismo concepto ya serían un «¿Repetimos?». Mejor
- * de una tienda que la muestra tiene, y de los conceptos de `prefer` si hay.
+ * de una tienda que la muestra tiene, y de los conceptos de `prefer` si hay. Primero lo que se puede destacar
+ * (`featuredProduct`: lo pedido vuelve en «¿Repetimos?» y «¿Volvemos a…?») y, en las verticales de comida, la comida:
+ * la persona no pide un vaso de cotillón ni un agregado de $1.300.
  */
 function sampleOf(snapshot, vertical, used, prefer = []) {
-  const { concepts } = snapshot.meta
+  const { concepts, featured } = snapshot.meta
   const ofVertical = snapshot.pool.filter((p) => p.vertical === vertical && p.concept && p.store_id)
   const fresh = ofVertical.filter((p) => !used.has(p.concept))
-  const good = fresh.filter((p) => offerableProduct(p, concepts))
+  const rank = (p) =>
+    (featuredProduct(p, featured) ? 0 : 2) +
+    (FOOD_VERTICALS.includes(vertical) && !FOOD_GROUPS.includes(concepts[p.concept]?.group) ? 1 : 0)
+  const good = fresh.filter((p) => offerableProduct(p, concepts)).sort((a, b) => rank(a) - rank(b))
   const shown = good.filter((p) => inSample(snapshot, p))
   const found =
     prefer.map((c) => shown.find((p) => p.concept === c)).find(Boolean) ??

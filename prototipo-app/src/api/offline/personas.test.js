@@ -105,3 +105,30 @@ test('el plato de siempre es de un concepto de hábito y de un restaurante que e
   // La pizza no tiene su restaurante en la muestra; la hamburguesa va antes en ella, pero el sushi, en los hábitos.
   expect(concepts.slice(0, 4)).toEqual(['sushi', 'sushi', 'sushi', 'sushi'])
 })
+
+test('las personas del panel piden lo que lo destacado mostraría: un plato principal con foto y, en Turbo, comida', () => {
+  const img = 'https://imagenes.prueba.invalid/p.png'
+  const dish = (id, name, concept, price) =>
+    product(id, { name, concept, price_value: price, vertical: 'restaurantes', entity_type: 'menu_item', img })
+  const pool = [
+    dish(60, 'Tomate cherry', 'pizza', 1300), // un agregado de la pizzería, con el concepto de su cocina
+    dish(61, 'Salsa de ajo', 'pizza', 3500),
+    dish(62, 'Brownie', 'postres', 4300),
+    dish(63, 'Pizza napolitana', 'pizza', 9990),
+    product(64, { name: 'Vaso de cotillón', concept: 'juguetes', vertical: 'turbo', img }),
+    product(65, { name: 'Galletas de avena', concept: 'galletas', vertical: 'turbo' }), // sin foto
+    product(66, { name: 'Café en grano', concept: 'cafe', vertical: 'turbo', img }),
+  ]
+  const concepts = {
+    ...snapshot.meta.concepts,
+    pizza: { name: 'Pizza', emoji: '🍕', group: 'comida', offerable: true },
+    postres: { name: 'Postres', emoji: '🍰', group: 'comida', offerable: true },
+  }
+  const withPool = { ...snapshot, meta: { ...snapshot.meta, concepts }, pool }
+  const history = personaHistory(
+    withPool,
+    personas(withPool).find((p) => p.id === 'rest-turbo'),
+    NOW,
+  )
+  expect(history.orders.map((o) => o.lines[0].entity_id)).toEqual(['63', '66'])
+})

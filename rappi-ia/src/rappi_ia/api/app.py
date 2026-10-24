@@ -37,7 +37,7 @@ from ..motor.home import home_verticals
 from ..motor.predict import next_verticals
 from ..offers.engine import most_ordered
 from ..offers.guards import is_offerable, offerable_vertical
-from ..offers.profiles import active_profiles
+from ..offers.profiles import active_profiles, person_city
 from ..retrieval.hybrid import MODES
 from ..text import contract_articles
 from . import deps, identity, prewarm
@@ -459,14 +459,15 @@ TOP_REASON = "Lo más pedido estas semanas en {vertical}"
 def _top_row(conn: Connection, user_id: str, current: str | None, taken: set[str]) -> dict | None:
     """«Lo más pedido en…»: la primera vertical, en el orden de la predicción para la persona (`next_verticals`), que el
     agente puede proponer (nunca Farmacia ni Licores), que no es la de la pantalla ni la de otra fila y que tiene algo
-    que mostrar: hasta tres de los productos que más pide la población ahí (`trends`), con el precio de esa vertical y
-    las guardias de las ofertas (`offers.engine.most_ordered`). La fila no tiene concepto; su `basis` dice la fuente."""
+    que mostrar: hasta tres de los productos que más pide la población ahí (`trends`), con el precio de esa vertical,
+    las guardias de las ofertas y las reglas de lo destacado, con los platos de su ciudad
+    (`offers.engine.most_ordered`). La fila no tiene concepto; su `basis` dice la fuente."""
     population = config.MOTOR_POBLACION
     for score in next_verticals(conn, user_id, population):
         vertical = score.vertical
         if not offerable_vertical(vertical) or vertical == current or vertical in taken:
             continue
-        if products := most_ordered(conn, vertical, population):
+        if products := most_ordered(conn, vertical, population, person_city(conn, user_id)):
             label = VERTICAL_LABELS.get(vertical, vertical)
             return {
                 "kind": "lo_mas_pedido",

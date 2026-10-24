@@ -61,6 +61,7 @@ from ..motor.predict import step_signal, target_step
 from ..motor.recommend import CrossPick, cross_picks, latest_lambda
 from ..retrieval.hybrid import concepts_of, detect_concepts
 from ..text import contract_articles, normalize, tokens
+from .featured import featured, one_per_concept, side_dish
 from .guards import (
     alcohol_in_name,
     alcohol_section,
@@ -78,6 +79,7 @@ from .profiles import (
     Destination,
     Profile,
     active_profiles,
+    city_places,
     ladder,
     load_destinations,
     load_profiles,
@@ -279,7 +281,7 @@ def make_offer(
     prefieren las marcas que compra (el complemento de `carrito`, `checkout` y `proximo_pedido`) o parten de sus
     perfiles de gusto (`perfil`, que busca sus peldaños a la vez con las conexiones extra de la API, `spare`)."""
     if moment == "plan":
-        return plan(conn, embedder, context["occasion"])
+        return plan(conn, embedder, context["occasion"], person_city(conn, user_id))
     if moment == "carrito":
         return complement(conn, embedder, "carrito", [context["product"]], bought_brands(conn, user_id), user_id)
     if moment == "checkout":
@@ -300,11 +302,14 @@ def make_offer(
 
 
 # ── plan ─────────────────────────────────────────────────────────────────────
-def plan(conn: Connection, embedder: TextEmbedder | None, occasion_id: str) -> Offer | None:
+def plan(
+    conn: Connection, embedder: TextEmbedder | None, occasion_id: str, city: str = config.PROFILE_CITY
+) -> Offer | None:
     """El kit de una ocasión: un producto por concepto (hasta KIT_SIZE), de la vertical donde es típico y repartido
     entre verticales, salvo que la ocasión tenga una fija (`vertical` en la taxonomía: «Hambre ya» es pedir comida
     lista): entonces sale de ahí. Es lo único que el agente arma con alcohol, con su marca +18, porque la persona eligió
-    la ocasión; nunca con lo sensible, farmacia, bebé ni salud."""
+    la ocasión; nunca con lo sensible, farmacia, bebé ni salud. Cada producto se puede destacar (`featured`: con foto y,
+    los platos, sin relleno y de un local de `city`)."""
     taxonomy = load_taxonomy()
     occasion = taxonomy.occasions.get(occasion_id)
     if occasion is None or not plannable_occasion(occasion):
@@ -321,7 +326,7 @@ def plan(conn: Connection, embedder: TextEmbedder | None, occasion_id: str) -> O
             if vertical in avoid:
                 continue
             if (concept.id, vertical) not in found:
-                found[concept.id, vertical] = _kit_product(conn, embedder, concept, vertical)
+                found[concept.id, vertical] = _kit_product(conn, embedder, concept, vertical, city)
             if found[concept.id, vertical]:
                 return found[concept.id, vertical]
         return None
@@ -381,8 +386,11 @@ def _kit_verticals(conn: Connection, concept: Concept, fixed: str | None) -> lis
     return allowed[:KIT_VERTICALS]
 
 
-def _kit_product(conn: Connection, embedder: TextEmbedder | None, concept: Concept, vertical: str) -> Product | None:
-    """El primer producto del concepto en la vertical que dice qué es: se saltan los de nombre pelado."""
+def _kit_product(
+    conn: Connection, embedder: TextEmbedder | None, concept: Concept, vertical: str, city: str
+) -> Product | None:
+    """El primer producto del concepto en la vertical que dice qué es y que se puede destacar (`featured`, con los
+    platos de `city`): se saltan los de nombre pelado."""
     for mode in ("vector", "hibrido") if embedder is not None else ("hibrido",):
         outcome = search_products(
             conn,
@@ -395,7 +403,9 @@ def _kit_product(conn: Connection, embedder: TextEmbedder | None, concept: Conce
             offer=True,
             adult_ok=concept.age_restricted,
         )
-        if product := next((p for p in outcome.products if p.concept == concept.id and not _bare(p, concept)), None):
+        candidates = [p for p in outcome.products if p.concept == concept.id and not _bare(p, concept)]
+        shown = {p["id"] for p in featured(conn, [p.to_dict() for p in candidates], city)}
+        if product := next((p for p in candidates if p.id in shown), None):
             return product
     return None
 
@@ -625,7 +635,7 @@ def _combo_offer(
                 "source": f"poblacion:{population}",
             }
             return _top_offer(vertical, products, combo, population, back, rule)
-        if products := most_ordered(conn, vertical, population):
+        if products := most_ordered(conn, vertical, population, person_city(conn, user_id)):
             return _top_offer(vertical, products, combo, population, back)
         if pick and not pushed and (products := _pick_products(conn, embedder, pick)):
             return _top_offer(vertical, products, combo, population, back)
@@ -718,11 +728,13 @@ LEFT JOIN item_concepts ic ON ic.entity_type = 'menu_item' AND ic.entity_id = mi
 WHERE mi.item_id = ANY(%(ids)s)"""
 
 
-def most_ordered(conn: Connection, vertical: str, population: str) -> list[dict]:
+def most_ordered(conn: Connection, vertical: str, population: str, city: str = config.PROFILE_CITY) -> list[dict]:
     """Hasta tres de los productos más pedidos por la población en la vertical (`trends`, alcance `producto`), en su
-    orden, que siguen a la venta ahí: un producto del catálogo con su oferta vigente más barata en una tienda de esa
-    vertical (`_TOP_CATALOG`), o en restaurantes un plato con precio que no es de una sección de tragos
-    (`_TOP_DISHES`). Pasan las guardias de las ofertas (`_offerable_products`), también la de su tienda."""
+    orden y uno por concepto mientras alcancen (`one_per_concept`), que siguen a la venta ahí: un producto del catálogo
+    con su oferta vigente más barata en una tienda de esa vertical (`_TOP_CATALOG`), o en restaurantes un plato con
+    precio que no es de una sección de tragos (`_TOP_DISHES`). Pasan las guardias de las ofertas
+    (`_offerable_products`), también la de su tienda, y se pueden destacar (`featured`): con foto y, en restaurantes,
+    platos principales de un local de `city`."""
     kind = "menu_item" if vertical == "restaurantes" else "catalog_item"
     rows = conn.execute(
         """SELECT entity_id FROM trends
@@ -732,8 +744,8 @@ def most_ordered(conn: Connection, vertical: str, population: str) -> list[dict]
     ).fetchall()
     ids = [i for (i,) in rows if _valid_id(i)]
     found = _priced_in_vertical(conn, vertical, ids)
-    ranked = [found[i].to_dict() for i in ids if i in found]
-    return _offerable_products(conn, ranked)[:SHOWN_PRODUCTS]
+    ranked = featured(conn, [found[i].to_dict() for i in ids if i in found], city, main=vertical == "restaurantes")
+    return one_per_concept(_offerable_products(conn, ranked), SHOWN_PRODUCTS)
 
 
 def _valid_id(entity_id: str) -> bool:
@@ -1034,8 +1046,10 @@ def _typical_first(found: list[dict], vertical: str, typical: dict[str, str]) ->
 def _popular_dishes(conn: Connection) -> list[dict]:
     """Los platos populares (`is_popular`) de los conceptos que más se piden hechos en restaurantes, uno por concepto y
     solo de los que el agente puede proponer, sin un nombre que diga alcohol ni de una sección de tragos
-    (`alcohol_in_name`, `alcohol_section`). Restaurantes no tiene ofertas ni otro dato de pedidos. Es dato del catálogo
-    y no de la persona: sale de su caché (catalog/cache.py), porque buscarlos recorre todos los platos."""
+    (`alcohol_in_name`, `alcohol_section`), con foto, sin relleno (`side_dish`) y de un local de la ciudad de la demo
+    (`config.PROFILE_CITY`: la lista es una sola para todos). Restaurantes no tiene ofertas ni otro dato de pedidos. Es
+    dato del catálogo y no de la persona: sale de su caché (catalog/cache.py), porque buscarlos recorre todos los
+    platos."""
     return cached("popular_dishes", conn, lambda: _find_popular_dishes(conn))
 
 
@@ -1049,17 +1063,21 @@ def _find_popular_dishes(conn: Connection) -> list[dict]:
         )
         if concept_id in concepts and is_offerable(concepts[concept_id])
     ]
+    places = city_places(config.PROFILE_CITY)
     dishes: dict[str, str] = {}
-    for concept_id, item_id, name, section in conn.execute(
-        """SELECT ic.concept_id, mi.item_id::text, mi.name, ms.name
+    for concept_id, item_id, name, section, comuna in conn.execute(
+        """SELECT ic.concept_id, mi.item_id::text, mi.name, ms.name, s.city
            FROM menu_items mi
+           JOIN stores s ON s.store_id = mi.store_id
            JOIN item_concepts ic ON ic.entity_type = 'menu_item' AND ic.entity_id = mi.item_id::text
            LEFT JOIN menu_sections ms ON ms.store_id = mi.store_id AND ms.section_id = mi.section_id
-           WHERE mi.is_popular AND ic.concept_id = ANY(%s)
+           WHERE mi.is_popular AND ic.concept_id = ANY(%s) AND coalesce(mi.image_url, '') <> ''
            ORDER BY ic.concept_id, mi.item_id""",
         (ranked,),
     ):
         if concept_id in dishes or alcohol_in_name("menu_item", name, concept_id) or alcohol_section(section):
+            continue
+        if side_dish(name, section) or normalize(comuna or "") not in places:
             continue
         dishes[concept_id] = item_id
     products: list[dict] = []
