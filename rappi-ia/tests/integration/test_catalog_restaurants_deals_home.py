@@ -680,6 +680,23 @@ def test_home_restaurant_lists_sort_by_eta_and_fee(seeded):
     assert [card["fee"] for card in reply["low_fee_restaurants"]] == ["$0", "$0", "$690", "$990", "$1.490", "$1.990"]
 
 
+def test_restaurant_lists_only_show_places_in_the_demo_city(seeded):
+    # Como en la base real (un local de Valparaíso con envío gratis y nota 5,0): la Home y la lista de restaurantes son
+    # de la ciudad de la demo (config.PROFILE_CITY, el Gran Santiago). Su menú se sigue abriendo (la búsqueda lo
+    # puede mostrar).
+    seeded.execute("UPDATE stores SET city = 'Valparaíso' WHERE store_id IN (%s, %s)", (SUSHI, SANDWICHES))
+    seeded.execute(
+        "UPDATE restaurant_details SET eta = '5 min', delivery_cost = 0, rating = 5 WHERE store_id = %s", (SUSHI,)
+    )
+
+    reply = home(seeded)
+
+    assert ids(reply["fast_restaurants"]) == [PASTRY, PIZZERIA]
+    assert ids(reply["low_fee_restaurants"]) == [CEVICHE, PASTRY, PIZZERIA, CAFE, GRILL]
+    assert SUSHI not in ids(restaurants(seeded)) and SANDWICHES not in ids(restaurants(seeded))
+    assert restaurant_menu(seeded, SUSHI)["restaurant"]["id"] == SUSHI
+
+
 def test_home_never_calls_a_restaurant_with_an_unknown_eta_fast(seeded):
     seeded.execute("UPDATE restaurant_details SET eta = '' WHERE store_id <> %s", (PIZZERIA,))
 

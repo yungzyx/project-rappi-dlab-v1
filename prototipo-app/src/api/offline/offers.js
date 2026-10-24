@@ -54,6 +54,24 @@ export function offerableProduct(product, concepts) {
   return !BABY_NAME.test(name)
 }
 
+/**
+ * Si el producto se puede destacar como plato principal (offers/featured.py con `main`, y las reglas de
+ * offers/destacado.toml que trae `meta.featured`): con foto y, si es un plato, desde el precio mínimo, de un concepto
+ * que es plato y no de una sección de relleno (`section`, la del menú grabado: «Bebidas», «Agregados»). Desde el precio
+ * mínimo, la regla de los nombres de relleno del backend no saca nada: aquí no hace falta. La comuna del local no viene
+ * en la muestra: los menús grabados son los que mostró la API.
+ */
+export function featuredProduct(product, featured, section = null) {
+  if (!product?.img) return false
+  if (product.entity_type !== 'menu_item' || !featured) return true
+  const heading = normalize(section).split(' ')
+  return (
+    !featured.side_sections.some((start) => start.every((word, i) => heading[i] === word)) &&
+    (product.price_value ?? 0) >= featured.min_main_price &&
+    !featured.not_main.includes(product.concept)
+  )
+}
+
 const TO_TRY_TEXT = 'Aún no pides en {vertical}: mira estas ofertas.'
 const REASON_TO_TRY = 'Porque aún no pides en {vertical}.'
 const REASON_SERVICE = {

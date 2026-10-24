@@ -1,9 +1,9 @@
 """Las tablas del backend que la API simulada de la demo sin conexión necesita y que la API no expone: los conceptos con
 sus guardias de ofertas y las palabras con que se los nombra en una consulta (con las de las ocasiones y las de
 relleno), los servicios sin catálogo, la tabla de combinaciones de Rappi (motor/combos.toml), los
-nombres visibles de las verticales y los perfiles de gusto (offers/perfiles.toml) con los conceptos que los activan
-(concepts/segments.toml). Lo corre `scripts/demo-snapshot.mjs` con el Python de rappi-ia; escribe JSON en la salida
-estándar. No toca la base."""
+nombres visibles de las verticales, los perfiles de gusto (offers/perfiles.toml) con los conceptos que los activan
+(concepts/segments.toml) y las reglas de lo destacado (offers/destacado.toml). Lo corre `scripts/demo-snapshot.mjs`
+con el Python de rappi-ia; escribe JSON en la salida estándar. No toca la base."""
 
 import json
 
@@ -13,6 +13,7 @@ from rappi_ia.concepts.assign import _name_keyword, _query_only_words
 from rappi_ia.concepts.taxonomy import load_taxonomy
 from rappi_ia.layers.segments import load_segment_rules
 from rappi_ia.motor.combos import FINE_ORDER, OWN_SIGNALS_ONLY, SERVICES, load_combos
+from rappi_ia.offers.featured import load_rules
 from rappi_ia.offers.guards import is_offerable
 from rappi_ia.offers.profiles import load_profiles
 from rappi_ia.text import FILLER_WORDS, tokens
@@ -20,6 +21,7 @@ from rappi_ia.text import FILLER_WORDS, tokens
 taxonomy = load_taxonomy()
 combos = load_combos()
 segments = {rule.id: rule for rule in load_segment_rules()[1]}
+featured = load_rules()
 
 
 def phrase(text: str) -> str:
@@ -85,6 +87,11 @@ print(
             "profiles": {
                 p.id: {"name": p.name, "emoji": p.emoji, "main": p.main, "concepts": profile_concepts(p)}
                 for p in load_profiles().values()
+            },
+            "featured": {
+                "min_main_price": featured.min_main_price,
+                "not_main": sorted(featured.not_main),
+                "side_sections": [list(start) for start in featured.side_sections],
             },
             "occasion_keywords": [phrase(k) for o in taxonomy.occasions.values() for k in o.keywords],
             "filler_words": sorted(FILLER_WORDS),

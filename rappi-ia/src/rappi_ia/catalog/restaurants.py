@@ -12,8 +12,10 @@ from typing import Literal
 from psycopg import Connection
 from rappi_scraper.storage.search import MIN_PRICE
 
+from .. import config
 from ..agent.tools import clp
 from ..concepts.taxonomy import load_taxonomy
+from ..offers.profiles import city_places
 from .cache import cached
 from .stores import BIGINT_MAX, product_card
 
@@ -33,8 +35,10 @@ _ORDER = {
 }
 
 # Las tarjetas de los restaurantes con algún plato con precio, en un orden, de una cocina o de un local (los filtros
-# que no se piden son NULL). El orden y el corte se hacen antes de buscar la portada y las cocinas, que solo se buscan
-# para los que quedan. El EXISTS se detiene en el primer plato con precio.
+# que no se piden son NULL). Sin local, solo los de una comuna de la ciudad de la demo (`places`; la comuna se compara
+# normalizada como en `text.normalize`: sin tildes, mayúsculas ni signos): la Home y la lista de restaurantes no
+# muestran locales de Valparaíso a quien está en Providencia. El orden y el corte se hacen antes de buscar la portada y
+# las cocinas, que solo se buscan para los que quedan. El EXISTS se detiene en el primer plato con precio.
 _CARDS = """
 WITH ranked AS (
     SELECT s.store_id, s.name, d.rating, d.eta, d.delivery_cost,
@@ -43,6 +47,8 @@ WITH ranked AS (
     JOIN store_verticals v ON v.store_id = s.store_id AND v.vertical = 'restaurantes'
     LEFT JOIN restaurant_details d ON d.store_id = s.store_id
     WHERE (%(store_id)s::bigint IS NULL OR s.store_id = %(store_id)s)
+      AND (%(store_id)s::bigint IS NOT NULL
+           OR btrim(regexp_replace(lower(unaccent(coalesce(s.city, ''))), '[^a-z0-9]+', ' ', 'g')) = ANY(%(places)s))
       AND (%(cuisine)s::text IS NULL
            OR EXISTS (SELECT 1 FROM restaurant_cuisines rc WHERE rc.store_id = s.store_id AND rc.cuisine = %(cuisine)s))
       AND EXISTS (SELECT 1 FROM menu_items mi JOIN latest_menu_prices p ON p.item_id = mi.item_id
@@ -80,10 +86,11 @@ ORDER BY ms.position, ms.section_id, mi.rappi_item_id, mi.item_id"""
 
 
 def restaurants(conn: Connection, cuisine: str | None = None, sort: Sort = "rating", limit: int = 30) -> list[dict]:
-    """Las tarjetas de los restaurantes con algún plato con precio, de una cocina si se pide, por mejor nota
-    (`rating`), menor tiempo de entrega (`eta`) o menor costo de envío (`fee`). Sin cocina sale de la caché del
-    catálogo (catalog/cache.py): la consulta recorre todos los platos y la lista solo cambia con una corrida. Con
-    cocina (texto libre, que la app no pide) no se guarda: cada texto distinto sería una entrada más, sin tope."""
+    """Las tarjetas de los restaurantes con algún plato con precio de la ciudad de la demo (`config.PROFILE_CITY`), de
+    una cocina si se pide, por mejor nota (`rating`), menor tiempo de entrega (`eta`) o menor costo de envío (`fee`).
+    Sin cocina sale de la caché del catálogo (catalog/cache.py): la consulta recorre todos los platos y la lista solo
+    cambia con una corrida. Con cocina (texto libre, que la app no pide) no se guarda: cada texto distinto sería una
+    entrada más, sin tope."""
 
     def compute() -> list[dict]:
         return [_card(*row) for row in _card_rows(conn, sort=sort, cuisine=cuisine, limit=limit)]
@@ -129,7 +136,13 @@ def restaurant_menu(conn: Connection, store_id: int) -> dict | None:
 def _card_rows(
     conn: Connection, sort: Sort, cuisine: str | None = None, store_id: int | None = None, limit: int = 30
 ) -> list[tuple]:
-    params = {"store_id": store_id, "cuisine": cuisine, "limit": limit, "min_price": MIN_PRICE}
+    params = {
+        "store_id": store_id,
+        "cuisine": cuisine,
+        "limit": limit,
+        "min_price": MIN_PRICE,
+        "places": sorted(city_places(config.PROFILE_CITY)),
+    }
     return conn.execute(_CARDS.format(order=_ORDER[sort]), params).fetchall()
 
 
