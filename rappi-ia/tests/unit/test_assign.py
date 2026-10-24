@@ -58,6 +58,15 @@ def test_a_doubtful_cuisine_gives_no_concept(matcher):
     assert assign_menu_item("14", "Especial de la casa", "Promos", ["Americana"], SECTIONS, CUISINES, matcher) is None
 
 
+def test_the_most_confident_cuisine_of_the_place_wins(matcher):
+    """Las cocinas llegan por orden alfabético: en un local «Asiática, Sushi», Asiática (0,85) ganaba a Sushi (0,97) y
+    13.605 platos de la base real (21-10-2026; 5.933 después del kNN), casi todos rolls y piezas, quedaban como comida
+    asiática."""
+    cuisines = {"asiática": MappedName("asiatica", "curado", 0.85), "sushi": MappedName("sushi", "llm", 0.97)}
+    a = assign_menu_item("17", "70 Piezas Mixtas", "Promociones", ["Asiática", "Sushi"], {}, cuisines, matcher)
+    assert (a.concept_id, a.source) == ("sushi", "cocina:Sushi")
+
+
 def test_an_ingredient_in_a_dish_name_does_not_beat_the_section(matcher):
     """«Mechada palta mayo» es un sándwich aunque diga palta; «Phad Kee Maoo Vacuno», un plato asiático."""
     sections = {"sandwiches": MappedName("sandwiches", "llm", 0.9), "wok": MappedName("asiatica", "llm", 0.9)}
@@ -126,6 +135,52 @@ def test_hot_dog_sections_of_the_real_map_make_the_dish_a_sandwich(matcher, csv_
     tomaba la cocina del local (pizza, hamburguesa, pastelería)."""
     a = assign_menu_item("24", name, section, cuisines, csv_maps["seccion_menu"], csv_maps["cocina"], matcher)
     assert (a.concept_id, a.source) == ("sandwiches", f"seccion:{section}"), a
+
+
+def test_pastry_as_the_cuisine_of_the_place_does_not_label_its_dishes(matcher, csv_maps):
+    """Cafeterías, juguerías y heladerías también se rotulan «Pastelería y Postres»: como cocina del local, mandaba a
+    pastelería las milanesas de «Milas - El Golf» («Just Mila Xl»), té, papas fritas y batidos; en dos muestras de la
+    base real (21-10-2026) acertaba unos 4 de cada 10. Sin otra pista el plato queda sin concepto (decide el kNN), y la
+    sección, si nombra un plato, manda."""
+    sections, cuisine_map = csv_maps["seccion_menu"], csv_maps["cocina"]
+    milas = ["Desayunos", "Internacional", "Pastelería y Postres"]
+    assert assign_menu_item("25", "Just Mila Xl", "+ Milanesas Xl", milas, sections, cuisine_map, matcher) is None
+    pastry = ["Pastelería y Postres"]
+    ice = assign_menu_item("26", "Frutilla Sin Azúcar", "Helados", pastry, sections, cuisine_map, matcher)
+    assert (ice.concept_id, ice.source) == ("helados", "seccion-nombre:Helados")
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "Tartaleta Frutos Mixtos",
+        "Pie de frambuesa",
+        "Pie de Maracuyá",
+        "Trozo Key Lime Pie",
+        "Trozo Pumpkin Pie",
+        "6 Churros azucarados",
+        "T.milhoja manj.crema framb.choc S/A",
+        "Torta Mil Hojas Manjar",
+        "Brazo de Reina Coco Mediano",
+        "Carrot Cake -Capricho M",
+    ],
+)
+def test_pastries_named_by_their_kind_are_pastry_without_the_cuisine(matcher, csv_maps, name):
+    """Lo que la cocina «Pastelería y Postres» dejó de etiquetar y su nombre dice: en la muestra de la base real
+    (21-10-2026) quedaban sin concepto pies, tartaletas, churros y milhojas, y un brazo de reina pasaba a pizza."""
+    sections, cuisine_map = csv_maps["seccion_menu"], csv_maps["cocina"]
+    a = assign_menu_item("27", name, "Dulces", ["Pastelería y Postres", "Pizzas"], sections, cuisine_map, matcher)
+    assert (a.concept_id, a.method) == ("pasteleria", "regla"), a
+
+
+def test_a_savory_pie_or_a_foot_is_not_pastry(matcher):
+    """«pie» no es keyword suelta: también es el pie de pollo y, en el catálogo, plantillas y cremas para pies."""
+    dish = assign_menu_item("28", "Pie de Pollo", "Fondos", [], {}, {}, matcher)
+    assert dish is None or dish.concept_id != "pasteleria"
+    insole = assign_catalog_item("29", "Plantilla Ortopédica Pie Plano T. 40 Al 46", "Otros", CATEGORIES, matcher)
+    assert insole.concept_id != "pasteleria"
+    query = concept_matcher(load_taxonomy(), for_queries=True)
+    assert query.best("crema para pies") is None or query.best("crema para pies").target != "pasteleria"
 
 
 TOBACCO = {"cigarrillos": MappedName("cigarrillos", "llm", 0.8, "v1")}
@@ -516,3 +571,146 @@ def test_the_real_map_keeps_yarn_and_rugs_out_of_food_and_baby(matcher, csv_maps
     """«Hilos» tenía un mapeo dudoso (útiles, 0,55) y el color del ovillo («Mostaza», «Verde Pistacho») lo mandaba a
     salsas o frutos secos; «Tapetes y Alfombras» (artículos de bebé) son sobre todo alfombras de baño."""
     assert assign_catalog_item("79", name, category, csv_maps["categoria"], matcher).concept_id == concept
+
+
+# Platos reales de secciones «Aperitivo» y «Cocktail» de la base `rappi` (22-10-2026). En un menú chileno «aperitivo»
+# es tanto la comida para picar como el trago de antes de comer, y «cóctel» en singular es comida de fiesta.
+def _is_alcohol(a) -> bool:
+    return a is not None and load_taxonomy().concepts[a.concept_id].parent == "alcohol"
+
+
+@pytest.mark.parametrize(
+    ("name", "section", "description"),
+    [
+        ("Queso Brie Francés Los Tilos, 140 G", "Aperitivo", "Queso brie de leche de vaca pasteurizada"),
+        ("Sopaipilla De Zapallo", "Aperitivo", "Sopaipillla artesanal hecha con zapallo camote"),
+        ("Chorizo chileno La Lobería 100 gr", "Aperitivo", "Chorizo de carne de cerdo, fabricado en un proceso"),
+        ("Papas Supremas Coquimbo Wey", "Aperitivos", "Papas fritas con cebolla morada, carne mechada, pollo"),
+        ("Arrollados Jamón y Queso", "Aperitivos", "6 Arrollados rellenos de jamón y queso."),
+        ("Emp. queso horno cocktail (10 unidades)", "Cocktail (ultracongelado)", "sólo queso con salsa bechamel"),
+        ("Brochetas Queso de Cabra", "Cocktail", "12 Unidades de brochetas de queso de cabra con orégano"),
+    ],
+)
+def test_food_in_an_aperitivo_section_is_not_alcohol(matcher, csv_maps, name, section, description):
+    """«aperitivo» es keyword de licores y «cóctel» de cócteles: quesos, sopaipillas y papas de esas secciones quedaban
+    como alcohol (38 platos en la base real del 21-10-2026)."""
+    maps = csv_maps["seccion_menu"], csv_maps["cocina"]
+    a = assign_menu_item("90", name, section, [], *maps, matcher, description=description)
+    assert not _is_alcohol(a), a
+
+
+@pytest.mark.parametrize(
+    ("name", "description"),
+    [
+        ("Vaina 170 ml", "Oporto, conac, licor de cacao, azucar, yema."),
+        ("Primavera", "Gin, Jugo D Epina, Jugo De Mango, Jugo De Naranja, Jugo De Durazno"),
+        ("Mango sour botella 300 cc", "Mango sour natural preparado en nuestra barra."),
+        ("Piña Colada", "Piña, ron, licor de coco y azúcar."),
+        ("Ruso Blanco 170 ml", "Vodka, licor de café y crema de leche ."),
+        ("Bitter Batido 170 ml", "Bitter y licor de cacao."),
+        ("Coca Sour", "Coca sour, aperitivo"),
+        ("INCA KOLA RAPPI", "INCA KOLA RAPPI"),  # lo que no se reconoce sigue con la sección
+        ("Babaganoush Suk, 175 Gr", "Dip de berenjenas asada con tahine listo para servir."),
+        # Un nombre de comida con un trago en el nombre o en la descripción: manda el trago.
+        ("Sour Catedral Pepino 1/2 Lt.", "Sour casero de pepino de 1/2 lt."),
+        ("Pepino Tonic", "Gin, pepino y agua tónica"),
+        ("Tomate Preparado", "Jugo de tomate con 5° de alcohol"),
+        # Sin una palabra de alcohol, también lo que dice ser una bebida: un volumen, una bebida, un trago.
+        ("Pepino Tonic", ""),
+        ("Pepino Ice 300 cc", ""),
+        ("Pepino Fresh", "Bebida alcohólica de la casa"),
+        ("Apio Frozen", "Trago de la casa"),
+        ("Tomate Punch", "Con jugo de tomate y limón"),
+        ("Chorizo Vermut", "Con vermut rosso"),
+        ("Vaina 170 ml", "Oporto, conac, licor de cacao, azucar, yema."),
+        ("Algarrobina 170 ml", "Pisco, leche, licor de cacao, azúcar y yema."),
+        ("Pepino Ice", ""),
+        ("Jarra de Pepino", ""),
+        ("Tomate Bloody", "Con rhum"),
+        ("Pepino Smash 16 oz", ""),
+        ("Apio Cooler", "Destilado de agave y apio"),
+    ],
+)
+def test_a_drink_or_an_unknown_dish_in_an_aperitivo_section_keeps_alcohol(matcher, csv_maps, name, description):
+    """Las mismas secciones traen cócteles que solo el concepto de alcohol protege de las ofertas: la guardia de
+    secciones no ve «Aperitivos». Solo sale del alcohol lo que el nombre dice que es comida sólida."""
+    maps = csv_maps["seccion_menu"], csv_maps["cocina"]
+    a = assign_menu_item("91", name, "Aperitivos", [], *maps, matcher, description=description)
+    assert _is_alcohol(a), a
+
+
+@pytest.mark.parametrize(
+    ("name", "section"),
+    [
+        ("Chorizo Ibérico Laminado", "APERITIVOS & TRAGOS"),  # la guardia la ve como sección de tragos
+        ("Papas Supremas", "Cervezas"),  # ni «aperitivo» ni «cóctel»: la sección decide
+        ("Queso Mantecoso", "Cocteles"),  # «cócteles» en plural son tragos
+        ("Queso Brie", "Aperitivos y Whisky"),  # otra palabra de la sección dice alcohol
+        ("Queso Brie", "Aperitivo Spritz"),
+        ("Queso Brie", "Aperitivos y Aperol"),
+        ("Tomate Picante", "Cocktail Bar"),
+    ],
+)
+def test_a_section_that_is_clearly_about_drinks_still_decides(matcher, csv_maps, name, section):
+    maps = csv_maps["seccion_menu"], csv_maps["cocina"]
+    assert _is_alcohol(assign_menu_item("92", name, section, [], *maps, matcher))
+
+
+@pytest.mark.parametrize(
+    ("name", "section", "concept"),
+    [
+        ("Tom Collins", "Aperitivos", "cocteles"),
+        ("Caipiriña con Sabor a Piña", "Aperitivos", "cocteles"),
+        ("Daikiri Sabores 1 Litro App", "Deliverys", "cocteles"),
+        ("Caipiroska", "Bebidas", "cocteles"),
+        ("Kir Royal 170 ml", "Aperitivos", "cocteles"),
+        ("Clavo Oxidado", "Cóctel y Tragos", "cocteles"),
+        ("Botella de Ramazzotti", "Bebidas", "licores"),
+        ("Amareto Sour 250 ml", "Aperitivos", "licores"),
+    ],
+)
+def test_known_cocktails_are_alcohol_by_their_name(matcher, csv_maps, name, section, concept):
+    """En la base real del 22-10-2026, «Botella de Ramazzotti» y «Caipiroska» en «Bebidas» y «Daikiri Sabores» en
+    «Deliverys» quedaban como gaseosas o pizza, y nada en el nombre los bloqueaba en una oferta."""
+    a = assign_menu_item("93", name, section, [], csv_maps["seccion_menu"], csv_maps["cocina"], matcher)
+    assert (a.concept_id, a.method) == (concept, "regla"), a
+
+
+def test_a_dish_without_a_description_is_read_as_one_without_it(matcher):
+    a = assign_menu_item("97", "Queso Brie", "Aperitivos", [], {}, {}, matcher, description=None)
+    assert a is None
+
+
+@pytest.mark.parametrize(
+    ("name", "section"), [("Hibistonic", "Cockteleria De Autor"), ("Vaina", "Cockteleria Clasica")]
+)
+def test_a_cocktail_bar_section_spelled_with_ck_is_a_drinks_section(matcher, csv_maps, name, section):
+    """Base real del 22-10-2026: «Hibistonic» y «Loica 75» (gin) quedaban sin concepto, y una «Vaina» de licor de
+    café."""
+    a = assign_menu_item("96", name, section, [], csv_maps["seccion_menu"], {}, matcher)
+    assert (a.concept_id, a.source) == ("cocteles", f"seccion-nombre:{section}"), a
+
+
+@pytest.mark.parametrize(
+    ("name", "section", "concept"),
+    [
+        ("Combo Eros Ramazzotti", "Combos", None),  # el cantante: un combo de paninos
+        ("Tres Leches Algarrobina", "Postres", "postres"),  # la torta, con «tres leches» antes que el trago
+        ("Edamame en vaina", "Entradas", None),
+    ],
+)
+def test_a_cocktail_word_with_another_sense_is_not_a_cocktail(matcher, csv_maps, name, section, concept):
+    a = assign_menu_item("94", name, section, [], csv_maps["seccion_menu"], csv_maps["cocina"], matcher)
+    assert not _is_alcohol(a) and (a.concept_id if a else None) == concept, a
+
+
+@pytest.mark.parametrize(
+    ("name", "category", "concept"),
+    [
+        ("Score Cuba Libre (473 Ml)", "Energizantes", "energizantes"),  # Score es una marca de energéticas
+        ("Gourmet Vainilla Vaina", "Esencias y colorantes", "reposteria"),
+        ("Edamame Sin Vaina", "Verduras", "verduras"),
+    ],
+)
+def test_cocktail_words_do_not_move_store_products_out_of_their_category(matcher, csv_maps, name, category, concept):
+    assert assign_catalog_item("95", name, category, csv_maps["categoria"], matcher).concept_id == concept

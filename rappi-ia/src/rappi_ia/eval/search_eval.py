@@ -20,7 +20,7 @@ from psycopg import Connection
 from ..agent.tools import search_products
 from ..agent.understand import Understander
 from ..embeddings.base import TextEmbedder
-from ..retrieval.hybrid import DEFAULT_TAU, MODES, THRESHOLDS_FILE, retrieve
+from ..retrieval.hybrid import DEFAULT_TAU, MODES, THRESHOLDS_FILE, UNNAMED_TAU, retrieve
 
 QUERIES_FILE = Path(__file__).resolve().parent / "queries.json"
 K = 10
@@ -58,6 +58,7 @@ class QueryRun:
     items: list[dict] = field(default_factory=list)  # los resultados (tipo, id, texto, concepto, tienda si se muestra)
     shown_unmet: bool | None = None  # solo en SHOWN: «sin resultado» como lo registra el agente (y nada a la vista)
     has_words: bool = True  # le queda alguna palabra sin las stopwords («té» no): sin ellas no hay «sin resultado»
+    names_occasion: bool = False  # sin concepto, si nombra una ocasión: solo entonces decide el τ del vertical
 
 
 def load_queries(path: Path = QUERIES_FILE) -> list[dict]:
@@ -75,10 +76,11 @@ def run_queries(
                 continue
             shown_unmet = None
             if mode == SHOWN:
-                # Como /search: los conceptos los detecta la consulta. El agente registra la demanda solo sin
+                # Como /search: los conceptos los detecta la consulta (y si queda «sin resultado», se corrigen los
+                # errores de tipeo y se vuelve a buscar: retrieval/spelling.py). El agente registra la demanda solo sin
                 # productos, y nunca por síntomas: ahí los medicamentos se ocultan por la regla 6d, no por falta de
                 # surtido.
-                outcome = search_products(conn, q["vertical"], q["query"], None, embedder, k=K)
+                outcome = search_products(conn, q["vertical"], q["query"], None, embedder, k=K, correct=True)
                 result = outcome.result
                 items = [(p.entity_type, p.entity_id, p.name, p.concept, p.store) for p in outcome.products]
                 symptom = understander.understand(conn, q["query"], q["vertical"]).symptom
@@ -108,6 +110,7 @@ def run_queries(
                     ],
                     shown_unmet,
                     result.has_words,
+                    result.names_occasion,
                 )
             )
     return runs
@@ -180,10 +183,10 @@ def compare_modes(runs: list[QueryRun]) -> list[dict]:
 def calibrate_tau(runs: list[QueryRun], candidates=None) -> dict[str, float]:
     """τ por vertical: el que maximiza el recall de 'sin resultado' con precisión ≥ 0,9 (modo híbrido).
 
-    Solo cuentan las negativas que dependen de τ (sin coincidencia léxica estricta ni concepto nombrado, y con
-    palabras que buscar): las demás dan el mismo recall con cualquier τ. Un vertical sin esas negativas, o donde
-    ningún τ detecta alguna, no recibe propuesta. Ante un empate gana el τ más bajo: el más prudente con las
-    consultas que no están en el set.
+    Solo cuentan las consultas que dependen de τ (sin coincidencia léxica estricta ni concepto nombrado, con palabras
+    que buscar y una ocasión nombrada: sin ella decide UNNAMED_TAU): las demás dan el mismo recall con cualquier τ.
+    Un vertical sin esas negativas, o donde ningún τ detecta alguna, no recibe propuesta. Ante un empate gana el τ más
+    bajo: el más prudente con las consultas que no están en el set.
     """
     candidates = candidates or TAU_CANDIDATES
     hybrid = [r for r in runs if r.mode == "hibrido"]
@@ -192,7 +195,11 @@ def calibrate_tau(runs: list[QueryRun], candidates=None) -> dict[str, float]:
         rows = [
             r
             for r in hybrid
-            if r.vertical == vertical and r.strict_lexical == 0 and not r.names_concept and r.has_words
+            if r.vertical == vertical
+            and r.strict_lexical == 0
+            and not r.names_concept
+            and r.has_words
+            and r.names_occasion
         ]
         actual = [r.tipo == "negativa" for r in rows]
         if not any(actual):
@@ -337,7 +344,8 @@ def render_markdown(
         "",
         "## Sin resultado (demanda no satisfecha)",
         "",
-        f"Umbral τ por vertical (sin τ propio rige {DEFAULT_TAU}):",
+        f"Umbral τ por vertical (sin τ propio rige {DEFAULT_TAU}). Decide en las consultas que nombran una ocasión y no"
+        f" un concepto; sin concepto ni ocasión rige {UNNAMED_TAU} en todas:",
         "",
         "| Vertical | τ vigente | τ propuesto |",
         "|---|---|---|",
@@ -347,9 +355,9 @@ def render_markdown(
         lines.append(f"| {vertical} | {current.get(vertical, '-')} | {suggestion} |")
     lines += [
         "",
-        "Sin propuesta: el vertical no tiene negativas que dependan de τ (todas cortan por coincidencia léxica o por"
-        " concepto nombrado), o ningún τ entre 0,70 y 0,95 las detecta con precisión ≥ 0,9. Un vertical sin propuesta,"
-        " al guardar, conserva su τ vigente.",
+        "Sin propuesta: el vertical no tiene negativas que dependan de τ (todas cortan por coincidencia léxica, por"
+        f" concepto nombrado o, sin concepto ni ocasión, por {UNNAMED_TAU}), o ningún τ entre 0,70 y 0,95 las detecta"
+        " con precisión ≥ 0,9. Un vertical sin propuesta, al guardar, conserva su τ vigente.",
     ]
     floor = [v for v in sorted(current) if current[v] <= min(TAU_CANDIDATES)]
     if floor:
@@ -357,7 +365,7 @@ def render_markdown(
             "",
             f"⚠ τ vigente en el piso de la grilla (0,70): {', '.join(floor)}. No viene de una calibración y con él la"
             " regla del coseno casi nunca se dispara (los cosenos e5 rara vez bajan de 0,76). Hacen falta negativas"
-            " sin concepto nombrado en ese vertical para calibrarlo.",
+            " que nombren una ocasión y no un concepto en ese vertical para calibrarlo.",
         ]
     lines += [
         "",
@@ -467,7 +475,9 @@ def negative_diagnosis(runs: list[QueryRun], taus: dict[str, float]) -> list[dic
         elif r.max_cosine is None:
             cause = "sin coseno (sin embeddings)"
         else:
-            cause = f"coseno {r.max_cosine:.3f} {'<' if r.max_cosine < tau else '≥'} τ {tau}"
+            used = _tau(r, tau)
+            unnamed = "" if r.names_occasion else "sin concepto ni ocasión: "
+            cause = f"{unnamed}coseno {r.max_cosine:.3f} {'<' if r.max_cosine < used else '≥'} τ {used}"
         rows.append(
             {
                 "vertical": r.vertical,
@@ -481,14 +491,19 @@ def negative_diagnosis(runs: list[QueryRun], taus: dict[str, float]) -> list[dic
 
 
 def _is_unmet(run: QueryRun, tau: float) -> bool:
-    """Misma regla que retrieval.hybrid._unmet, con τ variable para calibrar."""
+    """Misma regla que retrieval.hybrid._unmet, con el τ del vertical variable para calibrar."""
     if run.strict_lexical > 0:
         return False
     if run.names_concept:
         return not run.concept_in_vertical
     if not run.has_words:
         return False
-    return run.max_cosine is None or run.max_cosine < tau
+    return run.max_cosine is None or run.max_cosine < _tau(run, tau)
+
+
+def _tau(run: QueryRun, tau: float) -> float:
+    """El τ que decide una consulta sin concepto: el del vertical si nombra una ocasión; si no, UNNAMED_TAU."""
+    return tau if run.names_occasion else UNNAMED_TAU
 
 
 def _means(runs: list[QueryRun]) -> dict:

@@ -63,13 +63,16 @@ LEFT JOIN LATERAL (
 ) cover ON true
 ORDER BY r.pos"""
 
-# Los platos con precio de un restaurante, por la posición de su sección y, dentro de ella, por el id que les dio Rappi
-# (que no guarda el orden de los platos).
+# Los platos con precio de un restaurante, una fila por cada sección donde está el plato, por la posición de la sección
+# y, dentro de ella, por el id que les dio Rappi (que no guarda el orden de los platos). Rappi repite un plato en «Más
+# vendidos» y en la suya: `section_id` es la última y las demás van en `extra_section_ids` (migración 040). Es una
+# fila por par plato-sección aunque el arreglo traiga repetidos o la propia sección.
 _MENU = """
 SELECT ms.section_id, ms.name, mi.item_id::text, mi.name, p.price, p.real_price, NULLIF(mi.image_url, ''),
        mi.is_popular, ic.concept_id
 FROM menu_items mi
-JOIN menu_sections ms ON ms.store_id = mi.store_id AND ms.section_id = mi.section_id
+JOIN menu_sections ms ON ms.store_id = mi.store_id
+                     AND (ms.section_id = mi.section_id OR ms.section_id = ANY(mi.extra_section_ids))
 JOIN latest_menu_prices p ON p.item_id = mi.item_id  -- su último precio, desempatado por corrida
 LEFT JOIN item_concepts ic ON ic.entity_type = 'menu_item' AND ic.entity_id = mi.item_id::text
 WHERE mi.store_id = %(store_id)s AND p.price >= %(min_price)s
@@ -90,7 +93,8 @@ def restaurants(conn: Connection, cuisine: str | None = None, sort: Sort = "rati
 
 def restaurant_menu(conn: Connection, store_id: int) -> dict | None:
     """El restaurante con su menú: una sección por cada una de las suyas con platos con precio, en el orden de
-    `menu_sections.position`. Los platos populares abren el menú en la sección «Lo más pedido» y siguen en la suya.
+    `menu_sections.position`, y en cada una todos sus platos: uno que Rappi repite («Más vendidos» y la suya) sale en
+    las dos. Los platos populares abren el menú en la sección «Lo más pedido», una vez cada uno, y siguen en la suya.
     `None` si no existe, no es un restaurante o no tiene platos con precio."""
     if not 0 <= store_id <= BIGINT_MAX:
         return None
@@ -100,21 +104,24 @@ def restaurant_menu(conn: Connection, store_id: int) -> dict | None:
     full_name = rows[0][1]
     taxonomy = load_taxonomy()
     sections: dict[int, dict] = {}
+    dishes: dict[str, dict] = {}
     popular: list[dict] = []
     for section_id, section, entity_id, name, price, real, image, is_popular, concept_id in conn.execute(
         _MENU, {"store_id": store_id, "min_price": MIN_PRICE}
     ):
-        dish = product_card(
-            (entity_id, name, price, real, image, None, False, concept_id),
-            "restaurantes",
-            full_name,
-            store_id,
-            taxonomy,
-            "menu_item",
-        ).to_dict()
+        dish = dishes.get(entity_id)
+        if dish is None:
+            dish = dishes[entity_id] = product_card(
+                (entity_id, name, price, real, image, None, False, concept_id),
+                "restaurantes",
+                full_name,
+                store_id,
+                taxonomy,
+                "menu_item",
+            ).to_dict()
+            if is_popular:
+                popular.append(dish)
         sections.setdefault(section_id, {"name": section.strip(), "items": []})["items"].append(dish)
-        if is_popular:
-            popular.append(dish)
     first = [{"name": POPULAR_SECTION, "items": popular}] if popular else []
     return {"restaurant": _card(*rows[0]), "sections": first + list(sections.values())}
 

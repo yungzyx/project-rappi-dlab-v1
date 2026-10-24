@@ -37,6 +37,22 @@ describe('searchAll', () => {
     expect(result.unmetReason).toMatch(/sin coincidencia/)
   })
 
+  test('si la API corrigió un error de tipeo dice qué buscó; con exact pide buscar tal cual', async () => {
+    const calls = stubApi({
+      '/search': (req) =>
+        req.query.get('correct') === 'false' ? fixture('search-grouped-unmet') : fixture('search-grouped-corrected'),
+    })
+    const corrected = await searchAll('cervezaaaa')
+    expect(corrected.correctedQuery).toBe('cerveza')
+    expect(corrected.groups.length).toBeGreaterThan(0)
+    expect(new URL(calls.mock.calls[0][0]).searchParams.has('correct')).toBe(false)
+
+    const exact = await searchAll('cervezaaaa', { exact: true })
+    expect(new URL(calls.mock.calls[1][0]).searchParams.get('correct')).toBe('false')
+    expect(exact.correctedQuery).toBeNull()
+    expect(exact.unmet).toBe(true)
+  })
+
   test('con vertical busca solo ahí y devuelve un solo grupo', async () => {
     const calls = stubApi({
       '/search': (req) =>

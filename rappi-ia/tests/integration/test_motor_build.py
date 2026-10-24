@@ -135,8 +135,9 @@ def test_build_motor_twice_replaces_rows(simulated):
 
 def test_build_synthetic_keeps_prototype_rows(simulated):
     db = simulated
-    start = datetime(2026, 9, 1, 15, tzinfo=UTC)
-    for day in range(4):  # una persona del prototipo con pedidos en septiembre
+    # El prototipo cuenta hasta hoy (tendencias de 28 días, afinidad de 180): los pedidos, en las últimas 4 semanas.
+    start = datetime.now(UTC) - timedelta(days=22)
+    for day in range(4):  # una persona del prototipo con un pedido por semana
         events.record_order(
             db, "p-1", f"s-{day}", f"c-{day}", "supermercado", [_line("1", None)], ts=start + timedelta(days=7 * day)
         )
@@ -527,7 +528,7 @@ def test_build_uses_the_present_only_for_the_prototype(db, monkeypatch, source):
 
     orders = _recent_orders(days_ago=10, users=2)
     monkeypatch.setattr(build, "load_orders", lambda *_args: orders)
-    monkeypatch.setattr(build, "load_signals", lambda *_args: [])
+    monkeypatch.setattr(build, "load_signals", lambda *_args, **_kwargs: [])
     build_motor(db, source, evaluate=False)
 
     window_end = db.execute("SELECT DISTINCT window_end FROM trends WHERE data_source = %s", (source,)).fetchone()[0]
@@ -542,7 +543,7 @@ def test_prototype_trends_hide_what_one_or_two_people_ordered(db, monkeypatch):
     few, many = _recent_orders(2, users=2), _recent_orders(2, users=PROTOTYPE_MIN_USERS)
     for source, orders, products in (("prototype", few, 0), ("synthetic", few, 1)):
         monkeypatch.setattr(build, "load_orders", lambda *_args, orders=orders: orders)
-        monkeypatch.setattr(build, "load_signals", lambda *_args: [])
+        monkeypatch.setattr(build, "load_signals", lambda *_args, **_kwargs: [])
         build_motor(db, source, evaluate=False)
         assert (
             db.execute(

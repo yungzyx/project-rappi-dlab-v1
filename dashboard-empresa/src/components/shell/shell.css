@@ -49,6 +49,12 @@
   animation-delay: 180ms;
 }
 
+@keyframes grow-y {
+  from {
+    transform: scaleY(0);
+  }
+}
+
 .brand .eyebrow {
   color: var(--brand-ink);
 }
@@ -307,6 +313,10 @@
   flex: none;
 }
 
+.tab-short {
+  display: none;
+}
+
 /* ---------- Pie ---------- */
 .site-footer {
   padding-block: var(--space-6) var(--space-7);
@@ -317,6 +327,25 @@
 
 .site-footer p + p {
   margin-top: var(--space-2);
+}
+
+.site-footer a {
+  color: var(--brand-ink);
+}
+
+@media (max-width: 640px) {
+  .tab-long {
+    display: none;
+  }
+
+  .tab-short {
+    display: inline;
+  }
+
+  /* El aviso de arriba ya dice la fuente: la insignia le quitaba espacio a las pestañas */
+  .tabbar-source {
+    display: none;
+  }
 }
 
 @media (max-width: 760px) {

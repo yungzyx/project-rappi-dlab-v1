@@ -36,8 +36,11 @@ export function Tabs({ views, active, onSelect }) {
           aria-controls={view.id === active ? `panel-${view.id}` : undefined}
           tabIndex={view.id === active ? 0 : -1}
           onClick={() => onSelect(view.id)}
+          aria-label={view.label}
         >
-          {view.label}
+          {/* En angosto, el nombre corto (las tres pestañas caben); el lector de pantalla lee siempre el largo. */}
+          <span className="tab-long">{view.label}</span>
+          <span className="tab-short">{view.short ?? view.label}</span>
         </button>
       ))}
     </div>

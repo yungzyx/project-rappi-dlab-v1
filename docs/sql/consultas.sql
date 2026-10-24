@@ -247,11 +247,13 @@ LIMIT 10;
 
 -- 2.4 Platos populares de sushi
 -- Idea de SQL: JOIN de varias tablas (llave compuesta) + OR con ILIKE ANY + reutilizar el CTE de último precio
--- Tiempo medido: ~92 ms
+-- Tiempo medido: ~92 ms; con extra_section_ids, ~1,4 veces eso (21-10, con la columna simulada)
 -- ¿Cuáles son los platos populares de los restaurantes de sushi y cuánto cuestan?
 -- is_popular casi no viene marcado en los datos (solo 3 platos en total),
 -- así que también contamos como "popular" un plato que el restaurante puso
 -- en una sección tipo "Más vendidos", "Destacados", "Favoritos", etc.
+-- Un plato puede estar en varias secciones (en "Más vendidos" y en la suya):
+-- section_id es la última y las demás van en extra_section_ids (migración 040).
 WITH ultimo_precio AS (
   SELECT DISTINCT ON (p.item_id)
          p.item_id,
@@ -267,7 +269,8 @@ SELECT s.name     AS restaurante,
 FROM menu_items AS mi
 JOIN menu_sections AS ms
   ON ms.store_id = mi.store_id
- AND ms.section_id = mi.section_id
+ AND (ms.section_id = mi.section_id
+      OR ms.section_id = ANY (mi.extra_section_ids))
 JOIN restaurant_cuisines AS rc
   ON rc.store_id = mi.store_id
 JOIN stores AS s

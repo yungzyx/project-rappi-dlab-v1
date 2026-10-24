@@ -160,7 +160,7 @@ rappi-scraper/
 │   │   ├── repository.py           escrituras idempotentes y consultas de estado
 │   │   ├── search.py               documentos y búsqueda por vertical
 │   │   ├── backup.py               respaldo con pg_dump, validación y rotación
-│   │   └── migrations/             esquema SQL versionado, un solo historial para toda la base (001–039; las de rappi-ia: 009–013, 016, 020, 022–031, 033–037)
+│   │   └── migrations/             esquema SQL versionado, un solo historial para toda la base (001–040; las de rappi-ia: 009–013, 016, 020, 022–031, 033–037)
 │   └── legacy/                   scraper original a CSV (ver Legado)
 │       ├── csv_scraper.py          comando `rappi-csv`
 │       ├── csv_format.py           columnas y escritura de CSV

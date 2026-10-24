@@ -14,13 +14,15 @@
     "lint": "eslint .",
     "format": "prettier --write src scripts",
     "fixtures": "node scripts/update-fixtures.mjs",
-    "screenshots": "node scripts/screenshots.mjs"
+    "screenshots": "node scripts/screenshots.mjs",
+    "panel:snapshot": "node scripts/panel-snapshot.mjs",
+    "panel:html": "node scripts/panel-html.mjs"
   },
   "dependencies": {
     "@fontsource-variable/figtree": "^5.3.0",
     "@fontsource/ibm-plex-mono": "^5.3.0",
-    "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -31,9 +33,9 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.13.0",
     "jsdom": "^30.1.2",
-    "playwright-core": "^1.64.0",
-    "prettier": "^3.9.9",
+    "playwright-core": "^1.64.1",
+    "prettier": "^3.9.10",
     "vite": "^8.3.4",
-    "vitest": "^5.0.3"
+    "vitest": "^5.0.4"
   }
 }

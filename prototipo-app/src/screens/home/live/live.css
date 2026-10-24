@@ -464,6 +464,21 @@
   animation: live-bubble-in 360ms var(--live-spring);
 }
 
+/* Lo que falta escribir: invisible, pero ya ocupa su lugar en el globo */
+.live-bubble-rest::after {
+  content: attr(data-rest);
+  visibility: hidden;
+}
+
+/* Hasta que termina de escribir, «¿Por qué?» y los botones ya ocupan su lugar, sin verse ni animarse */
+.live-bubble-more.is-pending {
+  visibility: hidden;
+}
+
+.live-bubble-more.is-pending * {
+  animation: none;
+}
+
 /* Abajo en la pantalla, el globo crece hacia arriba desde la cabeza de Mochi */
 .live-agent.is-low .live-bubble {
   top: auto;

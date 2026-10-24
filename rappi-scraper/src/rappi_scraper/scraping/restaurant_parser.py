@@ -29,27 +29,33 @@ def parse_restaurant(next_data: dict) -> dict:
     rating = r.get("ratingData") or {}
     cuisines = sorted({t.strip() for t in (r.get("tags") or []) if t and t.strip()})
 
-    sections, items = [], []
+    sections, items = [], {}
     for position, corridor in enumerate(r.get("corridors") or []):
         section_id = _section_id(corridor, position)
         sections.append({"section_id": section_id, "name": corridor.get("name") or "", "position": position})
         for p in corridor.get("products") or []:
             price, real_price = p.get("price"), p.get("realPrice")
-            items.append(
-                {
-                    "item_id": int(p["id"]),
-                    "section_id": section_id,
-                    "name": (p.get("name") or "").strip(),
-                    "description": (p.get("description") or "").strip(),
-                    "image_url": IMAGE_BASE_URL + p["image"] if p.get("image") else "",
-                    "is_popular": bool(p.get("isPopular")),
-                    "has_toppings": bool(p.get("hasToppings")),
-                    "price": price,
-                    "real_price": real_price,
-                    "discount_pct": discount_pct(price, real_price),
-                    "is_available": bool(p.get("isAvailable")),
-                }
-            )
+            item = {
+                "item_id": int(p["id"]),
+                "section_id": section_id,
+                "extra_section_ids": [],
+                "name": (p.get("name") or "").strip(),
+                "description": (p.get("description") or "").strip(),
+                "image_url": IMAGE_BASE_URL + p["image"] if p.get("image") else "",
+                "is_popular": bool(p.get("isPopular")),
+                "has_toppings": bool(p.get("hasToppings")),
+                "price": price,
+                "real_price": real_price,
+                "discount_pct": discount_pct(price, real_price),
+                "is_available": bool(p.get("isAvailable")),
+            }
+            # Rappi repite el plato en «Más vendidos» y en su sección: queda uno, con los datos de la última aparición
+            # y las demás secciones en extra_section_ids (migración 040).
+            if earlier := items.get(item["item_id"]):
+                seen = [*earlier["extra_section_ids"], earlier["section_id"]]
+                item["extra_section_ids"] = [s for s in seen if s != section_id]
+                item["is_popular"] = item["is_popular"] or earlier["is_popular"]
+            items[item["item_id"]] = item
 
     return {
         "store": {
@@ -74,5 +80,5 @@ def parse_restaurant(next_data: dict) -> dict:
         },
         "cuisines": cuisines,
         "sections": sections,
-        "items": items,
+        "items": list(items.values()),
     }

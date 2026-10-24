@@ -37,23 +37,9 @@ from rappi_ia.motor.model import TZ
 
 FIXTURES = Path(__file__).resolve().parents[3] / "prototipo-app" / "src" / "api" / "fixtures"
 PANEL_FIXTURES = Path(__file__).resolve().parents[3] / "dashboard-empresa" / "src" / "fixtures"
-PANEL_METRICS = ("offers", "unmet", "combos", "motor", "home", "volver")
+PANEL_METRICS = ("offers", "unmet", "combos", "motor", "volver")
 # Las métricas de /analytics que guarda `npm run fixtures` (dashboard-empresa/scripts/update-fixtures.mjs).
-PANEL_SHAPE = (
-    "kpis",
-    "weekly",
-    "opportunities",
-    "trends",
-    "funnel",
-    "cohorts",
-    "rhythm",
-    "at-risk",
-    "suggestions",
-    "services",
-    "multi-vertical",
-    "affinity",
-    "assortment",
-)
+PANEL_SHAPE = ("kpis", "weekly", "opportunities", "trends", "at-risk", "suggestions", "services", "assortment")
 PANEL_ORIGINS = {
     "prototype": "make contract · recorrido corto sobre el catálogo de prueba inventado",
     "synthetic": "make contract · simulación chica con semilla fija (40 personas, 8 semanas)",
@@ -89,6 +75,7 @@ CONTRACT: tuple[Example, ...] = (
     Example("catalog-home", "GET", "/catalog/home"),
     Example("search-grouped", "GET", "/search?q=cerveza"),
     Example("search-grouped-unmet", "GET", "/search?q=xyzzy"),
+    Example("search-grouped-corrected", "GET", "/search?q=cervezaaaa"),
     # La pizzería tiene platos populares: el primero de sus platos trae lo más pedido según su menú (`top_dishes`).
     Example("search-grouped-restaurantes", "GET", "/search?q=pizza"),
     Example(
@@ -379,7 +366,6 @@ def prototype_journey(client) -> None:
             "results": 0,
             "unmet": search["unmet"],
         },
-        {"type": "vertical_open", "session_id": "s-panel", "vertical": "farmacia"},
     ]
     assert client.post("/events", json={"user_id": "u-panel", "events": sent}).json() == {"guardados": len(sent)}
 
@@ -438,14 +424,6 @@ def test_panel_saved_responses_keep_the_api_shape(client, db, name, source):
         generate(db, users=40, weeks=8, seed=11, until=date(2026, 10, 4))
     live = client.get(f"/analytics/{name}?source={source}")
     saved = json.loads((PANEL_FIXTURES / f"{name}.{source}.json").read_text(encoding="utf-8"))
-
-    assert live.status_code == 200, live.text
-    assert shape_differences(live.json()["data"], saved["data"]) == []
-
-
-def test_panel_saved_catalog_keeps_the_api_shape(client):
-    live = client.get("/analytics/catalog")
-    saved = json.loads((PANEL_FIXTURES / "catalog.json").read_text(encoding="utf-8"))
 
     assert live.status_code == 200, live.text
     assert shape_differences(live.json()["data"], saved["data"]) == []

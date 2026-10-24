@@ -206,7 +206,9 @@ parent = "alcohol"
 name = "Licores y aperitivos"
 emoji = "🍹"
 age_restricted = true
-keywords = ["licor", "crema de licor", "aperitivo", "aperol", "campari", "fernet", "jägermeister", "jagermeister", "baileys", "amaretto", "cognac", "coñac", "brandy", "aguardiente", "vermouth", "martini", "anís", "araucano", "manzanilla licor", "soju", "makgeolli"]
+keywords = ["licor", "crema de licor", "aperitivo", "aperol", "campari", "fernet", "jägermeister", "jagermeister", "baileys", "amaretto", "amareto", "cognac", "coñac", "brandy", "aguardiente", "vermouth", "vermut", "martini", "anís", "araucano", "manzanilla licor", "soju", "makgeolli", "ramazzotti"]
+# «Combo Eros Ramazzotti» es un combo de paninos con el nombre del cantante.
+avoid = ["eros ramazzotti"]
 
 [[concept]]
 id = "cocteles"
@@ -214,7 +216,13 @@ parent = "alcohol"
 name = "Cócteles listos"
 emoji = "🍹"
 age_restricted = true
-keywords = ["cóctel", "coctel", "cocktail", "hard seltzer", "seltzer", "mojito", "margarita", "spritz", "ready to drink"]
+# «cocktelería» es una sección de tragos con otra ortografía. Desde «tom collins», los cócteles que los menús nombran
+# sin decir alcohol (base real del 22-10-2026). Fuera, los que en los menús, el catálogo o una búsqueda son otra cosa:
+# «vaina» (porotos, vainilla, espadas), «algarrobina» (un jarabe), «mule» (tazones de cobre), «negroni» (salames y
+# tomates), «chilcano» (una sopa), «manhattan» (hamburguesas), «cola de mono» (té y helado), «piña colada» (jugos y
+# helados), «terremoto» y «michelada» (helados, salsas). Esos los bloquean las guardias de ofertas por el nombre del
+# plato, y la vaina y la algarrobina de un menú quedan como alcohol por su sección.
+keywords = ["cóctel", "coctel", "cocktail", "cocktelería", "hard seltzer", "seltzer", "mojito", "margarita", "spritz", "ready to drink", "tom collins", "daiquiri", "daikiri", "caipiriña", "caipirinha", "caipiroska", "bloody mary", "cuba libre", "kir royal", "ruso blanco", "ruso negro", "cosmopolitan", "clavo oxidado"]
 # Score es una marca de energéticas: «Score Mojito» no es un mojito.
 avoid = ["score"]
 
@@ -366,7 +374,9 @@ parent = "dulces"
 name = "Tortas y pastelería"
 emoji = "🎂"
 prepared = true
-keywords = ["torta", "pastel", "kuchen", "queque", "cupcake", "muffin", "dona", "donut", "croissant", "medialuna", "berlín", "berlin", "pie de limón", "tarta dulce", "cinnamon roll", "rollo de canela", "macarons", "pastelito", "calzones rotos"]
+# Pies y tartas por su sabor dulce: «pie» suelto es también un pie de pollo y, en el catálogo y las consultas, un pie
+# («Plantilla Ortopédica Pie Plano», «crema para pies»). Sin «palmera»: en el catálogo son pijamas y prendedores.
+keywords = ["torta", "pastel", "kuchen", "queque", "cupcake", "muffin", "dona", "donut", "croissant", "medialuna", "berlín", "berlin", "pie de limón", "tarta dulce", "cinnamon roll", "rollo de canela", "macarons", "pastelito", "calzones rotos", "tartaleta", "churro", "milhoja", "mil hojas", "brazo de reina", "carrot cake", "pie de maracuyá", "pie de manzana", "pie de frambuesa", "pie de nuez", "pie de berries", "pie de frutos", "lemon pie", "key lime pie", "apple pie", "pumpkin pie"]
 
 [[concept]]
 id = "untables-dulces"

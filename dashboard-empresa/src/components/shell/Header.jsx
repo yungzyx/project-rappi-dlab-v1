@@ -1,3 +1,4 @@
+import { SNAPSHOT_INFO } from '../../lib/api.js'
 import { formatDate } from '../../lib/format.js'
 import { useAnalytics } from '../../lib/useAnalytics.js'
 import { Async } from '../Async.jsx'
@@ -37,17 +38,23 @@ export function Header({ source, onSourceChange, onRefresh }) {
           <ThemeToggle />
         </div>
         <p className="masthead-lede">
-          La conducta de compra y lo que la gente pide en búsquedas y preguntas al agente, convertidos en decisiones
-          para <strong>subir la frecuencia</strong> y <strong>bajar el abandono</strong>.
+          Para la <strong>gerencia</strong> y <strong>RappiAds</strong>: venta cruzada, retención y lo que ofrece Mochi.
         </p>
         <div className="masthead-meta">
           <Async fallback={<span>Cargando fecha de corte…</span>}>
             <AsOf source={source} />
           </Async>
           {' · '}
-          <button type="button" className="text-button" onClick={onRefresh}>
-            Actualizar
-          </button>
+          {SNAPSHOT_INFO ? (
+            // En el archivo suelto no hay nada que volver a pedir: se dice de cuándo es la foto.
+            <span>
+              foto del <strong className="num">{formatDate(SNAPSHOT_INFO.fecha)}</strong>
+            </span>
+          ) : (
+            <button type="button" className="text-button" onClick={onRefresh}>
+              Actualizar
+            </button>
+          )}
         </div>
       </div>
     </header>

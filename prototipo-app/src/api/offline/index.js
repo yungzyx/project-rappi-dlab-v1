@@ -10,13 +10,17 @@
 // - rappi-ia/src/rappi_ia/motor/home.py ............ el orden de los accesos de la Home (motor.js: homeVerticals)
 // - rappi-ia/src/rappi_ia/motor/combos.py, combos.toml y predict.py ... la escalera fina (motor.js: targetStep)
 // - rappi-ia/src/rappi_ia/motor/model.py, data.py .. la afinidad propia, sin «Rappi hoy» (motor.js)
-// - rappi-ia/src/rappi_ia/offers/engine.py ......... vertical por probar, recompra, complementos (offers.js)
+// - rappi-ia/src/rappi_ia/offers/engine.py ......... vertical por probar, recompra, volver, complementos (offers.js)
+// - rappi-ia/src/rappi_ia/offers/winback.py y motor/model.py (replenishment) ... recompra y volver (winback.js)
 // - rappi-ia/src/rappi_ia/offers/guards.py ......... lo que el agente nunca ofrece (offers.js: offerableProduct)
+// - rappi-ia/src/rappi_ia/agent/tools.py ........... el foco de la búsqueda (_focus, en search.js) y el complemento
+//   alternado (_takes_second, en offers.js: complementOf)
+// - rappi-ia/src/rappi_ia/agent/rappi_agent.py ..... «qué me recomiendas» (search.js: recommend)
 // - rappi-ia/src/rappi_ia/events/store.py .......... el perfil de intereses (index.js: interests)
 // - rappi-ia/src/rappi_ia/offers/profiles.py ....... los perfiles de gusto activos (tastes.js)
 // - rappi-ia/src/rappi_ia/api/app.py y api/catalog.py ... las rutas (index.js, catalog.js, search.js)
-// No hay población que aprenda (transiciones, popularidad, retención aprendida), ni búsqueda semántica, ni ritmo real
-// de recompra: es una demo, no evidencia.
+// No hay población que aprenda (transiciones, popularidad, retención aprendida) ni búsqueda semántica, y lo pedido en
+// la demo se repite sin esperar su ritmo (offers.js: repeatOffer): es una demo, no evidencia.
 import { catalogRoute } from './catalog'
 import { contractArticles, homeVerticals } from './motor'
 import { makeOffer } from './offers'
@@ -84,6 +88,7 @@ function recommendations(snapshot, state, now, query) {
   const rows = []
   const shown = new Set()
   for (const concept of mine.filter((c) => concepts[c].offerable).slice(0, 4)) {
+    // api/app.py busca el complemento sin la persona: aquí no se alterna.
     const recorded = snapshot.complements[concept]
     const target = recorded?.reason?.concept
     if (!recorded || shown.has(target)) continue
@@ -137,7 +142,10 @@ export function route(snapshot, { method, path, query, body }, now = Date.now())
     return { body: { user_id: userId, token: `offline.${userId}` } }
   }
   if (key === 'GET /search') return { body: search(snapshot, query) }
-  if (key === 'POST /agent/ask') return { body: ask(snapshot, body) }
+  if (key === 'POST /agent/ask') {
+    const mine = interests(snapshot, state, now).map((i) => i.concept)
+    return { body: ask(snapshot, body, { interests: mine, userId: state.userId }) }
+  }
   if (key === 'GET /agent/plans') return { body: snapshot.plans }
   if (key === 'POST /agent/offer') {
     const offer =

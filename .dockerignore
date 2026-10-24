@@ -33,3 +33,7 @@ rappi-ia/data
 # Tests: no corren en la imagen
 rappi-scraper/tests
 rappi-ia/tests
+
+# El panel en un solo HTML: la foto de la API y su armado son locales (nunca entran a una imagen)
+dashboard-empresa/snapshot
+**/dist-html

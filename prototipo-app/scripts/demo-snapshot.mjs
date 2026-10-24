@@ -12,6 +12,7 @@
 // Las tablas que la API no expone (conceptos con sus guardias, combinaciones de Rappi, servicios) las da
 // scripts/demo-snapshot-meta.py con el Python de rappi-ia.
 import { execFileSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
@@ -185,7 +186,20 @@ async function agent(token, userId) {
   const recommendations = await call(`/recommendations?user_id=${userId}`, { token })
   // Sin pedidos, la vertical por probar de siempre (el súper, si tiene ofertas).
   const usual = await post('/agent/offer', { moment: 'vertical_por_probar', user_id: userId, context: {} })
-  return { search, ask, plans, planOffers, noResult, recommendations, toTry: { usual } }
+  // «Qué me recomiendas» de alguien sin intereses: los ejemplos de siempre (con intereses, la API simulada busca los
+  // suyos). Con una persona nueva: la de la muestra ya hizo preguntas (`_log_ask` las registra).
+  const fresh = await session()
+  let help
+  try {
+    help = await call('/agent/ask', {
+      method: 'POST',
+      token: fresh.token,
+      body: { message: 'qué me recomiendas', user_id: fresh.user_id, mode: 'propuesta' },
+    })
+  } finally {
+    await call(`/profile/${fresh.user_id}`, { method: 'DELETE', token: fresh.token })
+  }
+  return { search, ask, help, plans, planOffers, noResult, recommendations, toTry: { usual } }
 }
 
 /** Todos los productos de una respuesta (los objetos con entity_type, entity_id y precio). */
@@ -199,21 +213,43 @@ function productsIn(value, found = []) {
 }
 const isProduct = (value) => 'entity_type' in value && 'entity_id' in value && 'price_value' in value
 
-/** El complemento de cada concepto (la oferta `carrito` real con un producto de ese concepto en el carro). */
-async function complements(token, pool) {
+/** Si a la persona le toca primero el segundo complemento de ese concepto de origen (agent/tools.py: _takes_second). */
+const takesSecond = (userId, concept) => createHash('md5').update(`${userId}|${concept}`).digest()[0] % 2 === 1
+const PEOPLE = 8 // personas de prueba para los complementos alternados: alguna tiene el md5 impar con cada concepto
+
+/**
+ * El complemento de cada concepto: la oferta `carrito` real con un producto de ese concepto en el carro, sin persona
+ * (el de siempre, `complements`) y con una persona de prueba a la que le toca primero el segundo, cuando los dos
+ * primeros pesan parecido (`complementsAlt`, solo si cambia). Las personas se olvidan al final.
+ */
+async function complements(pool) {
   const byConcept = new Map()
   for (const p of pool) if (p.concept && !byConcept.has(p.concept)) byConcept.set(p.concept, p)
+  const people = []
+  for (let i = 0; i < PEOPLE; i += 1) people.push(await session())
   const out = {}
-  for (const [concept, p] of byConcept) {
-    const reply = await call('/agent/offer', {
-      method: 'POST',
-      token,
-      body: { moment: 'carrito', context: { product: { entity_type: p.entity_type, entity_id: p.entity_id } } },
-      allow: [422],
-    })
-    if (reply?.products.length) out[concept] = reply
+  const alt = {}
+  try {
+    for (const [concept, p] of byConcept) {
+      const product = { entity_type: p.entity_type, entity_id: p.entity_id }
+      const offer = (who) =>
+        call('/agent/offer', {
+          method: 'POST',
+          token: who?.token,
+          body: { moment: 'carrito', user_id: who?.user_id, context: { product } },
+          allow: [422],
+        })
+      const usual = await offer(null)
+      if (!usual?.products.length) continue
+      out[concept] = usual
+      const second = people.find((who) => takesSecond(who.user_id, concept))
+      const reply = second && (await offer(second))
+      if (reply?.products.length && reply.reason?.concept !== usual.reason?.concept) alt[concept] = reply
+    }
+  } finally {
+    for (const who of people) await call(`/profile/${who.user_id}`, { method: 'DELETE', token: who.token })
   }
-  return out
+  return { complements: out, complementsAlt: alt }
 }
 
 /**
@@ -370,7 +406,7 @@ async function main() {
     console.log('  búsquedas, preguntas y ofertas…')
     Object.assign(snapshot, await agent(token, userId))
     console.log('  complementos…')
-    snapshot.complements = await complements(token, productsIn(snapshot))
+    Object.assign(snapshot, await complements(productsIn(snapshot)))
     console.log('  escalera…')
     Object.assign(snapshot.toTry, await ladder(snapshot))
     console.log('  perfiles de gusto…')

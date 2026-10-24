@@ -3,6 +3,7 @@ import { AGENT_NAME } from '../../../agent/name'
 import Mascot from '../../../components/assistant/Mascot'
 import OfferWhy from '../../../components/assistant/OfferWhy'
 import { rectInPhone } from '../../../state/AssistantContext'
+import { typedEnd } from '../../../utils/typed'
 
 const SIZE = 84 // ancho de la mascota de cuerpo entero (alto = 1,2 × ancho)
 const HEIGHT = SIZE * 1.2
@@ -24,9 +25,11 @@ function useTypewriter(text, reduceMotion) {
     if (!text || reduceMotion) return undefined
     const timer = setInterval(
       () =>
-        setProgress((prev) =>
-          prev.text === text ? { text, count: Math.min(prev.count + 1, text.length) } : { text, count: 1 },
-        ),
+        setProgress((prev) => {
+          if (prev.text !== text) return { text, count: 1 }
+          // Ya escrita: el mismo estado, así no vuelve a pintar el globo cada 16 ms mientras sigue a la vista.
+          return prev.count >= text.length ? prev : { text, count: prev.count + 1 }
+        }),
       TYPE_MS,
     )
     return () => clearInterval(timer)
@@ -34,7 +37,7 @@ function useTypewriter(text, reduceMotion) {
   if (!text) return { shown: '', done: true }
   if (reduceMotion) return { shown: text, done: true }
   const count = progress.text === text ? progress.count : 0
-  return { shown: text.slice(0, count), done: count >= text.length }
+  return { shown: text.slice(0, typedEnd(text, count)), done: count >= text.length }
 }
 
 /**
@@ -157,20 +160,34 @@ const LiveAgent = forwardRef(function LiveAgent(
       <div className={classes.join(' ')} style={style} data-at={target ?? undefined}>
         {say && !away && (
           <div className="live-bubble">
-            <p aria-hidden="true">{shown}</p>
-            {say.why && done && <OfferWhy reason={say.why} onToggle={onWhyToggle} />}
-            {say.actions?.length > 0 && done && (
-              <div className="live-bubble-actions">
-                {say.actions.map((action, i) => (
-                  <button
-                    key={action.label}
-                    type="button"
-                    className={i === 0 ? 'live-chip is-primary tap' : 'live-chip tap'}
-                    onClick={action.onClick}
-                  >
-                    {action.label}
-                  </button>
-                ))}
+            {/* Lo que falta va invisible detrás (`data-rest`, que pinta el CSS): el globo mide desde la primera letra lo
+                que medirá al terminar, y su borde no se corre con cada letra. */}
+            <p aria-hidden="true">
+              {shown}
+              {!done && <span className="live-bubble-rest" data-rest={say.text.slice(shown.length)} />}
+            </p>
+            {/* «¿Por qué?» y los botones también ocupan su lugar desde el principio (el globo no crece al terminar),
+                pero no se ven ni se tocan hasta que termina de escribir. */}
+            {(say.why || say.actions?.length > 0) && (
+              <div
+                className={done ? 'live-bubble-more' : 'live-bubble-more is-pending'}
+                aria-hidden={!done || undefined}
+              >
+                {say.why && <OfferWhy reason={say.why} onToggle={onWhyToggle} />}
+                {say.actions?.length > 0 && (
+                  <div className="live-bubble-actions">
+                    {say.actions.map((action, i) => (
+                      <button
+                        key={action.label}
+                        type="button"
+                        className={i === 0 ? 'live-chip is-primary tap' : 'live-chip tap'}
+                        onClick={action.onClick}
+                      >
+                        {action.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>

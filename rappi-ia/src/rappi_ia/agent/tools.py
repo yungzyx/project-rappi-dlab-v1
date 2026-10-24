@@ -3,6 +3,7 @@
 Todo producto que el agente muestra pasa por aquí: sale de la base, con su precio vigente, nunca inventado.
 """
 
+import hashlib
 import re
 import unicodedata
 from dataclasses import dataclass, field
@@ -11,13 +12,13 @@ from psycopg import Connection
 from rappi_scraper.storage.search import MIN_PRICE
 
 from .. import config
-from ..concepts.matcher import KeywordMatcher
-from ..concepts.taxonomy import Occasion, load_taxonomy
+from ..concepts.taxonomy import load_taxonomy
 from ..embeddings.base import TextEmbedder
 from ..motor.combos import SERVICES
 from ..motor.predict import step_signal, target_step
 from ..motor.recommend import RECENT_DAYS, CrossPick, cross_picks, latest_lambda
 from ..offers.guards import (
+    alcohol_in_description,
     alcohol_in_name,
     alcohol_section,
     baby_in_name,
@@ -25,7 +26,8 @@ from ..offers.guards import (
     offerable_vertical,
     unofferable_subverticals,
 )
-from ..retrieval.hybrid import Filters, RetrievalResult, retrieve
+from ..retrieval.hybrid import Filters, RetrievalResult, named_occasion, retrieve
+from ..retrieval.spelling import correct_query
 from ..text import FILLER_WORDS, LEAFLET_WARNINGS, normalize, tokens
 from .verticals import ranked_verticals
 
@@ -90,6 +92,7 @@ class SearchOutcome:
     result: RetrievalResult
     products: list[Product]
     cheapest_without_filter: Product | None = None
+    corrected_query: str | None = None  # con `correct`, la consulta corregida que se buscó (retrieval/spelling.py)
 
 
 @dataclass
@@ -120,13 +123,37 @@ def search_products(
     offer: bool = False,
     adult_ok: bool = False,
     words: bool | None = None,
+    correct: bool = False,
 ) -> SearchOutcome:
     """Con `concepts=None`, los conceptos los detecta la búsqueda en la consulta (endpoint /search). Con `symptom` (o
     en farmacia) no se muestra lo que no tiene concepto: podría ser un medicamento sin categoría mapeada. Con `offer`,
     la búsqueda es de una oferta del agente y solo trae lo que puede proponer por su cuenta: nada +18 ni de tiendas
     Farmacia, Sex shop o Smoking shop (offers/guards.py); el concepto y la vertical los elige quien llama. `adult_ok`
     deja pasar lo +18 en una oferta: solo para el kit de una ocasión que la persona eligió (alcohol con su marca).
-    `words`: si a la consulta le queda alguna palabra (`retrieval.hybrid.has_words`), si quien llama ya lo sabe."""
+    `words`: si a la consulta le queda alguna palabra (`retrieval.hybrid.has_words`), si quien llama ya lo sabe.
+    Con `correct` (/search), si nada calza todas las palabras, corrige los errores de tipeo (`retrieval.spelling`) y
+    vuelve a buscar: si así algo calza todas las palabras y hay productos, devuelve eso con `corrected_query`; si no, lo
+    de la consulta tal cual."""
+    found = _search_products(
+        conn, vertical, query, concepts, embedder, price_max, k, mode, symptom, offer, adult_ok, words
+    )
+    if not correct or found.result.strict_lexical_matches:
+        return found
+    fixed = correct_query(conn, query, vertical)
+    if fixed is None:
+        return found
+    again = _search_products(
+        conn, vertical, fixed, concepts, embedder, price_max, k, mode, symptom, offer, adult_ok, None
+    )
+    if not again.result.strict_lexical_matches or not again.products:
+        return found
+    again.corrected_query = fixed
+    return again
+
+
+def _search_products(
+    conn, vertical, query, concepts, embedder, price_max, k, mode, symptom, offer, adult_ok, words
+) -> SearchOutcome:
     result = retrieve(
         conn, vertical, query, embedder, k=k * 2, filters=Filters(price_max), mode=mode, concepts=concepts, words=words
     )
@@ -198,6 +225,7 @@ def search_remedies(
 SIMILAR_MARGIN = 0.1  # dos complementos cuyo peso difiere en menos que esto son parecidos: decide la combinación
 CROSS_LIFT_SPAN = 3  # peso de una compra cruzada: min(1, (lift − 1) / 3); con lift 4 o más pesa 1, lo máximo
 COMPLEMENT_REPEAT_DAYS = 7  # un complemento ofrecido en estos días y antes del último pedido cede su lugar
+ROTATION_MARGIN = 0.2  # con el segundo complemento a esto o menos del primero, a la mitad de las personas les toca él
 # De dónde viene un complemento ofrecido (`payload.origen` de su `suggestion_shown`): los momentos `carrito`,
 # `checkout` y `proximo_pedido` y lo que sugiere al preguntarle (`ask`). `mochi-<momento>` es el nombre histórico de
 # `agent-<momento>`.
@@ -246,7 +274,12 @@ def suggest_complement(
     y antes de su último pedido (`_recently_offered`) pasa al final: sale el siguiente mejor. Lo ofrecido desde ese
     pedido (la compra en curso) no cuenta: el complemento no cambia mientras se arma el mismo pedido. Si todos los
     candidatos con productos se ofrecieron hace poco, sale el mejor de siempre. La razón y la `basis` no cambian: dicen
-    por qué sale este complemento."""
+    por qué sale este complemento.
+
+    Con `user_id`, antes de todo eso, si los dos primeros pesan parecido (`_takes_second`), a la mitad de las personas
+    les toca primero el segundo: las gaseosas eran el primer complemento de toda la comida preparada. Lo personal le
+    gana a esa alternancia: si el primero trae un producto de una marca que compra, o si completa su combinación, va
+    primero (el desempate se mide desde el primero de siempre)."""
     taxonomy = load_taxonomy()
     sources = [c for c in source_concepts if c in taxonomy.concepts and not taxonomy.concepts[c].sensitive]
     if not sources:
@@ -326,25 +359,29 @@ def suggest_complement(
         return Suggestion(candidate.concept, candidate.source, vertical, reason, products, brand, basis)
 
     def choose(candidates: list[_Candidate]) -> Suggestion | None:
-        """El primer candidato con productos, con el desempate de la combinación."""
-        best = candidates[0]
+        """El primer candidato con productos, con el desempate de la combinación. El desempate se mide desde el primero
+        de siempre (`first`), no desde el que la alternancia (`_takes_second`) puso primero, y le gana a ella: si el de
+        siempre ya completa la combinación, va primero."""
+        first = min(candidates, key=lambda c: (-c.weight, c.concept))  # el orden de `candidates` sin la alternancia
         searched: dict[str, tuple[str, list[Product], str | None] | None] = {}  # lo ya buscado de un candidato
         # Los pesos son `real`: redondeados, 0,4 − 0,3 no queda bajo el margen por el error de coma flotante.
-        similar = [c for c in candidates[1:] if round(best.weight - c.weight, 6) < SIMILAR_MARGIN]
+        similar = [c for c in candidates if c is not first and round(first.weight - c.weight, 6) < SIMILAR_MARGIN]
         step = target_step(conn, user_id, population) if user_id is not None and similar else None
         if step is not None:
             # Un servicio no tiene productos.
             group = {step.vertical} if step.vertical not in SERVICES and offerable_vertical(step.vertical) else set()
-            for candidate in (best, *similar):
+            for candidate in (first, *similar):
                 if completing := [v for v in verticals_of(candidate) if v in group and v != current_vertical]:
                     break
-            # Si el primero ya completa la combinación, o ninguno la completa, el orden de siempre.
-            if completing and candidate is not best:
+            # Si el primero ya completa la combinación, va primero; si ninguno la completa, el orden de siempre.
+            if completing and candidate is first:
+                candidates = [first, *(c for c in candidates if c is not first)]
+            elif completing:
                 # Su marca gana al desempate: el primero con un producto de una marca que compra va igual primero.
                 if prefer_brands:
-                    usual = searched[best.concept] = search(best, verticals_of(best))
+                    usual = searched[first.concept] = search(first, verticals_of(first))
                     if usual is not None and usual[2] is not None:
-                        return suggestion(best, usual, [])
+                        return suggestion(first, usual, [])
                 # Primero en la vertical del paso; si ahí no hay productos, vuelve a su lugar de siempre.
                 if result := search(candidate, completing):
                     return suggestion(candidate, result, [step_signal(conn, step, population)])
@@ -366,6 +403,12 @@ def suggest_complement(
                 return suggestion(edge, result, [])
         return None
 
+    if user_id is not None and _takes_second(candidates, user_id):
+        best = candidates[0]
+        usual = search(best, verticals_of(best)) if prefer_brands else None
+        if usual is None or usual[2] is None:  # sin un producto de sus marcas en el primero
+            candidates = [candidates[1], best, *candidates[2:]]
+
     recent = _recently_offered(conn, user_id) if user_id is not None else set()
     fresh = [c for c in candidates if c.concept not in recent]
     # Primero sin lo ofrecido hace poco; si no queda nada o nada de eso tiene productos, el mejor de siempre.
@@ -373,6 +416,20 @@ def suggest_complement(
         if (chosen := choose(pool)) is not None:
             return chosen
     return None
+
+
+def _takes_second(candidates: list[_Candidate], user_id: str) -> bool:
+    """Si a la persona le toca primero el segundo complemento: cuando pesa `ROTATION_MARGIN` o menos que el primero, a
+    la mitad de las personas, siempre la misma para un mismo origen (md5 de la persona y el concepto de origen; `hash`
+    de Python cambia entre procesos). Las gaseosas (0,6 o 0,7) iban primero con toda la comida preparada, y con la
+    pizza, la hamburguesa o los sándwiches casi todos veían las mismas. Una compra cruzada de la persona no rota."""
+    if len(candidates) < 2:
+        return False
+    best, second = candidates[:2]
+    # Los pesos son `real`: redondeados, como en `choose`.
+    if best.pick or second.pick or round(best.weight - second.weight, 6) > ROTATION_MARGIN:
+        return False
+    return hashlib.md5(f"{user_id}|{best.source}".encode()).digest()[0] % 2 == 1
 
 
 def _recently_offered(conn: Connection, user_id: str) -> set[str]:
@@ -453,17 +510,20 @@ def _focus(hits, result: RetrievalResult, capped: bool = False):
     """Si la consulta nombra conceptos (`result.query_concepts`), solo esos: pedir cigarrillos no debe traer cerveza.
 
     - "Sin resultado" no muestra nada, nombre o no un concepto: mostrar una pizza a quien pidió kebab, o los vecinos
-      de un coseno bajo τ, sería inventar una respuesta (y la demanda no se anotaría). Tampoco los pocos productos de
+      de un coseno bajo τ (sin concepto ni ocasión, el de la búsqueda agrupada: «sofá de tres cuerpos» en Turbo traía
+      pisco Tres Erres), sería inventar una respuesta (y la demanda no se anotaría). Tampoco los pocos productos de
       un concepto que el vertical casi no tiene (bajo TESTIMONIAL_SHARE), que suelen ser otra cosa con su etiqueta: un
       cable HDMI para «televisor 55 pulgadas» en Turbo, un pack de regalo para «cerveza en lata» en el Mall.
     - Con tope de precio (`capped`), si nada del concepto pedido cabe bajo el tope tampoco se muestra otra cosa:
       El agente dice cuánto cuesta lo más barato de lo pedido.
-    - Si nada de lo encontrado es del concepto pedido y el vertical no lo vende (`concept_in_vertical`, la regla de
-      «sin resultado»), solo se muestra lo que lo dice en su nombre (`_names_query`): «sándwiches» en Express trae los
-      sándwiches rotulados como empanadas, pero «pañales» en restaurantes no trae el postre con «panal» que el
-      stemming juntaba. El agente y el buscador dicen dónde sí lo venden. No rige si la consulta nombra una ocasión
-      («algo para el asado» en Licores) o un concepto amplio (`broad` en taxonomy.toml: «picoteo»): ahí lo pedido
-      son productos de varios tipos que su nombre no dice.
+    - Si nada de lo encontrado es del concepto pedido, solo se muestra lo que lo dice en su nombre (`_names_query`):
+      «sándwiches» en Express trae los sándwiches rotulados como empanadas, pero «pañales» en restaurantes no trae el
+      postre con «panal» que el stemming juntaba. Rige también si el vertical vende el concepto: lo que calza solo un
+      número o una palabra de la descripción puede dejar fuera de lo encontrado los productos del concepto, y
+      «neumáticos aro 15» en Express traía jugos en polvo de 15 g. El buscador agrupado muestra las verticales donde
+      sí hay del concepto; el agente, además, busca por el nombre del concepto y dice dónde más está («También en»).
+      No rige si la consulta nombra una ocasión («algo para el asado» en Licores) o un concepto
+      amplio (`broad` en taxonomy.toml: «picoteo»): ahí lo pedido son productos de varios tipos que su nombre no dice.
     - El foco no cede ante productos de otro concepto que calzan las palabras: esa coincidencia mira todo el texto y
       el stemming junta palabras («flores» calza con azúcar flor). Que el concepto de la consulta (keywords) y el de
       los productos (categoría) coincidan se asegura en la taxonomía.
@@ -478,22 +538,9 @@ def _focus(hits, result: RetrievalResult, capped: bool = False):
         return matching
     if result.unmet or capped:
         return []
-    if result.concept_in_vertical or _broad_request(result.query, concepts):
+    if _broad_request(result.query, concepts):
         return hits
     return [h for h in hits if _names_query(h.content, result.query)]
-
-
-_OCCASIONS = None
-
-
-def named_occasion(q: str) -> Occasion | None:
-    """La ocasión que nombra la consulta («algo para el carrete»), con las keywords de taxonomy.toml."""
-    global _OCCASIONS
-    taxonomy = load_taxonomy()
-    if _OCCASIONS is None:
-        _OCCASIONS = KeywordMatcher((o.id, kw) for o in taxonomy.occasions.values() for kw in o.keywords)
-    match = _OCCASIONS.best(normalize(q))
-    return taxonomy.occasions[match.target] if match else None
 
 
 def _broad_request(query: str, concepts: list[str]) -> bool:
@@ -602,17 +649,22 @@ def _with_prices(conn: Connection, vertical: str, hits, offer: bool = False, adu
         ):
             prices[("catalog_item", pid)] = (name, price, real, store, age, store_id, presentation)
     if menu_ids:
-        for iid, name, price, real, store, store_id, section in conn.execute(
-            """SELECT mi.item_id::text, mi.name, mp.price, mp.real_price, s.name, mi.store_id, ms.name
+        dish_concepts = {h.entity_id: h.concept_id for h in hits if h.entity_type == "menu_item"}
+        for iid, name, price, real, store, store_id, section, description in conn.execute(
+            """SELECT mi.item_id::text, mi.name, mp.price, mp.real_price, s.name, mi.store_id, ms.name,
+                      CASE WHEN %s THEN clean_html(mi.description) END
                FROM menu_items mi
                JOIN stores s USING (store_id)
                LEFT JOIN latest_menu_prices mp ON mp.item_id = mi.item_id
                LEFT JOIN menu_sections ms ON ms.store_id = mi.store_id AND ms.section_id = mi.section_id
                WHERE mi.item_id = ANY(%s::bigint[])""",
-            (menu_ids,),
+            (offer, menu_ids),  # la descripción solo hace falta en una oferta
         ):
-            # En una oferta, un plato de una sección de tragos cuenta como +18 (offers/guards.py).
-            prices[("menu_item", iid)] = (name, price, real, store, offer and alcohol_section(section), store_id, None)
+            # En una oferta, un plato de una sección de tragos, o sin concepto o de bebida y con una descripción (o, sin
+            # concepto, una sección de botellas o vinos) que nombra alcohol, cuenta como +18 (offers/guards.py).
+            unknown = alcohol_in_description(description, dish_concepts[iid], section) if offer else False
+            adult = offer and (alcohol_section(section) or unknown)
+            prices[("menu_item", iid)] = (name, price, real, store, adult, store_id, None)
     taxonomy = load_taxonomy()
     products = []
     for hit in hits:

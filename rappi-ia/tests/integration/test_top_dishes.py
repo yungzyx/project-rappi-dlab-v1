@@ -100,6 +100,28 @@ def test_a_most_ordered_section_counts_and_popular_dishes_go_first(demo):
     assert ids(top_dishes(db)[SUSHI_STORE]) == ["menu-98007", "menu-98901", "menu-98902"]
 
 
+def test_a_dish_listed_in_most_ordered_and_in_its_own_section_counts(demo):
+    """Un plato que el menú repite en «Más vendidos» y en la suya es una fila con `section_id` en la suya y «Más
+    vendidos» en `extra_section_ids` (migración 040): cuenta igual."""
+    db, _ = demo
+    for item_id, name, section in (
+        (98911, "Gyozas de cerdo (prueba)", "Entradas"),
+        (98912, "Ramen shoyu (prueba)", "Ramen"),
+    ):
+        add_dish(db, item_id, name, SUSHI_STORE, section)
+        price(db, item_id, 5990)
+    add_dish(db, 98913, "Mochi de té verde (prueba)", SUSHI_STORE, "Más vendidos")  # crea la sección
+    top = db.execute(
+        "SELECT section_id FROM menu_sections WHERE store_id = %s AND name = 'Más vendidos'", (SUSHI_STORE,)
+    ).fetchone()[0]
+    db.execute(
+        "UPDATE menu_items SET extra_section_ids = ARRAY[%s]::bigint[] WHERE item_id = ANY(%s)", (top, [98911, 98912])
+    )
+    cache.clear()
+
+    assert set(ids(top_dishes(db)[SUSHI_STORE])) == {"menu-98911", "menu-98912"}  # el mochi no tiene precio
+
+
 def test_dishes_without_price_alcohol_or_a_drinks_section_are_left_out(demo):
     db, _ = demo
     add_dish(db, 98903, "Pisco sour de la casa (prueba)", SUSHI_STORE, "Más vendidos")

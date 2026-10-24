@@ -1,27 +1,28 @@
-import { useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { ProvenanceBadge } from './components/ProvenanceBadge.jsx'
 import { Header } from './components/shell/Header.jsx'
 import { ProvenanceBanner } from './components/shell/ProvenanceBanner.jsx'
 import { Tabs } from './components/shell/Tabs.jsx'
-import { API_URL, refreshSource, retryConnection } from './lib/api.js'
+import { API_URL, refreshSource, retryConnection, SNAPSHOT_INFO } from './lib/api.js'
+import { formatDate } from './lib/format.js'
 import { useFallbacks } from './lib/useAnalytics.js'
 import { useUrlState } from './lib/useUrlState.js'
-import { CatalogView } from './views/catalog/CatalogView.jsx'
-import { CrossVerticalView } from './views/cross/CrossVerticalView.jsx'
-import { FrequencyView } from './views/frequency/FrequencyView.jsx'
-import { MvpUsageView } from './views/mvp/MvpUsageView.jsx'
-import { OpportunitiesView } from './views/opportunities/OpportunitiesView.jsx'
-import { SummaryView } from './views/summary/SummaryView.jsx'
+import { CustomersView } from './views/customers/CustomersView.jsx'
+import { MochiView } from './views/mochi/MochiView.jsx'
+import { OverviewView } from './views/overview/OverviewView.jsx'
 
+// Tres vistas alrededor de 4 preguntas (docs/superpowers/plans/2026-10-22-panel-rediseno.md): el Resumen para la
+// gerencia y RappiAds, y un detalle para cada público.
 export const VIEWS = [
-  { id: 'resumen', label: 'Resumen', View: SummaryView },
-  { id: 'oportunidades', label: 'Oportunidades', View: OpportunitiesView },
-  { id: 'frecuencia', label: 'Frecuencia y abandono', View: FrequencyView },
-  { id: 'verticales', label: 'Entre verticales', View: CrossVerticalView },
-  { id: 'catalogo', label: 'Catálogo (real)', View: CatalogView },
-  { id: 'mvp', label: 'Uso del MVP', View: MvpUsageView },
+  { id: 'resumen', label: 'Resumen', View: OverviewView },
+  { id: 'clientes', label: 'Retención y venta cruzada', short: 'Clientes', View: CustomersView },
+  { id: 'mochi', label: 'Mochi y búsquedas', short: 'Mochi', View: MochiView },
 ]
 const VIEW_IDS = VIEWS.map((view) => view.id)
+
+// «Ver cómo funciona»: solo en el panel en un solo HTML (el modo panel-html de `npm run panel:html`); se decide por el
+// modo del armado y no por una variable de entorno, que podría colarse en un build normal.
+const DemoTour = import.meta.env.MODE === 'panel-html' ? lazy(() => import('./demo/DemoTour.jsx')) : null
 
 export default function App() {
   const [{ view, source }, setUrlState] = useUrlState(VIEW_IDS)
@@ -29,14 +30,44 @@ export default function App() {
   const [reloadKey, setReloadKey] = useState(0)
   const main = useRef(null)
   const tabbar = useRef(null)
+  const anchor = useRef(null)
   const { View } = VIEWS.find((item) => item.id === view)
 
-  const selectView = (id) => {
+  /** Cambia de vista; con `section` (el id del título de una sección), llega a esa sección y le pasa el foco. */
+  const selectView = (id, section) => {
     setUrlState((state) => ({ ...state, view: id }))
+    if (section) {
+      anchor.current = { id: section, focus: true }
+      return
+    }
     // Al cambiar de vista desde abajo, se vuelve al comienzo del contenido (bajo la barra fija).
     const top = main.current.offsetTop - tabbar.current.offsetHeight
     if (window.scrollY > top) window.scrollTo({ top })
   }
+
+  // También tras recargar los datos: la demostración vuelve a pintar la vista y lleva a la sección que cambió. Lo que
+  // está más arriba puede seguir cargando y empujar la sección hacia abajo: se vuelve a llevar arriba cuando termina
+  // (hasta ~2 s; si la persona se mueve antes, no se la interrumpe).
+  // El enlace de una decisión pasa el foco al título; la demostración solo desplaza (el foco sigue en su tarjeta).
+  useEffect(() => {
+    const pending = anchor.current
+    anchor.current = null
+    const target = pending && document.getElementById(pending.id)
+    if (!target) return undefined
+    target.scrollIntoView?.({ block: 'start' })
+    if (pending.focus) target.focus({ preventScroll: true })
+    let frames = 0
+    let frame
+    const settle = () => {
+      if (pending.focus && document.activeElement !== target) return
+      if (main.current?.querySelector('.state--loading') && frames < 120) {
+        frames += 1
+        frame = requestAnimationFrame(settle)
+      } else if (frames > 0) target.scrollIntoView?.({ block: 'start' })
+    }
+    frame = requestAnimationFrame(settle)
+    return () => cancelAnimationFrame(frame)
+  }, [view, reloadKey])
 
   const retry = () => {
     retryConnection()
@@ -61,23 +92,46 @@ export default function App() {
         <div className="container tabbar-inner">
           <Tabs views={VIEWS} active={view} onSelect={selectView} />
           <span className="tabbar-source">
-            <ProvenanceBadge kind={view === 'catalogo' ? 'real' : source} />
+            <ProvenanceBadge kind={source} />
           </span>
         </div>
       </div>
       <main ref={main} id={`panel-${view}`} role="tabpanel" aria-labelledby={`tab-${view}`} className="container">
         <View key={`${view}-${source}-${reloadKey}`} source={source} onNavigate={selectView} />
       </main>
+      {DemoTour && (
+        <Suspense fallback={null}>
+          <DemoTour
+            onShow={(target) => {
+              // El recorrido es del prototipo: lleva a esa fuente y a la sección que cambia; al cerrar, solo repinta.
+              if (target) {
+                anchor.current = { id: target.section, focus: false }
+                setUrlState({ view: target.view, source: 'prototype' })
+              }
+              setReloadKey((key) => key + 1)
+            }}
+          />
+        </Suspense>
+      )}
       <footer className="site-footer">
         <div className="container">
-          <p>
-            Definiciones de cada métrica: <span className="mono">docs/diseno-ia.md §5</span>. Datos de la API de
-            rappi-ia en <span className="mono">{API_URL}</span>.{' '}
-            <a href={`${import.meta.env.BASE_URL}presentacion.html`}>Presentación de la propuesta</a>.
-          </p>
+          {SNAPSHOT_INFO ? (
+            // El archivo suelto no lleva la presentación ni habla con una API.
+            <p>
+              Definiciones de cada métrica: <span className="mono">docs/diseno-ia.md §5</span>. Datos grabados el{' '}
+              {formatDate(SNAPSHOT_INFO.fecha)} desde la API de rappi-ia sobre una copia de la base (
+              {SNAPSHOT_INFO.base}).
+            </p>
+          ) : (
+            <p>
+              Definiciones de cada métrica: <span className="mono">docs/diseno-ia.md §5</span>. Datos de la API de
+              rappi-ia en <span className="mono">{API_URL}</span>.{' '}
+              <a href={`${import.meta.env.BASE_URL}presentacion.html`}>Presentación de la propuesta</a>.
+            </p>
+          )}
           <p>Demo no oficial · prototipo independiente, no afiliado a Rappi.</p>
           <p>
-            Usuarios con id seudónimo; las listas por usuario nunca muestran conceptos sensibles. Ninguna palanca se
+            Personas con id seudónimo; las listas por persona nunca muestran conceptos sensibles. Ninguna palanca se
             escala sin un grupo de control (A/B con holdout).
           </p>
         </div>

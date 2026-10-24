@@ -27,8 +27,7 @@ function OfflineNote() {
   }
   return (
     <p className="demo-disclaimer demo-disclaimer--offline">
-      Demo sin conexión: datos de una muestra del catálogo y una API simulada en el navegador; las fotos necesitan
-      internet.{' '}
+      Demo sin conexión: datos de una muestra del catálogo y una API simulada en el navegador.{' '}
       <button type="button" className="demo-disclaimer-reset" onClick={restart}>
         Empezar de cero
       </button>

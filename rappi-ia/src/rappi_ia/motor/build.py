@@ -108,7 +108,7 @@ def _build(conn: Connection, source: str, run: int, evaluate: bool) -> dict:
     now = datetime.now(UTC) if source == "prototype" else max(o.ts for o in orders)
     if evaluate:
         start = time.perf_counter()
-        signals = load_signals(conn, source)
+        signals = load_signals(conn, source, orders=orders)
         counts["evaluacion"] = evaluate_motor(orders, signals, sensitive, previous, previous_lambda)
         if counts["evaluacion"] is not None:
             counts["pesos"] = counts["evaluacion"]["pesos"]
@@ -206,7 +206,9 @@ def _build_personal(conn: Connection, source: str, now: datetime, sensitive: fro
         if present:
             _delete_personal(conn, "user_id = ANY(%s)", present)
             orders = load_orders(conn, source, present)
-            affinity_rows, replenish_rows = _personal_rows(load_signals(conn, source, present), orders, now, sensitive)
+            affinity_rows, replenish_rows = _personal_rows(
+                load_signals(conn, source, present, orders=orders), orders, now, sensitive
+            )
             written = _write_personal(conn, affinity_rows, replenish_rows)
             affinity_n, replenish_n = affinity_n + written[0], replenish_n + written[1]
         conn.commit()
@@ -297,7 +299,7 @@ def refresh_user_conn(conn: Connection, user_id: str, now: datetime | None = Non
     source = row[0]
     orders = load_orders(conn, source, user_id)
     affinity_rows, replenish_rows = _personal_rows(
-        load_signals(conn, source, user_id), orders, now or datetime.now(UTC), sensitive_concepts(conn)
+        load_signals(conn, source, user_id, orders=orders), orders, now or datetime.now(UTC), sensitive_concepts(conn)
     )
     _write_personal(conn, affinity_rows, replenish_rows)
 

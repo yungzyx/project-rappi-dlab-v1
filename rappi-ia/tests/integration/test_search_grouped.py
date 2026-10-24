@@ -194,7 +194,7 @@ def test_grouped_search_returns_products_only_and_does_not_apply_offer_guards(de
 def test_grouped_endpoint_shape(client):
     body = client.get("/search", params={"q": "cerveza"}).json()
 
-    assert set(body) == {"query", "groups", "unmet", "unmet_reason"}
+    assert set(body) == {"query", "groups", "unmet", "unmet_reason", "corrected_query"}
     assert body["query"] == "cerveza" and body["unmet"] is False
     first = body["groups"][0]
     assert set(first) == {"vertical", "prototype_vertical", "products"}
@@ -209,7 +209,7 @@ def test_grouped_endpoint_shape(client):
 def test_vertical_search_is_unchanged(client):
     body = client.get("/search", params={"q": "cerveza", "vertical": "licores"}).json()
 
-    assert set(body) == {"vertical", "products", "unmet", "unmet_reason"}
+    assert set(body) == {"vertical", "products", "unmet", "unmet_reason", "corrected_query"}
     assert body["vertical"] == "licores" and body["products"] and body["unmet"] is False
     assert client.get("/search", params={"q": "cerveza", "vertical": "liquor"}).json() == body  # id del prototipo
     one = client.get("/search", params={"q": "cerveza", "vertical": "licores", "limit": 1}).json()
@@ -220,7 +220,7 @@ def test_vertical_search_is_unchanged(client):
 
 
 def test_grouped_search_without_a_concept_is_unmet_for_nonsense_although_low_tau_verticals_pass(db):
-    embedder = _fixed_cosine(db, 0.8)  # sobre el τ del Mall, las chocolaterías y Turbo; bajo el de todas a la vez
+    embedder = _fixed_cosine(db, 0.8)  # sobre el τ del Mall, las chocolaterías y Turbo; bajo UNNAMED_TAU
 
     for query in ("xyzzy", "asdfgh"):
         result = search_grouped(db, query, embedder, current=None, limit=6)

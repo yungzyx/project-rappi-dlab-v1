@@ -13,6 +13,7 @@ vi.mock('../../../state/EventsContext', async (importOriginal) => ({
 // La memoria de la escena vive en el módulo (lo que dura la pestaña): cada test, una pestaña nueva.
 let HomeScreen
 let useOrders
+let useProfile
 let Providers
 let memory
 let useAssistant
@@ -31,6 +32,7 @@ beforeEach(async () => {
   const toast = await import('../../../components/Toast')
   const orders = await import('../../../state/OrdersContext')
   useOrders = orders.useOrders
+  useProfile = profile.useProfile
   memory = await import('../../../state/liveMemory')
   useAssistant = assistant.useAssistant
   HomeScreen = (await import('../HomeScreen')).default
@@ -51,7 +53,9 @@ beforeEach(async () => {
       </demo.DemoProvider>
     )
   }
-  vi.useFakeTimers()
+  // A mediodía: «en silencio por hoy» guarda la fecha y los tests adelantan el reloj; con la hora real, un test que
+  // partía justo antes de la medianoche terminaba en otro día.
+  vi.useFakeTimers({ now: new Date(2026, 9, 21, 12) })
   // La Home pide su catálogo a la API (sin respuestas, esas secciones no se ven) y a Mochi sus ocasiones y ofertas.
   api = stubAgent()
 })
@@ -169,6 +173,20 @@ describe('Home del prototipo final', () => {
     expect(screen.queryByText(/^Nuevo para ti:/)).toBeNull()
     expect(container.querySelector('.is-dim, .is-dimmed, [inert]')).toBeNull()
     expect(screen.queryByRole('button', { name: '¡Sí, tráelos!' })).toBeNull()
+  })
+
+  test('el globo mide desde la primera letra lo que medirá al terminar: lo que falta va invisible', async () => {
+    const { container } = await renderHome()
+    await advance(900 + 200) // entra y empieza a saludar
+    const said = container.querySelector('.live-bubble p')
+    const rest = () => said.querySelector('.live-bubble-rest')
+    expect(said.textContent.length).toBeGreaterThan(0)
+    expect(said.textContent + rest().dataset.rest).toBe(
+      '¡Hola! Ahora vivo en tu Home 👋 Pídeme ideas o prueba una vertical nueva.',
+    )
+
+    await advance(2000) // terminó de escribir
+    expect(rest()).toBeNull()
   })
 
   test('las listas de la API van en los bloques de siempre; si fallan, la Home sigue igual', async () => {
@@ -511,6 +529,60 @@ describe('Home del prototipo final', () => {
       await advance(100)
       expect(repeatRequests()).toHaveLength(1)
       expect(repeatBlock(container)).toBeNull()
+    })
+    // El buscador olvida (sube la generación) antes de que el servidor borre: pedir ahí traía la misma oferta y dejaba
+    // otra `suggestion_shown`. Si el borrado sale bien la app se recarga; si falla, pide al volver a la Home.
+    const forgetTree = (active) => {
+      function Forget() {
+        forget = useProfile().reset
+        return null
+      }
+      return (
+        <Providers>
+          <Forget />
+          <div className="phone">
+            <div className="screen-wrap">
+              <HomeScreen push={vi.fn()} tab="home" setTab={vi.fn()} active={active} />
+            </div>
+          </div>
+        </Providers>
+      )
+    }
+    let forget
+
+    test('tras «Olvidar» no se vuelve a pedir ni a contar; si el borrado falla, pide al volver a la Home', async () => {
+      api = stubRepeat()
+      const { container, rerender } = render(forgetTree(true))
+      await advance(100)
+      expect(repeatRequests()).toHaveLength(1)
+      act(() => forget())
+      await advance(500)
+      expect(repeatRequests()).toHaveLength(1)
+      expect(tracked('suggestion_shown', 'agent-recompra')).toHaveLength(1)
+      expect(repeatBlock(container)).not.toBeNull() // sin cambio a la vista: el buscador está encima
+
+      rerender(forgetTree(false))
+      rerender(forgetTree(true))
+      await advance(100)
+      expect(repeatRequests()).toHaveLength(2)
+    })
+
+    test('la recompra que venía en camino al «Olvidar» ni se muestra ni se cuenta', async () => {
+      api = stubAgent({
+        'POST /agent/offer': (req) =>
+          req.body.moment === 'recompra'
+            ? { slow: 300, body: fixture('agent-offer-recompra') }
+            : OFFER_FIXTURES[req.body.moment]
+              ? fixture(OFFER_FIXTURES[req.body.moment])
+              : 204,
+      })
+      const { container } = render(forgetTree(true))
+      await advance(100)
+      act(() => forget())
+      await advance(500)
+      expect(repeatRequests()).toHaveLength(1)
+      expect(repeatBlock(container)).toBeNull()
+      expect(tracked('suggestion_shown', 'agent-recompra')).toEqual([])
     })
   })
 
@@ -864,6 +936,22 @@ describe('Home del prototipo final', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Mochi:/ }))
     await advance(3000) // termina de escribir
     expect(container.querySelector('.live-bubble p').textContent).toBe(POKE_LINE)
+  })
+
+  test('«¿Por qué?» y los botones del globo ocupan su lugar mientras escribe, sin verse hasta terminar', async () => {
+    const { container } = await renderHome()
+    await advance(900 + 3400)
+    fireEvent.click(screen.getByRole('button', { name: /^Mochi:/ }))
+    await advance(400) // llegó la oferta y empezó a escribir
+    const more = () => container.querySelector('.live-bubble-more')
+    expect(container.querySelector('.live-bubble-rest')).not.toBeNull()
+    expect(more().classList.contains('is-pending')).toBe(true)
+    expect(more().getAttribute('aria-hidden')).toBe('true')
+    expect(within(more()).getAllByRole('button', { hidden: true }).length).toBeGreaterThan(0)
+
+    await advance(3000) // termina de escribir
+    expect(more().classList.contains('is-pending')).toBe(false)
+    expect(within(more()).getByRole('button', { name: '¿Por qué?' })).toBeTruthy()
   })
 
   test('«Repetir escena» vuelve a saludar', async () => {

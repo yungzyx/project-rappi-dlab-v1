@@ -8,6 +8,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from owner_client import OwnerClient
+from rappi_ia.agent import tools
 from rappi_ia.agent.compose import TemplateComposer
 from rappi_ia.agent.rappi_agent import RappiAgent
 from rappi_ia.agent.tools import COMPLEMENT_REPEAT_DAYS, suggest_complement
@@ -22,6 +23,7 @@ NOW = datetime.now(UTC)
 SUSHI_ROLL = {"entity_type": "menu_item", "entity_id": "98005"}  # un plato de sushi del restaurante de prueba
 SUSHI_COMPLEMENTS = ["bebidas-asiaticas", "postres", "despensa-asiatica", "gaseosas"]  # 0,5 · 0,4 · 0,3 · 0,3 (por id)
 PERSON = "u-variada"
+ROTATION_MARGIN = tools.ROTATION_MARGIN
 
 
 @pytest.fixture
@@ -33,6 +35,13 @@ def demo(db):
     events.ensure_user(db, "u-otra")
     db.commit()
     return db, embedder
+
+
+@pytest.fixture(autouse=True)
+def without_alternation(monkeypatch):
+    """«No repetir» se mide con el orden de siempre: sin la alternancia entre los dos mejores complementos, que depende
+    del id de cada persona. Sus tests piden `people`, que la vuelve a encender."""
+    monkeypatch.setattr(tools, "ROTATION_MARGIN", -1.0)
 
 
 @pytest.fixture
@@ -186,6 +195,69 @@ def test_any_moment_that_offers_complements_counts(demo, origin):
     ordered(db, 1)
 
     assert first(db, embedder).concept == "postres"
+
+
+PEOPLE = [f"u-{i}" for i in range(8)]
+
+
+@pytest.fixture
+def people(demo, monkeypatch):
+    monkeypatch.setattr(tools, "ROTATION_MARGIN", ROTATION_MARGIN)
+    db, _ = demo
+    for person in PEOPLE:
+        events.ensure_user(db, person)
+    db.commit()
+    return PEOPLE
+
+
+def test_people_split_between_the_two_best_complements_when_they_weigh_alike(demo, people):
+    """Bebidas asiáticas (0,5) y postres (0,4) pesan parecido (`ROTATION_MARGIN`): a cada persona le toca uno fijo,
+    así no todos ven lo mismo. Las gaseosas (0,3) siguen al final."""
+    db, embedder = demo
+
+    firsts = {person: first(db, embedder, person).concept for person in people}
+
+    assert set(firsts.values()) == {"bebidas-asiaticas", "postres"}
+    assert firsts == {person: first(db, embedder, person).concept for person in people}  # siempre el mismo
+
+
+def test_a_second_complement_well_below_the_first_is_not_swapped(demo, people):
+    db, embedder = demo
+    db.execute(
+        "UPDATE concept_edges SET weight = 0.75 WHERE from_concept = 'sushi' AND to_concept = 'bebidas-asiaticas'"
+    )
+    db.commit()
+
+    assert {first(db, embedder, person).concept for person in people} == {"bebidas-asiaticas"}
+
+
+def test_who_gets_the_second_moves_on_to_the_first_after_seeing_it(demo, people):
+    db, embedder = demo
+    person = next(p for p in people if first(db, embedder, p).concept == "postres")
+    offered(db, "postres", 3, user=person)
+    ordered(db, 1, user=person)
+
+    assert first(db, embedder, person).concept == "bebidas-asiaticas"
+
+
+def test_a_brand_the_person_buys_in_the_first_complement_beats_the_alternation(demo, people):
+    """Como en el desempate por la combinación: si el primero trae un producto de una marca que la persona compra, va
+    primero aunque a ella le toque el segundo."""
+    db, embedder = demo
+    person = next(p for p in people if first(db, embedder, p).concept == "postres")
+    drink = suggest_complement(db, ["sushi"], "restaurantes", embedder).products[0]
+    db.execute("INSERT INTO product_brands (brand_key, name) VALUES ('kirin', 'Kirin')")
+    db.execute(
+        "INSERT INTO item_brands (entity_type, entity_id, brand_key, source) VALUES (%s, %s, 'kirin', 'regla')",
+        (drink.entity_type, drink.entity_id),
+    )
+    db.commit()
+
+    chosen = suggest_complement(db, ["sushi"], "restaurantes", embedder, set(), {"kirin": 2}, person)
+
+    assert (chosen.concept, chosen.brand) == ("bebidas-asiaticas", "kirin")
+    other = suggest_complement(db, ["sushi"], "restaurantes", embedder, set(), {"otra": 2}, person)
+    assert (other.concept, other.brand) == ("postres", None)
 
 
 def test_without_a_person_the_order_never_changes(demo):

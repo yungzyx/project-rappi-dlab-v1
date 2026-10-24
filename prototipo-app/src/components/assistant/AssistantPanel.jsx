@@ -30,7 +30,7 @@ import './assistant.css'
 const OPEN_MS = 380
 const CLOSE_MS = 280
 const MIN_TYPING_MS = 450
-const FOR_YOU_WAIT_MS = 3000 // lo que el saludo espera «Para ti»; si tarda más, sale sin él
+const FOR_YOU_WAIT_MS = 3000 // lo que el saludo espera lo que se pide al abrir; después sale con lo que haya de «Para ti»
 
 const DISCOVER_ROWS = 3
 
@@ -220,11 +220,19 @@ export default function AssistantPanel({ push, vertical, depth = 1 }) {
     ask(() => offered(moment, context, NOTHING_TO_TRY))
   }
 
-  /** El saludo, con «Para ti» de /recommendations (sin él si la API no contesta o no tiene nada que recomendar). */
-  const greet = (rows) => {
+  /**
+   * El saludo, con «Para ti» de /recommendations (sin él si la API no contesta o no tiene nada que recomendar). Espera
+   * también lo demás que se pide al abrir (`others`: lo aprendido y el perfil de gusto): el panel aparece con el saludo
+   * (`waiting`), y lo que llegara después lo empujaría.
+   */
+  const greet = (rows, others) => {
     ask(async () => {
-      const waited = new Promise((resolve) => later(() => resolve([]), FOR_YOU_WAIT_MS))
-      const [row] = await Promise.race([rows, waited])
+      // Al tope sale con «Para ti» si ya llegó, aunque lo demás siga en camino.
+      let arrived = []
+      rows.then((list) => (arrived = list))
+      const waited = new Promise((resolve) => later(() => resolve(arrived), FOR_YOU_WAIT_MS))
+      const all = Promise.allSettled([rows, ...others]).then(([list]) => list.value ?? [])
+      const [row] = await Promise.race([all, waited])
       if (!row) return { text: GREETING }
       const shown = { origin: 'para-ti', concept: row.concept, generation: profile.resets, kind: row.kind }
       noteShown(events.track, row.products, shown)
@@ -279,7 +287,7 @@ export default function AssistantPanel({ push, vertical, depth = 1 }) {
     // Si mientras tanto se tocó "Olvidar", la respuesta es de antes de borrar: se ignora.
     const generation = profileGeneration.current
     const fresh = () => generation === profileGeneration.current
-    remoteProfile(userId())
+    const learned = remoteProfile(userId())
       .then((data) => fresh() && setLearnedRemote(data.interests.slice(0, 3)))
       .catch(() => fresh() && setLearnedRemote(null))
     // Una sola petición sirve a «Para ti» y a «Descubre con el agente».
@@ -288,9 +296,10 @@ export default function AssistantPanel({ push, vertical, depth = 1 }) {
       .catch(() => [])
     rows.then((list) => fresh() && setDiscoverRows(list.slice(0, DISCOVER_ROWS)))
     // Solo si sigue siendo la misma persona («Olvidar» mientras llegaba): ni se muestra ni se cuenta.
-    loadTaste().then((found) => fresh() && showTaste(found))
+    const taste = loadTaste()
+    taste.then((found) => fresh() && showTaste(found))
 
-    if (messages.length === 0) greet(rows)
+    if (messages.length === 0) greet(rows, [learned, taste])
     if (session.product) later(() => askPairing(session.product), OPEN_MS)
     else if (session.offer) later(() => askOffer(session.offer, session.query), OPEN_MS)
     else if (session.query) later(() => send(session.query), OPEN_MS)
@@ -370,6 +379,11 @@ export default function AssistantPanel({ push, vertical, depth = 1 }) {
   const lastAnswer = messages.findLast((m) => m.from === 'bot' && !m.typing)
   const announcement = lastAnswer?.text ?? ''
 
+  // Hasta la primera respuesta (el saludo, que espera lo que se pide al abrir), solo se ven el encabezado de Mochi y su
+  // «escribiendo…»: el saludo mide más, y lo aprendido, el perfil y «Para ti» llegan de a uno; cada cosa empujaba lo de
+  // abajo. El resto aparece con el saludo, ya en su lugar (a lo más tras FOR_YOU_WAIT_MS). Los resultados de una
+  // búsqueda no esperan.
+  const waiting = !search.hasQuery && !messages.some((m) => m.from === 'bot' && !m.typing)
   const style = { transitionDuration: `${phase === 'closing' ? CLOSE_MS : OPEN_MS}ms` }
   // Lo aprendido viene de rappi-ia (conceptos, sin sensibles); sin perfil del servidor no se muestra.
   const learned = learnedRemote ?? []
@@ -416,7 +430,7 @@ export default function AssistantPanel({ push, vertical, depth = 1 }) {
   return (
     <div
       ref={rootRef}
-      className={`assistant agent-search is-${phase}${cart.count > 0 ? ' has-cart' : ''}`}
+      className={`assistant agent-search is-${phase}${waiting ? ' is-waiting' : ''}${cart.count > 0 ? ' has-cart' : ''}`}
       style={style}
       role="dialog"
       aria-modal="true"
@@ -459,6 +473,7 @@ export default function AssistantPanel({ push, vertical, depth = 1 }) {
               error={search.error}
               onRetry={search.retry}
               onOpenProduct={openProduct}
+              onSearchExact={search.searchExact}
               onOpenVertical={(vertical) => go(...routeForScreen(vertical))}
               onTryAnother={() => {
                 search.setQuery('')

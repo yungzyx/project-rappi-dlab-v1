@@ -3,7 +3,7 @@ import csv
 import pytest
 from psycopg import errors
 
-from conftest import FakeClient
+from conftest import FakeClient, restaurant_block, with_top_section
 from rappi_scraper.legacy.csv_format import CSV_COLUMNS, CSV_ENCODING
 from rappi_scraper.legacy.csv_io import export_catalog_csv, import_legacy_csv
 from rappi_scraper.pipeline.restaurants import process_restaurant_jobs
@@ -158,6 +158,34 @@ def test_search_documents_mark_products_that_need_a_prescription(db):
     assert rows == [("100", True), ("101", None)]
 
 
+def test_search_documents_rebuild_the_vocabulary_by_vertical(db):
+    """Las palabras del catálogo, sin tildes ni ñ, por vertical y con en cuántos documentos están: rappi-ia corrige con
+    ellas los errores de tipeo (migración 041). Se rearma con los documentos: lo que ya no existe sale."""
+    _store(db, 1, "lider", "supermercado")
+    _store(db, 2, "cruzverde", "farmacia")
+    run = repository.start_run(db, "stores", {})
+    repository.save_products(
+        db, run, 1, [_product("a", 100, "Nutella 350 g", 3990), _product("b", 101, "Nutella Pañales", 990)]
+    )
+    repository.save_products(db, run, 2, [_product("c", 102, "Paracetamol", 990)])
+    build_search_documents(db)
+    vocabulary = dict(
+        ((v, w), n) for v, w, n in db.execute("SELECT vertical, word, docs FROM search_vocabulary").fetchall()
+    )
+    assert vocabulary[("supermercado", "nutella")] == 2
+    assert vocabulary[("supermercado", "panales")] == 2  # «Pañales» en la categoría de los dos
+    shown = db.execute("SELECT display FROM search_vocabulary WHERE vertical = 'supermercado' AND word = 'panales'")
+    assert shown.fetchone()[0] == "pañales"  # la corrección la muestra como la escribe el catálogo
+    assert ("farmacia", "nutella") not in vocabulary and vocabulary[("farmacia", "paracetamol")] == 1
+
+    db.execute("DELETE FROM store_products WHERE master_product_id IN (100, 101)")
+    db.execute("DELETE FROM catalog_items WHERE master_product_id IN (100, 101)")
+    repository.save_products(db, run, 1, [_product("d", 103, "Arroz", 1500)])
+    build_search_documents(db)
+    words = {w for (w,) in db.execute("SELECT word FROM search_vocabulary WHERE vertical = 'supermercado'")}
+    assert "arroz" in words and "nutella" not in words
+
+
 EMBEDDED_ITEMS = "SELECT count(*) FROM search_documents WHERE embedding IS NOT NULL AND entity_type = 'catalog_item'"
 
 
@@ -265,6 +293,33 @@ def test_a_dish_the_restaurant_no_longer_offers_leaves_the_search(db, page):
 
     dishes = {r[0] for r in db.execute("SELECT entity_id FROM search_documents WHERE entity_type = 'menu_item'")}
     assert len(dishes) == 60 and str(parsed["items"][0]["item_id"]) not in dishes
+
+
+# Los platos de una sección, también los que están en otra (como lo leería «lo más pedido», #106).
+SECTION_DISHES = """
+SELECT mi.rappi_item_id FROM menu_items mi
+JOIN menu_sections ms ON ms.store_id = mi.store_id
+     AND (ms.section_id = mi.section_id OR ms.section_id = ANY(mi.extra_section_ids))
+WHERE ms.name = %s ORDER BY 1"""
+
+
+def test_a_dish_in_mas_vendidos_and_in_its_own_section_is_saved_in_both(db, page):
+    """Antes el plato quedaba solo en la última sección y «Más vendidos» quedaba vacía (24 de 66 en `rappi`, 21-10)."""
+    data = page("restaurant")
+    products = next(c for c in restaurant_block(data)["corridors"] if c["name"] == "Hamburguesas")["products"]
+    burgers = [p["id"] for p in products]
+    run = repository.start_run(db, "restaurants", {})
+
+    repository.save_restaurant(db, run, parse_restaurant(with_top_section(data, products[:2])))
+
+    assert _count(db, "SELECT count(*) FROM menu_items") == 61
+    assert [r[0] for r in db.execute(SECTION_DISHES, ("Más vendidos",))] == sorted(burgers[:2])
+    assert [r[0] for r in db.execute(SECTION_DISHES, ("Hamburguesas",))] == sorted(burgers)
+
+    # La descarga siguiente ya no trae «Más vendidos»: el plato vuelve a estar solo en su sección.
+    repository.save_restaurant(db, repository.start_run(db, "restaurants", {}), parse_restaurant(page("restaurant")))
+    assert _count(db, "SELECT count(*) FROM menu_items WHERE extra_section_ids <> '{}'") == 0
+    assert [r[0] for r in db.execute(SECTION_DISHES, ("Hamburguesas",))] == sorted(burgers)
 
 
 def test_two_restaurants_sharing_a_rappi_dish_id_keep_their_own_dish_and_price(db, page):

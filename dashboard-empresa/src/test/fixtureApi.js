@@ -8,8 +8,7 @@ const fixtures = import.meta.glob('../fixtures/*.json', { eager: true, import: '
 function fixtureFor(url) {
   const { pathname, searchParams } = new URL(url)
   const name = pathname.replace('/analytics/', '')
-  const key = name === 'catalog' ? 'catalog' : `${name}.${searchParams.get('source')}`
-  return fixtures[`../fixtures/${key}.json`]
+  return fixtures[`../fixtures/${name}.${searchParams.get('source')}.json`]
 }
 
 /** La API "responde" con los fixtures (camino en vivo, sin red). */
