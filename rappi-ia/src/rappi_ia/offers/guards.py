@@ -24,6 +24,7 @@ OFFER_BLOCKED_GROUPS = ("bebe", "salud")  # grupos de taxonomy.toml; el alcohol 
 # Parecida a catalog.stores.NOT_PUSHED_VERTICALS (lo que la Home no empuja), pero con otro motivo y otra lista.
 OFFER_BLOCKED_VERTICALS = ("farmacia", "licores")
 ALCOHOL_VERTICALS = ("licores",)  # las bloqueadas de las que el alcohol de un kit elegido sí puede salir
+DRINK_GROUP = "bebidas"  # el grupo de taxonomy.toml cuyos conceptos no dicen si un trago lleva alcohol
 NOT_PLANNABLE_OCCASIONS = ("guagua", "enfermo")  # bebé y salud: ni siquiera como kit que la persona pide
 # Palabras de un nombre que dicen alcohol aunque la tienda no lo marque: las marcas de la tienda (`is_alcoholic`,
 # `age_restricted`) y la categoría pueden estar mal. En la base real del 14-10-2026, «Soju Uva Verde 13.0» venía en
@@ -47,7 +48,8 @@ _ALCOHOL_NAMES = KeywordMatcher(("alcohol", word) for word in ALCOHOL_NAME_WORDS
 # por su sección. «mimosa» tampoco: en la base real del 14-10-2026 las dos que hay son sin alcohol (un jugo y una de
 # «Sin Alcohol»). Desde «tom collins», los cócteles que en la base real del 22-10-2026 se llamaban así sin otra palabra
 # de alcohol («Vaina», «Caipiroska» en «Bebidas», «Botella de Ramazzotti»): los vecinos del kNN pueden sacar un plato
-# del alcohol y aquí lo sigue bloqueando el nombre.
+# del alcohol y aquí lo sigue bloqueando el nombre. Desde «absolut», los de la base real del 24-10-2026: «ABSOLUTE
+# PEAR» («Corto con pera y bebida con hielo») tenía concepto sandwiches, y «Jarra de Ramazzoti» venía mal escrita.
 MENU_ALCOHOL_NAME_WORDS = frozenset(
     {
         *("soju", "sangria", "michelada", "cerveza", "schop", "shop", "chela", "chelada", "vino", "pisco", "piscola"),
@@ -59,6 +61,7 @@ MENU_ALCOHOL_NAME_WORDS = frozenset(
         *("cabernet", "carmenere", "merlot", "chardonnay", "sauvignon", "syrah", "malbec", "pinot", "cono sur"),
         *("tom collins", "vaina", "algarrobina", "daikiri", "caipiroska", "bloody mary", "cuba libre", "kir royal"),
         *("ruso blanco", "ruso negro", "cosmopolitan", "clavo oxidado", "ramazzotti"),
+        *("absolut", "absolute", "ramazzoti"),
     }
 )
 # Palabras de trago que también nombran comida: (lo que en el nombre dice que es comida, conceptos de plato que lo
@@ -81,6 +84,7 @@ _MENU_FOOD_SENSES: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "vaina": (("edamame", "en vaina", "con vaina", "sin vaina"), ()),
     "algarrobina": (("tres leches", "torta", "helado", "postre"), ()),
     "ramazzotti": (("eros",), ()),
+    "ramazzoti": (("eros",), ()),
 }
 _MENU_ALCOHOL_NAMES = KeywordMatcher(
     ((word if word in _MENU_FOOD_SENSES else "alcohol", word) for word in MENU_ALCOHOL_NAME_WORDS),
@@ -103,6 +107,41 @@ _SOBER_SECTION = (
 )
 _MENU_ALCOHOL_SECTIONS = KeywordMatcher(
     (("alcohol", word) for word in MENU_ALCOHOL_SECTION_WORDS), avoid=[("alcohol", p) for p in _SOBER_SECTION]
+)
+# La descripción de un plato sin concepto o con uno de bebida: en la base real del 24-10-2026, 22 tragos («Electric
+# Lemonade Deli»: «Vodka ron gin blue curacao…», en «Barra Barbazul»; «HAVANA ESPECIAL»: «Corto + Bebida», en
+# «Combinados» junto a platos peruanos) y 22 combos o packs con su cerveza, su vino o su botella de pisco o fernet no
+# tenían concepto ni decían alcohol en el nombre ni en la sección, y 7 tragos tenían concepto de bebida («Gautama
+# Jack», gaseosas: «Ron havana dorado…»; un café irlandés). Sin concepto, la descripción es lo único que dice qué es el
+# plato, y un concepto de bebida no dice si lleva alcohol: la que nombra alcohol no se ofrece, aunque sea comida
+# cocinada con vino o ron (80 platos: risottos, canelés, cannoli al marsala) o algo sin alcohol (16: un café con jarabe
+# de amaretto, una cerveza sin alcohol, combos de pizza «margarita»). Con un concepto de comida no cuenta: unos 1.000
+# platos ofrecibles así la nombran, casi todos comida. Las palabras de los nombres de platos, sin la vaina ni la
+# algarrobina (en una descripción son porotos y un jarabe), más destilados y licores, el cóctel salvo el de camarones o
+# el tamaño de las empanadas, y el corto salvo el de café. «Sin alcohol» no libra una descripción («Mojito con o sin
+# alcohol»).
+MENU_ALCOHOL_DESCRIPTION_WORDS = frozenset(
+    {
+        *(MENU_ALCOHOL_NAME_WORDS - {"vaina", "algarrobina"}),
+        *("mezcal", "fernet", "jagermeister", "kahlua", "triple sec", "havana", "alto del carmen", "mistral"),
+        *("aperol", "campari", "vermouth", "vermut", "cognac", "conac", "brandy", "bourbon", "baileys", "amaretto"),
+        *("coctel", "cocktail", "corto"),
+    }
+)
+_DESCRIPTION_FOOD_SENSES = {
+    **{word: phrases for word, (phrases, _) in _MENU_FOOD_SENSES.items()},
+    **dict.fromkeys(
+        ("coctel", "cocktail"),
+        (
+            *("camaron", "mariscos", "pescado", "ceviche", "tamano", "tipo", "empanada", "empanadita", "pan"),
+            *("sopaipilla", "tequeno", "choclito"),
+        ),
+    ),
+    "corto": ("espresso", "expreso", "cafe", "ristretto", "ristreto", "queso"),
+}
+_MENU_ALCOHOL_DESCRIPTIONS = KeywordMatcher(
+    ((word if word in _DESCRIPTION_FOOD_SENSES else "alcohol", word) for word in MENU_ALCOHOL_DESCRIPTION_WORDS),
+    avoid=[(word, phrase) for word, phrases in _DESCRIPTION_FOOD_SENSES.items() for phrase in phrases],
 )
 # Palabras de un nombre del catálogo que dicen bebé aunque el concepto no lo diga: en la base real del 14-10-2026 la
 # ropa, los juguetes, las colonias y el detergente de bebé venían como ropa, juguetes-infantiles, fragancias o limpieza,
@@ -158,6 +197,15 @@ def baby_in_name(entity_type: str, name: str) -> bool:
 def alcohol_section(section: str | None) -> bool:
     """Si la sección del menú donde está un plato es de tragos (`MENU_ALCOHOL_SECTION_WORDS`)."""
     return bool(section) and _MENU_ALCOHOL_SECTIONS.best(section) is not None
+
+
+def alcohol_in_description(description: str | None, concept_id: str | None) -> bool:
+    """Si la descripción de un plato sin concepto o con uno de bebida nombra alcohol (`MENU_ALCOHOL_DESCRIPTION_WORDS`).
+    Con un concepto de comida, nunca: lo que es el plato lo dice su concepto."""
+    concept = load_taxonomy().concepts.get(concept_id) if concept_id else None
+    if concept_id is not None and (concept is None or concept.parent != DRINK_GROUP):
+        return False
+    return bool(description) and _MENU_ALCOHOL_DESCRIPTIONS.best(description) is not None
 
 
 def offerable_vertical(vertical: str) -> bool:

@@ -62,6 +62,7 @@ from ..motor.recommend import CrossPick, cross_picks, latest_lambda
 from ..retrieval.hybrid import concepts_of, detect_concepts
 from ..text import contract_articles, normalize, tokens
 from .guards import (
+    alcohol_in_description,
     alcohol_in_name,
     alcohol_section,
     baby_in_name,
@@ -706,10 +707,10 @@ LEFT JOIN item_concepts ic ON ic.entity_type = 'catalog_item' AND ic.entity_id =
 WHERE sp.master_product_id = ANY(%(ids)s) AND l.current AND l.in_stock IS NOT FALSE AND l.price >= %(min_price)s
   AND EXISTS (SELECT 1 FROM v_store_verticals v WHERE v.store_id = sp.store_id AND v.vertical = %(vertical)s)
 ORDER BY sp.master_product_id, l.price, sp.store_id"""
-# Los platos con su último precio (`latest_menu_prices`) y la sección del menú donde están.
+# Los platos con su último precio (`latest_menu_prices`), la sección del menú donde están y su descripción.
 _TOP_DISHES = """
 SELECT mi.item_id::text, mi.name, mp.price, mp.real_price, s.name, s.store_id, NULLIF(mi.image_url, ''),
-       ic.concept_id, ms.name
+       ic.concept_id, ms.name, mi.description
 FROM menu_items mi
 JOIN stores s ON s.store_id = mi.store_id
 JOIN latest_menu_prices mp ON mp.item_id = mi.item_id
@@ -721,8 +722,9 @@ WHERE mi.item_id = ANY(%(ids)s)"""
 def most_ordered(conn: Connection, vertical: str, population: str) -> list[dict]:
     """Hasta tres de los productos más pedidos por la población en la vertical (`trends`, alcance `producto`), en su
     orden, que siguen a la venta ahí: un producto del catálogo con su oferta vigente más barata en una tienda de esa
-    vertical (`_TOP_CATALOG`), o en restaurantes un plato con precio que no es de una sección de tragos
-    (`_TOP_DISHES`). Pasan las guardias de las ofertas (`_offerable_products`), también la de su tienda."""
+    vertical (`_TOP_CATALOG`), o en restaurantes un plato con precio que no es de una sección de tragos ni, sin
+    concepto, nombra alcohol en su descripción (`_TOP_DISHES`). Pasan las guardias de las ofertas
+    (`_offerable_products`), también la de su tienda."""
     kind = "menu_item" if vertical == "restaurantes" else "catalog_item"
     rows = conn.execute(
         """SELECT entity_id FROM trends
@@ -742,8 +744,8 @@ def _valid_id(entity_id: str) -> bool:
 
 def _priced_in_vertical(conn: Connection, vertical: str, ids: list[str]) -> dict[str, Product]:
     """id → producto de los `ids` (`_valid_id`) que siguen a la venta en la vertical, con el precio de ahí: productos
-    del catálogo (`_TOP_CATALOG`) o, en restaurantes, platos con precio que no son de una sección de tragos
-    (`_TOP_DISHES`). Una sola consulta."""
+    del catálogo (`_TOP_CATALOG`) o, en restaurantes, platos con precio que no son de una sección de tragos ni, sin
+    concepto, nombran alcohol en su descripción (`_TOP_DISHES`). Una sola consulta."""
     if not ids:
         return {}
     kind = "menu_item" if vertical == "restaurantes" else "catalog_item"
@@ -757,8 +759,10 @@ def _priced_in_vertical(conn: Connection, vertical: str, ids: list[str]) -> dict
             row = (id_, name, price, real, image, presentation, adult, concept)
             found[id_] = product_card(row, vertical, store, store_id, taxonomy)
     else:
-        for id_, name, price, real, store, store_id, image, concept, section in conn.execute(_TOP_DISHES, params):
-            if not alcohol_section(section):
+        for id_, name, price, real, store, store_id, image, concept, section, description in conn.execute(
+            _TOP_DISHES, params
+        ):
+            if not (alcohol_section(section) or alcohol_in_description(description, concept)):
                 row = (id_, name, price, real, image, None, False, concept)
                 found[id_] = product_card(row, vertical, store, store_id, taxonomy, kind)
     return {i: p for i, p in found.items() if p.price_value is not None}
