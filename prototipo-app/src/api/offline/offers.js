@@ -46,9 +46,8 @@ export function offerableProduct(product, concepts) {
   if (!product || product.age_restricted) return false
   if (OFFER_BLOCKED_VERTICALS.includes(product.vertical)) return false
   if (product.concept && concepts[product.concept] && !concepts[product.concept].offerable) return false
-  if (product.entity_type === 'menu_item' && (!product.concept || concepts[product.concept]?.group === 'bebidas')) {
-    return false
-  }
+  const group = product.concept && concepts[product.concept]?.group
+  if (product.entity_type === 'menu_item' && (!group || group === 'bebidas')) return false // sin concepto conocido
   const name = normalize(product.name)
   if (ALCOHOL_NAME.test(name)) return false
   if (product.entity_type === 'menu_item') return !MENU_ALCOHOL_NAME.test(name)

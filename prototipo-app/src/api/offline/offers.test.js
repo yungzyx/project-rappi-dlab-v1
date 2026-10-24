@@ -103,6 +103,7 @@ describe('guardias (offers/guards.py)', () => {
     expect(offerableProduct(dish, CONCEPTS)).toBe(true)
     expect(offerableProduct({ ...dish, concept: null }, CONCEPTS)).toBe(false)
     expect(offerableProduct({ ...dish, concept: 'cafe' }, CONCEPTS)).toBe(false)
+    expect(offerableProduct({ ...dish, concept: 'concepto-que-ya-no-existe' }, CONCEPTS)).toBe(false)
     expect(offerableProduct({ ...coffee, concept: null }, CONCEPTS)).toBe(true) // un producto del catálogo, sí
     expect(offerableProduct({ ...dish, name: 'Absolute Blue' }, CONCEPTS)).toBe(false)
     expect(offerableProduct({ ...coffee, name: 'Absolute New York delineador' }, CONCEPTS)).toBe(true)

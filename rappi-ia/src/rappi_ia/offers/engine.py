@@ -762,7 +762,7 @@ def _priced_in_vertical(conn: Connection, vertical: str, ids: list[str]) -> dict
         for id_, name, price, real, store, store_id, image, concept, section, description in conn.execute(
             _TOP_DISHES, params
         ):
-            if not (alcohol_section(section) or alcohol_in_description(description, concept)):
+            if not (alcohol_section(section) or alcohol_in_description(description, concept, section)):
                 row = (id_, name, price, real, image, None, False, concept)
                 found[id_] = product_card(row, vertical, store, store_id, taxonomy, kind)
     return {i: p for i, p in found.items() if p.price_value is not None}
@@ -1066,7 +1066,7 @@ def _find_popular_dishes(conn: Connection) -> list[dict]:
     ):
         if concept_id in dishes or alcohol_in_name("menu_item", name, concept_id) or alcohol_section(section):
             continue
-        if alcohol_in_description(description, concept_id):
+        if alcohol_in_description(description, concept_id, section):
             continue
         dishes[concept_id] = item_id
     products: list[dict] = []

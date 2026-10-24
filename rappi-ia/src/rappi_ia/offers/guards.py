@@ -19,6 +19,7 @@ Las reglas viven solo aquí; las consultas de productos las aplican con `search_
 
 from ..concepts.matcher import KeywordMatcher
 from ..concepts.taxonomy import Concept, Occasion, load_taxonomy
+from ..text import tokens
 
 OFFER_BLOCKED_GROUPS = ("bebe", "salud")  # grupos de taxonomy.toml; el alcohol y el tabaco se bloquean por sus marcas
 # Parecida a catalog.stores.NOT_PUSHED_VERTICALS (lo que la Home no empuja), pero con otro motivo y otra lista.
@@ -111,47 +112,81 @@ _MENU_ALCOHOL_SECTIONS = KeywordMatcher(
 # La descripción de un plato sin concepto o con uno de bebida: en la base real del 24-10-2026, 22 tragos («Electric
 # Lemonade Deli»: «Vodka ron gin blue curacao…», en «Barra Barbazul»; «HAVANA ESPECIAL»: «Corto + Bebida», en
 # «Combinados» junto a platos peruanos) y 22 combos o packs con su cerveza, su vino o su botella de pisco o fernet no
-# tenían concepto ni decían alcohol en el nombre ni en la sección, y 7 tragos tenían concepto de bebida («Gautama
+# tenían concepto ni decían alcohol en el nombre ni en la sección, y 9 tragos tenían concepto de bebida («Gautama
 # Jack», gaseosas: «Ron havana dorado…»; un café irlandés). Sin concepto, la descripción es lo único que dice qué es el
 # plato, y un concepto de bebida no dice si lleva alcohol: la que nombra alcohol no se ofrece, aunque sea comida
 # cocinada con vino o ron (risottos, canelés, cannoli al marsala) o algo sin alcohol (un café con jarabe de amaretto,
-# una piña colada sin alcohol). Con un concepto de comida no cuenta: unos 1.000 platos ofrecibles así la nombran, casi
+# una piña colada sin alcohol). Con un concepto de comida no cuenta: unos 1.100 platos ofrecibles así la nombran, casi
 # todos comida. Las palabras: las de los nombres de platos sin la vaina ni la algarrobina (en una descripción son
 # porotos y un jarabe), más tragos, destilados, licores y sus marcas, el cóctel y el corto. Una descripción es larga:
-# solo la libra una frase de comida pegada a la palabra («cóctel de camarones», «empanaditas cóctel», «sour cream»,
-# «pizza margarita», «espresso corto»), no una palabra de comida en otra parte («tabla de empanadas + 2 cócteles»).
-# «Sin alcohol» tampoco la libra («Mojito con o sin alcohol»), y «alcohol» solo no cuenta: casi siempre es «sin
-# alcohol».
+# solo se libra la palabra que queda dentro de una frase de comida («cóctel de camarones», «empanaditas cóctel», «sour
+# cream», «pizza margarita», «espresso corto», «chop suey»), no las demás («Empanadas cóctel x12 + 2 cócteles») ni por
+# una palabra de comida en otra parte («tabla de empanadas + 2 cócteles»). «Sin alcohol» tampoco la libra («Mojito con
+# o sin alcohol»), y «alcohol» solo no cuenta: casi siempre es «sin alcohol». Sin apóstrofes («Gordon's»).
 MENU_ALCOHOL_DESCRIPTION_WORDS = frozenset(
     {
         *(MENU_ALCOHOL_NAME_WORDS - {"vaina", "algarrobina"}),
         *("trago", "alcoholica", "alcoholico", "con alcohol", "contiene alcohol", "chilcano", "whiskies", "prosecco"),
-        *("mezcal", "fernet", "jagermeister", "kahlua", "triple sec", "havana", "alto del carmen", "mistral"),
+        *("mezcal", "fernet", "jagermeister", "jager", "jagerbomb", "kahlua", "triple sec", "havana"),
+        *("alto del carmen", "mistral", "capel", "control c", "ginebra", "aguardiente", "destilado"),
+        *("captain morgan", "flor de cana"),
         *("aperol", "campari", "vermouth", "vermut", "cognac", "conac", "brandy", "bourbon", "baileys", "amaretto"),
-        *("cachaca", "smirnoff", "bacardi", "jack daniel", "johnnie walker", "chivas", "jameson", "ballantines"),
-        *("tanqueray", "beefeater", "hendricks", "gordons", "malibu", "stolichnaya", "royal guard", "kross"),
+        *("cachaca", "smirnoff", "bacardi", "jack daniel", "jack daniels", "johnnie walker", "johnny walker", "chivas"),
+        *("jameson", "ballantines", "tanqueray", "beefeater", "hendricks", "gordons", "malibu", "stolichnaya"),
+        *("royal guard", "kross", "torobayo", "becker", "lager", "pilsen", "ipa", "chop", "tinto", "navegado", "clery"),
+        *("calimocho", "kalimotxo", "pichuncho", "gintonic", "roncola"),
+        *("pinas coladas", "cubas libres", "rusos blancos", "rusos negros", "bloody marys", "clavos oxidados"),
+        *("stellas artois", "havanna"),
         *("coctel", "cocktail", "corto"),
     }
 )
-_DESCRIPTION_FOOD_SENSES = {
-    "coctel": (
-        *("coctel de camaron", "coctel de camarones", "cocktail de camarones", "coctel de mariscos", "tipo coctel"),
-        *("tamano coctel", "empanadas coctel", "empanaditas coctel", "empanadas de queso coctel", "panes coctel"),
-        *("empanaditas de queso coctel", "sopaipillas coctel", "choclito coctel", "queso coctel"),
+_MENU_ALCOHOL_DESCRIPTIONS = KeywordMatcher(("alcohol", word) for word in MENU_ALCOHOL_DESCRIPTION_WORDS)
+_DESCRIPTION_FOOD_PHRASES = sorted(
+    (
+        tuple(tokens(phrase))
+        for phrase in (
+            *("coctel de camaron", "coctel de camarones", "cocktail de camarones", "coctel de mariscos"),
+            *("tipo coctel", "tamano coctel", "empanadas coctel", "empanaditas coctel", "empanadas de queso coctel"),
+            *("empanaditas de queso coctel", "panes coctel", "sopaipillas coctel", "choclito coctel", "queso coctel"),
+            *("sour cream", "crema sour", "sweet and sour", "sweet sour", "hot and sour", "hot sour"),
+            *("pizza margarita", "pizzeta margarita", "pesto margarita", "salsa margarita"),
+            *("espresso corto", "expreso corto", "cafe corto", "corto de cafe", "cafe tinto", "chop suey", "chop suei"),
+            *("fideos de cristal", "fideo cristal", "fideos cristal", "salame negroni"),
+            *("eros ramazzotti", "eros ramazzoti"),
+        )
     ),
-    "sour": ("sour cream", "crema sour", "sweet and sour", "sweet sour", "hot and sour", "hot sour"),
-    "margarita": ("pizza margarita", "pizzeta margarita", "pesto margarita", "salsa margarita"),
-    "corto": ("espresso corto", "expreso corto", "cafe corto", "corto de cafe"),
-    "cristal": ("fideos de cristal", "fideo cristal", "fideos cristal"),
-    "negroni": ("salame negroni",),
-    "ramazzotti": ("eros ramazzotti",),
-    "ramazzoti": ("eros ramazzoti",),
-}
-_DESCRIPTION_FOOD_SENSES["cocktail"] = _DESCRIPTION_FOOD_SENSES["coctel"]
-_MENU_ALCOHOL_DESCRIPTIONS = KeywordMatcher(
-    ((word if word in _DESCRIPTION_FOOD_SENSES else "alcohol", word) for word in MENU_ALCOHOL_DESCRIPTION_WORDS),
-    avoid=[(word, phrase) for word, phrases in _DESCRIPTION_FOOD_SENSES.items() for phrase in phrases],
+    key=len,
+    reverse=True,  # la frase más larga primero
 )
+
+
+# Sin concepto, también la sección del menú: en la base real del 24-10-2026, cervezas («Erdinger Dunkel», «Gulden
+# Draak») en «Botellas» y «Botellas 300 cc», y vinos con el nombre abreviado o mal escrito («Cab.Sauvig CASAS
+# PATRONALES», «Chardonay AROMO») en «Tinto» y «Blanco», sin nada más que diga alcohol. Con concepto estas secciones
+# no deciden: ahí también hay gaseosas («Botellas 1.5 Lts») y platos peruanos («Combinados»).
+UNKNOWN_DISH_SECTION_WORDS = frozenset(
+    {"botella", "tinto", "blanco", "gin", "destilados", "spritz", "combinados", "cock ta ils"}
+)
+_UNKNOWN_DISH_SECTIONS = KeywordMatcher(
+    (("alcohol", word) for word in UNKNOWN_DISH_SECTION_WORDS),
+    avoid=[("alcohol", phrase) for phrase in ("te blanco", "chocolate blanco", "arroz blanco")],
+)
+
+
+def _without_food_phrases(description: str) -> str:
+    """La descripción en palabras normalizadas y sin apóstrofes, sin las frases de comida (`_DESCRIPTION_FOOD_PHRASES`):
+    lo que queda es lo que puede nombrar un trago."""
+    words, kept, i = tokens(description.replace("'", "").replace("’", "")), [], 0
+    while i < len(words):
+        phrase = next((p for p in _DESCRIPTION_FOOD_PHRASES if tuple(words[i : i + len(p)]) == p), None)
+        if phrase:
+            i += len(phrase)
+        else:
+            kept.append(words[i])
+            i += 1
+    return " ".join(kept)
+
+
 # Palabras de un nombre del catálogo que dicen bebé aunque el concepto no lo diga: en la base real del 14-10-2026 la
 # ropa, los juguetes, las colonias y el detergente de bebé venían como ropa, juguetes-infantiles, fragancias o limpieza,
 # y «vertical por probar» partía en Mall con un «Fisher-price Juguete Para Bebés». Palabra entera, con su plural.
@@ -208,13 +243,16 @@ def alcohol_section(section: str | None) -> bool:
     return bool(section) and _MENU_ALCOHOL_SECTIONS.best(section) is not None
 
 
-def alcohol_in_description(description: str | None, concept_id: str | None) -> bool:
-    """Si la descripción de un plato sin concepto o con uno de bebida nombra alcohol (`MENU_ALCOHOL_DESCRIPTION_WORDS`).
-    Con un concepto de comida, nunca: lo que es el plato lo dice su concepto."""
+def alcohol_in_description(description: str | None, concept_id: str | None, section: str | None = None) -> bool:
+    """Si la descripción de un plato sin concepto o con uno de bebida nombra alcohol (`MENU_ALCOHOL_DESCRIPTION_WORDS`)
+    o, sin concepto, su sección es de botellas, vinos o destilados (`UNKNOWN_DISH_SECTION_WORDS`). Con un concepto de
+    comida, nunca: lo que es el plato lo dice su concepto."""
     concept = load_taxonomy().concepts.get(concept_id) if concept_id else None
     if concept is not None and concept.parent != DRINK_GROUP:  # un concepto que ya no existe, como sin concepto
         return False
-    return bool(description) and _MENU_ALCOHOL_DESCRIPTIONS.best(description) is not None
+    if concept is None and section and _UNKNOWN_DISH_SECTIONS.best(section) is not None:
+        return True
+    return bool(description) and _MENU_ALCOHOL_DESCRIPTIONS.best(_without_food_phrases(description)) is not None
 
 
 def offerable_vertical(vertical: str) -> bool:
