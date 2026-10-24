@@ -118,7 +118,8 @@ describe('preguntas que la muestra no grabó (agent/understand.py y rappi_agent.
     expect(reply.text).toContain('pediatra')
     expect(reply.products).toEqual([])
     expect(reply.actions).toEqual([{ label: 'Ir a Farmacia', vertical: 'farmacia' }])
-    expect(reply.intent.kind).toBe('consejo')
+    expect(reply.intent).toMatchObject({ kind: 'consejo', symptom: true })
+    expect(said('algo para la fiebre de mi hijo').intent.kind).toBe('consejo') // un niño: tampoco se elige remedio
   })
 
   test('un síntoma: sin conexión no busca remedios y lo dice, sin anotarlo como demanda', () => {

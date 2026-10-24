@@ -679,3 +679,15 @@
   line-height: 1;
   color: var(--accent-ink);
 }
+
+.agent-ask-key {
+  flex: none;
+  padding: 3px 7px;
+  border: 1px solid var(--accent-ink);
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--accent-ink);
+}

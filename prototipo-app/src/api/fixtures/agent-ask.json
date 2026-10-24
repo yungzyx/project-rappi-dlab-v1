@@ -11,6 +11,7 @@
     "occasion": null,
     "price_max": null,
     "query": "pizza",
+    "symptom": false,
     "vertical": "restaurantes"
   },
   "products": [

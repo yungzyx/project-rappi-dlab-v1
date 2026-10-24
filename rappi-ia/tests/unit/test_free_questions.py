@@ -37,9 +37,9 @@ def test_a_number_that_is_not_people(text):
     assert understand(text).people is None
 
 
-def test_people_are_not_searched():
-    assert understand("sushi para 2 personas").query == "sushi"
-    assert "6" not in understand("¿qué llevo para un asado de 6?").query
+def test_people_stay_in_the_query():
+    """Los combos dicen para cuántos («Desayuno Para Dos»): la cantidad se busca igual."""
+    assert understand("desayuno para dos").query == "desayuno para dos"
 
 
 @pytest.mark.parametrize(
@@ -109,7 +109,7 @@ def test_asking_for_medical_advice(text):
     assert understand(text).kind == "consejo"
 
 
-@pytest.mark.parametrize("text", ["tengo fiebre", "algo para la tos de mi hija", "paracetamol", "qué le doy de comer"])
+@pytest.mark.parametrize("text", ["tengo fiebre", "algo para la tos", "paracetamol", "qué le doy de comer"])
 def test_not_medical_advice(text):
     assert understand(text).kind != "consejo"
 
@@ -149,3 +149,68 @@ def test_a_named_drink_for_a_dish_is_a_search_for_the_drink():
     """«¿qué vino va con pasta?» pide vino (alcohol pedido): se busca, no es «con qué acompaño»."""
     intent = understand("¿qué vino va con pasta?")
     assert intent.kind == "buscar" and intent.concepts[:1] == ["vino"]
+
+
+# Revisión de código del 24-10
+@pytest.mark.parametrize(
+    "text",
+    [
+        "pañales para 2 años",
+        "comida para 2 perros",
+        "leche para 6 meses",
+        "cargador para 2 celulares",
+        "cumpleaños de mi hijo de 6",
+    ],
+)
+def test_ages_and_amounts_are_not_people(text):
+    assert understand(text).people is None
+
+
+CHILD_SYMPTOMS = [
+    "mi guagua tiene fiebre",
+    "algo para la fiebre de mi hijo",
+    "algo para la tos de mi hija",
+    "remedio para la tos de mi hija",
+]
+
+
+@pytest.mark.parametrize("text", CHILD_SYMPTOMS)
+def test_a_child_with_a_symptom_gets_no_remedies_chosen_by_mochi(text):
+    assert understand(text).kind == "consejo"
+
+
+def test_a_named_remedy_for_a_child_is_searched():
+    assert understand("paracetamol infantil para mi hijo").kind != "consejo"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "qué sopa le doy a mi hijo resfriado",
+        "qué jugo me tomo si estoy resfriado",
+        "mi mamá está enferma, le doy un regalo",
+        "qué pastilla de menta me recomiendas",
+    ],
+)
+def test_advice_words_with_something_mochi_can_offer_are_not_medical_advice(text):
+    assert understand(text).kind != "consejo"
+
+
+@pytest.mark.parametrize("text", ["qué es lo más barato en sushi", "qué tiene de bueno el ramen"])
+def test_a_dish_inside_another_question_is_not_its_card(text):
+    assert understand(text).kind != "que_es"
+
+
+@pytest.mark.parametrize("text", ["qué pido hoy", "que como hoy"])
+def test_what_should_i_order_today_is_hunger_not_a_search_for_today(text):
+    assert understand(text).occasion == "hambre"
+
+
+def test_what_goes_with_an_occasion_starts_from_what_mochi_can_offer():
+    intent = understand("con que acompaño el carrete")
+    assert intent.kind == "acompanar" and intent.concepts[0] not in {"cerveza", "pisco", "ron", "vodka"}
+
+
+def test_picnic_alone_is_not_the_occasion():
+    """El buscador sigue buscando «picnic» (chocolates Costa Picnic); la ocasión es «para un picnic»."""
+    assert understand("picnic").occasion is None

@@ -371,21 +371,21 @@ function recommend(snapshot, body, { interests, userId }) {
 // síntomas que la muestra no grabó. Sin conexión no se buscan remedios.
 const SYMPTOM =
   /\b(?:fiebre|resfrio|resfriado|tos|gripe|dolor|migrana|me duele|guata|nauseas|diarrea|alergia|enferm[oa]|me siento mal|remedios?|acidez|garganta|estrenid[oa]|estrenimiento)\b/
-const MEDICINE =
-  /\b(?:medicamentos?|pastillas?|jarabe|paracetamol|ibuprofeno|aspirina|antibiotico|antialergico|dosis)\b/
+const MEDICINE = /\b(?:medicamentos?|pastillas?|jarabe|dosis)\b/
+const NAMED_MEDICINE = /\b(?:paracetamol|ibuprofeno|aspirina|antibiotico|antialergico|antigripal)\b/
 const ADVICE =
   /\b(?:le|les|me|te) (?:doy|damos|tomo|tomas|puedo dar|puedo tomar)\b|\b(?:puedo|puede|debo|debe) tomar\b|\bque (?:tomo|tomar|remedios?|medicamento|pastilla|jarabe)\b|\bdosis\b|\bcada cuanto\b|\b(?:sirven?|es buen[oa]) para\b/
-const CHILD = /\b(?:hij[oa]s?|nin[oa]s?|guaguas?|bebes?)\b/
+const CHILD = /\b(?:hij[oa]s?|nin[oa]s?|guaguas?|bebes?|niet[oa]|sobrin[oa])\b/
 const ADVICE_TEXT =
-  'No puedo decirte qué remedio tomar o dar, ni cuánto: eso lo ve un médico o el químico farmacéutico de la farmacia 💊.'
-const ADVICE_CHILD = ' Si es para un niño o una guagua, pregúntale a su pediatra.'
+  'No puedo decirte qué remedio tomar o dar, ni cuánto: eso lo ve un médico o un químico farmacéutico 💊.'
+const ADVICE_CHILD = ' Pregúntale a su pediatra.'
 const ADVICE_END = ' Si es urgente, llama al SAMU (131). Si ya sabes qué remedio buscas, escríbeme su nombre.'
 const NO_REMEDIES =
   'Esta demo sin conexión no busca remedios. Pregúntale al químico farmacéutico qué te sirve para eso.'
 const NEW_QUESTION = 'Esta demo sin conexión no entiende preguntas nuevas'
 
-/** Una respuesta de solo texto, con el formato de /agent/ask. */
-function textReply(text, kind, extra = {}) {
+/** Una respuesta de solo texto, con el formato de /agent/ask; `symptom`, si es de salud (la app no ofrece ideas debajo). */
+function textReply(text, kind, { symptom = false, ...extra } = {}) {
   return {
     text,
     products: [],
@@ -400,6 +400,7 @@ function textReply(text, kind, extra = {}) {
       follow_up: false,
       occasion: null,
       price_max: null,
+      symptom,
     },
     reason: null,
     suggestion: null,
@@ -419,12 +420,19 @@ function textReply(text, kind, extra = {}) {
  */
 function unrecorded(snapshot, message, body, userId) {
   const said = normalize(message)
-  const sick = SYMPTOM.test(said) || MEDICINE.test(said)
-  if (sick && ADVICE.test(said)) {
+  const symptom = SYMPTOM.test(said)
+  const named = detectConcepts(snapshot.meta, message)
+  // Como agent/understand.py (_advice): no si nombra algo que Mochi propone («qué sopa le doy…»); un niño con un
+  // síntoma, sin nombrar el remedio, también es consejo.
+  const offerable = named.some((c) => snapshot.meta.concepts[c]?.offerable)
+  const child = symptom && CHILD.test(said) && !NAMED_MEDICINE.test(said)
+  const sick = symptom || MEDICINE.test(said) || NAMED_MEDICINE.test(said)
+  if (sick && !offerable && (child || ADVICE.test(said))) {
     const text = ADVICE_TEXT + (CHILD.test(said) ? ADVICE_CHILD : '') + ADVICE_END
-    return textReply(text, 'consejo', { actions: [{ label: 'Ir a Farmacia', vertical: 'farmacia' }] })
+    const farmacia = [{ label: 'Ir a Farmacia', vertical: 'farmacia' }]
+    return textReply(text, 'consejo', { symptom: true, actions: farmacia })
   }
-  if (SYMPTOM.test(said) && !detectConcepts(snapshot.meta, message).length) return textReply(NO_REMEDIES, 'buscar')
+  if (symptom && !named.length) return textReply(NO_REMEDIES, 'buscar', { symptom: true })
   if (!looksLikeQuestion(message)) return null
   const found = matchProducts(snapshot, message)
   const group = groupsOf(snapshot, found, backendVertical(body?.vertical), ASK_LIMIT)[0]

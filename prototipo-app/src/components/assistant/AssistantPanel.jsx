@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { AGENT_NAME } from '../../agent/name'
 import { storeOfProduct } from '../../api/catalog'
 import { ask as askAgent, profile as remoteProfile, recommendations, toMessage } from '../../api/client'
@@ -67,6 +67,7 @@ export default function AssistantPanel({ push, vertical, depth = 1 }) {
   const rootRef = useRef(null)
   const inputRef = useRef(null)
   const bodyRef = useRef(null)
+  const askHintId = useId()
   const timers = useRef([])
   // Preguntas en fila: la siguiente sale cuando la respuesta anterior ya está en pantalla.
   const askQueue = useRef(Promise.resolve())
@@ -259,6 +260,7 @@ export default function AssistantPanel({ push, vertical, depth = 1 }) {
     search.setQuery('')
     send(text, undefined, { typed: true })
     bodyRef.current?.scrollTo({ top: 0 })
+    inputRef.current?.blur() // en el celular el teclado tapaba la respuesta
   }
 
   /**
@@ -469,7 +471,9 @@ export default function AssistantPanel({ push, vertical, depth = 1 }) {
               if (looksLikeQuestion(search.query)) askTyped()
               else search.logSearch(search.query)
             }}
-            onBlur={() => search.logSearch(search.query)}
+            aria-describedby={search.hasQuery && looksLikeQuestion(search.query) ? askHintId : undefined}
+            // Pasar con Tab a «Pregúntale a Mochi» no es terminar una búsqueda
+            onBlur={(e) => e.relatedTarget?.classList.contains('agent-ask-row') || search.logSearch(search.query)}
           />
           {search.hasQuery && (
             <button type="button" className="search-clear" aria-label="Borrar" onClick={() => search.setQuery('')}>
@@ -482,7 +486,12 @@ export default function AssistantPanel({ push, vertical, depth = 1 }) {
       <div ref={bodyRef} className="agent-search-body">
         {search.hasQuery ? (
           <div className="agent-block">
-            <AskMochiRow query={search.query.trim()} question={looksLikeQuestion(search.query)} onAsk={askTyped} />
+            <AskMochiRow
+              query={search.query.trim()}
+              question={looksLikeQuestion(search.query)}
+              hintId={askHintId}
+              onAsk={askTyped}
+            />
             <SearchResults
               query={search.query}
               data={search.data}
@@ -546,22 +555,25 @@ export default function AssistantPanel({ push, vertical, depth = 1 }) {
                 />
               )}
 
-              <p className="agent-picks-label">Toca y te armo algo 👇</p>
+              {/* Bajo una respuesta de salud no van las ideas de siempre («Arma un carrete») */}
+              {!current?.health && <p className="agent-picks-label">Toca y te armo algo 👇</p>}
               {/* Clave con prefijo: un número solo podría coincidir con la del mensaje de arriba (su id) y React lo duplicaría. */}
-              <div key={`chips-${chipRound}`} className="assistant-chips agent-picks">
-                {CHIPS.map((chip, i) => (
-                  <button
-                    key={chip}
-                    type="button"
-                    className="assistant-chip"
-                    disabled={forgetting}
-                    style={{ animationDelay: `${120 + i * 55}ms` }}
-                    onClick={() => send(chip.replace(/^\S+\s/, ''))}
-                  >
-                    {chip}
-                  </button>
-                ))}
-              </div>
+              {!current?.health && (
+                <div key={`chips-${chipRound}`} className="assistant-chips agent-picks">
+                  {CHIPS.map((chip, i) => (
+                    <button
+                      key={chip}
+                      type="button"
+                      className="assistant-chip"
+                      disabled={forgetting}
+                      style={{ animationDelay: `${120 + i * 55}ms` }}
+                      onClick={() => send(chip.replace(/^\S+\s/, ''))}
+                    >
+                      {chip}
+                    </button>
+                  ))}
+                </div>
+              )}
             </section>
 
             {taste && (

@@ -20,6 +20,7 @@ from psycopg import Connection
 from ..concepts.assign import concept_matcher
 from ..concepts.matcher import KeywordMatcher, Match
 from ..concepts.taxonomy import load_taxonomy
+from ..offers.guards import is_offerable
 from ..text import GREETING_WORDS, REQUEST_WORDS, THANKS_WORDS, assistant_words, normalize
 from .glossary import load_glossary
 from .verticals import contending_verticals, ranked_verticals
@@ -329,21 +330,26 @@ PRICE = re.compile(
 )
 
 
-# Para cuántas personas («asado de 6», «somos 10», «para dos»). «de N» solo con una ocasión («huevos de 12» no) y
-# nunca con una medida después («para 2 kilos»).
+# Para cuántas personas: «somos 10», «para 4 personas», «para dos» al final y, con una ocasión, «asado de 6» al final.
+# Un número que sigue con otra cosa no es gente: «pañales para 2 años», «comida para 2 perros», «mi hijo de 6».
 _NUMBERS = {
     **{"dos": 2, "tres": 3, "cuatro": 4, "cinco": 5, "seis": 6, "siete": 7, "ocho": 8, "nueve": 9, "diez": 10},
     **{"doce": 12, "quince": 15, "veinte": 20, "treinta": 30},  # sin «once»: «algo para una once para 4»
 }
 _HOW_MANY = r"(\d{1,2}|" + "|".join(_NUMBERS) + r")"
-_NOT_PEOPLE_AFTER = (
-    r"(?!\s*(?:kg|kilos?|gr?|gramos?|l|litros?|ml|cc|unidades|u|porciones|cm|mts?|metros?|piezas|lucas|mil)\b)"
-)
+_WHO = r"(?:personas?|amigos|amigas|adultos|invitados)"
 PEOPLE_COUNT = re.compile(
-    r"\b(?:somos|seremos|para)\s+(?:unas?\s+)?" + _HOW_MANY + r"(?:\s+personas?)?\b" + _NOT_PEOPLE_AFTER
+    r"\b(?:somos|seremos)\s+" + _HOW_MANY + r"\b"
+    r"|\bpara\s+(?:unas?\s+)?" + _HOW_MANY + r"(?:\s+" + _WHO + r"\b|\s*$)"
 )
-PEOPLE_COUNT_OF = re.compile(r"\bde\s+" + _HOW_MANY + r"(?:\s+personas?)?(?=\s*$)")  # «asado de 6» (con ocasión)
+PEOPLE_COUNT_OF = re.compile(r"\bde\s+" + _HOW_MANY + r"(?:\s+" + _WHO + r")?\s*$")  # «asado de 6» (con ocasión)
+CHILD_WORDS = {
+    *("hijo", "hija", "hijos", "hijas", "nino", "nina", "ninos", "ninas", "guagua", "guaguas", "bebe", "bebes"),
+    *("nieto", "nieta", "sobrino", "sobrina"),
+}
 MAX_PEOPLE = 40
+# Lo que queda de una pregunta sin pedido («qué pido hoy»): entonces la frase de pregunta no se quita.
+TIME_FILLER = {"hoy", "ahora", "ya", "esta", "noche", "tarde", "manana", "dia", "algo", "rico"}
 # Frases de pregunta antes de lo que se pide: «qué llevo para un asado», «se me antoja algo salado», «cosas para
 # limpiar». No se buscan (traían una manta para «qué compro para un picnic»).
 QUESTION_LEAD = re.compile(
@@ -362,18 +368,20 @@ ADVICE = re.compile(
     r"|\bque\s+(?:tomo|tomar|remedio|remedios|medicamento|pastilla|jarabe)\b|\bdosis\b|\bcada\s+cuanto\b"
     r"|\b(?:sirve|sirven|es\s+bueno|es\s+buena)\s+para\b"
 )
-MEDICINE_WORDS = {
-    *("remedio", "remedios", "medicamento", "medicamentos", "pastilla", "pastillas", "jarabe", "paracetamol"),
-    *("ibuprofeno", "aspirina", "antibiotico", "antialergico", "antigripal", "dosis"),
-}
-# «¿qué es un poke?», «¿qué lleva una paella?»: una ficha del glosario (agent/glosario.toml).
+GENERIC_MEDICINE = {"remedio", "remedios", "medicamento", "medicamentos", "pastilla", "pastillas", "jarabe", "dosis"}
+NAMED_MEDICINE = {"paracetamol", "ibuprofeno", "aspirina", "antibiotico", "antialergico", "antigripal"}
+MEDICINE_WORDS = GENERIC_MEDICINE | NAMED_MEDICINE
+NOT_ADVICE_OCCASIONS = {"enfermo", "guagua"}  # nombrar otra ocasión («le doy un regalo») no pide consejo médico
+# «¿qué es un poke?», «¿qué lleva una paella?»: una ficha del glosario (agent/glosario.toml). Solo si se pregunta por
+# el plato: a lo más una palabra más («qué es lo más barato en sushi» no es la ficha del sushi).
+DISH_EXTRA_WORDS = 1
 WHAT_IS = re.compile(
     r"^(?:que|q)\s+(?:es|son|significa|lleva|llevan|trae|tiene)\s+(?:un|una|el|la|los|las|unos|unas)?\s*(.+)$"
     r"|^de\s+que\s+es\s+(?:un|una|el|la)?\s*(.+)$"
 )
 # «¿con qué acompaño un salmón?»: el complemento de lo que se nombra, no más de eso.
 GOES_WITH = re.compile(
-    r"^(?:con\s+que\s+(?:acompano|acompanar|acompanamos|acompaño|combino|combinar|sirvo|servir)"
+    r"^(?:con\s+que\s+(?:acompano|acompanar|acompanamos|combino|combinar|sirvo|servir)"
     r"|que\s+(?:le\s+pongo|le\s+echo|acompana|combina|va\s+bien|queda\s+bien)\s+(?:a|al|con)"
     r"|que\s+va\s+con|que\s+(?:sirvo|pongo)\s+con)\s+(.+)$"
 )
@@ -449,8 +457,9 @@ class Understander:
             return asked
         # Ocasiones y síntomas, sobre el texto sin limpiar: «me siento mal» y «me duele» empiezan con «me».
         occasion = self.occasions.best(said)
-        people, said_without_people = _people(said, occasion is not None)
-        body = " ".join(PEOPLE.sub(" ", _clean(_without_lead(_clean(said_without_people)))).split())
+        # La cantidad se queda en la consulta: los combos la dicen («Desayuno Para Dos», «Pichanga para 4 Personas»).
+        people = _people(said, occasion is not None)
+        body = " ".join(PEOPLE.sub(" ", _clean(_without_lead(_clean(said)))).split())
         # «sin azúcar» no pide azúcar ni «no quiero pizza» pizza: se descarta el concepto nombrado después.
         body_words = body.split()
         concept_matches, refused = [], []
@@ -537,26 +546,48 @@ class Understander:
 
     def _question(self, said: str, current_vertical: str | None) -> Intent | None:
         """Las preguntas que no son un pedido: consejo médico, la ficha de un plato o con qué acompañar algo."""
-        words = set(said.split())
-        sick = self.symptoms.best(said) is not None or bool(words & MEDICINE_WORDS)
-        if sick and ADVICE.search(said):  # «mi hijo tiene fiebre, ¿qué le doy?»: Mochi no da consejo médico
+        if self._advice(said):
             return Intent("consejo", said, current_vertical, confidence=1.0, symptom=True, query=said)
         plain = _clean(said)  # sin saludo ni nombre: «hola mochi, ¿qué es un ramen?»
         what = WHAT_IS.match(plain)
-        dish = self.dishes.best(what.group(1) or what.group(2)) if what else None
-        if dish:
+        rest = (what.group(1) or what.group(2)) if what else ""
+        dish = self.dishes.best(rest) if what else None
+        if dish and len(rest.split()) - dish.words <= DISH_EXTRA_WORDS:
             return Intent("que_es", said, current_vertical, confidence=0.9, query=said, dish=dish.target)
         goes = GOES_WITH.match(plain)
         if goes:
             rest = _clean(goes.group(1))
             named = [m.target for m in self.concepts.matches(rest)]
             occasion = self.occasions.best(rest)
-            base = named[:1] or (list(self.taxonomy.occasions[occasion.target].concepts[:1]) if occasion else [])
+            # De una ocasión, lo primero que Mochi puede proponer («con qué acompaño el carrete» no nombra la cerveza).
+            of_occasion = self.taxonomy.occasions[occasion.target].concepts if occasion else ()
+            offerable = [c for c in of_occasion if self._offerable(c)]
+            base = named[:1] or offerable[:1]
             if base:
                 return Intent(
                     "acompanar", said, current_vertical, base, confidence=0.8, explicit_concepts=True, query=rest
                 )
         return None
+
+    def _advice(self, said: str) -> bool:
+        """Si se pide consejo médico: «¿qué le doy?», «qué me tomo», «dosis», con un síntoma o un remedio nombrado; o un
+        síntoma de un niño sin nombrar el remedio («mi guagua tiene fiebre»: elegirle un remedio es un consejo). No, si
+        se nombra algo que Mochi puede proponer («qué sopa le doy a mi hijo resfriado») u otra ocasión («le doy un
+        regalo»)."""
+        words = set(said.split())
+        symptom = self.symptoms.best(said) is not None
+        if not (symptom or words & MEDICINE_WORDS):
+            return False
+        if any(self._offerable(m.target) for m in self.concepts.matches(said)):
+            return False
+        if any(m.target not in NOT_ADVICE_OCCASIONS for m in self.occasions.matches(said)):
+            return False
+        child = symptom and bool(words & CHILD_WORDS) and not words & NAMED_MEDICINE
+        return child or ADVICE.search(said) is not None
+
+    def _offerable(self, concept_id: str) -> bool:
+        concept = self.taxonomy.concepts.get(concept_id)
+        return concept is not None and is_offerable(concept)
 
     def _follow_up(self, text, said, body_words, concepts, occasion, symptom, mention, previous, price_max):
         """Un mensaje corto que no nombra nada nuevo (o que empieza con «con», «sin», «talla», «más»…) sigue el pedido
@@ -615,23 +646,28 @@ class Understander:
         return None
 
 
-def _people(said: str, with_occasion: bool) -> tuple[int | None, str]:
-    """(para cuántas personas, el texto sin esa frase). «de N» al final solo cuenta con una ocasión."""
+def _people(said: str, with_occasion: bool) -> int | None:
+    """Para cuántas personas. «de N» al final solo cuenta con una ocasión («asado de 6»; «huevos de 12» no) y no tras
+    un niño («cumpleaños de mi hijo de 6» es la edad)."""
     for pattern in (PEOPLE_COUNT, PEOPLE_COUNT_OF) if with_occasion else (PEOPLE_COUNT,):
         match = pattern.search(said)
+        if match and pattern is PEOPLE_COUNT_OF and said[: match.start()].split()[-1:] in ([w] for w in CHILD_WORDS):
+            continue
         if match:
-            number = match.group(1)
+            number = next(g for g in match.groups() if g)
             people = int(number) if number.isdigit() else _NUMBERS[number]
             if 2 <= people <= MAX_PEOPLE:
-                return people, " ".join((said[: match.start()] + " " + said[match.end() :]).split())
-    return None, said
+                return people
+    return None
 
 
 def _without_lead(body: str) -> str:
     """Sin la frase de pregunta del inicio ni el «me recomiendas» del final: «qué trago me recomiendas» → «trago»."""
-    body = QUESTION_LEAD.sub("", body)
-    asked = RECOMMEND_ASK.match(body)
-    return asked.group(1) if asked else body
+    rest = QUESTION_LEAD.sub("", body)
+    if rest and set(rest.split()) <= TIME_FILLER or not rest:  # «qué pido hoy»: no queda un pedido
+        rest = body
+    asked = RECOMMEND_ASK.match(rest)
+    return asked.group(1) if asked else rest
 
 
 def _without_mention(body: str, mention: str | None) -> str:

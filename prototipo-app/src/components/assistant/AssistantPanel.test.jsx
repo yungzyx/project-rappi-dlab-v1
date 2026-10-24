@@ -667,6 +667,44 @@ describe('preguntarle a Mochi desde el buscador', () => {
     expect(tracked('search')).toEqual([]) // es una pregunta a Mochi, no una búsqueda
   })
 
+  test('la fila resaltada dice que Enter pregunta, también al lector de pantalla; sin resaltar, no', async () => {
+    await renderPanel()
+    const field = screen.getByLabelText('Buscar en Rappi')
+    fireEvent.change(field, { target: { value: QUESTION } })
+    await runUntilIdle()
+    expect(screen.getByText('Enter')).toBeTruthy()
+    expect(document.getElementById(field.getAttribute('aria-describedby')).textContent).toBe(
+      'Enter le pregunta a Mochi',
+    )
+    fireEvent.change(field, { target: { value: 'cerveza' } })
+    await runUntilIdle()
+    expect(screen.queryByText('Enter')).toBeNull()
+    expect(field.getAttribute('aria-describedby')).toBeNull()
+  })
+
+  test('pasar con Tab a la fila no registra la búsqueda', async () => {
+    await renderPanel()
+    const field = screen.getByLabelText('Buscar en Rappi')
+    fireEvent.change(field, { target: { value: QUESTION } })
+    await runUntilIdle()
+    const row = screen.getByRole('button', { name: `Pregúntale a Mochi: «${QUESTION}»` })
+    fireEvent.blur(field, { relatedTarget: row })
+    await runUntilIdle()
+    expect(tracked('search')).toEqual([])
+  })
+
+  test('bajo una respuesta de salud no salen las ideas de siempre («Arma un carrete»)', async () => {
+    api.ask.mockResolvedValueOnce({ ...apiAnswer('No puedo decirte qué remedio tomar…'), intent: { symptom: true } })
+    await renderPanel()
+    const field = screen.getByLabelText('Buscar en Rappi')
+    fireEvent.change(field, { target: { value: 'mi hijo tiene fiebre, ¿qué le doy?' } })
+    await runUntilIdle()
+    fireEvent.keyDown(field, { key: 'Enter' })
+    await runUntilIdle()
+    expect(bubbles()).toContain('No puedo decirte qué remedio tomar…')
+    expect(screen.queryByRole('button', { name: '🍻 Arma un carrete' })).toBeNull()
+  })
+
   test('tocar «Pregúntale a Mochi» pregunta aunque lo escrito sea un producto', async () => {
     api.ask.mockResolvedValueOnce(apiAnswer('Mira estas cervezas'))
     await renderPanel()

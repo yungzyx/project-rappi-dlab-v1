@@ -113,3 +113,33 @@ def test_mochi_does_not_take_you_to_licores_unless_you_ask_for_alcohol(agent):
     assert rappi.reply(db, "se me antoja algo salado", Context())["vertical"] == "supermercado"
     assert rappi.reply(db, "algo salado", Context(vertical="licores"))["vertical"] == "licores"
     assert rappi.reply(db, "algo salado en la botillería", Context())["vertical"] == "licores"
+
+
+def test_what_is_does_not_carry_the_previous_request(agent):
+    """«pañales» y después «¿qué es un poke?» mostraba pañales: la ficha no sigue el pedido anterior."""
+    rappi, db = agent
+    previous = {"query": "salmon", "concepts": ["pescados-mariscos"], "vertical": "supermercado", "product_ids": []}
+    r = rappi.reply(db, "¿qué es un poke?", Context(previous=previous))
+    assert [p["name"] for p in r["products"]] == ["Poke de salmón"] and not r["intent"]["follow_up"]
+
+
+def test_an_occasion_said_without_naming_alcohol_brings_none(agent):
+    rappi, db = agent
+    for text in ["algo para el carrete", "una cena romántica para dos"]:
+        r = rappi.reply(db, text, Context())
+        assert r["vertical"] != "licores" and not r["age_notice"], text
+        assert not any(p["concept"] in {"cerveza", "vino", "espumante", "cocteles"} for p in r["products"]), text
+
+
+def test_health_answers_say_so_for_the_app(agent):
+    """La app oculta sus ideas («Arma un carrete») bajo una respuesta de salud: el intent dice si habló de síntomas."""
+    rappi, db = agent
+    assert rappi.reply(db, "tengo tos", Context())["intent"]["symptom"]
+    assert rappi.reply(db, "mi hijo tiene fiebre, ¿qué le doy?", Context())["intent"]["symptom"]
+    assert not rappi.reply(db, "salmón", Context())["intent"]["symptom"]
+
+
+def test_what_goes_with_in_rappi_hoy_is_a_plain_search(agent):
+    rappi, db = agent
+    r = rappi.reply(db, "¿con qué acompaño un salmón?", Context(mode="actual"))
+    assert not r["text"].startswith("No se me ocurre")

@@ -17,10 +17,20 @@ describe('looksLikeQuestion', () => {
     expect(looksLikeQuestion(text)).toBe(true)
   })
 
-  test.each(['cerveza', 'pañales talla G', 'leche sin lactosa', 'papas fritas lays', 'coca cola 3 litros', '', '  '])(
-    '«%s» es una búsqueda',
-    (text) => {
-      expect(looksLikeQuestion(text)).toBe(false)
-    },
-  )
+  test.each([
+    'cerveza',
+    'pañales talla G',
+    'leche sin lactosa',
+    'papas fritas lays',
+    'coca cola 3 litros',
+    'coca cola zero 3 litros',
+    'papas fritas lays 250 gr',
+    'leche descremada sin lactosa colun',
+    'torta mil hojas',
+    'como agua para chocolate',
+    '',
+    '  ',
+  ])('«%s» es una búsqueda', (text) => {
+    expect(looksLikeQuestion(text)).toBe(false)
+  })
 })

@@ -352,7 +352,7 @@ id = "golosinas"
 parent = "dulces"
 name = "Golosinas"
 emoji = "🍬"
-keywords = ["gomitas", "gomita", "caramelo", "chicle", "calugas", "marshmallow", "malvavisco", "chupete dulce", "mentitas", "dulces típicos", "turrón", "mazapán", "calugón"]
+keywords = ["gomitas", "gomita", "caramelo", "chicle", "calugas", "marshmallow", "malvavisco", "chupete dulce", "mentitas", "pastillas de menta", "pastilla de menta", "dulces típicos", "turrón", "mazapán", "calugón"]
 
 [[concept]]
 id = "helados"
@@ -1094,7 +1094,7 @@ vertical = "chocolateria"  # por masa mínima ganaba Licores: el piso lo ponían
 id = "hambre"
 name = "Hambre ya"
 emoji = "🍽️"
-keywords = ["hambre", "tengo hambre", "almorzar", "cenar", "comida rápida", "algo rico", "delivery de comida", "para comer", "no quiero cocinar", "sin ganas de cocinar", "flojera de cocinar"]
+keywords = ["hambre", "tengo hambre", "que pido", "que como hoy", "que ceno", "almorzar", "cenar", "comida rápida", "algo rico", "delivery de comida", "para comer", "no quiero cocinar", "sin ganas de cocinar", "flojera de cocinar"]
 concepts = ["pizza", "hamburguesa", "sushi", "pollo", "pollo-preparado", "sandwiches", "asiatica", "empanadas", "platos-listos"]
 vertical = "restaurantes"  # "hambre ya": pedir comida lista, no comprar una pizza congelada
 
@@ -1190,10 +1190,11 @@ id = "picnic"
 name = "Picnic"
 emoji = "🧺"
 # «qué compro para un picnic» traía una manta, un portacolación de bebé y chocolates «Picnic».
-keywords = ["picnic", "dia de campo", "día de campo", "paseo al parque"]
+# «picnic» suelto no: en el buscador son los chocolates Costa Picnic.
+keywords = ["un picnic", "de picnic", "al picnic", "dia de campo", "día de campo", "paseo al parque"]
 concepts = ["panaderia", "fiambres", "quesos", "frutas", "jugos", "snacks-salados", "galletas"]
 vertical = "supermercado"
-plan = false  # para entender la pregunta; no es (todavía) un plan de la Home
+plan = false  # no es (todavía) un plan de la Home; la búsqueda y Mochi sí la entienden
 
 [[occasion]]
 id = "frio"

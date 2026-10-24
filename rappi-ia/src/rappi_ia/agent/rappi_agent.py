@@ -33,7 +33,7 @@ from .tools import (
     search_remedies,
     suggest_complement,
 )
-from .understand import Intent, Understander
+from .understand import CHILD_WORDS, Intent, Understander
 from .verticals import MIN_ITEMS_ELSEWHERE, available_elsewhere, ranked_verticals
 
 PROTOTYPE_VERTICALS = {  # ids del prototipo (prototipo-app/src/screens/vertical/data.js)
@@ -65,17 +65,12 @@ MIN_HOME_ITEMS = MIN_ITEMS_ELSEWHERE  # con menos productos del concepto, la pan
 RECOMMEND_INTERESTS = 3  # «qué me recomiendas» prueba hasta estos intereses antes de pasar a los ejemplos
 # Sin un remedio que nombre el síntoma, Mochi no elige uno (antes, los analgésicos): lo dice y muestra lo de cuidarse.
 NO_REMEDY = (
-    "No encontré en Farmacia un remedio que diga que es para eso, y no puedo recomendarte uno: pregúntale al químico "
-    "farmacéutico."
+    "No encontré en Farmacia un remedio para eso, y no te puedo recomendar uno: pregúntale al químico farmacéutico."
 )
-ADVICE_TEXT = (
-    "No puedo decirte qué remedio tomar o dar, ni cuánto: eso lo ve un médico o el químico farmacéutico de la farmacia "
-    "💊."
-)
-ADVICE_CHILD = " Si es para un niño o una guagua, pregúntale a su pediatra."
+ADVICE_TEXT = "No puedo decirte qué remedio tomar o dar, ni cuánto: eso lo ve un médico o un químico farmacéutico 💊."
+ADVICE_CHILD = " Pregúntale a su pediatra."
 ADVICE_URGENT = " Si es urgente, llama al SAMU (131)."
 ADVICE_NAME = " Si ya sabes qué remedio buscas, escríbeme su nombre."
-CHILD_WORDS = {"hijo", "hija", "hijos", "hijas", "nino", "nina", "ninos", "ninas", "guagua", "bebe", "guaguas", "bebes"}
 REMEDY_WORDS = {"remedio", "remedios", "medicamento", "medicamentos", "pastilla", "pastillas", "algo", "para"}
 # Palabras de un pedido que no son un detalle que deba decir el nombre del producto («lúcuma» en «helado de lúcuma» sí).
 NOT_DETAIL = {
@@ -163,12 +158,12 @@ class RappiAgent:
             if proposable and len(proposable) < len(intent.concepts):
                 intent = replace(intent, concepts=proposable)
                 if not (intent.explicit_vertical or ctx.vertical or self.taxonomy.occasions[intent.occasion].vertical):
-                    vertical = next(iter(_ranked_for(conn, proposable)), vertical)
+                    vertical = next(iter(_ranked_for(conn, proposable)), "supermercado")
         # Tampoco lleva a Licores por su cuenta («algo salado»: los snacks pesan más allá): sin alcohol nombrado, ni la
         # pantalla ni la mención de Licores, la vertical más típica entre las que propone.
         alcohol = any(c in self.taxonomy.concepts and self.taxonomy.concepts[c].age_restricted for c in intent.concepts)
         if vertical == "licores" and intent.concepts and not (alcohol or intent.explicit_vertical or ctx.vertical):
-            vertical = next(iter(_ranked_for(conn, intent.concepts[:1])), vertical)
+            vertical = next(iter(_ranked_for(conn, intent.concepts[:1])), "supermercado")
         # «vino» desde Farmacia: si la pantalla actual casi no tiene el concepto, se busca donde está y se dice.
         missing = None  # (vertical donde no está, qué, cuántos hay allí) para decirlo
         home = self._home_for(conn, intent, vertical, offer) if vertical == ctx.vertical else None
@@ -340,7 +335,7 @@ class RappiAgent:
     def _advice(self, intent: Intent) -> dict:
         """«¿Qué le doy?», «qué me tomo», «dosis»: Mochi no da consejo médico ni muestra remedios (sería elegirlos por
         la persona). Lo dice, nombra a quién preguntarle y deja ir a Farmacia; con el nombre de un remedio, lo busca."""
-        child = " " + ADVICE_CHILD.strip() if set(tokens(intent.text)) & CHILD_WORDS else ""
+        child = ADVICE_CHILD if set(tokens(intent.text)) & CHILD_WORDS else ""
         response = _base(intent, ADVICE_TEXT + child + ADVICE_URGENT + ADVICE_NAME)
         response["actions"] = [{"label": "Ir a Farmacia", "vertical": "farmacia"}]  # la app la lleva a su pantalla
         return response
@@ -349,7 +344,8 @@ class RappiAgent:
         """«¿Qué es un poke?»: la ficha del plato (agent/glosario.toml, escrita a mano) y lo que hay de él, buscado como
         cualquier pedido (con sus guardias). Si no hay, la ficha y el «No encontré» de siempre."""
         dish = load_glossary()[intent.dish]
-        response = self._reply(conn, dish.query, ctx, offer)
+        # Sin el pedido anterior: «¿qué es una paella?» tras «pañales» no es «pañales paella».
+        response = self._reply(conn, dish.query, replace(ctx, previous=None), offer)
         response["text"] = f"{dish.text} {response['text']}"
         response["intent"] = {**response["intent"], "kind": "que_es", "dish": dish.id}
         return response
@@ -365,9 +361,10 @@ class RappiAgent:
             if ctx.mode == "propuesta" and not base.sensitive
             else None
         )
-        if found is None:
-            response = self._reply(conn, intent.query, ctx, offer)
-            response["text"] = f"No se me ocurre con qué acompañar {_mid(base.label)}. {response['text']}"
+        if found is None:  # en «Rappi hoy» no sugiere: busca lo nombrado, sin decir que no se le ocurre nada
+            response = self._reply(conn, intent.query, replace(ctx, previous=None), offer)
+            if ctx.mode == "propuesta":
+                response["text"] = f"No se me ocurre con qué acompañar {_mid(base.label)}. {response['text']}"
             return response
         complement = self.taxonomy.concepts[found.concept]
         label = VERTICAL_LABELS.get(found.vertical, found.vertical)
@@ -688,6 +685,7 @@ def _base(intent: Intent, text: str) -> dict:
             "confidence": intent.confidence,
             "query": intent.query,
             "follow_up": intent.follow_up,
+            "symptom": intent.symptom,  # habló de síntomas o pidió consejo médico: la app no ofrece sus ideas debajo
         },
         "unmet": False,
         "age_notice": False,

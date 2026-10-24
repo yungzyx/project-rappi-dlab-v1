@@ -124,7 +124,7 @@ def _for_people(d: Draft) -> str | None:
     if d.kind != "resultados" or not d.people:
         return None
     if not d.portion:
-        return f"Para {d.people} personas: revisa cuánto trae cada uno."
+        return f"Para {d.people} personas: revisa para cuántos alcanza cada producto."
     grams, of = d.portion
     total = grams * d.people
     amount = f"{total / 1000:.1f}".replace(".", ",").removesuffix(",0") + " kg" if total >= 1000 else f"{total} g"

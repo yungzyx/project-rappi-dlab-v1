@@ -270,6 +270,7 @@ export function toMessage(response) {
     concepts: response.intent?.concepts ?? [],
     unmet: Boolean(response.unmet),
     ageNotice: Boolean(response.age_notice),
+    health: Boolean(response.intent?.symptom), // síntomas o consejo médico: el panel no ofrece sus ideas debajo
     source: 'api',
   }
 }
