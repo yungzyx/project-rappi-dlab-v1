@@ -325,7 +325,9 @@ def test_plans_lists_offerable_occasions_in_home_order(client):
     ids = [p["id"] for p in plans]
     assert ids[:5] == ["once", "carrete", "asado", "panorama", "regalo"]
     assert "guagua" not in ids and "enfermo" not in ids and len(ids) == len(set(ids)) == 13
-    assert set(ids) == set(load_taxonomy().occasions) - {"guagua", "enfermo"}
+    # Sin guagua ni enfermo, ni las que solo sirven para entender preguntas (`plan = false`: picnic, frío)
+    occasions = load_taxonomy().occasions
+    assert set(ids) == {o for o in occasions if occasions[o].plan} - {"guagua", "enfermo"}
     assert plans[1] == {"id": "carrete", "name": "Carrete", "emoji": "🎉"}
 
 

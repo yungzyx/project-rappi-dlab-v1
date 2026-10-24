@@ -41,6 +41,8 @@ class Draft:
     interest_label: str | None = None
     learns: bool = True  # en «Rappi hoy» no se aprende nada
     unmet: bool = False
+    people: int | None = None  # para cuántas personas («asado de 6»)
+    portion: tuple[int, str] | None = None  # gramos por persona y de qué, de la ocasión (taxonomy.toml)
 
 
 class TemplateComposer:
@@ -112,8 +114,21 @@ class TemplateComposer:
 
 
 def notices(d: Draft) -> list[str]:
-    """Los avisos los pone siempre el código (nunca el LLM): así no se pierden ni se reescriben."""
-    return [AGE_NOTICE] if d.age_notice else []
+    """Los avisos los pone siempre el código (nunca el LLM): así no se pierden ni se reescriben. También la cantidad de
+    personas: el LLM no escribe cifras."""
+    return [p for p in (_for_people(d), AGE_NOTICE if d.age_notice else None) if p]
+
+
+def _for_people(d: Draft) -> str | None:
+    """«Para 6 personas, calcula unos 2,1 kg de carne.» Sin porción en la ocasión, solo lo que se entendió."""
+    if d.kind != "resultados" or not d.people:
+        return None
+    if not d.portion:
+        return f"Para {d.people} personas: revisa cuánto trae cada uno."
+    grams, of = d.portion
+    total = grams * d.people
+    amount = f"{total / 1000:.1f}".replace(".", ",").removesuffix(",0") + " kg" if total >= 1000 else f"{total} g"
+    return f"Para {d.people} personas, calcula unos {amount} de {of}."
 
 
 SANTIAGO = ZoneInfo("America/Santiago")

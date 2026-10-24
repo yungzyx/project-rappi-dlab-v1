@@ -495,19 +495,15 @@ def test_a_symptom_goes_to_pharmacy_with_remedies_and_no_notice(remedies_rappi_a
         assert not r.get("suggestion") and not r.get("also_in") and not r["unmet"]
 
 
-def test_a_symptom_without_remedies_for_it_gets_the_painkillers(remedies_rappi_agent):
-    """Si nada en la farmacia nombra el síntoma («me siento mal», «tengo tos»), no se muestra cualquier medicamento
-    que calce por cercanía: los analgésicos, y el texto no habla de la ocasión."""
+def test_a_symptom_without_remedies_for_it_gets_no_medicine(remedies_rappi_agent):
+    """Si nada en la farmacia nombra el síntoma («me siento mal», «tengo tos»), Mochi no elige un remedio (antes, los
+    analgésicos; 24-10, docs/decisiones.md): lo dice, nombra al químico farmacéutico y no anota demanda."""
     agent, db = remedies_rappi_agent
     for text in ["me siento mal", "tengo tos"]:
         r = agent.reply(db, text, Context(vertical="supermercado"))
-        ids = [p["entity_id"] for p in r["products"]]
-        assert r["vertical"] == "farmacia" and {"800", "801"} <= set(ids) and "803" not in ids, text
-        assert "me siento mal" not in r["text"].lower() and "químico farmacéutico" not in r["text"], text
-    # Con los analgésicos genéricos lo dice: no aparenta que son para la tos.
-    assert agent.reply(db, "tengo tos", Context())["text"].startswith(
-        "No encontré algo específico para eso en Farmacia"
-    )
+        assert not any(p["concept"] == "medicamentos" for p in r["products"]), text
+        assert r["text"].startswith("No encontré en Farmacia un remedio") and "químico farmacéutico" in r["text"], text
+        assert not r["unmet"] and not r.get("suggestion") and not r.get("also_in"), text
     assert not agent.reply(db, "tengo fiebre", Context())["text"].startswith("No encontré")
 
 
@@ -1040,7 +1036,9 @@ def pharmacy(rappi_agent):
 def test_one_remedy_is_not_enough_and_only_medicines_are_remedies(pharmacy):
     agent, db = pharmacy
     cough = agent.reply(db, "tengo tos", Context())
-    assert cough["text"].startswith("No encontré algo específico")  # un solo jarabe: los analgésicos
+    # un solo jarabe no alcanza: Mochi no elige otro remedio (ni los analgésicos)
+    assert cough["text"].startswith("No encontré en Farmacia un remedio")
+    assert not any(p["concept"] == "medicamentos" for p in cough["products"])
     fever = agent.reply(db, "tengo fiebre", Context())
     assert fever["intent"]["vertical"] == "farmacia" and fever["tags"] == ["medicamentos"]
     assert "805" not in [p["entity_id"] for p in fever["products"]]  # un termómetro no es un remedio

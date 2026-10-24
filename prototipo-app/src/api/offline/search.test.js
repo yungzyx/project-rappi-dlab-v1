@@ -77,7 +77,9 @@ describe('«qué me recomiendas» (rappi_agent.py: _recommend)', () => {
 
   test('si nombra algo, busca eso: «¿me recomiendas un café?» no es «qué me recomiendas»', () => {
     const reply = recommend(['juguetes'], { message: '¿Me recomiendas un café?' })
-    expect(reply.text).toBe('Mira lo que encontré de «¿Me recomiendas un café?» en el súper.')
+    expect(reply.text).toBe(
+      'Esta demo sin conexión no entiende preguntas nuevas, solo busca palabras: esto encontré en el súper.',
+    )
     expect(reply.products).toEqual([coffee])
   })
 
@@ -98,5 +100,45 @@ describe('«qué me recomiendas» (rappi_agent.py: _recommend)', () => {
     expect(recommend(['cerveza'])).toBe(HELP)
     expect(recommend([])).toBe(HELP)
     expect(recommend(['cafe'], { mode: 'actual' })).toBe(HELP)
+  })
+})
+
+describe('preguntas que la muestra no grabó (agent/understand.py y rappi_agent.py, en corto)', () => {
+  const said = (message) => ask(snapshot, { message, mode: 'propuesta' }, { interests: [], userId: 'proto-1' })
+
+  test('lo grabado de la API real va primero', () => {
+    const recorded = { text: 'Para 6 personas…', products: [coffee] }
+    const withRecord = { ...snapshot, ask: { 'que llevo para un asado de 6': recorded } }
+    expect(ask(withRecord, { message: '¿Qué llevo para un asado de 6?' })).toBe(recorded)
+  })
+
+  test('consejo médico: no lo da, como la API, y deja ir a Farmacia', () => {
+    const reply = said('mi hijo tiene fiebre, ¿qué le doy?')
+    expect(reply.text).toMatch(/^No puedo decirte qué remedio tomar o dar/)
+    expect(reply.text).toContain('pediatra')
+    expect(reply.products).toEqual([])
+    expect(reply.actions).toEqual([{ label: 'Ir a Farmacia', vertical: 'farmacia' }])
+    expect(reply.intent.kind).toBe('consejo')
+  })
+
+  test('un síntoma: sin conexión no busca remedios y lo dice, sin anotarlo como demanda', () => {
+    const reply = said('tengo tos')
+    expect(reply.text).toBe(
+      'Esta demo sin conexión no busca remedios. Pregúntale al químico farmacéutico qué te sirve para eso.',
+    )
+    expect(reply.products).toEqual([])
+    expect(reply.unmet).toBe(false)
+  })
+
+  test('una pregunta nueva sin nada que calce lo dice con honestidad', () => {
+    const reply = said('¿qué es una kombucha?')
+    expect(reply.text).toBe(
+      'Esta demo sin conexión no entiende preguntas nuevas. Prueba con una de las ideas o escribe un producto.',
+    )
+    expect(reply.products).toEqual([])
+  })
+
+  test('un producto suelto se sigue buscando como siempre', () => {
+    expect(said('café').text).toBe('Mira lo que encontré de «café» en el súper.')
   })
 })

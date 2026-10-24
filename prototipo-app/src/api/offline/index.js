@@ -15,7 +15,11 @@
 // - rappi-ia/src/rappi_ia/offers/guards.py ......... lo que el agente nunca ofrece (offers.js: offerableProduct)
 // - rappi-ia/src/rappi_ia/agent/tools.py ........... el foco de la búsqueda (_focus, en search.js) y el complemento
 //   alternado (_takes_second, en offers.js: complementOf)
-// - rappi-ia/src/rappi_ia/agent/rappi_agent.py ..... «qué me recomiendas» (search.js: recommend)
+// - rappi-ia/src/rappi_ia/agent/rappi_agent.py ..... «qué me recomiendas» (search.js: recommend) y el texto del consejo
+//   médico (ADVICE_*, en search.js: unrecorded)
+// - rappi-ia/src/rappi_ia/agent/understand.py ...... síntomas y consejo médico (SYMPTOMS, MEDICINE_WORDS, ADVICE, en
+//   search.js) para las preguntas que la muestra no grabó; las grabadas (eval/frases_usuarios/preguntas-libres.txt) salen
+//   tal cual de la API real
 // - rappi-ia/src/rappi_ia/events/store.py .......... el perfil de intereses (index.js: interests)
 // - rappi-ia/src/rappi_ia/offers/profiles.py ....... los perfiles de gusto activos (tastes.js)
 // - rappi-ia/src/rappi_ia/api/app.py y api/catalog.py ... las rutas (index.js, catalog.js, search.js)

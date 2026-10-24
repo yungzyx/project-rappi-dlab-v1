@@ -21,6 +21,7 @@ from ..concepts.assign import concept_matcher
 from ..concepts.matcher import KeywordMatcher, Match
 from ..concepts.taxonomy import load_taxonomy
 from ..text import GREETING_WORDS, REQUEST_WORDS, THANKS_WORDS, assistant_words, normalize
+from .glossary import load_glossary
 from .verticals import contending_verticals, ranked_verticals
 
 # Menciones inequívocas de un vertical. Palabras sueltas como "mall", "super" o "express" son también marcas
@@ -319,19 +320,69 @@ _UNITS = (
 )
 _DECIMAL = r"\d+[.,]\d{1,2}(?=\s*(?:mil|lucas|k)\b)"  # «1,5 lucas»: decimales solo con mil/lucas/k
 PRICE = re.compile(
-    # «de 2 lucas» también es un tope, pero solo con $ o mil/lucas/k («pack de 6» no lo es)
+    # «de 2 lucas» o «con 8 mil» también son un tope, pero solo con $ o mil/lucas/k («pack de 6» no lo es)
     r"(?:bajo|menos de|hasta|maximo|max|no mas de|por menos de|que cueste menos de"
-    r"|\bde(?=\s*(?:\$|\d[\d.,]*\s*(?:mil|lucas)\b))"
+    r"|\b(?:de|con)(?=\s*(?:\$|\d[\d.,]*\s*(?:mil|lucas)\b))"
     r"|\b(?=\d[\d.,]*\s*lucas\b))\s*"  # «10 lucas» solo es plata
     r"(\$)?\s*(" + _DECIMAL + r"|\d{1,3}(?:[.,\s]\d{3})+|\d+)(?![.,]\d)\s*(mil|lucas|k)?\b"
     r"(?:\s*(?:pesos|clp)\b)?(?!\s*" + _UNITS + r"\b)"
 )
 
 
+# Para cuántas personas («asado de 6», «somos 10», «para dos»). «de N» solo con una ocasión («huevos de 12» no) y
+# nunca con una medida después («para 2 kilos»).
+_NUMBERS = {
+    **{"dos": 2, "tres": 3, "cuatro": 4, "cinco": 5, "seis": 6, "siete": 7, "ocho": 8, "nueve": 9, "diez": 10},
+    **{"doce": 12, "quince": 15, "veinte": 20, "treinta": 30},  # sin «once»: «algo para una once para 4»
+}
+_HOW_MANY = r"(\d{1,2}|" + "|".join(_NUMBERS) + r")"
+_NOT_PEOPLE_AFTER = (
+    r"(?!\s*(?:kg|kilos?|gr?|gramos?|l|litros?|ml|cc|unidades|u|porciones|cm|mts?|metros?|piezas|lucas|mil)\b)"
+)
+PEOPLE_COUNT = re.compile(
+    r"\b(?:somos|seremos|para)\s+(?:unas?\s+)?" + _HOW_MANY + r"(?:\s+personas?)?\b" + _NOT_PEOPLE_AFTER
+)
+PEOPLE_COUNT_OF = re.compile(r"\bde\s+" + _HOW_MANY + r"(?:\s+personas?)?(?=\s*$)")  # «asado de 6» (con ocasión)
+MAX_PEOPLE = 40
+# Frases de pregunta antes de lo que se pide: «qué llevo para un asado», «se me antoja algo salado», «cosas para
+# limpiar». No se buscan (traían una manta para «qué compro para un picnic»).
+QUESTION_LEAD = re.compile(
+    r"^(?:(?:que|como)\s+(?:llevo|compro|pido|preparo|cocino|hago|me\s+compro|me\s+pido"
+    r"|puedo\s+(?:comer|cenar|almorzar|comprar|pedir|llevar|regalar|preparar))"
+    r"|se\s+me\s+antoja[n]?|me\s+(?:tinca|tincan|apetece)|cosas)\b"
+    r"(?:\s+(?:para|de|con|en)\b)?(?:\s+(?:un|una|el|la|los|las|unos|unas)\b)?\s*"
+)
+# «qué trago me recomiendas», «cuál vino me sugieres»: se pide eso.
+RECOMMEND_ASK = re.compile(
+    r"^(?:(?:que|cual|cuales)\s+)?(.+?)\s+(?:me\s+)?(?:recomiendas|recomendarias|sugieres|recomiendan)$"
+)
+# Pedir consejo médico («¿qué le doy?», «qué me tomo», «dosis»): con un síntoma o un remedio nombrado, Mochi no lo da.
+ADVICE = re.compile(
+    r"\b(?:le|les|me|te)\s+(?:doy|damos|tomo|tomas|puedo\s+dar|puedo\s+tomar)\b|\b(?:puedo|puede|debo|debe)\s+tomar\b"
+    r"|\bque\s+(?:tomo|tomar|remedio|remedios|medicamento|pastilla|jarabe)\b|\bdosis\b|\bcada\s+cuanto\b"
+    r"|\b(?:sirve|sirven|es\s+bueno|es\s+buena)\s+para\b"
+)
+MEDICINE_WORDS = {
+    *("remedio", "remedios", "medicamento", "medicamentos", "pastilla", "pastillas", "jarabe", "paracetamol"),
+    *("ibuprofeno", "aspirina", "antibiotico", "antialergico", "antigripal", "dosis"),
+}
+# «¿qué es un poke?», «¿qué lleva una paella?»: una ficha del glosario (agent/glosario.toml).
+WHAT_IS = re.compile(
+    r"^(?:que|q)\s+(?:es|son|significa|lleva|llevan|trae|tiene)\s+(?:un|una|el|la|los|las|unos|unas)?\s*(.+)$"
+    r"|^de\s+que\s+es\s+(?:un|una|el|la)?\s*(.+)$"
+)
+# «¿con qué acompaño un salmón?»: el complemento de lo que se nombra, no más de eso.
+GOES_WITH = re.compile(
+    r"^(?:con\s+que\s+(?:acompano|acompanar|acompanamos|acompaño|combino|combinar|sirvo|servir)"
+    r"|que\s+(?:le\s+pongo|le\s+echo|acompana|combina|va\s+bien|queda\s+bien)\s+(?:a|al|con)"
+    r"|que\s+va\s+con|que\s+(?:sirvo|pongo)\s+con)\s+(.+)$"
+)
+
+
 @dataclass
 class Intent:
     # saludo | gracias | ayuda | envio | ofertas | fuera | pedido | receta | memoria | buscar | ocasion | aclarar
-    # | servicio | vacio
+    # | servicio | vacio | consejo (consejo médico) | que_es (ficha de un plato) | acompanar (con qué acompañar algo)
     kind: str
     text: str
     vertical: str | None = None
@@ -349,6 +400,8 @@ class Intent:
     priciest: bool = False  # «más caro»: lo más caro primero
     follow_up: bool = False  # refina el mensaje anterior («talla g» tras «pañales»)
     exclude_previous: bool = False  # «de otra marca», «otras opciones»: sin lo que ya se mostró
+    people: int | None = None  # para cuántas personas («asado de 6»)
+    dish: str | None = None  # ficha del glosario («¿qué es un poke?»)
 
 
 class Understander:
@@ -362,6 +415,7 @@ class Understander:
         self.services = KeywordMatcher((s.id, kw) for s in taxonomy.services.values() for kw in s.keywords)
         self.app_questions = KeywordMatcher((kind, kw) for kind, kws in APP_QUESTIONS.items() for kw in kws)
         self.memory_questions = KeywordMatcher(("memoria", kw) for kw in MEMORY_QUESTIONS)
+        self.dishes = KeywordMatcher((d.id, kw) for d in load_glossary().values() for kw in d.keywords)
         # «🍕» o «quiero un 🍔»: el emoji de un concepto se lee como su nombre (gana el primero que lo usa).
         self.emojis: dict[str, str] = {}
         for concept in taxonomy.concepts.values():
@@ -390,9 +444,13 @@ class Understander:
         price_max, without_price = _price(text)
         # Habla chilena: «pa» y «pal» son «para» y «para el» («algo pa comer», «juguete pal gato»).
         said = re.sub(r"\bpal\b", "para el", re.sub(r"\bpa\b", "para", normalize(without_price)))
-        body = " ".join(PEOPLE.sub(" ", _clean(said)).split())
+        asked = self._question(said, current_vertical)
+        if asked:
+            return asked
         # Ocasiones y síntomas, sobre el texto sin limpiar: «me siento mal» y «me duele» empiezan con «me».
         occasion = self.occasions.best(said)
+        people, said_without_people = _people(said, occasion is not None)
+        body = " ".join(PEOPLE.sub(" ", _clean(_without_lead(_clean(said_without_people)))).split())
         # «sin azúcar» no pide azúcar ni «no quiero pizza» pizza: se descarta el concepto nombrado después.
         body_words = body.split()
         concept_matches, refused = [], []
@@ -455,6 +513,7 @@ class Understander:
             **_price_order(said.split()),
         )
 
+        common["people"] = people
         if mention:
             return Intent(kind, text, mention, concepts, explicit_vertical=True, **common)
         if current_vertical:
@@ -475,6 +534,29 @@ class Understander:
         if len(pair) == 2 and "restaurantes" in pair and _comparable(conn, concepts[0], pair):
             return Intent("aclarar", text, None, concepts, options=pair, **common)
         return Intent(kind, text, options[0] if options else self._home(concepts[0]), concepts, **common)
+
+    def _question(self, said: str, current_vertical: str | None) -> Intent | None:
+        """Las preguntas que no son un pedido: consejo médico, la ficha de un plato o con qué acompañar algo."""
+        words = set(said.split())
+        sick = self.symptoms.best(said) is not None or bool(words & MEDICINE_WORDS)
+        if sick and ADVICE.search(said):  # «mi hijo tiene fiebre, ¿qué le doy?»: Mochi no da consejo médico
+            return Intent("consejo", said, current_vertical, confidence=1.0, symptom=True, query=said)
+        plain = _clean(said)  # sin saludo ni nombre: «hola mochi, ¿qué es un ramen?»
+        what = WHAT_IS.match(plain)
+        dish = self.dishes.best(what.group(1) or what.group(2)) if what else None
+        if dish:
+            return Intent("que_es", said, current_vertical, confidence=0.9, query=said, dish=dish.target)
+        goes = GOES_WITH.match(plain)
+        if goes:
+            rest = _clean(goes.group(1))
+            named = [m.target for m in self.concepts.matches(rest)]
+            occasion = self.occasions.best(rest)
+            base = named[:1] or (list(self.taxonomy.occasions[occasion.target].concepts[:1]) if occasion else [])
+            if base:
+                return Intent(
+                    "acompanar", said, current_vertical, base, confidence=0.8, explicit_concepts=True, query=rest
+                )
+        return None
 
     def _follow_up(self, text, said, body_words, concepts, occasion, symptom, mention, previous, price_max):
         """Un mensaje corto que no nombra nada nuevo (o que empieza con «con», «sin», «talla», «más»…) sigue el pedido
@@ -531,6 +613,25 @@ class Understander:
             if all(match.words > m.words for m in overlapping):
                 return match.target
         return None
+
+
+def _people(said: str, with_occasion: bool) -> tuple[int | None, str]:
+    """(para cuántas personas, el texto sin esa frase). «de N» al final solo cuenta con una ocasión."""
+    for pattern in (PEOPLE_COUNT, PEOPLE_COUNT_OF) if with_occasion else (PEOPLE_COUNT,):
+        match = pattern.search(said)
+        if match:
+            number = match.group(1)
+            people = int(number) if number.isdigit() else _NUMBERS[number]
+            if 2 <= people <= MAX_PEOPLE:
+                return people, " ".join((said[: match.start()] + " " + said[match.end() :]).split())
+    return None, said
+
+
+def _without_lead(body: str) -> str:
+    """Sin la frase de pregunta del inicio ni el «me recomiendas» del final: «qué trago me recomiendas» → «trago»."""
+    body = QUESTION_LEAD.sub("", body)
+    asked = RECOMMEND_ASK.match(body)
+    return asked.group(1) if asked else body
 
 
 def _without_mention(body: str, mention: str | None) -> str:
