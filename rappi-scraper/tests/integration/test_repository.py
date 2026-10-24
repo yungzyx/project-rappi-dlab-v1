@@ -158,6 +158,34 @@ def test_search_documents_mark_products_that_need_a_prescription(db):
     assert rows == [("100", True), ("101", None)]
 
 
+def test_search_documents_rebuild_the_vocabulary_by_vertical(db):
+    """Las palabras del catálogo, sin tildes ni ñ, por vertical y con en cuántos documentos están: rappi-ia corrige con
+    ellas los errores de tipeo (migración 041). Se rearma con los documentos: lo que ya no existe sale."""
+    _store(db, 1, "lider", "supermercado")
+    _store(db, 2, "cruzverde", "farmacia")
+    run = repository.start_run(db, "stores", {})
+    repository.save_products(
+        db, run, 1, [_product("a", 100, "Nutella 350 g", 3990), _product("b", 101, "Nutella Pañales", 990)]
+    )
+    repository.save_products(db, run, 2, [_product("c", 102, "Paracetamol", 990)])
+    build_search_documents(db)
+    vocabulary = dict(
+        ((v, w), n) for v, w, n in db.execute("SELECT vertical, word, docs FROM search_vocabulary").fetchall()
+    )
+    assert vocabulary[("supermercado", "nutella")] == 2
+    assert vocabulary[("supermercado", "panales")] == 2  # «Pañales» en la categoría de los dos
+    shown = db.execute("SELECT display FROM search_vocabulary WHERE vertical = 'supermercado' AND word = 'panales'")
+    assert shown.fetchone()[0] == "pañales"  # la corrección la muestra como la escribe el catálogo
+    assert ("farmacia", "nutella") not in vocabulary and vocabulary[("farmacia", "paracetamol")] == 1
+
+    db.execute("DELETE FROM store_products WHERE master_product_id IN (100, 101)")
+    db.execute("DELETE FROM catalog_items WHERE master_product_id IN (100, 101)")
+    repository.save_products(db, run, 1, [_product("d", 103, "Arroz", 1500)])
+    build_search_documents(db)
+    words = {w for (w,) in db.execute("SELECT word FROM search_vocabulary WHERE vertical = 'supermercado'")}
+    assert "arroz" in words and "nutella" not in words
+
+
 EMBEDDED_ITEMS = "SELECT count(*) FROM search_documents WHERE embedding IS NOT NULL AND entity_type = 'catalog_item'"
 
 

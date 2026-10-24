@@ -10,6 +10,7 @@ Flujo típico (después de cada `rappi refresh` del scraper):
     rappi-ia prune-embeddings        # borra del caché los vectores que ya no usa ningún documento ni nombre
     rappi-ia search "algo para el carrete" --vertical licores
     rappi-ia eval-search             # léxico vs vectorial vs híbrido + calibración de τ ("sin resultado")
+    rappi-ia eval-typos              # errores de tipeo (eval/typos.json): cuántos recupera la corrección
     rappi-ia jev-planillas           # planillas CSV (data/eval/) para juzgar a mano; luego `eval-human` da el κ
     rappi-ia jev-piloto              # con clave y planillas juzgadas: mide a Jev y propone adoptarlo (o no)
     rappi-ia synth                   # usuarios y eventos SIMULADOS para el panel (reemplaza los anteriores)
@@ -328,6 +329,23 @@ def cmd_eval_search(conn, args) -> None:
     jev_part = _jev_judgment(conn, jev_client, runs) if jev_client else None
     report = search_eval.render_markdown(summary, unmet, current, proposed, saved, model, comparisons, jev_part)
     out = config.DATA_DIR / "eval" / "busqueda.md"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(report, encoding="utf-8")
+    print(report)
+    print(f"Reporte en {out}")
+
+
+def cmd_eval_typos(conn, args) -> None:
+    from .embeddings.models import text_embedder
+    from .eval import typo_eval
+
+    embedder = text_embedder()
+    report = typo_eval.render_markdown(
+        typo_eval.run_typos(conn, embedder, typo_eval.load_typos()),
+        typo_eval.run_negatives(conn, embedder),
+        typo_eval.run_grouped_negatives(conn, embedder),
+    )
+    out = config.DATA_DIR / "eval" / "tipeo.md"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(report, encoding="utf-8")
     print(report)
@@ -685,6 +703,7 @@ COMMANDS = {
     "prune-embeddings": cmd_prune_embeddings,
     "search": cmd_search,
     "eval-search": cmd_eval_search,
+    "eval-typos": cmd_eval_typos,
     "eval-sample": cmd_eval_sample,
     "eval-human": cmd_eval_human,
     "jev-planillas": cmd_jev_planillas,
@@ -768,6 +787,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="agrega a Jev como juez solo si hay clave y eval/jev-adopcion.json lo adoptó; si no, sigue sin él",
     )
+    sub.add_parser("eval-typos", help="errores de tipeo de src/rappi_ia/eval/typos.json y negativas de queries.json")
     sub.add_parser("eval-sample", help="muestra de ~200 pares (consulta, producto) para juzgar a mano")
     sub.add_parser("eval-human", help="juez automático y refuerzo por concepto contra los juicios a mano, y κ")
     sheets_cmd = sub.add_parser("jev-planillas", help="planillas CSV para juzgar a mano la búsqueda y las categorías")
