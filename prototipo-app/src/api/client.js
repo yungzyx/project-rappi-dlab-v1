@@ -259,14 +259,18 @@ export function toMessage(response) {
     // La razón visible va con la sugerencia cruzada; aquí no se repite.
     reason: suggestion ? null : response.reason,
     suggestion,
-    // Acciones de aclaración ("¿para pedir ya o para el súper?"): vuelven a preguntar con ese vertical.
-    actions: (response.actions ?? []).map((a) =>
-      a.query ? { label: a.label, ask: { text: a.query, vertical: a.vertical } } : a,
-    ),
+    // Acciones de aclaración ("¿para pedir ya o para el súper?"): vuelven a preguntar con ese vertical. Una vertical
+    // sola («Ir a Farmacia», tras una pregunta de salud) lleva a su pantalla.
+    actions: (response.actions ?? []).map((a) => {
+      if (a.query) return { label: a.label, ask: { text: a.query, vertical: a.vertical } }
+      if (a.vertical && !a.route) return { label: a.label, route: verticalView(a.vertical).route }
+      return a
+    }),
     tags: response.tags ?? [],
     concepts: response.intent?.concepts ?? [],
     unmet: Boolean(response.unmet),
     ageNotice: Boolean(response.age_notice),
+    health: Boolean(response.intent?.symptom), // síntomas o consejo médico: el panel no ofrece sus ideas debajo
     source: 'api',
   }
 }

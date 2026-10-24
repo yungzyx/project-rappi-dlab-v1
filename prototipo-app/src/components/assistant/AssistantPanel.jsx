@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { AGENT_NAME } from '../../agent/name'
 import { storeOfProduct } from '../../api/catalog'
 import { ask as askAgent, profile as remoteProfile, recommendations, toMessage } from '../../api/client'
@@ -6,6 +6,7 @@ import { offer, profileLadder, tasteProfiles } from '../../api/agent'
 import { firstShowing, noteShown } from '../../api/suggestions'
 import { userId } from '../../api/user'
 import { askAbout } from '../../assistant/agentAsk'
+import { looksLikeQuestion } from '../../assistant/question'
 import { routeForScreen } from '../../data/verticals'
 import { PopularStores, SearchIdeas, SearchResults } from '../search/SearchSections'
 import { useSearch } from '../search/useSearch'
@@ -20,6 +21,7 @@ import BackButton from '../BackButton'
 import ForgetConfirm, { FORGET_TITLE } from '../ForgetConfirm'
 import Sheet from '../Sheet'
 import AgentMessage from './AgentMessage'
+import AskMochiRow from './AskMochiRow'
 import DiscoverSection from './DiscoverSection'
 import Mascot from './Mascot'
 import { SparkleIcon } from './SmartBar'
@@ -64,6 +66,8 @@ export default function AssistantPanel({ push, vertical, depth = 1 }) {
   const [chipRound, setChipRound] = useState(0)
   const rootRef = useRef(null)
   const inputRef = useRef(null)
+  const bodyRef = useRef(null)
+  const askHintId = useId()
   const timers = useRef([])
   // Preguntas en fila: la siguiente sale cuando la respuesta anterior ya está en pantalla.
   const askQueue = useRef(Promise.resolve())
@@ -242,11 +246,21 @@ export default function AssistantPanel({ push, vertical, depth = 1 }) {
 
   // En orden: la pregunta N+1 sale cuando la respuesta N ya está en pantalla, así sus shown_topics incluyen
   // lo que N sugirió.
-  const send = (text, askVertical) => {
+  const send = (text, askVertical, { typed = false } = {}) => {
     const clean = text.trim()
     if (!clean || forgetting) return
-    addMessage({ from: 'user', text: clean })
+    addMessage({ from: 'user', text: clean, typed })
     ask(() => answer(clean, askVertical))
+  }
+
+  /** Lo escrito en el buscador, como pregunta a Mochi: el campo se vacía y vuelve su tarjeta, arriba, con la respuesta. */
+  const askTyped = () => {
+    const text = search.query.trim()
+    if (!text || forgetting) return
+    search.setQuery('')
+    send(text, undefined, { typed: true })
+    bodyRef.current?.scrollTo({ top: 0 })
+    inputRef.current?.blur() // en el celular el teclado tapaba la respuesta
   }
 
   /**
@@ -448,12 +462,18 @@ export default function AssistantPanel({ push, vertical, depth = 1 }) {
             ref={inputRef}
             type="search"
             aria-label="Buscar en Rappi"
-            placeholder="What do you want today?"
+            placeholder={`Busca o pregúntale a ${AGENT_NAME}`}
             value={search.query}
             maxLength={500}
             onChange={(e) => search.setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && search.logSearch(search.query)}
-            onBlur={() => search.logSearch(search.query)}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter') return
+              if (looksLikeQuestion(search.query)) askTyped()
+              else search.logSearch(search.query)
+            }}
+            aria-describedby={search.hasQuery && looksLikeQuestion(search.query) ? askHintId : undefined}
+            // Pasar con Tab a «Pregúntale a Mochi» no es terminar una búsqueda
+            onBlur={(e) => e.relatedTarget?.classList.contains('agent-ask-row') || search.logSearch(search.query)}
           />
           {search.hasQuery && (
             <button type="button" className="search-clear" aria-label="Borrar" onClick={() => search.setQuery('')}>
@@ -463,9 +483,15 @@ export default function AssistantPanel({ push, vertical, depth = 1 }) {
         </label>
       </header>
 
-      <div className="agent-search-body">
+      <div ref={bodyRef} className="agent-search-body">
         {search.hasQuery ? (
           <div className="agent-block">
+            <AskMochiRow
+              query={search.query.trim()}
+              question={looksLikeQuestion(search.query)}
+              hintId={askHintId}
+              onAsk={askTyped}
+            />
             <SearchResults
               query={search.query}
               data={search.data}
@@ -513,7 +539,11 @@ export default function AssistantPanel({ push, vertical, depth = 1 }) {
 
               {taste && <ProfileCard profile={taste.profile} />}
 
-              {showAsked && <p className="agent-asked">Elegiste «{asked.text}»</p>}
+              {showAsked && (
+                <p className="agent-asked">
+                  {asked.typed ? 'Preguntaste' : 'Elegiste'} «{asked.text}»
+                </p>
+              )}
               {current && (
                 <AgentMessage
                   key={current.id}
@@ -526,22 +556,25 @@ export default function AssistantPanel({ push, vertical, depth = 1 }) {
                 />
               )}
 
-              <p className="agent-picks-label">Toca y te armo algo 👇</p>
+              {/* Bajo una respuesta de salud no van las ideas de siempre («Arma un carrete») */}
+              {!current?.health && <p className="agent-picks-label">Toca y te armo algo 👇</p>}
               {/* Clave con prefijo: un número solo podría coincidir con la del mensaje de arriba (su id) y React lo duplicaría. */}
-              <div key={`chips-${chipRound}`} className="assistant-chips agent-picks">
-                {CHIPS.map((chip, i) => (
-                  <button
-                    key={chip}
-                    type="button"
-                    className="assistant-chip"
-                    disabled={forgetting}
-                    style={{ animationDelay: `${120 + i * 55}ms` }}
-                    onClick={() => send(chip.replace(/^\S+\s/, ''))}
-                  >
-                    {chip}
-                  </button>
-                ))}
-              </div>
+              {!current?.health && (
+                <div key={`chips-${chipRound}`} className="assistant-chips agent-picks">
+                  {CHIPS.map((chip, i) => (
+                    <button
+                      key={chip}
+                      type="button"
+                      className="assistant-chip"
+                      disabled={forgetting}
+                      style={{ animationDelay: `${120 + i * 55}ms` }}
+                      onClick={() => send(chip.replace(/^\S+\s/, ''))}
+                    >
+                      {chip}
+                    </button>
+                  ))}
+                </div>
+              )}
             </section>
 
             {taste && (

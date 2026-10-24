@@ -223,6 +223,8 @@ age_restricted = true
 # helados), «terremoto» y «michelada» (helados, salsas). Esos los bloquean las guardias de ofertas por el nombre del
 # plato, y la vaina y la algarrobina de un menú quedan como alcohol por su sección.
 keywords = ["cóctel", "coctel", "cocktail", "cocktelería", "hard seltzer", "seltzer", "mojito", "margarita", "spritz", "ready to drink", "tom collins", "daiquiri", "daikiri", "caipiriña", "caipirinha", "caipiroska", "bloody mary", "cuba libre", "kir royal", "ruso blanco", "ruso negro", "cosmopolitan", "clavo oxidado"]
+# «qué trago me recomiendas»: pide alcohol por su nombre (se busca, con +18); sin esto era la ayuda.
+query_keywords = ["trago", "tragos"]
 # Score es una marca de energéticas: «Score Mojito» no es un mojito.
 avoid = ["score"]
 
@@ -302,7 +304,7 @@ parent = "snacks"
 name = "Snacks salados"
 emoji = "🥨"
 keywords = ["papas fritas", "chips", "ramitas", "suflitos", "doritos", "pringles", "lays", "lay's", "nachos", "cheetos", "cabritas", "pochoclos", "popcorn", "pretzel", "tortilla chips", "snack", "maní salado", "papas lisas", "papas corrugadas"]
-query_keywords = ["para picar", "algo para picar"]
+query_keywords = ["para picar", "algo para picar", "algo salado"]
 
 [[concept]]
 id = "frutos-secos"
@@ -350,7 +352,7 @@ id = "golosinas"
 parent = "dulces"
 name = "Golosinas"
 emoji = "🍬"
-keywords = ["gomitas", "gomita", "caramelo", "chicle", "calugas", "marshmallow", "malvavisco", "chupete dulce", "mentitas", "dulces típicos", "turrón", "mazapán", "calugón"]
+keywords = ["gomitas", "gomita", "caramelo", "chicle", "calugas", "marshmallow", "malvavisco", "chupete dulce", "mentitas", "pastillas de menta", "pastilla de menta", "dulces típicos", "turrón", "mazapán", "calugón"]
 
 [[concept]]
 id = "helados"
@@ -788,6 +790,8 @@ parent = "hogar"
 name = "Limpieza"
 emoji = "🧽"
 keywords = ["detergente", "lavaloza", "cloro", "limpiador", "desinfectante", "suavizante", "quitamanchas", "esponja", "lysol", "bolsas de basura", "insecticida", "limpiavidrios", "virutex", "cera para piso", "lavalozas", "cif", "omo", "ariel"]
+# «cosas para limpiar la casa» traía bombitas de defumación y un desinfectante de teléfono.
+query_keywords = ["limpiar la casa", "para limpiar", "hacer aseo", "productos de aseo", "productos de limpieza"]
 
 [[concept]]
 id = "papeles-desechables"
@@ -1068,6 +1072,8 @@ name = "Asado"
 emoji = "🔥"
 keywords = ["asado", "parrilla", "parrillada", "quincho", "costillar al palo"]
 concepts = ["carnes", "carbon", "cerveza", "vino", "panaderia", "verduras", "salsas", "gaseosas"]
+# «asado de 6»: cuánto calcular por persona (Mochi lo dice con la cantidad de personas). La regla de la casa en Chile.
+portion = { grams = 350, of = "carne" }
 
 [[occasion]]
 id = "carrete"
@@ -1080,7 +1086,7 @@ concepts = ["cerveza", "pisco", "ron", "vodka", "gaseosas", "hielo", "snacks-sal
 id = "regalo"
 name = "Regalo"
 emoji = "🎁"
-keywords = ["regalo", "regalar", "sorpresa", "aniversario", "día de la madre", "san valentín", "detalle para"]
+keywords = ["regalo", "regalar", "regalarle", "regalarles", "sorpresa", "aniversario", "día de la madre", "san valentín", "detalle para"]
 concepts = ["flores-regalos", "chocolates", "fragancias", "vino", "espumante", "joyeria", "juguetes-infantiles"]
 vertical = "chocolateria"  # por masa mínima ganaba Licores: el piso lo ponían los juguetes y joyas del Mall
 
@@ -1088,7 +1094,7 @@ vertical = "chocolateria"  # por masa mínima ganaba Licores: el piso lo ponían
 id = "hambre"
 name = "Hambre ya"
 emoji = "🍽️"
-keywords = ["hambre", "tengo hambre", "almorzar", "cenar", "comida rápida", "algo rico", "delivery de comida", "para comer", "no quiero cocinar", "sin ganas de cocinar", "flojera de cocinar"]
+keywords = ["hambre", "tengo hambre", "que pido", "que como hoy", "que ceno", "almorzar", "cenar", "comida rápida", "algo rico", "delivery de comida", "para comer", "no quiero cocinar", "sin ganas de cocinar", "flojera de cocinar"]
 concepts = ["pizza", "hamburguesa", "sushi", "pollo", "pollo-preparado", "sandwiches", "asiatica", "empanadas", "platos-listos"]
 vertical = "restaurantes"  # "hambre ya": pedir comida lista, no comprar una pizza congelada
 
@@ -1178,6 +1184,27 @@ emoji = "🧸"
 keywords = ["mi nieto", "mi nieta", "mi sobrino", "mi sobrina", "regalo para un niño", "regalo para una niña", "regalo para niño", "regalo para niña", "para un niño", "para una niña", "cabros chicos", "chiquillos"]
 concepts = ["juguetes-infantiles", "juegos-mesa", "golosinas", "chocolates"]
 vertical = "mall"
+
+[[occasion]]
+id = "picnic"
+name = "Picnic"
+emoji = "🧺"
+# «qué compro para un picnic» traía una manta, un portacolación de bebé y chocolates «Picnic».
+# «picnic» suelto no: en el buscador son los chocolates Costa Picnic.
+keywords = ["un picnic", "de picnic", "al picnic", "dia de campo", "día de campo", "paseo al parque"]
+concepts = ["panaderia", "fiambres", "quesos", "frutas", "jugos", "snacks-salados", "galletas"]
+vertical = "supermercado"
+plan = false  # no es (todavía) un plan de la Home; la búsqueda y Mochi sí la entienden
+
+[[occasion]]
+id = "frio"
+name = "Para el frío"
+emoji = "🧣"
+# «algo calentito que hace frío» traía una compresa de frío y calor y ampolletas. Frases, no «calentito» suelto:
+# «algo calentito para la once» es la once.
+keywords = ["hace frio", "hace frío", "para el frio", "para el frío", "dia de lluvia", "día de lluvia", "esta lloviendo", "está lloviendo"]
+concepts = ["sopas", "te", "cafe"]
+plan = false
 
 # Servicios de Rappi sin catálogo de productos. El agente los reconoce por sus keywords (si la consulta no nombra un
 # producto), lleva a su pantalla del prototipo (`route`) y, si tiene ganchos, sugiere UN producto del catálogo que lo

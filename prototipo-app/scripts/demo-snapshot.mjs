@@ -13,7 +13,7 @@
 // scripts/demo-snapshot-meta.py con el Python de rappi-ia.
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
@@ -37,11 +37,17 @@ const QUERIES = [
   ...['queso', 'galletas', 'yogurt', 'fruta', 'detergente', 'audífonos', 'cargador', 'alfajores', 'bombones'],
   ...['tacos', 'ramen', 'sándwich', 'comida de perro', 'pasta', 'arroz', 'cafe molido', 'jugo', 'torta'],
 ]
-// Los chips del buscador con Mochi (AssistantPanel) y preguntas comunes.
+// Las preguntas en texto libre del set de rappi-ia (una por línea; # comenta): las que se le escriben a Mochi.
+const FREE_QUESTIONS = readFileSync(`${ROOT}../rappi-ia/src/rappi_ia/eval/frases_usuarios/preguntas-libres.txt`, 'utf8')
+  .split('\n')
+  .map((line) => line.trim())
+  .filter((line) => line && !line.startsWith('#'))
+// Los chips del buscador con Mochi (AssistantPanel), preguntas comunes y las preguntas en texto libre.
 const ASKS = [
   ...['🍔 ¿Qué almuerzo hoy?', '🍻 Arma un carrete', '🔥 Ofertas de hoy', '🍫 Algo dulce', '🎁 Un regalo'],
   ...['Quiero sushi', 'Algo para el desayuno', 'Tengo hambre', 'Algo para la once', 'Quiero café', 'Pizza'],
   ...['Un regalo para mi mamá', 'Algo para el asado', 'Necesito pañales', 'Comida para mi perro'],
+  ...FREE_QUESTIONS,
 ]
 // Búsquedas sin resultado que la oferta `sin_resultado` sabe responder (se graban las que respondan).
 const NO_RESULT = ['sushi de chocolate', 'helado de palta', 'pizza vegana sin gluten', 'xyzzy']

@@ -38,6 +38,8 @@ class Occasion:
     keywords: tuple[str, ...]
     concepts: tuple[str, ...]
     vertical: str | None = None  # vertical fijo ("hambre ya" = pedir a un restaurante); si no, el del surtido
+    portion: tuple[int, str] | None = None  # gramos por persona y de qué («asado de 6»: 350 g de carne cada uno)
+    plan: bool = True  # si es un plan de la Home (un kit); las que solo sirven para entender preguntas, no
 
 
 @dataclass(frozen=True)
@@ -106,7 +108,16 @@ def load_taxonomy(path: Path = DATA_DIR / "taxonomy.toml") -> Taxonomy:
         for c in raw["concept"]
     }
     occasions = {
-        o["id"]: Occasion(o["id"], o["name"], o["emoji"], tuple(o["keywords"]), tuple(o["concepts"]), o.get("vertical"))
+        o["id"]: Occasion(
+            o["id"],
+            o["name"],
+            o["emoji"],
+            tuple(o["keywords"]),
+            tuple(o["concepts"]),
+            o.get("vertical"),
+            (o["portion"]["grams"], o["portion"]["of"]) if "portion" in o else None,
+            o.get("plan", True),
+        )
         for o in raw.get("occasion", ())
     }
     services = {

@@ -1,5 +1,5 @@
 // Revisa en un Chrome real que la app del MVP responda como debe (lo corre scripts/mvp-check.sh con `make mvp-check`).
-// Uso: node scripts/mvp-check.mjs --app http://localhost:5184 [--api http://localhost:8010] [--shop | --kit | --home | --combo | --expect-offline | --panel http://localhost:5185]
+// Uso: node scripts/mvp-check.mjs --app http://localhost:5184 [--api http://localhost:8010] [--shop | --kit | --ask | --home | --combo | --expect-offline | --panel http://localhost:5185]
 //   sin banderas: la app abre en la Home conectada, con la barra «Busca o pídele ideas a <agente>» y el aviso de privacidad
 //     de la primera visita (que se cierra con «Entendido»);
 //   con --shop: Home → vertical Grocery → primera tienda → agregar un producto → carrito → pagar, y la API recibe el
@@ -7,6 +7,10 @@
 //   con --kit: busca «cerveza» en el buscador con Mochi (ve la búsqueda agrupada por vertical), vuelve a la Home, elige
 //     la ocasión «Carrete», agrega el kit que arma Mochi (`plan`) y paga; scripts/mvp-check.sh verifica después en la base
 //     de prueba que el pedido tiene líneas sembradas y al menos una aceptación `agent-plan`;
+//   con --ask: preguntarle a Mochi en texto libre. En el buscador con Mochi escribe «¿qué es un completo?»: la primera fila
+//     es «Pregúntale a <agente>», resaltada; Enter se lo pregunta y la tarjeta de Mochi muestra «Preguntaste «…»», la
+//     ficha del plato y el completo del catálogo de prueba. Después «mi hijo tiene fiebre, ¿qué le doy?»: Mochi no da
+//     consejo médico, nombra al químico farmacéutico y ofrece «Ir a Farmacia», sin productos;
 //   con --home: Home dinámica. Una persona nueva ve los 6 accesos en el orden fijo, con Loyalty y Benefits Pro al final y
 //     sin el texto «Ordenadas según lo que más usas»; toca «Retail» (Rappi Mall) tres veces, volviendo a la Home cada
 //     vez, espera a que la API acepte los toques (`vertical_open`; al volver a la Home la app los manda y vuelve a pedir
@@ -173,6 +177,48 @@ async function checkKit(page) {
     throw new Error('la app no registró la aceptación del kit (POST /events con suggestion_accepted)')
   })
   return `buscó «cerveza» (${found} grupos), pidió el kit «Carrete», lo agregó y la API aceptó el pedido`
+}
+
+/**
+ * Preguntarle a Mochi en texto libre desde el buscador: la ficha de un plato con lo que hay, y una pregunta de salud que
+ * no responde con remedios. Los textos son los de la app y la API (AskMochiRow, agent/glosario.toml, rappi_agent.py).
+ */
+async function checkAsk(page) {
+  await checkOnline(page)
+  await step(page, `abrir el buscador con ${AGENT_NAME}`, () => page.locator('.smart-bar').first().click())
+  const panel = page.getByRole('dialog', { name: SEARCH_DIALOG })
+  const field = panel.getByRole('searchbox', { name: 'Buscar en Rappi' })
+  const ask = async (question) => {
+    await step(page, `escribir «${question}»`, () => field.fill(question))
+    const row = panel.getByRole('button', { name: `Pregúntale a ${AGENT_NAME}: «${question}»` })
+    await step(page, `ver «Pregúntale a ${AGENT_NAME}» resaltada`, () =>
+      row.and(panel.locator('.is-question')).waitFor(),
+    )
+    await step(page, 'preguntar con Enter', () => field.press('Enter'))
+    await step(page, `ver «Preguntaste «${question}»»`, () => panel.getByText(`Preguntaste «${question}»`).waitFor())
+  }
+  await ask('¿qué es un completo?')
+  await step(page, 'ver la ficha del completo', () =>
+    panel
+      .locator('.agent-msg-bubble')
+      .getByText(/^El completo es el hot dog chileno/)
+      .waitFor(),
+  )
+  await step(page, 'ver el completo del catálogo de prueba', () =>
+    panel
+      .getByText(/^Hot dog completo/)
+      .first()
+      .waitFor(),
+  )
+  await ask('mi hijo tiene fiebre, ¿qué le doy?')
+  await step(page, 'ver que no da consejo médico', () =>
+    panel
+      .locator('.agent-msg-bubble')
+      .getByText(/químico farmacéutico/)
+      .waitFor(),
+  )
+  await step(page, 'ver «Ir a Farmacia»', () => panel.getByRole('button', { name: 'Ir a Farmacia' }).waitFor())
+  return 'preguntó «¿qué es un completo?» (ficha y producto) y una duda de salud (sin consejo médico, «Ir a Farmacia»)'
 }
 
 /** Cuánto se espera a que Mochi termine de saludar y responda a un toque. */
@@ -380,6 +426,7 @@ const { values } = parseArgs({
     app: { type: 'string' },
     shop: { type: 'boolean', default: false },
     kit: { type: 'boolean', default: false },
+    ask: { type: 'boolean', default: false },
     home: { type: 'boolean', default: false },
     combo: { type: 'boolean', default: false },
     api: { type: 'string', default: API_DEFAULT },
@@ -394,13 +441,15 @@ const label = values.panel
     ? 'sin API'
     : values.kit
       ? 'kit de Mochi'
-      : values.home
-        ? 'home'
-        : values.combo
-          ? 'combinación'
-          : values.shop
-            ? 'compra'
-            : 'en línea'
+      : values.ask
+        ? 'preguntarle a Mochi'
+        : values.home
+          ? 'home'
+          : values.combo
+            ? 'combinación'
+            : values.shop
+              ? 'compra'
+              : 'en línea'
 
 /** Con MVP_CHECK_ARTIFACTS=<carpeta> (lo usa el CI), una revisión que falla deja la captura de lo que se veía. */
 async function saveFailureScreenshot(page) {
@@ -431,6 +480,7 @@ async function main() {
       home: checkHome,
       combo: checkCombo,
       kit: checkKit,
+      ask: checkAsk,
       shop: checkShop,
     }
     const picked = Object.keys(checks).find((name) => values[name])

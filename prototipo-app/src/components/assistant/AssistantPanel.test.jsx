@@ -633,6 +633,102 @@ describe('sin escribir una pregunta', () => {
   })
 })
 
+describe('preguntarle a Mochi desde el buscador', () => {
+  const QUESTION = '¿qué llevo para un asado de 6?'
+
+  test('el campo invita a preguntar y lo escrito trae primero «Pregúntale a Mochi»', async () => {
+    await renderPanel()
+    const field = screen.getByLabelText('Buscar en Rappi')
+    expect(field.placeholder).toBe('Busca o pregúntale a Mochi')
+    fireEvent.change(field, { target: { value: 'cerveza' } })
+    await runUntilIdle()
+    const row = screen.getByRole('button', { name: 'Pregúntale a Mochi: «cerveza»' })
+    // Antes que los resultados de la búsqueda, y sin resaltar: «cerveza» es un producto.
+    expect(row.compareDocumentPosition(screen.getByRole('heading', { name: 'Licores' }))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    )
+    expect(row.classList.contains('is-question')).toBe(false)
+  })
+
+  test('con un error de tipeo corregido, conviven «Pregúntale a Mochi» y «Mostrando resultados para…»', async () => {
+    stubCatalog({ '/search': fixture('search-grouped-corrected') })
+    await renderPanel()
+    fireEvent.change(screen.getByLabelText('Buscar en Rappi'), { target: { value: 'cervezaaaa' } })
+    await runUntilIdle()
+    const row = screen.getByRole('button', { name: 'Pregúntale a Mochi: «cervezaaaa»' })
+    const notice = screen.getByText(/^Mostrando resultados para «cerveza»/)
+    expect(row.compareDocumentPosition(notice)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+  })
+
+  test('una pregunta va resaltada y Enter se la pregunta a Mochi, no la busca', async () => {
+    api.ask.mockResolvedValueOnce(apiAnswer('Mira estas opciones de asado 🔥 en el súper.'))
+    await renderPanel()
+    const field = screen.getByLabelText('Buscar en Rappi')
+    fireEvent.change(field, { target: { value: QUESTION } })
+    await runUntilIdle()
+    expect(screen.getByRole('button', { name: `Pregúntale a Mochi: «${QUESTION}»` }).classList).toContain('is-question')
+
+    fireEvent.keyDown(field, { key: 'Enter' })
+    await runUntilIdle()
+    expect(api.ask.mock.calls[0][0].message).toBe(QUESTION)
+    expect(field.value).toBe('')
+    expect(screen.getByText(`Preguntaste «${QUESTION}»`)).toBeTruthy()
+    expect(bubbles()).toContain('Mira estas opciones de asado 🔥 en el súper.')
+    expect(tracked('search')).toEqual([]) // es una pregunta a Mochi, no una búsqueda
+  })
+
+  test('la fila resaltada dice que Enter pregunta, también al lector de pantalla; sin resaltar, no', async () => {
+    await renderPanel()
+    const field = screen.getByLabelText('Buscar en Rappi')
+    fireEvent.change(field, { target: { value: QUESTION } })
+    await runUntilIdle()
+    expect(screen.getByText('Enter')).toBeTruthy()
+    expect(document.getElementById(field.getAttribute('aria-describedby')).textContent).toBe(
+      'Enter le pregunta a Mochi',
+    )
+    fireEvent.change(field, { target: { value: 'cerveza' } })
+    await runUntilIdle()
+    expect(screen.queryByText('Enter')).toBeNull()
+    expect(field.getAttribute('aria-describedby')).toBeNull()
+  })
+
+  test('pasar con Tab a la fila no registra la búsqueda', async () => {
+    await renderPanel()
+    const field = screen.getByLabelText('Buscar en Rappi')
+    fireEvent.change(field, { target: { value: QUESTION } })
+    await runUntilIdle()
+    const row = screen.getByRole('button', { name: `Pregúntale a Mochi: «${QUESTION}»` })
+    fireEvent.blur(field, { relatedTarget: row })
+    await runUntilIdle()
+    expect(tracked('search')).toEqual([])
+  })
+
+  test('bajo una respuesta de salud no salen las ideas de siempre («Arma un carrete»)', async () => {
+    api.ask.mockResolvedValueOnce({ ...apiAnswer('No puedo decirte qué remedio tomar…'), intent: { symptom: true } })
+    await renderPanel()
+    const field = screen.getByLabelText('Buscar en Rappi')
+    fireEvent.change(field, { target: { value: 'mi hijo tiene fiebre, ¿qué le doy?' } })
+    await runUntilIdle()
+    fireEvent.keyDown(field, { key: 'Enter' })
+    await runUntilIdle()
+    expect(bubbles()).toContain('No puedo decirte qué remedio tomar…')
+    expect(screen.queryByRole('button', { name: '🍻 Arma un carrete' })).toBeNull()
+  })
+
+  test('tocar «Pregúntale a Mochi» pregunta aunque lo escrito sea un producto', async () => {
+    api.ask.mockResolvedValueOnce(apiAnswer('Mira estas cervezas'))
+    await renderPanel()
+    const field = screen.getByLabelText('Buscar en Rappi')
+    fireEvent.change(field, { target: { value: 'cerveza' } })
+    await runUntilIdle()
+    fireEvent.click(screen.getByRole('button', { name: 'Pregúntale a Mochi: «cerveza»' }))
+    await runUntilIdle()
+    expect(api.ask.mock.calls[0][0].message).toBe('cerveza')
+    expect(screen.getByText('Preguntaste «cerveza»')).toBeTruthy()
+    expect(tracked('search')).toEqual([])
+  })
+})
+
 describe('sin resultados', () => {
   const type = async (text) => {
     fireEvent.change(screen.getByLabelText('Buscar en Rappi'), { target: { value: text } })

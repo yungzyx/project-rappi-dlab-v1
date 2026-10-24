@@ -215,9 +215,13 @@ def plannable_vertical(vertical: str, concept: Concept) -> bool:
 
 def plannable_occasion(occasion: Occasion) -> bool:
     """Si el agente arma el kit de esta ocasión (y la lista en la Home): no las de bebé ni salud, ni una sin concepto
-    que pueda ir en el kit."""
+    que pueda ir en el kit, ni una que solo sirve para entender preguntas (`plan = false`)."""
     concepts = load_taxonomy().concepts
-    return occasion.id not in NOT_PLANNABLE_OCCASIONS and any(is_plannable(concepts[c]) for c in occasion.concepts)
+    return (
+        occasion.plan
+        and occasion.id not in NOT_PLANNABLE_OCCASIONS
+        and any(is_plannable(concepts[c]) for c in occasion.concepts)
+    )
 
 
 def alcohol_in_name(entity_type: str, name: str, concept_id: str | None = None) -> bool:

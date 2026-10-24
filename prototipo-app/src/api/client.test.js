@@ -112,6 +112,11 @@ describe('de la API al prototipo', () => {
     })
   })
 
+  test('«Ir a Farmacia» (una vertical sin pregunta) lleva a su pantalla', () => {
+    const message = toMessage({ text: 'No puedo…', actions: [{ label: 'Ir a Farmacia', vertical: 'farmacia' }] })
+    expect(message.actions).toEqual([{ label: 'Ir a Farmacia', route: ['vertical', { id: 'pharmacy' }] }])
+  })
+
   test('la sugerencia dice de qué vertical viene y a qué pantalla lleva', () => {
     const from = (vertical, prototypeVertical) =>
       toMessage({
