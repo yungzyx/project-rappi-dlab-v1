@@ -98,6 +98,17 @@ describe('guardias (offers/guards.py)', () => {
     expect(offerableProduct({ ...coffee, name: 'Galletas Ronda ginger' }, CONCEPTS)).toBe(true)
   })
 
+  test('un plato sin concepto o con uno de bebida no se ofrece: el backend lee su descripción y la muestra no la tiene', () => {
+    const dish = { ...coffee, entity_type: 'menu_item', vertical: 'restaurantes', concept: 'galletas' }
+    expect(offerableProduct(dish, CONCEPTS)).toBe(true)
+    expect(offerableProduct({ ...dish, concept: null }, CONCEPTS)).toBe(false)
+    expect(offerableProduct({ ...dish, concept: 'cafe' }, CONCEPTS)).toBe(false)
+    expect(offerableProduct({ ...dish, concept: 'concepto-que-ya-no-existe' }, CONCEPTS)).toBe(false)
+    expect(offerableProduct({ ...coffee, concept: null }, CONCEPTS)).toBe(true) // un producto del catálogo, sí
+    expect(offerableProduct({ ...dish, name: 'Absolute Blue' }, CONCEPTS)).toBe(false)
+    expect(offerableProduct({ ...coffee, name: 'Absolute New York delineador' }, CONCEPTS)).toBe(true)
+  })
+
   test('una oferta grabada pierde los productos que no pasan las guardias; sin ninguno, no se ofrece nada', () => {
     const snapshot = snapshotWith({ toTry: { turbo: recordedStep('turbo', [beer, turboSnack]) } })
     const made = offer('vertical_por_probar', state({ orders: [order('restaurantes')] }), {}, snapshot)
