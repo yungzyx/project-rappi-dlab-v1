@@ -38,3 +38,16 @@ corregida pasa las mismas reglas de #129.
 ## Fuera
 - Mochi (`agent/rappi_agent.py`) no corrige todavía: lo trabaja otro chat; `search_products(correct=True)` queda listo.
 - Las keywords de conceptos no entran al vocabulario (casi todas están en el catálogo).
+
+## Cambios durante la implementación (medidos en `rappi_staging`)
+- Se corrige cuando **nada calza todas las palabras** (no solo con «sin resultado»: «heladoo de chocolate» mostraba
+  chocolates), y lo corregido se acepta **solo si calza todas sus palabras** («pasaje … punta arenas» → «masaje …
+  avenas» no). La agrupada sigue la misma regla.
+- Guardas que salieron del barrido de frases y de la revisión de código: no se corrigen palabras con 20 documentos o
+  más en el catálogo, conceptos, números, ocasiones ni lo que le habla al asistente; ni se cambia por una stopword o
+  una palabra de la misma raíz (en vez de la regla de plurales). Mínimo 6 letras para cambiar una letra (5 para una
+  letra doble), dos ediciones desde 9. Muletillas solo al inicio y si queda una consulta corta.
+- `pg_trgm` no va en `init-roles.sh` (es «trusted»: la crea rappi_owner), y su comentario se salta si no es dueño.
+- El vocabulario guarda cómo escribe el catálogo cada palabra (`display`), para el aviso.
+- La evaluación mide la búsqueda agrupada (la de la app) además de la de una vertical, y un producto «es de lo
+  pedido» si su nombre dice lo que se quiso escribir.

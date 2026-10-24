@@ -51,7 +51,7 @@ def catalog(db):
     ("vertical", "query", "corrected", "found"),
     [
         ("supermercado", "nutela", "nutella", "Nutella"),
-        ("turbo", "cuchuflis", "cuchuflies", "Cuchuflíes"),
+        ("turbo", "cuchuflis", "cuchuflíes", "Cuchuflíes"),  # como lo escribe el catálogo
         ("licores", "cervezaaaa", "cerveza", "Cerveza"),
         ("turbo", "eh quiero este una coca", "coca", "Coca-Cola"),
     ],

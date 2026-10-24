@@ -133,8 +133,8 @@ def _ranked(word: str, own_docs: int, candidates: list[tuple[str, int]]) -> list
         if candidate == word or docs < floor:
             continue
         distance = edit_distance(word, candidate)
-        if distance <= limit:
-            scored.append((distance, -docs, candidate))
+        if distance <= limit:  # a igual documentos, la más larga: lo más común es que falte una letra
+            scored.append((distance, -docs, -len(candidate), candidate))
     return [candidate for *_, candidate in sorted(scored)]
 
 

@@ -47,6 +47,7 @@ def test_choose_prefers_the_closest_word_and_then_the_most_common():
     # Dos a una edición: gana la que más documentos tiene.
     assert spelling.choose("heladoo", 0, [("helado", 300), ("helados", 900), ("heladera", 18)]) == "helados"
     assert spelling.choose("bluetoth", 0, [("bluetooh", 17), ("bluetooth", 413)]) == "bluetooth"  # no la errata
+    assert spelling.choose("aspirna", 0, [("aspira", 2), ("aspirina", 2)]) == "aspirina"  # empate: falta una letra
 
 
 def test_choose_needs_a_word_the_vertical_has_ten_times_more():
