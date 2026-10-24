@@ -62,6 +62,16 @@ const inSample = (snapshot, p) =>
 // offers/engine.py (FOOD_VERTICALS y FOOD_GROUPS de `_typical_first`): en las verticales de comida, primero la comida.
 const FOOD_VERTICALS = ['supermercado', 'conveniencia', 'turbo']
 const FOOD_GROUPS = ['bebidas', 'snacks', 'dulces', 'despensa', 'frescos', 'comida']
+const POPULAR_SECTION = 'Lo más pedido' // catalog/restaurants.py: la sección que el menú suma arriba
+
+/** La sección del menú grabado donde está el plato (la suya, no «Lo más pedido»), o null. */
+function sectionOf(snapshot, dish) {
+  const sections = snapshot.catalog?.menus?.[dish.store_id]?.sections ?? []
+  const found = sections.find(
+    (s) => s.name !== POPULAR_SECTION && s.items.some((item) => item.entity_id === dish.entity_id),
+  )
+  return found?.name ?? null
+}
 
 /**
  * Un producto de la muestra para un pedido de esa vertical: el primero con concepto que el agente puede ofrecer, de un
@@ -75,7 +85,7 @@ function sampleOf(snapshot, vertical, used, prefer = []) {
   const ofVertical = snapshot.pool.filter((p) => p.vertical === vertical && p.concept && p.store_id)
   const fresh = ofVertical.filter((p) => !used.has(p.concept))
   const rank = (p) =>
-    (featuredProduct(p, featured) ? 0 : 2) +
+    (featuredProduct(p, featured, p.entity_type === 'menu_item' ? sectionOf(snapshot, p) : null) ? 0 : 2) +
     (FOOD_VERTICALS.includes(vertical) && !FOOD_GROUPS.includes(concepts[p.concept]?.group) ? 1 : 0)
   const good = fresh.filter((p) => offerableProduct(p, concepts)).sort((a, b) => rank(a) - rank(b))
   const shown = good.filter((p) => inSample(snapshot, p))

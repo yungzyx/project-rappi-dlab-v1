@@ -463,11 +463,12 @@ def _top_row(conn: Connection, user_id: str, current: str | None, taken: set[str
     las guardias de las ofertas y las reglas de lo destacado, con los platos de su ciudad
     (`offers.engine.most_ordered`). La fila no tiene concepto; su `basis` dice la fuente."""
     population = config.MOTOR_POBLACION
+    city = person_city(conn, user_id)
     for score in next_verticals(conn, user_id, population):
         vertical = score.vertical
         if not offerable_vertical(vertical) or vertical == current or vertical in taken:
             continue
-        if products := most_ordered(conn, vertical, population, person_city(conn, user_id)):
+        if products := most_ordered(conn, vertical, population, city):
             label = VERTICAL_LABELS.get(vertical, vertical)
             return {
                 "kind": "lo_mas_pedido",

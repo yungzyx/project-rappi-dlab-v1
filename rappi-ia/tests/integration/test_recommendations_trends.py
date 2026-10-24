@@ -148,13 +148,16 @@ def new_dish(db, item_id, name, store_id, section, price, concept):
 
 
 def test_the_most_ordered_dishes_are_main_dishes_with_photo_from_the_city_one_per_concept(client, db):
-    # El chicle de la caja de una pizzería (concepto pizza por la cocina del local), una pizza de otra ciudad, el roll
-    # sin foto y el tiramisú de la sección de postres no son «lo más pedido en restaurantes»; tres pizzas tampoco.
+    # El chicle de $650 de la caja de una pizzería (concepto pizza por la cocina del local), una pizza de otra ciudad,
+    # la bebida de la sección «Bebidas», el roll sin foto y el tiramisú (postres) no son «lo más pedido en
+    # restaurantes»; tres pizzas tampoco.
     new_dish(db, 98101, "Chicle refrescante (prueba)", 9801, "Para llevar", 650, "pizza")
     db.execute("""INSERT INTO stores (store_id, name, store_type, city, path)
                   VALUES (9899, 'Pizzería de prueba - Rancagua', 'restaurant', 'Rancagua', '/tiendas/9899')""")
     new_dish(db, 98102, "Pizza napolitana familiar (prueba)", 9899, "Pizzas", 9990, "pizza")
-    dish_trends(db, ["98101", "98102", "98001", "98002", "98005", "98004", "98006", "98007"])
+    # Cuesta como un plato y su concepto es el de la cocina del local: solo la sección dice que es una bebida.
+    new_dish(db, 98103, "Bebida cola 1,5 L (prueba)", 9801, "Bebidas", 3990, "pizza")
+    dish_trends(db, ["98101", "98102", "98103", "98001", "98002", "98005", "98004", "98006", "98007"])
 
     rows = for_you(client)
 

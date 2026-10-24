@@ -29,6 +29,7 @@ def rules_toml(price="3000", out="[]", sections="['x']", names="['y']") -> str:
         (rules_toml(out="['no-existe']"), "no-existe"),
         (rules_toml(sections="[]"), "secciones"),
         (rules_toml(names="['']"), "nombres"),
+        (rules_toml(names="['costo de envio']"), "una sola palabra"),
     ],
 )
 def test_bad_rules_are_rejected(tmp_path, content, message):
@@ -39,34 +40,35 @@ def test_bad_rules_are_rejected(tmp_path, content, message):
 
 
 @pytest.mark.parametrize(
-    "name, section",
+    "name, section, price",
     [
-        ("Bigtime refrescante celeste", "Para llevar"),  # el chicle de una pizzería, en su sección de caja
-        ("Choclo", "Agregados"),
-        ("Papas Trufadas Grandes", "Appetizer"),
-        ("Coca-Cola 350 cc", "Bebidas y jugos"),
-        ("Salsa de ajo", "Pizzas"),  # el nombre lo dice aunque la sección sea de platos
-        ("BOLSA", None),
-        ("Cubiertos desechables", "Otros"),
-        ("Extra queso", "Pizzas"),
+        ("Choclo", "Agregados", 1195),  # el agregado de una pizzería, con el concepto de su cocina
+        ("Coca-Cola 350 cc", "Bebidas y jugos", 2000),
+        ("Coca-Cola 1.5 L", "Bebidas", 3990),  # la sección lo dice aunque cueste como un plato
+        ("Salsa de ajo", "Pizzas", 600),  # el nombre lo dice y cuesta poco
+        ("BOLSA", None, None),  # sin precio no se sabe: relleno
+        ("Cubiertos desechables", "Otros", 100),
+        ("Extra queso", "Pizzas", 1500),
     ],
 )
-def test_side_dishes(name, section):
-    assert side_dish(name, section)
+def test_side_dishes(name, section, price):
+    assert side_dish(name, section, price)
 
 
 @pytest.mark.parametrize(
-    "name, section",
+    "name, section, price",
     [
-        ("Tropical", "Pizzas"),
-        ("Pizza con salsa pomodoro", "Pizzas"),  # «salsa» no es la primera palabra
-        ("Promo pizza + bebida", "Pizzas y bebidas"),  # la sección no empieza con «bebidas»
-        ("Rollo Sake Especial", "Panko Rolls"),
-        ("Empanada de pino", None),
+        ("Tropical", "Pizzas", 11990),
+        ("Pizza con salsa pomodoro", "Pizzas", 9990),  # «salsa» no es la primera palabra
+        ("Promo pizza + bebida", "Pizzas y bebidas", 12990),  # la sección no empieza con «bebidas»
+        ("Extra Pepperoni Familiar", "Pizzas", 9500),  # una pizza de Little Caesars, no un agregado
+        ("Ceviche mixto", "Entradas y ceviches", 8990),  # las entradas no son relleno
+        ("Bigtime refrescante celeste", "Para llevar", 650),  # no es relleno, pero tampoco plato principal (precio)
+        ("Empanada de pino", None, 3500),
     ],
 )
-def test_main_dishes_are_not_side_dishes(name, section):
-    assert not side_dish(name, section)
+def test_main_dishes_are_not_side_dishes(name, section, price):
+    assert not side_dish(name, section, price)
 
 
 def test_a_main_dish_costs_at_least_the_minimum_and_is_not_a_dessert():

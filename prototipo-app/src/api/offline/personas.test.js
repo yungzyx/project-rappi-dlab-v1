@@ -112,7 +112,7 @@ test('las personas del panel piden lo que lo destacado mostraría: un plato prin
     product(id, { name, concept, price_value: price, vertical: 'restaurantes', entity_type: 'menu_item', img })
   const pool = [
     dish(60, 'Tomate cherry', 'pizza', 1300), // un agregado de la pizzería, con el concepto de su cocina
-    dish(61, 'Salsa de ajo', 'pizza', 3500),
+    dish(61, 'Bebida cola 1,5 L', 'pizza', 3990), // cuesta como un plato: la sección del menú dice que es bebida
     dish(62, 'Brownie', 'postres', 4300),
     dish(63, 'Pizza napolitana', 'pizza', 9990),
     product(64, { name: 'Vaso de cotillón', concept: 'juguetes', vertical: 'turbo', img }),
@@ -124,7 +124,14 @@ test('las personas del panel piden lo que lo destacado mostraría: un plato prin
     pizza: { name: 'Pizza', emoji: '🍕', group: 'comida', offerable: true },
     postres: { name: 'Postres', emoji: '🍰', group: 'comida', offerable: true },
   }
-  const withPool = { ...snapshot, meta: { ...snapshot.meta, concepts }, pool }
+  const menu = {
+    sections: [
+      { name: 'Lo más pedido', items: [pool[1]] },
+      { name: 'Bebidas', items: [pool[1]] },
+      { name: 'Pizzas', items: [pool[0], pool[2], pool[3]] },
+    ],
+  }
+  const withPool = { ...snapshot, meta: { ...snapshot.meta, concepts }, pool, catalog: { menus: { 1: menu } } }
   const history = personaHistory(
     withPool,
     personas(withPool).find((p) => p.id === 'rest-turbo'),

@@ -44,6 +44,8 @@ def load_rules(path: Path = DATA_PATH) -> Rules:
         words = side.get(key)
         if not words or not all(isinstance(w, str) and normalize(w) for w in words):
             raise ValueError(f"destacado.toml: «{key}» va como una lista de textos no vacíos")
+    if any(len(tokens(n)) > 1 for n in side["nombres"]):
+        raise ValueError("destacado.toml: cada uno de «nombres» es una sola palabra (se compara la primera del plato)")
     return Rules(
         float(price),
         frozenset(main.get("conceptos_fuera", ())),
@@ -52,12 +54,13 @@ def load_rules(path: Path = DATA_PATH) -> Rules:
     )
 
 
-def side_dish(name: str, section: str | None) -> bool:
-    """Un acompañamiento o relleno: el nombre empieza con una palabra de relleno («Salsa de ajo», «Bolsa») o la sección
-    del menú empieza con una de relleno («Para llevar», «Bebidas y jugos»)."""
+def side_dish(name: str, section: str | None, price: float | None) -> bool:
+    """Un acompañamiento o relleno: la sección del menú empieza con una de relleno («Agregados», «Bebidas y jugos») o el
+    nombre empieza con una palabra de relleno y cuesta menos que un plato principal («Salsa de ajo» de $600; sin precio
+    también: no se sabe)."""
     rules = load_rules()
     words = tokens(name)
-    if words and words[0] in rules.side_names:
+    if words and words[0] in rules.side_names and (price is None or price < rules.min_main_price):
         return True
     heading = tokens(section or "")
     return any(heading[: len(start)] == list(start) for start in rules.side_sections)
@@ -97,7 +100,7 @@ def featured(conn: Connection, products: list[dict], city: str, main: bool = Fal
             continue
         if product.get("entity_type") == "menu_item":
             section, comuna = facts.get(product["entity_id"], (None, ""))
-            if side_dish(product["name"], section) or comuna not in places:
+            if side_dish(product["name"], section, product.get("price_value")) or comuna not in places:
                 continue
             if main and not main_dish(product.get("price_value"), product.get("concept")):
                 continue

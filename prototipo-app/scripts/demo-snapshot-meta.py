@@ -91,7 +91,7 @@ print(
             "featured": {
                 "min_main_price": featured.min_main_price,
                 "not_main": sorted(featured.not_main),
-                "side_names": sorted(featured.side_names),
+                "side_sections": [list(start) for start in featured.side_sections],
             },
             "occasion_keywords": [phrase(k) for o in taxonomy.occasions.values() for k in o.keywords],
             "filler_words": sorted(FILLER_WORDS),

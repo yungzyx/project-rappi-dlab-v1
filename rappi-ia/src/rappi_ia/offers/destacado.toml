@@ -13,14 +13,14 @@ conceptos_fuera = ["cafe", "helados", "pasteleria", "postres"]
 [relleno]
 # Platos de acompañamiento o de relleno, que lo destacado nunca muestra (tampoco en un kit). Se comparan sin tildes ni
 # mayúsculas, palabra por palabra: la sección del menú empieza con una de `secciones` («Bebidas y jugos» sí, «Pizzas y
-# bebidas» no) o el nombre del plato empieza con una de `nombres` («Salsa de ajo» sí, «Pizza con salsa» no).
+# bebidas» no), o el nombre del plato empieza con una de `nombres` y cuesta menos que `precio_minimo` («Salsa de ajo» de
+# $600 sí; «Extra Pepperoni Familiar» de $9.500, una pizza, no). Las entradas no son relleno: en una cevichería o un
+# local japonés son lo que más se pide (ceviches, gyozas, nigiris).
 secciones = [
-  "para llevar", "agregados", "agregado", "extras", "extra", "adicionales", "adicional", "acompanamientos",
-  "acompanamiento", "salsas", "salsa", "aderezos", "bebidas", "bebida", "bebestibles", "jugos", "desechables",
-  "cubiertos", "toppings", "complementos", "entradas", "appetizer", "appetizers",
+  "agregados", "agregado", "extras", "extra", "adicionales", "adicional", "acompanamientos", "acompanamiento",
+  "salsas", "salsa", "aderezos", "bebidas", "bebida", "bebestibles", "desechables", "cubiertos", "toppings",
 ]
 nombres = [
   "salsa", "salsas", "aderezo", "aderezos", "bolsa", "bolsas", "chicle", "chicles", "cubierto", "cubiertos",
-  "servilleta", "servilletas", "palillos", "propina", "servicio", "envase", "envases", "extra", "agregado",
-  "adicional",
+  "servilleta", "servilletas", "propina", "extra", "agregado", "adicional",
 ]
