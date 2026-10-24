@@ -29,22 +29,29 @@ const ALCOHOL_WORDS = [
   ...['tom collins', 'bloody mary', 'cuba libre', 'kir royal', 'ruso blanco', 'ruso negro', 'cosmopolitan'],
   ...['clavo oxidado'],
 ]
+const MENU_ALCOHOL_WORDS = ['absolut', 'absolute'] // solo en un menú: en el catálogo hay maquillaje «Absolute New York»
 const BABY_WORDS = ['bebe', 'guagua']
 const wordsIn = (list) => new RegExp(`\\b(?:${list.join('|')})(?:s|es)?\\b`)
 const ALCOHOL_NAME = wordsIn(ALCOHOL_WORDS)
+const MENU_ALCOHOL_NAME = wordsIn(MENU_ALCOHOL_WORDS)
 const BABY_NAME = wordsIn(BABY_WORDS)
 
 /**
  * Si el agente puede proponer este producto por su cuenta: ni +18, ni de Farmacia o Licores, ni de un concepto que no
  * ofrece (alcohol, salud, bebé, sensibles: `meta.concepts[…].offerable`), ni con un nombre que dice alcohol o bebé.
+ * Un plato sin concepto o con uno de bebida, tampoco: el backend lee si su descripción nombra alcohol
+ * (`alcohol_in_description`) y la muestra no trae descripciones (la API no las da).
  */
 export function offerableProduct(product, concepts) {
   if (!product || product.age_restricted) return false
   if (OFFER_BLOCKED_VERTICALS.includes(product.vertical)) return false
   if (product.concept && concepts[product.concept] && !concepts[product.concept].offerable) return false
+  const group = product.concept && concepts[product.concept]?.group
+  if (product.entity_type === 'menu_item' && (!group || group === 'bebidas')) return false // sin concepto conocido
   const name = normalize(product.name)
   if (ALCOHOL_NAME.test(name)) return false
-  return !(product.entity_type !== 'menu_item' && BABY_NAME.test(name))
+  if (product.entity_type === 'menu_item') return !MENU_ALCOHOL_NAME.test(name)
+  return !BABY_NAME.test(name)
 }
 
 const TO_TRY_TEXT = 'Aún no pides en {vertical}: mira estas ofertas.'

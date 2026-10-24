@@ -36,6 +36,9 @@ REQUEST_WORDS = {
     "unos",
     "unas",
 }
+# Muletillas de quien escribe como habla («eh quiero este una coca»): solo las salta la corrección de errores de tipeo
+# (retrieval/spelling.py), que corre cuando la búsqueda queda «sin resultado». «este» y «pues» también son palabras.
+MUTTER_WORDS = {"eh", "ehh", "ehm", "em", "emm", "mm", "mmm", "este", "oye", "po", "pos", "pues", "osea"}
 FILLER_WORDS = frozenset(GREETING_WORDS | THANKS_WORDS | {LEGACY_ASSISTANT_NAME} | REQUEST_WORDS)
 
 

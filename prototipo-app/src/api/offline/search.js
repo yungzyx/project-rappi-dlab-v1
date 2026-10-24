@@ -242,11 +242,23 @@ export function search(snapshot, query) {
       0,
       limit ?? VERTICAL_LIMIT,
     )
-    return { vertical, products, unmet: !products.length, unmet_reason: products.length ? null : UNMET_REASON }
+    return {
+      vertical,
+      products,
+      unmet: !products.length,
+      unmet_reason: products.length ? null : UNMET_REASON,
+      corrected_query: null,
+    }
   }
   if (recorded && !current) return recorded
   const groups = groupsOf(snapshot, matchProducts(snapshot, q), current, limit ?? GROUPED_LIMIT)
-  return { groups, query: q, unmet: !groups.length, unmet_reason: groups.length ? null : UNMET_REASON }
+  return {
+    groups,
+    query: q,
+    unmet: !groups.length,
+    unmet_reason: groups.length ? null : UNMET_REASON,
+    corrected_query: null,
+  }
 }
 
 /** El concepto más repetido entre los productos. */

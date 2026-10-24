@@ -51,7 +51,8 @@ export function PopularStores({ onOpen }) {
  * Resultados de una búsqueda escrita (`data` de `useSearch`): un grupo por vertical con su nombre, o el aviso de que no
  * hay, o «Sin conexión». Un producto se abre en su tienda (`onOpenProduct`). Mientras carga se ven los resultados
  * anteriores. Con `onOpenVertical` (solo el buscador con el agente), sin resultados el agente no deja un callejón sin salida:
- * ofrece la vertical que tiene lo buscado o invita a buscar con otras palabras (`onTryAnother`).
+ * ofrece la vertical que tiene lo buscado o invita a buscar con otras palabras (`onTryAnother`). Si la API corrigió un
+ * error de tipeo, dice qué buscó y, con `onSearchExact`, ofrece buscar lo escrito tal cual.
  */
 export function SearchResults({
   query,
@@ -62,6 +63,7 @@ export function SearchResults({
   onOpenProduct,
   onOpenVertical,
   onTryAnother,
+  onSearchExact,
 }) {
   if (error) return <OfflineNotice onRetry={onRetry} />
   if (!data)
@@ -82,6 +84,16 @@ export function SearchResults({
 
   return (
     <>
+      {data.correctedQuery && (
+        <p className="search-corrected" role="status">
+          Mostrando resultados para «{data.correctedQuery}».
+          {onSearchExact && (
+            <button type="button" className="search-exact tap" onClick={() => onSearchExact(data.query)}>
+              Buscar «{data.query}» tal cual
+            </button>
+          )}
+        </p>
+      )}
       {data.groups.map((group) => (
         <ResultGroup key={`${data.query}|${group.vertical}`} group={group} onOpenProduct={onOpenProduct} />
       ))}

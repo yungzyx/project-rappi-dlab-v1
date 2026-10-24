@@ -19,6 +19,7 @@ from rappi_scraper.storage.search import VERTICALS
 from ..concepts.taxonomy import load_taxonomy
 from ..embeddings.base import MemoizedQueryEmbedder, TextEmbedder
 from ..retrieval.hybrid import UNNAMED_TAU, detect_concepts, has_words, named_occasion
+from ..retrieval.spelling import correct_query
 from .rappi_agent import PROTOTYPE_VERTICALS
 from .tools import Product, search_products
 from .verticals import ranked_verticals
@@ -58,6 +59,7 @@ class GroupedResult:
     groups: list[VerticalGroup] = field(default_factory=list)
     unmet: bool = False
     unmet_reason: str | None = None
+    corrected_query: str | None = None  # lo que se buscó si se corrigieron errores de tipeo (retrieval/spelling.py)
 
     def to_dict(self) -> dict:
         return {
@@ -65,6 +67,7 @@ class GroupedResult:
             "groups": [g.to_dict() for g in self.groups],
             "unmet": self.unmet,
             "unmet_reason": self.unmet_reason,
+            "corrected_query": self.corrected_query,
         }
 
 
@@ -144,6 +147,7 @@ def search_grouped(
     price_max: float | None = None,
     mode: str = "hibrido",
     spare: SpareConnector | None = None,
+    correct: bool = True,
 ) -> GroupedResult:
     """Productos por vertical, con `limit` por grupo y solo los grupos que traen algo. Con un concepto detectado el
     orden es el de sus verticales típicas. Una ocasión sin concepto nombrado («algo para el carrete») se busca como
@@ -152,7 +156,29 @@ def search_grouped(
     primero las que calzan y luego por la cercanía vectorial. La pantalla actual (`current`), si trae productos, va
     siempre primero (el resto conserva su orden); sin productos, no aparece. `unmet` solo si ningún grupo trae
     productos. Con `spare` (las conexiones extra de la API), las verticales se buscan a la vez (`search_each`); el
-    resultado es el mismo que en serie."""
+    resultado es el mismo que en serie. Con `correct`, si ninguna vertical calza todas las palabras, corrige una vez los
+    errores de tipeo con el vocabulario de todas las verticales (`retrieval.spelling`) y vuelve a buscar: si así hay
+    grupos y alguna vertical calza todas las palabras, los devuelve con `corrected_query`."""
+    found, strict = _search_grouped(conn, q, embedder, current, limit, price_max, mode, spare)
+    if not correct or strict or (fixed := correct_query(conn, q, None)) is None:
+        return found
+    again, strict = _search_grouped(conn, fixed, embedder, current, limit, price_max, mode, spare)
+    if not again.groups or not strict:
+        return found
+    return GroupedResult(q, again.groups, corrected_query=fixed)
+
+
+def _search_grouped(
+    conn: Connection,
+    q: str,
+    embedder: TextEmbedder | None,
+    current: str | None,
+    limit: int,
+    price_max: float | None,
+    mode: str,
+    spare: SpareConnector | None,
+) -> tuple[GroupedResult, bool]:
+    """El resultado y si alguna vertical calza todas las palabras."""
     concepts = detect_concepts(q)
     occasion = None if concepts else named_occasion(q)
     query, fixed = q, None
@@ -168,6 +194,7 @@ def search_grouped(
         return search_products(connection, vertical, query, concepts, memo, price_max, k=limit, mode=mode, words=words)
 
     searched = list(zip(verticals, search_each(conn, verticals, search, spare), strict=True))
+    strict = any(o.result.strict_lexical_matches for _, o in searched)
     outcomes = searched if concepts else _related(searched)
     if not concepts:  # sorted es estable: a igual relevancia queda el orden de VERTICALS
         outcomes.sort(key=lambda o: (o[1].result.strict_lexical_matches == 0, -(o[1].result.max_cosine or 0.0)))
@@ -178,9 +205,9 @@ def search_grouped(
     ]
     if groups:
         groups.sort(key=lambda group: group.vertical != current)  # estable: solo sube la de la pantalla actual
-        return GroupedResult(q, groups)
+        return GroupedResult(q, groups), strict
     reason = next((o.result.unmet_reason for _, o in searched if o.result.unmet_reason), None)
     if reason is None and not concepts:
         best = max((o.result.max_cosine or 0.0 for _, o in searched), default=0.0)
         reason = f"sin coincidencia léxica ni concepto ni ocasión; coseno máx {best:.3f} < τ {UNNAMED_TAU} en todas"
-    return GroupedResult(q, [], unmet=True, unmet_reason=reason)
+    return GroupedResult(q, [], unmet=True, unmet_reason=reason), strict

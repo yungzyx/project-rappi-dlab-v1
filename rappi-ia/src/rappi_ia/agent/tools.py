@@ -18,6 +18,7 @@ from ..motor.combos import SERVICES
 from ..motor.predict import step_signal, target_step
 from ..motor.recommend import RECENT_DAYS, CrossPick, cross_picks, latest_lambda
 from ..offers.guards import (
+    alcohol_in_description,
     alcohol_in_name,
     alcohol_section,
     baby_in_name,
@@ -26,6 +27,7 @@ from ..offers.guards import (
     unofferable_subverticals,
 )
 from ..retrieval.hybrid import Filters, RetrievalResult, named_occasion, retrieve
+from ..retrieval.spelling import correct_query
 from ..text import FILLER_WORDS, LEAFLET_WARNINGS, normalize, tokens
 from .verticals import ranked_verticals
 
@@ -90,6 +92,7 @@ class SearchOutcome:
     result: RetrievalResult
     products: list[Product]
     cheapest_without_filter: Product | None = None
+    corrected_query: str | None = None  # con `correct`, la consulta corregida que se buscó (retrieval/spelling.py)
 
 
 @dataclass
@@ -120,13 +123,37 @@ def search_products(
     offer: bool = False,
     adult_ok: bool = False,
     words: bool | None = None,
+    correct: bool = False,
 ) -> SearchOutcome:
     """Con `concepts=None`, los conceptos los detecta la búsqueda en la consulta (endpoint /search). Con `symptom` (o
     en farmacia) no se muestra lo que no tiene concepto: podría ser un medicamento sin categoría mapeada. Con `offer`,
     la búsqueda es de una oferta del agente y solo trae lo que puede proponer por su cuenta: nada +18 ni de tiendas
     Farmacia, Sex shop o Smoking shop (offers/guards.py); el concepto y la vertical los elige quien llama. `adult_ok`
     deja pasar lo +18 en una oferta: solo para el kit de una ocasión que la persona eligió (alcohol con su marca).
-    `words`: si a la consulta le queda alguna palabra (`retrieval.hybrid.has_words`), si quien llama ya lo sabe."""
+    `words`: si a la consulta le queda alguna palabra (`retrieval.hybrid.has_words`), si quien llama ya lo sabe.
+    Con `correct` (/search), si nada calza todas las palabras, corrige los errores de tipeo (`retrieval.spelling`) y
+    vuelve a buscar: si así algo calza todas las palabras y hay productos, devuelve eso con `corrected_query`; si no, lo
+    de la consulta tal cual."""
+    found = _search_products(
+        conn, vertical, query, concepts, embedder, price_max, k, mode, symptom, offer, adult_ok, words
+    )
+    if not correct or found.result.strict_lexical_matches:
+        return found
+    fixed = correct_query(conn, query, vertical)
+    if fixed is None:
+        return found
+    again = _search_products(
+        conn, vertical, fixed, concepts, embedder, price_max, k, mode, symptom, offer, adult_ok, None
+    )
+    if not again.result.strict_lexical_matches or not again.products:
+        return found
+    again.corrected_query = fixed
+    return again
+
+
+def _search_products(
+    conn, vertical, query, concepts, embedder, price_max, k, mode, symptom, offer, adult_ok, words
+) -> SearchOutcome:
     result = retrieve(
         conn, vertical, query, embedder, k=k * 2, filters=Filters(price_max), mode=mode, concepts=concepts, words=words
     )
@@ -622,17 +649,22 @@ def _with_prices(conn: Connection, vertical: str, hits, offer: bool = False, adu
         ):
             prices[("catalog_item", pid)] = (name, price, real, store, age, store_id, presentation)
     if menu_ids:
-        for iid, name, price, real, store, store_id, section in conn.execute(
-            """SELECT mi.item_id::text, mi.name, mp.price, mp.real_price, s.name, mi.store_id, ms.name
+        dish_concepts = {h.entity_id: h.concept_id for h in hits if h.entity_type == "menu_item"}
+        for iid, name, price, real, store, store_id, section, description in conn.execute(
+            """SELECT mi.item_id::text, mi.name, mp.price, mp.real_price, s.name, mi.store_id, ms.name,
+                      CASE WHEN %s THEN clean_html(mi.description) END
                FROM menu_items mi
                JOIN stores s USING (store_id)
                LEFT JOIN latest_menu_prices mp ON mp.item_id = mi.item_id
                LEFT JOIN menu_sections ms ON ms.store_id = mi.store_id AND ms.section_id = mi.section_id
                WHERE mi.item_id = ANY(%s::bigint[])""",
-            (menu_ids,),
+            (offer, menu_ids),  # la descripción solo hace falta en una oferta
         ):
-            # En una oferta, un plato de una sección de tragos cuenta como +18 (offers/guards.py).
-            prices[("menu_item", iid)] = (name, price, real, store, offer and alcohol_section(section), store_id, None)
+            # En una oferta, un plato de una sección de tragos, o sin concepto o de bebida y con una descripción (o, sin
+            # concepto, una sección de botellas o vinos) que nombra alcohol, cuenta como +18 (offers/guards.py).
+            unknown = alcohol_in_description(description, dish_concepts[iid], section) if offer else False
+            adult = offer and (alcohol_section(section) or unknown)
+            prices[("menu_item", iid)] = (name, price, real, store, adult, store_id, None)
     taxonomy = load_taxonomy()
     products = []
     for hit in hits:

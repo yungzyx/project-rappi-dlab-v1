@@ -383,24 +383,35 @@ def search(
     price_max: float | None = Query(None, ge=0, allow_inf_nan=False),
     limit: int | None = Query(None, ge=1, le=50),
     mode: str = Query("hibrido"),
+    correct: bool = True,
     conn: Connection = Depends(get_conn),
     svc: Services = Depends(get_services),
     spare: SpareConnector = Depends(get_spare_connector),
 ) -> dict:
     """Con `vertical`, busca solo ahí. Sin `vertical`, en las verticales que corresponden a la consulta (más la de la
     pantalla, `current`) y agrupa: `limit` es por grupo. Las verticales se buscan en paralelo con las conexiones del
-    pool que sobran (`spare`, sin tomar su reserva); sin ninguna, en serie."""
+    pool que sobran (`spare`, sin tomar su reserva); sin ninguna, en serie. Si queda «sin resultado», corrige los
+    errores de tipeo y vuelve a buscar: `corrected_query` dice qué se buscó (null si nada); `correct=false` busca tal
+    cual."""
     if mode not in MODES:
         raise HTTPException(400, f"mode debe ser uno de {MODES}")
     if vertical is None:
         grouped = search_grouped(
-            conn, q, svc.embedder, backend_vertical(current), limit or GROUPED_SEARCH_LIMIT, price_max, mode, spare
+            conn,
+            q,
+            svc.embedder,
+            backend_vertical(current),
+            limit or GROUPED_SEARCH_LIMIT,
+            price_max,
+            mode,
+            spare,
+            correct,
         )
         return grouped.to_dict()
     code = backend_vertical(vertical)
     try:
         outcome = search_products(
-            conn, code, q, None, svc.embedder, price_max, k=limit or VERTICAL_SEARCH_LIMIT, mode=mode
+            conn, code, q, None, svc.embedder, price_max, k=limit or VERTICAL_SEARCH_LIMIT, mode=mode, correct=correct
         )
     except ValueError as exc:
         raise rejected(exc) from exc
@@ -409,6 +420,7 @@ def search(
         "products": [p.to_dict() for p in outcome.products],
         "unmet": outcome.result.unmet,
         "unmet_reason": outcome.result.unmet_reason,
+        "corrected_query": outcome.corrected_query,
     }
 
 

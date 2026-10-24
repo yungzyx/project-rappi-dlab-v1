@@ -44,9 +44,12 @@ afterEach(() => {
   localStorage.clear()
 })
 
-/** `/search` con el ejemplo agrupado, o sin coincidencias si la consulta es «xyzzy». */
-const searchRoute = (req) =>
-  req.query.get('q') === 'xyzzy' ? fixture('search-grouped-unmet') : fixture('search-grouped')
+/** `/search` con el ejemplo agrupado, sin coincidencias si la consulta es «xyzzy» o se pide tal cual, y corregido si es
+ * «cervezaaaa». */
+const searchRoute = (req) => {
+  if (req.query.get('q') === 'xyzzy' || req.query.get('correct') === 'false') return fixture('search-grouped-unmet')
+  return req.query.get('q') === 'cervezaaaa' ? fixture('search-grouped-corrected') : fixture('search-grouped')
+}
 
 describe('SearchScreen', () => {
   const setup = (params = {}, routes = {}) => {
@@ -68,6 +71,30 @@ describe('SearchScreen', () => {
     expect(headings).toEqual(['Licores', 'Express', 'Súper'])
     expect(screen.getAllByText('Cerveza rubia lata 470 cc (prueba)')).toHaveLength(3)
     expect(screen.getByText('Cerveza negra botella 330 cc (prueba)')).toBeTruthy()
+  })
+
+  test('un error de tipeo corregido dice qué se buscó y deja buscar lo escrito tal cual', async () => {
+    const { input, fetchMock } = setup()
+    await type(input, 'cervezaaaa')
+
+    expect(screen.getByText(/Mostrando resultados para «cerveza»/)).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Licores' })).toBeTruthy()
+
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(searches().at(-1)).toMatchObject({ query: 'cervezaaaa', unmet: false, payload: { corregida: 'cerveza' } })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Buscar «cervezaaaa» tal cual' }))
+    await advance(0)
+    // La búsqueda tal cual también se registra, sin corrección y sin resultado.
+    expect(searches().at(-1)).toMatchObject({ query: 'cervezaaaa', unmet: true })
+    expect(searches().at(-1).payload).toBeUndefined()
+    const last = new URL(fetchMock.mock.calls.at(-1)[0])
+    expect(last.searchParams.get('correct')).toBe('false')
+    expect(screen.getByText('No results for “cervezaaaa”.')).toBeTruthy()
+    expect(screen.queryByText(/Mostrando resultados/)).toBeNull()
+
+    await type(input, 'cervezaaa') // con otro texto, la API vuelve a poder corregir
+    expect(new URL(fetchMock.mock.calls.at(-1)[0]).searchParams.has('correct')).toBe(false)
   })
 
   test('el título de sugerencias no dice recientes: son ideas fijas, no un historial', () => {

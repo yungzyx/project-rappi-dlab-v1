@@ -10,6 +10,7 @@ from rappi_ia.offers.guards import (
     MENU_ALCOHOL_NAME_WORDS,
     NOT_PLANNABLE_OCCASIONS,
     OFFER_BLOCKED_VERTICALS,
+    alcohol_in_description,
     alcohol_in_name,
     alcohol_section,
     baby_in_name,
@@ -421,3 +422,153 @@ def test_a_cocktail_word_with_another_sense_is_not_alcohol_in_a_menu(name, conce
 
 def test_a_cocktail_bar_spelled_with_ck_is_a_drinks_section():
     assert alcohol_section("Cockteleria De Autor")
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        # «Barra Barbazul» en la base real del 24-10-2026: sin concepto y sin alcohol en el nombre ni en la sección
+        "Vodka ron gin blue curacao jugo de limón y sprite. puedes elegir de 475cc o de 1 litro",
+        "Jagermeister manifest gin jugo de pomelo piña jugo de limon jarabe de azúcar ginger ale.",
+        "Mistral barrica tostada pulpa de piña pulpa de frutilla jugo de limón syrup simple y aperol.",
+        "Jack daniels apple vermouth rosso jugo de limón y piña.",
+        "HAVANA 7, un corto con bebida.",
+        "EXTRA SHOT KAHLUA",
+        "Whiskey con coca-cola",
+        "Corto + Bebida",  # «Absolute Blue» y «Havana Especial», en «Combinados» junto a platos peruanos
+        "Cerveza a elección.",
+        # combos y packs que traen el alcohol
+        "2 Tártaros (250 grs de carne magra, pepinillo, cebolla) + 2 cervezas heineken.",
+        "Kit Carniceria 2 + 4 Coca Cola elección + botella de fernet + hielo frape 2 kilos",
+        "Kit Carniceria 2 + 4 Coca Cola elección + botella de alto del Carmen 35 + hielo cubo 2 kilos.",
+        "Incluye caja y un regalo especial para gozadores, el vino veneris, pinot noir de casa blanca año 2021.",
+        "Fiesta para 1 elige tus papas fritas de 300grs y mixea con tu gaseosa o cóctel favorito",
+        "Mojito con o sin alcohol",  # «sin alcohol» no la libra: también puede ser con
+        "Piña colada (con o sin alcohol)",
+        # una palabra de comida en otra parte de la descripción no la libra (revisión de código)
+        "Combo after office: tabla de empanadas + 2 cócteles a elección",
+        "Tabla de mariscos + 2 cócteles de la casa",
+        "Promo 40 piezas: 2 rolls + 2 sour de maracuyá",
+        "Papas fritas + sour catedral",
+        "Promo 2 pizzas + 2 margaritas",
+        "Tabla de quesos + 2 cortos",
+        "Tabla + 2 tragos a elección",
+        "Incluye bebida alcohólica",
+        "Selección de tragos: Chilcano, Mojito o Sangría.",
+        "Copa de prosecco",
+        "Smirnoff con bebida",
+        "Bacardi con coca cola",
+        "Whiskies importados",
+        # la frase de comida libra solo la palabra que tiene pegada (segunda revisión)
+        "Empanadas cóctel x12 + 2 cócteles",
+        "Cóctel de camarones y un cóctel de la casa",
+        "Pizza margarita + margarita de maracuyá",
+        "Nachos con sour cream + 2 sour de maracuyá",
+        "Espresso corto + corto a elección",
+        # plurales de frases, apóstrofes y nombres que faltaban
+        "2 piñas coladas",
+        "2 cubas libres",
+        "Jack Daniels con Coca-Cola",
+        "Ballantine's con bebida",
+        "Gordon's con tónica",
+        "Johnny Walker con hielo",
+        "Pisco Capel con bebida",
+        "Ginebra con tónica",
+        "Chop de cerveza artesanal",
+        "Schop o chop a elección",
+        "Copa de tinto",
+        "Tinto de verano",
+        "Navegado de la casa",
+        "Jarra de clery",
+        "Calimocho",
+        "Pichuncho",
+        "Gintonic de pepino",
+        "Roncola",
+        "Jagerbomb",
+        "Captain Morgan con cola",
+        "Havanna Anejo Reserva, Incluye Bebida.",
+        "Papas fritas + 1 estofado + 2 bebidas o 2 stellas artois de regalo.",
+    ],
+)
+def test_a_dish_without_concept_whose_description_names_alcohol_says_alcohol(description):
+    assert alcohol_in_description(description, None)
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "Piqueo de cocktail de camarones, ceviche mixto, pulpito al olivo, tiradito de pescado y causa criolla.",
+        "Caja familiar con papas fritas, 6 aros de cebolla y 6 empanaditas de queso (coctel).",
+        "Incluye: 50 tequeños tipo coctel + 20 empanadas medianas",
+        "Puré de habas, hummus, salsa verde, + 6 panes cóctel + 4 verduras a elección",
+        "12 unidades de sopaipillas coctel acompañadas de mostaza dulce",
+        "Ceviche mixto, tiradito de pescado y coctel de camarones a la hawaiana",
+        "Sándwich: pesto margarita, tomate y queso",
+        "Plato de fideos de cristal salteados con verduras",
+        "Chop suey de pollo con arroz",
+        "Café tinto colombiano",
+        "7 Unidades (tamaño cóctel).",
+        "Papas fritas con carne, cheddar fundido, sour cream, tomate.",
+        "Vainas de soja servidas con salsa agridulce y semillas de sésamo.",
+        "Papaya, leche, maca, algarrobina, proteína.",  # un jarabe: el trago de algarrobina se llama así
+        "Bebida refrescante, mezcla de ginger ale y granadina.",
+        "Ginger beer 100% natural, elaborada a base de jengibre fresco",
+        "Rollito de panqueque de chocolate, chocolate bitter, manjar y pasta de almendras",
+        "Maíz cancha tostado, ideal como aperitivo crujiente.",
+        "Espresso corto e intenso.",
+        "",
+        None,
+    ],
+)
+def test_a_dish_description_that_only_uses_a_drink_word_in_another_sense_is_not_alcohol(description):
+    assert not alcohol_in_description(description, None)
+
+
+def test_a_dish_description_only_counts_without_concept_or_with_a_drink_concept():
+    """Con un concepto de comida, la descripción no cuenta: unos 1.100 platos ofrecibles con concepto nombran alcohol,
+    casi todos comida cocinada con vino. Sin concepto la cuenta es otra: también la comida con alcohol en la receta deja
+    de ofrecerse (un plato que no se sabe qué es). Un concepto de bebida no dice si el trago lleva alcohol."""
+    assert not alcohol_in_description("Risotto de hongos al vino blanco", "pastas")
+    assert alcohol_in_description("Risotto de hongos al vino blanco", None)
+    assert alcohol_in_description("Ron havana dorado, leche de coco, maracuya y naranja.", "gaseosas")
+    assert alcohol_in_description("Café, whiskey y crema chantilly", "cafe")
+    assert not alcohol_in_description("Café, leche y crema chantilly", "cafe")
+    # un concepto que ya no está en la taxonomía (sin recalcular) cuenta como sin concepto
+    assert alcohol_in_description("Vodka con bebida", "concepto-que-ya-no-existe")
+
+
+def test_the_queries_must_clean_the_html_entities_of_a_description():
+    """Sin limpiar, «C&oacute;ctel» no calza: por eso las consultas leen `clean_html(mi.description)` (lo prueban los
+    tests de integración)."""
+    assert not alcohol_in_description("C&oacute;ctel de la casa", None)
+    assert alcohol_in_description("Cóctel de la casa", None)
+
+
+@pytest.mark.parametrize("name", ["ABSOLUTE PEAR", "Absolut Mandarin", "Jarra de Ramazzoti"])
+def test_a_dish_named_after_a_vodka_or_a_misspelled_ramazzotti_says_alcohol(name):
+    """En la base real del 24-10-2026, «ABSOLUTE PEAR» («Corto con pera y bebida con hielo») era un sándwich."""
+    assert alcohol_in_name("menu_item", name, "sandwiches")
+
+
+@pytest.mark.parametrize(
+    ("name", "section"),
+    [
+        # base real del 24-10-2026: sin concepto y sin nada de alcohol en el nombre ni en la descripción
+        ("Erdinger Dunkel", "Botellas"),
+        ("Gulden Draak", "Botellas 300 cc"),
+        ("Cab.Sauvig CASAS PATRONALES RESERVA", "Tinto"),
+        ("Chardonay AROMO RESERVA PRIVADA", "Blanco"),
+        ("Malfy Originale", "Gin"),
+        ("Corto + Bebida", "COMBINADOS"),
+    ],
+)
+def test_a_dish_without_concept_in_a_bottles_or_wine_section_says_alcohol(name, section):
+    """Sin concepto, una sección de botellas, de vinos, de gin, de destilados o de combinados dice lo que es el plato
+    (con concepto, la sección decide solo si es de tragos: `alcohol_section`)."""
+    assert alcohol_in_description(name, None, section)
+    assert not alcohol_in_description(name, "pastas", section)
+
+
+@pytest.mark.parametrize("section", ["Té blanco", "Chocolate blanco", "Bebidas", None])
+def test_other_sections_do_not_say_alcohol_for_a_dish_without_concept(section):
+    assert not alcohol_in_description("Bebida de la casa", None, section)
