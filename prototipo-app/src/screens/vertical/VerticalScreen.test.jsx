@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from 'vitest'
 import { fixture, stubApi } from '../../api/testing'
 import { ToastProvider } from '../../components/Toast'
@@ -181,10 +181,14 @@ describe('catálogo real en la vertical', () => {
     // La primera de la lista abierta (lista → tienda): su visita va a Súper y no se rechaza el lote en rappi-ia.
     render(<StoreScreen back={() => {}} push={() => {}} params={{ store: stores[0] }} />, { wrapper: Providers })
     expect(await screen.findByText('Despensa')).toBeTruthy()
-    const visits = events.track.mock.calls.filter(([type]) => type === 'view_store').map(([, fields]) => fields)
-    expect(visits).toEqual([
-      expect.objectContaining({ vertical: 'grocery', entity_id: '9101', payload: { name: stores[0].name } }),
-    ])
+    // La visita se registra cuando llega la tienda de la API, que puede llegar después de sus pasillos: se espera a
+    // ella (en el CI a veces se leía antes y salía vacía).
+    const visits = () => events.track.mock.calls.filter(([type]) => type === 'view_store').map(([, fields]) => fields)
+    await waitFor(() =>
+      expect(visits()).toEqual([
+        expect.objectContaining({ vertical: 'grocery', entity_id: '9101', payload: { name: stores[0].name } }),
+      ]),
+    )
   })
 
   test('Ver tienda del detalle abre la tienda del producto', async () => {
