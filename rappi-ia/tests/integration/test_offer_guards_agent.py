@@ -433,12 +433,45 @@ def test_the_most_ordered_dishes_skip_one_without_concept_whose_description_name
 
     add_store(db, 22, "restaurantes", "Barbazul")
     db.execute("INSERT INTO scrape_runs (run_id, kind, status) VALUES (999, 'restaurants', 'done')")
-    for item_id, name, description in ((971, "Mal paso", "Whiskey con coca-cola"), (972, "Papas Deli", "Papas fritas")):
+    for item_id, name, description, concept in (
+        (971, "Mal paso", "Whiskey con coca-cola", None),
+        (972, "Papas Deli", "Papas fritas", None),
+        (973, "Café irlandés", "Café, whiskey y crema chantilly", "cafe"),  # un concepto de bebida no lo dice
+        (974, "Risotto Deli", "Risotto de hongos al vino blanco", "pastas"),  # uno de comida, sí
+        (975, "Combinado", "C&oacute;ctel de la casa", None),  # la descripción llega con entidades HTML
+    ):
         add_dish(db, item_id, name, 22, "Combos")
         db.execute("UPDATE menu_items SET description = %s WHERE item_id = %s", (description, item_id))
         db.execute("INSERT INTO menu_price_snapshots (run_id, item_id, price) VALUES (999, %s, 5990)", (item_id,))
+        if concept:
+            db.execute(
+                """INSERT INTO item_concepts (entity_type, entity_id, concept_id, method, confidence)
+                   VALUES ('menu_item', %s, %s, 'regla', 1)""",
+                (str(item_id), concept),
+            )
 
-    assert set(_priced_in_vertical(db, "restaurantes", ["971", "972"])) == {"972"}
+    found = _priced_in_vertical(db, "restaurantes", ["971", "972", "973", "974", "975"])
+    assert set(found) == {"972", "974"}
+
+
+def test_vertical_to_try_never_offers_a_popular_drink_whose_description_names_alcohol(demo):
+    """Los platos populares (`_popular_dishes`) tampoco pasan por la búsqueda de ofertas: un café con concepto `cafe`
+    cuya descripción dice whiskey no se muestra."""
+    from rappi_ia.offers.engine import _popular_dishes
+
+    db, _ = demo
+    db.execute(
+        """UPDATE item_concepts SET concept_id = 'cafe'
+           WHERE entity_type = 'menu_item' AND entity_id = '98004'"""
+    )
+    db.execute("REFRESH MATERIALIZED VIEW concept_assortment")
+    cache.clear()
+    assert "Tiramisú individual (prueba)" in {d["name"] for d in _popular_dishes(db)}
+
+    db.execute("UPDATE menu_items SET description = 'Café, whiskey y crema' WHERE item_id = 98004")
+    cache.clear()
+
+    assert "Tiramisú individual (prueba)" not in {d["name"] for d in _popular_dishes(db)}
 
 
 def test_vertical_to_try_never_offers_a_popular_dish_from_a_drinks_section(demo):

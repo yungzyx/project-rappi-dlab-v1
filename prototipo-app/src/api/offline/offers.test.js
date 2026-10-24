@@ -93,7 +93,6 @@ describe('guardias (offers/guards.py)', () => {
     // Los cócteles que un menú nombra sin decir alcohol (#130), aunque su concepto sea otro.
     expect(offerableProduct({ ...coffee, name: 'Tom Collins' }, CONCEPTS)).toBe(false)
     expect(offerableProduct({ ...coffee, name: 'Clavo oxidado de la casa' }, CONCEPTS)).toBe(false)
-    expect(offerableProduct({ ...coffee, name: 'Absolute Blue' }, CONCEPTS)).toBe(false)
     expect(offerableProduct({ ...coffee, name: 'Juguete para Bebés', concept: 'juguetes' }, CONCEPTS)).toBe(false)
     // Palabra entera: «ron» no está en «ronda», ni «gin» en «ginger».
     expect(offerableProduct({ ...coffee, name: 'Galletas Ronda ginger' }, CONCEPTS)).toBe(true)
@@ -105,6 +104,8 @@ describe('guardias (offers/guards.py)', () => {
     expect(offerableProduct({ ...dish, concept: null }, CONCEPTS)).toBe(false)
     expect(offerableProduct({ ...dish, concept: 'cafe' }, CONCEPTS)).toBe(false)
     expect(offerableProduct({ ...coffee, concept: null }, CONCEPTS)).toBe(true) // un producto del catálogo, sí
+    expect(offerableProduct({ ...dish, name: 'Absolute Blue' }, CONCEPTS)).toBe(false)
+    expect(offerableProduct({ ...coffee, name: 'Absolute New York delineador' }, CONCEPTS)).toBe(true)
   })
 
   test('una oferta grabada pierde los productos que no pasan las guardias; sin ninguno, no se ofrece nada', () => {

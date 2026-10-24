@@ -625,7 +625,8 @@ def _with_prices(conn: Connection, vertical: str, hits, offer: bool = False, adu
     if menu_ids:
         dish_concepts = {h.entity_id: h.concept_id for h in hits if h.entity_type == "menu_item"}
         for iid, name, price, real, store, store_id, section, description in conn.execute(
-            """SELECT mi.item_id::text, mi.name, mp.price, mp.real_price, s.name, mi.store_id, ms.name, mi.description
+            """SELECT mi.item_id::text, mi.name, mp.price, mp.real_price, s.name, mi.store_id, ms.name,
+                      clean_html(mi.description)
                FROM menu_items mi
                JOIN stores s USING (store_id)
                LEFT JOIN latest_menu_prices mp ON mp.item_id = mi.item_id

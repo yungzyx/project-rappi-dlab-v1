@@ -25,27 +25,39 @@ alternativas sugeridas no alcanzan: exigir además una señal de bebida (ml, cc,
 ## Regla
 
 `offers/guards.alcohol_in_description(descripción, concepto)`: un plato **sin concepto o con uno de bebida** (grupo
-`bebidas`: un concepto como gaseosas o café no dice si el trago lleva alcohol) cuya descripción nombra alcohol cuenta
-como +18 en una oferta. Las palabras: las de los nombres de platos (`MENU_ALCOHOL_NAME_WORDS`, con sus sentidos de
-comida) sin «vaina» ni «algarrobina», más destilados y licores (mezcal, fernet, jägermeister, kahlúa, triple sec,
-havana, alto del carmen, mistral, aperol, campari, vermouth, coñac, brandy, bourbon, baileys, amaretto), el cóctel
-(salvo el de camarones o el tamaño de las empanadas) y el corto (salvo el de café o el queso). «Sin alcohol» no la
-libra («Mojito con o sin alcohol»). La aplican los dos caminos que ofrecen platos: `agent/tools._with_prices`
-(búsquedas de oferta) y `offers/engine._priced_in_vertical` (lo más pedido). Los nombres suman «absolut», «absolute»
-(«ABSOLUTE PEAR» tenía concepto sandwiches) y «ramazzoti» (mal escrito). La búsqueda y la pregunta no cambian.
+`bebidas`: un concepto como gaseosas o café no dice si el trago lleva alcohol; un concepto que ya no está en la
+taxonomía cuenta como sin concepto) cuya descripción nombra alcohol cuenta como +18 en una oferta. Las palabras: las de
+los nombres de platos (`MENU_ALCOHOL_NAME_WORDS`) sin «vaina» ni «algarrobina», más tragos («trago», «chilcano»,
+«alcohólica», «con alcohol»), destilados, licores y sus marcas (mezcal, fernet, jägermeister, kahlúa, triple sec,
+havana, alto del carmen, mistral, aperol, vermouth, coñac, smirnoff, bacardi…), el cóctel y el corto. Una descripción es
+larga, así que solo la libra una frase de comida pegada a la palabra («cóctel de camarones», «empanaditas cóctel»,
+«sour cream», «pizza margarita», «espresso corto»), no una palabra de comida en otra parte («tabla de empanadas + 2
+cócteles»): las frases sueltas de los nombres («papas», «roll», «jugo») no sirven aquí. «Sin alcohol» no la libra
+(«Mojito con o sin alcohol»), y «alcohol» solo no cuenta: casi siempre es «sin alcohol». La aplican los tres caminos
+que ofrecen platos: `agent/tools._with_prices` (búsquedas de oferta), `offers/engine._priced_in_vertical` (lo más
+pedido) y `offers/engine._find_popular_dishes` (los populares de «vertical por probar»), sobre
+`clean_html(mi.description)`. Los nombres suman «absolut», «absolute» («ABSOLUTE PEAR» tenía concepto sandwiches) y
+«ramazzoti» (mal escrito). La búsqueda y la pregunta no cambian.
 
 Demo sin conexión (`src/api/offline/offers.js`): la API no da descripciones, así que la muestra no las tiene; ahí
-ningún plato sin concepto o con concepto de bebida se ofrece, y los nombres suman «absolut» y «absolute».
+ningún plato sin concepto o con concepto de bebida se ofrece (más estricto que el backend: un café de un restaurante
+tampoco), y los nombres de platos suman «absolut» y «absolute».
 
 ## Cero fugas
 
-Guardias de `main` contra las de la rama, sobre todos los platos con precio: 150 pasan a bloqueados y ninguno se
-libera. Los 150, revisados uno por uno: 52 fugas cerradas (los 44 de arriba, 7 tragos con concepto de bebida como
+Guardias de `main` contra las de la rama, sobre todos los platos con precio: 160 pasan a bloqueados y ninguno se
+libera. Los 160, revisados uno por uno: 52 fugas cerradas (los 44 de arriba, 7 tragos con concepto de bebida como
 «Gautama Jack» o un café irlandés, y «ABSOLUTE PEAR»), 2 dudosos con alcohol (un americano con amaretto, un helado con
-whisky), 80 comida y 16 cosas sin alcohol (cafés con jarabe de amaretto, una cerveza sin alcohol, combos de pizza
-«margarita» con concepto gaseosas). De los que se siguen pudiendo ofrecer sin concepto o con concepto de bebida, 1.010
-tienen alguna señal amplia (también «sin alcohol», «shot», «tónica», «drinks», «barra», «combinado», «anís»): revisados
-todos, ninguno es un trago.
+whisky), 82 comida (con alcohol en la receta o con otra palabra: «Cóctel de jugo de limón con trozos de pescado») y 24
+cosas sin alcohol (cafés con jarabe de amaretto, piñas coladas sin alcohol, espressos «cortos», jugos «en cada
+trago»). De los que se siguen pudiendo ofrecer sin concepto o con concepto de bebida, 1.002 tienen alguna señal amplia
+(también «sin alcohol», «shot», «tónica», «drinks», «barra», «combinado», «anís»): revisados todos, ninguno es un trago.
+
+La revisión de código (subagente) encontró que una primera versión heredaba de los nombres frases de comida de una
+palabra, que en una descripción larga la libraban («tabla de empanadas + 2 cócteles», «2 rolls + 2 sour de
+maracuyá», «piña colada con o sin alcohol»), que faltaban «trago», «chilcano», «prosecco» y marcas, que no miraba los
+populares de «vertical por probar» ni limpiaba el HTML de la descripción. No había casos así en la base; quedaron
+arreglados con tests, y las cifras son de la versión final.
 
 ## Pendiente (fuera de este cambio)
 

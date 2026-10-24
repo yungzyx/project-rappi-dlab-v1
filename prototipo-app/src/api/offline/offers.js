@@ -27,11 +27,13 @@ const ALCOHOL_WORDS = [
   ...['licor', 'aperitivo', 'espumante', 'champagne', 'sidra', 'sangria', 'michelada', 'schop', 'piscola'],
   ...['mojito', 'terremoto', 'spritz', 'negroni', 'caipirinha', 'daiquiri', 'daikiri', 'caipiroska'],
   ...['tom collins', 'bloody mary', 'cuba libre', 'kir royal', 'ruso blanco', 'ruso negro', 'cosmopolitan'],
-  ...['clavo oxidado', 'absolut', 'absolute'],
+  ...['clavo oxidado'],
 ]
+const MENU_ALCOHOL_WORDS = ['absolut', 'absolute'] // solo en un menú: en el catálogo hay maquillaje «Absolute New York»
 const BABY_WORDS = ['bebe', 'guagua']
 const wordsIn = (list) => new RegExp(`\\b(?:${list.join('|')})(?:s|es)?\\b`)
 const ALCOHOL_NAME = wordsIn(ALCOHOL_WORDS)
+const MENU_ALCOHOL_NAME = wordsIn(MENU_ALCOHOL_WORDS)
 const BABY_NAME = wordsIn(BABY_WORDS)
 
 /**
@@ -49,7 +51,8 @@ export function offerableProduct(product, concepts) {
   }
   const name = normalize(product.name)
   if (ALCOHOL_NAME.test(name)) return false
-  return !(product.entity_type !== 'menu_item' && BABY_NAME.test(name))
+  if (product.entity_type === 'menu_item') return !MENU_ALCOHOL_NAME.test(name)
+  return !BABY_NAME.test(name)
 }
 
 const TO_TRY_TEXT = 'Aún no pides en {vertical}: mira estas ofertas.'
