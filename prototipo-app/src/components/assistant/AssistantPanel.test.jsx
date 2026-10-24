@@ -650,6 +650,16 @@ describe('preguntarle a Mochi desde el buscador', () => {
     expect(row.classList.contains('is-question')).toBe(false)
   })
 
+  test('con un error de tipeo corregido, conviven «Pregúntale a Mochi» y «Mostrando resultados para…»', async () => {
+    stubCatalog({ '/search': fixture('search-grouped-corrected') })
+    await renderPanel()
+    fireEvent.change(screen.getByLabelText('Buscar en Rappi'), { target: { value: 'cervezaaaa' } })
+    await runUntilIdle()
+    const row = screen.getByRole('button', { name: 'Pregúntale a Mochi: «cervezaaaa»' })
+    const notice = screen.getByText(/^Mostrando resultados para «cerveza»/)
+    expect(row.compareDocumentPosition(notice)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+  })
+
   test('una pregunta va resaltada y Enter se la pregunta a Mochi, no la busca', async () => {
     api.ask.mockResolvedValueOnce(apiAnswer('Mira estas opciones de asado 🔥 en el súper.'))
     await renderPanel()
