@@ -12,6 +12,9 @@ del prototipo pasa por un archivo. Deja una carpeta con:
 - `catalogo.dump`: `pg_dump` en formato custom, sin dueño ni permisos, con las tablas de personas vacías;
 - `poblacion-simulada.sql`: las filas simuladas de esas tablas, para `psql`;
 - `LEEME.txt`: qué trae y cómo restaurarlo.
+
+Se restaura en tres pasos: las tablas y el catálogo (`pg_restore --section=pre-data --section=data`), la población
+(`psql`) y al final los índices, las claves foráneas y los triggers (`--section=post-data`), que así validan todo junto.
 """
 
 import logging
@@ -30,10 +33,12 @@ log = logging.getLogger(__name__)
 SYNTHETIC = "synthetic"
 _USERS = "user_id IN (SELECT user_id FROM public.app_users WHERE source = 'synthetic')"
 _ORDERS = f"source = 'synthetic' AND {_USERS}"
-# Las tablas con datos de personas (o aprendidos de ellas) y qué filas van, en el orden en que se restauran (las que
-# otras referencian, primero). Una tabla nueva con `user_id`, `session_id` o `data_source` tiene que estar aquí: si no,
-# `dump-entrega` se niega (`unknown_person_tables`).
+# Las tablas con datos de personas (o aprendidos de ellas) y qué filas van. Una tabla nueva con `user_id`,
+# `session_id` o `data_source`, o que apunte a una de las de personas, tiene que estar aquí: si no, `dump-entrega` se
+# niega (`unknown_person_tables`).
 PERSON_TABLES = {
+    # El registro de las corridas de las capas: las del motor sobre el prototipo guardan sus conteos y pesos.
+    "layer_runs": "coalesce(counts->>'fuente', '') <> 'prototype'",
     "app_users": "source = 'synthetic'",
     "app_events": f"source = 'synthetic' AND {_USERS}",
     "app_orders": _ORDERS,
@@ -51,6 +56,7 @@ PERSON_TABLES = {
     "knowledge_edges": "data_source <> 'prototype'",
 }
 PERSON_COLUMNS = ("user_id", "session_id", "data_source")
+PEOPLE = ("app_users", "app_events", "app_orders", "app_order_lines")  # una tabla que apunta a estas es de personas
 
 DUMP_FILE = "catalogo.dump"
 POPULATION_FILE = "poblacion-simulada.sql"
@@ -58,16 +64,22 @@ README_FILE = "LEEME.txt"
 
 
 def unknown_person_tables(conn: psycopg.Connection) -> list[str]:
-    """Tablas con columnas de personas que PERSON_TABLES no sabe filtrar (en cualquier esquema que no sea del
-    sistema)."""
+    """Tablas de personas que PERSON_TABLES no sabe filtrar (en cualquier esquema que no sea del sistema): las que
+    tienen una columna de PERSON_COLUMNS o una clave foránea hacia una de PEOPLE."""
     rows = conn.execute(
-        """SELECT DISTINCT c.table_schema, c.table_name
+        """SELECT c.table_schema, c.table_name
            FROM information_schema.columns c
            JOIN information_schema.tables t USING (table_schema, table_name)
            WHERE t.table_type = 'BASE TABLE' AND c.column_name = ANY(%s)
              AND c.table_schema NOT IN ('pg_catalog', 'information_schema')
+           UNION
+           SELECT n.nspname, r.relname
+           FROM pg_constraint k
+           JOIN pg_class r ON r.oid = k.conrelid
+           JOIN pg_namespace n ON n.oid = r.relnamespace
+           WHERE k.contype = 'f' AND k.confrelid IN (SELECT to_regclass('public.' || t) FROM unnest(%s::text[]) t)
            ORDER BY 1, 2""",
-        (list(PERSON_COLUMNS),),
+        (list(PERSON_COLUMNS), list(PEOPLE)),
     ).fetchall()
     return [f"{schema}.{table}" for schema, table in rows if schema != "public" or table not in PERSON_TABLES]
 
@@ -88,8 +100,9 @@ def _write_population(conn: psycopg.Connection, path: Path, source_name: str) ->
     counts = {}
     with path.open("wb") as out:
         out.write(
-            f"-- Población simulada (source = '{SYNTHETIC}') de la base {source_name}, para restaurar con psql después"
-            f" de {DUMP_FILE}.\n\\set ON_ERROR_STOP on\nBEGIN;\n".encode()
+            f"-- Población simulada (source = '{SYNTHETIC}') de la base {source_name}: va con psql entre las secciones"
+            f" data y post-data de {DUMP_FILE} (ver {README_FILE}).\n\\set ON_ERROR_STOP on\n"
+            "SET client_encoding = 'UTF8';\nSET datestyle = 'ISO, YMD';\nBEGIN;\n".encode()
         )
         for table, condition in PERSON_TABLES.items():
             columns = sql.SQL(", ").join(map(sql.Identifier, _columns(conn, table)))
@@ -131,16 +144,18 @@ No trae a las personas del prototipo (source = 'prototype'), ni sus eventos, bú
 el grafo aprendieron de ellas (data_source = 'prototype'). Quedaron fuera:
   personas: {excluded["app_users"]}, eventos: {excluded["app_events"]}, pedidos: {excluded["app_orders"]}
 
-Restaurar en Postgres 17 con pgvector 0.8 (unaccent, pg_trgm y pg_prewarm vienen con Postgres):
+Restaurar en Postgres 17 con pgvector 0.8 (unaccent, pg_trgm y pg_prewarm vienen con Postgres), en este orden: las
+tablas y el catálogo, la población, y al final los índices, las claves foráneas y los triggers.
 
   createdb rappi
-  pg_restore --no-owner --no-privileges --dbname=rappi {DUMP_FILE}
+  pg_restore --no-owner --no-privileges --section=pre-data --section=data --dbname=rappi {DUMP_FILE}
   psql --dbname=rappi --file={POPULATION_FILE}
+  pg_restore --no-owner --no-privileges --section=post-data --dbname=rappi {DUMP_FILE}
   vacuumdb --analyze-only --dbname=rappi
 
 Con un rol que no es superusuario, pg_restore no puede comentar las extensiones: se saltan con
   pg_restore --list {DUMP_FILE} | grep -v 'COMMENT - EXTENSION' > lista.txt
-y agregando --use-list=lista.txt al pg_restore de arriba.
+y agregando --use-list=lista.txt al primer pg_restore.
 
 Después, en rappi-ia/ (con DATABASE_URL apuntando a esa base): make migrate (no debería quedar nada pendiente) y
 make serve. Las dos partes van juntas: {DUMP_FILE} solo trae las tablas de personas vacías.
@@ -157,6 +172,9 @@ def build_delivery(database_url: str, out_dir: Path | None = None) -> Path:
     with psycopg.connect(database_url) as conn:
         conn.isolation_level = psycopg.IsolationLevel.REPEATABLE_READ
         conn.read_only = True
+        # Lo que se copia sale en UTF-8 y con fechas ISO, lo mismo que dice la cabecera del SQL.
+        conn.execute("SET client_encoding = 'UTF8'")
+        conn.execute("SET datestyle = 'ISO, YMD'")
         unknown = unknown_person_tables(conn)
         if unknown:
             raise RuntimeError(

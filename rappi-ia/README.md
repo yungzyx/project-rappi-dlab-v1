@@ -171,7 +171,7 @@ La cobertura por vertical sale de `rappi-ia concepts --solo-reporte`. La precisi
 
 `make dump-entrega` arma, en `data/entrega/entrega_<fecha>/`, la base lista para entregar: el catálogo (tiendas, productos, menús y precios), los conceptos, las capas de datos, los embeddings y documentos de búsqueda, y la población simulada (`source = 'synthetic'`). **No** lleva a las personas del prototipo (`source = 'prototype'`), ni sus eventos, búsquedas y pedidos, ni lo que el motor y el grafo aprendieron de ellas (`data_source = 'prototype'`). Lee `DATABASE_URL` sin escribir en ella (para probarlo, `DATABASE_URL=postgresql:///rappi_staging make dump-entrega`).
 
-Todo sale de una sola foto de la base: una transacción de solo lectura exporta su snapshot, `pg_dump` vuelca con él todo salvo los datos de las tablas de personas (`PERSON_TABLES` en `src/rappi_ia/delivery.py`) y la misma transacción copia de esas tablas solo las filas simuladas. Nada del prototipo pasa por un archivo. Si una migración agrega una tabla con `user_id`, `session_id` o `data_source` que no está en `PERSON_TABLES`, el comando se niega a armar el respaldo. La carpeta trae:
+Todo sale de una sola foto de la base: una transacción de solo lectura exporta su snapshot, `pg_dump` vuelca con él todo salvo los datos de las tablas de personas (`PERSON_TABLES` en `src/rappi_ia/delivery.py`) y la misma transacción copia de esas tablas solo las filas simuladas. Nada del prototipo pasa por un archivo. Si una migración agrega una tabla con `user_id`, `session_id` o `data_source`, o con una clave foránea hacia las tablas de personas, que no está en `PERSON_TABLES`, el comando se niega a armar el respaldo. Del registro de corridas de las capas (`layer_runs`) quedan fuera las del motor sobre el prototipo (sus conteos y pesos). La carpeta trae:
 
 | Archivo | Qué es |
 |---|---|
@@ -179,16 +179,17 @@ Todo sale de una sola foto de la base: una transacción de solo lectura exporta 
 | `poblacion-simulada.sql` | Las filas simuladas de esas tablas, para `psql` |
 | `LEEME.txt` | Qué trae (con los conteos), qué quedó fuera y cómo restaurarlo |
 
-Para restaurarlo, en Postgres 17 con pgvector 0.8:
+Para restaurarlo, en Postgres 17 con pgvector 0.8, en este orden: las tablas y el catálogo, la población, y al final los índices, las claves foráneas y los triggers (así validan todo junto):
 
 ```bash
 createdb rappi
-pg_restore --no-owner --no-privileges --dbname=rappi catalogo.dump
+pg_restore --no-owner --no-privileges --section=pre-data --section=data --dbname=rappi catalogo.dump
 psql --dbname=rappi --file=poblacion-simulada.sql
+pg_restore --no-owner --no-privileges --section=post-data --dbname=rappi catalogo.dump
 vacuumdb --analyze-only --dbname=rappi
 ```
 
-Con un rol que no es superusuario se saltan los comentarios de las extensiones (`pg_restore --list catalogo.dump | grep -v 'COMMENT - EXTENSION' > lista.txt` y `--use-list=lista.txt`). Después, en `rappi-ia/` con `DATABASE_URL` apuntando a esa base: `make migrate` (no debería quedar nada pendiente) y `make serve`. El respaldo se entrega por un canal acordado, nunca por git.
+Con un rol que no es superusuario se saltan los comentarios de las extensiones (`pg_restore --list catalogo.dump | grep -v 'COMMENT - EXTENSION' > lista.txt` y `--use-list=lista.txt` en el primer `pg_restore`). Después, en `rappi-ia/` con `DATABASE_URL` apuntando a esa base: `make migrate` (no debería quedar nada pendiente) y `make serve`. El respaldo se entrega por un canal acordado, nunca por git.
 
 ## Límites
 

@@ -6,6 +6,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from psycopg.types.json import Jsonb
 from rappi_scraper.storage.backup import find_pg_dump
 
 from rappi_ia import delivery
@@ -23,7 +24,7 @@ def _people(db) -> None:
         db.execute("INSERT INTO app_users (user_id, source) VALUES (%s, %s)", (user, source))
         db.execute(
             "INSERT INTO app_events (user_id, session_id, type, query, source) VALUES (%s, 's', 'search', %s, %s)",
-            (user, f"busqueda de {user}", source),
+            (user, f"pañales para {user}", source),
         )
         db.execute(
             "INSERT INTO app_orders (order_id, user_id, ts, vertical, total, source) VALUES (%s, %s, now(), "
@@ -45,13 +46,19 @@ def _people(db) -> None:
             "VALUES (%s, 'supermercado', 'farmacia', 1, 1)",
             (source,),
         )
+        db.execute(
+            "INSERT INTO layer_runs (layer, rules_version, counts) VALUES ('motor', 'v1', %s)",
+            (Jsonb({"fuente": source, "pedidos": 1}),),
+        )
 
 
 def test_the_current_schema_has_no_unknown_person_tables(db):
-    """Si una migración suma una tabla con `user_id`, `session_id` o `data_source`, va en PERSON_TABLES."""
+    """Si una migración suma una tabla con `user_id`, `session_id` o `data_source`, o que apunta a una de personas, va
+    en PERSON_TABLES."""
     assert delivery.unknown_person_tables(db) == []
     db.execute("CREATE TABLE public.notas_de_personas (user_id text)")
-    assert delivery.unknown_person_tables(db) == ["public.notas_de_personas"]
+    db.execute("CREATE TABLE public.lineas_extra (order_id text REFERENCES app_orders)")
+    assert delivery.unknown_person_tables(db) == ["public.lineas_extra", "public.notas_de_personas"]
 
 
 def test_the_population_file_has_only_the_simulated_people(db, tmp_path):
@@ -61,11 +68,11 @@ def test_the_population_file_has_only_the_simulated_people(db, tmp_path):
     counts = delivery._write_population(db, path, "rappi_ia_test")
 
     text = path.read_text(encoding="utf-8")
-    assert SYNTH in text and f"busqueda de {SYNTH}" in text
+    assert SYNTH in text and f"pañales para {SYNTH}" in text
     assert PROTO not in text and "prototype" not in text
     assert counts["app_users"] == counts["app_events"] == counts["app_order_lines"] == 1
-    assert counts["vertical_transitions"] == 1
-    assert delivery._excluded(db)["app_users"] == 1
+    assert counts["vertical_transitions"] == counts["layer_runs"] == 1
+    assert delivery._excluded(db)["app_users"] == delivery._excluded(db)["layer_runs"] == 1
 
 
 def _pg_tools(db) -> tuple[str, str, str] | None:
@@ -103,13 +110,19 @@ def test_the_delivery_restores_without_the_prototype(db, test_url, tmp_path):
     db.execute("DROP SCHEMA public CASCADE")
     db.execute("CREATE SCHEMA public")
     db.commit()
+    # Los tres pasos del LEEME: tablas y catálogo, población, y al final índices, claves foráneas y triggers.
     restore = [pg_restore, "--no-owner", "--no-privileges", "--exit-on-error", f"--dbname={test_url}"]
-    subprocess.run([*restore, str(target / delivery.DUMP_FILE)], check=True)
+    dump = str(target / delivery.DUMP_FILE)
+    subprocess.run([*restore, "--section=pre-data", "--section=data", dump], check=True)
     assert db.execute("SELECT count(*) FROM app_users").fetchone()[0] == 0  # el volcado solo trae la tabla
+    db.rollback()  # sin una transacción abierta: las claves foráneas de post-data esperarían por ella
     subprocess.run([psql, "--quiet", f"--dbname={test_url}", f"--file={target / delivery.POPULATION_FILE}"], check=True)
+    subprocess.run([*restore, "--section=post-data", dump], check=True)
 
     assert db.execute("SELECT array_agg(user_id) FROM app_users").fetchone()[0] == [SYNTH]
-    assert db.execute("SELECT count(*), max(query) FROM app_events").fetchone() == (1, f"busqueda de {SYNTH}")
+    assert db.execute("SELECT count(*), max(query) FROM app_events").fetchone() == (1, f"pañales para {SYNTH}")
     assert db.execute("SELECT array_agg(data_source) FROM vertical_transitions").fetchone()[0] == ["synthetic"]
+    assert db.execute("SELECT array_agg(counts->>'fuente') FROM layer_runs").fetchone()[0] == ["synthetic"]
+    assert db.execute("SELECT count(*) FROM pg_constraint WHERE conname = 'app_events_user_id_fkey'").fetchone()[0] == 1
     assert db.execute("SELECT name FROM stores").fetchone()[0] == "Tienda de prueba"
     assert "personas: 1, eventos: 1, pedidos: 1" in (target / delivery.README_FILE).read_text(encoding="utf-8")
