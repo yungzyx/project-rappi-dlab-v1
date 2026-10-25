@@ -446,7 +446,7 @@ def test_a_failed_migration_stops_before_downloading(tmp_path, shell):
         # Posible bloqueo: no es un fallo cualquiera; la línea lo dice y no sigue con la IA.
         (4, 4, False, " (detenida: posible bloqueo)"),
         # robots.txt no permite una página: igual, se detiene y lo dice.
-        (7, 7, False, " (detenida: robots.txt no lo permite)"),
+        (7, 7, False, " (detenida: robots.txt no permite una página o no respondió)"),
         # Tiendas, búsqueda y respaldo quedaron; solo los restaurantes no se actualizaron.
         (5, 0, True, " (restaurantes sin actualizar)"),
         (6, 0, True, " (restaurantes sin actualizar; respaldo fallido: se conservan los anteriores)"),

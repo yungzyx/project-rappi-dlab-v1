@@ -9,7 +9,7 @@ import random
 import time
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
-from urllib.parse import quote, urlparse
+from urllib.parse import quote, urljoin, urlparse
 
 import requests
 
@@ -54,6 +54,9 @@ class RobotsDisallowed(DownloadStopped):
 # Errores esperables al bajar y leer una página: se registran y se sigue con la siguiente.
 PAGE_ERRORS = (PageNotFound, ParseError, requests.RequestException, RuntimeError)
 RETRY_STATUSES = (429, 500, 502, 503, 504)
+# Las redirecciones se siguen a mano, hasta este tope (RFC 9309 pide al menos 5 para robots.txt): robots.txt se revisa
+# antes de pedir cada destino, no después de bajarlo.
+MAX_REDIRECTS = 5
 BLOCK_STATUSES = (403, 429)
 
 
@@ -176,6 +179,22 @@ class RappiClient:
         if reason:
             raise RobotsDisallowed(f"{reason}: la descarga se detiene sin bajar esa página")
 
+    def _get(self, url: str, check_robots: bool) -> requests.Response:
+        """Un GET que sigue las redirecciones a mano: con `check_robots`, cada destino pasa por robots.txt antes de
+        pedirlo. La respuesta final trae en `url` adónde llegó (así se ve una tienda que redirige al listado)."""
+        response = self._session.get(url, timeout=config.TIMEOUT_SECONDS, allow_redirects=False)
+        for _ in range(MAX_REDIRECTS):
+            if not response.is_redirect:
+                return response
+            url = urljoin(response.url, response.headers["Location"])
+            response.close()
+            if check_robots:
+                self._check_robots(url)
+            response = self._session.get(url, timeout=config.TIMEOUT_SECONDS, allow_redirects=False)
+        if response.is_redirect:
+            raise requests.TooManyRedirects(f"más de {MAX_REDIRECTS} redirecciones hasta {url}")
+        return response
+
     def _request(self, url: str, check_robots: bool = True) -> requests.Response:
         if check_robots:
             self._check_robots(url)
@@ -183,7 +202,7 @@ class RappiClient:
             time.sleep(random.uniform(*config.REQUEST_DELAY_RANGE))
             wait = None
             try:
-                response = self._session.get(url, timeout=config.TIMEOUT_SECONDS)
+                response = self._get(url, check_robots)
             except requests.RequestException as exc:
                 log.warning("Error de red en %s (intento %d): %s", url, attempt, exc)
             else:
@@ -191,8 +210,6 @@ class RappiClient:
                     self._blocked_streak = 0
                     raise PageNotFound(url)
                 if response.status_code < 400:
-                    if check_robots and response.history:  # una redirección: también vale para donde terminó
-                        self._check_robots(response.url)
                     return response
                 if response.status_code in BLOCK_STATUSES:
                     self._count_rejection(url, f"HTTP {response.status_code}")

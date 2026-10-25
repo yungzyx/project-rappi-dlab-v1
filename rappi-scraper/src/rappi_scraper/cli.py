@@ -36,7 +36,7 @@ from .pipeline.refresh import JOB_TYPES, finish_and_report, refresh
 from .pipeline.restaurants import process_restaurant_jobs
 from .pipeline.stores import process_store_jobs
 from .reporting import render_markdown, write_run_report
-from .scraping.client import DownloadStopped, PossibleBlock, RappiClient
+from .scraping.client import DownloadStopped, PossibleBlock, RappiClient, RobotsDisallowed
 from .storage import repository
 from .storage.backup import backup_database
 from .storage.db import APPLIED_BY_DEPLOY, PendingMigrations, check_migrations, connect, database_url, migrate
@@ -169,6 +169,8 @@ def cmd_refresh(conn, args) -> None:
             state = "El reporte está en data/reports/; la corrida quedó abierta y la próxima actualización la retoma."
         else:  # al descubrir: la corrida se cerró y no hay qué retomar
             state = "Fue al descubrir: la corrida se cerró como fallida y la próxima actualización empieza otra."
+        if isinstance(exc, RobotsDisallowed):  # la próxima vuelve a pedir lo mismo: alguien tiene que decidir antes
+            state += " Si robots.txt sigue sin permitir esa página, la próxima se detendrá en el mismo lugar."
         print(f"Descarga detenida: {exc}. {state}", file=sys.stderr)
         raise SystemExit(POSSIBLE_BLOCK_EXIT if isinstance(exc, PossibleBlock) else ROBOTS_EXIT) from exc
     for report in reports:

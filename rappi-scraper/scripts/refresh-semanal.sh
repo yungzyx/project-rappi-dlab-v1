@@ -139,7 +139,7 @@ elif [ "$refresh_rc" -eq 4 ]; then
   nota="detenida: posible bloqueo"
   exit "$refresh_rc"
 elif [ "$refresh_rc" -eq 7 ]; then
-  nota="detenida: robots.txt no lo permite"
+  nota="detenida: robots.txt no permite una página o no respondió"
   exit "$refresh_rc"
 elif [ "$refresh_rc" -ne 0 ]; then
   exit "$refresh_rc"

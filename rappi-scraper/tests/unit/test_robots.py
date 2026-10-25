@@ -18,7 +18,7 @@ from rappi_scraper import config
 from rappi_scraper.pipeline.discover import CHAIN_SITEMAP, PARTNER_SITEMAP, VERTICAL_LISTINGS
 from rappi_scraper.scraping import client as client_module
 from rappi_scraper.scraping.client import DownloadStopped, RappiClient, RobotsDisallowed
-from rappi_scraper.scraping.robots import CACHE_SECONDS, RobotsPolicy
+from rappi_scraper.scraping.robots import CACHE_SECONDS, RETRY_SECONDS, RobotsPolicy
 
 AGENT = "rappi-dlab-scraper"
 RAPPI_ROBOTS = (FIXTURES_DIR / "robots.txt").read_text(encoding="utf-8")
@@ -40,7 +40,7 @@ def test_user_agent_names_the_program_and_its_version_not_a_browser():
 
 
 def test_project_and_contact_come_from_the_environment():
-    clean = {k: v for k, v in os.environ.items() if not k.startswith("RAPPI_UA_")}
+    clean = {k: v for k, v in os.environ.items() if not k.startswith("RAPPI_UA_")} | {"RAPPI_ENV_FILE": os.devnull}
     code = "from rappi_scraper import config; print(config.UA_PROJECT); print(config.USER_AGENT)"
 
     def run(**env):
@@ -109,6 +109,26 @@ def test_the_group_of_the_program_wins_over_the_generic_one():
     policy = RobotsPolicy(AGENT, lambda url: text)
     assert policy.denial("https://a.example/tiendas/1") is None
     assert policy.denial("https://a.example/restaurantes/1") is not None
+
+
+def test_if_the_renewal_does_not_answer_the_previous_copy_is_kept_and_asked_again_later():
+    """Una descarga de días no se detiene porque robots.txt no respondió justo al renovarlo (RFC 9309 §2.4)."""
+    now, answers = [0.0], ["User-agent: *\nDisallow: /privado\n", RuntimeError("caído"), "User-agent: *\nDisallow: /\n"]
+
+    def fetch(url):
+        answer = answers.pop(0)
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
+
+    policy = RobotsPolicy(AGENT, fetch, clock=lambda: now[0])
+    assert policy.denial("https://a.example/uno") is None
+    now[0] = CACHE_SECONDS + 1
+    assert policy.denial("https://a.example/uno") is None  # no respondió: sigue la copia de antes
+    assert "no permite /privado" in policy.denial("https://a.example/privado")
+    now[0] += RETRY_SECONDS + 1
+    assert policy.denial("https://a.example/uno") is not None  # la nueva ya no permite nada
+    assert answers == []
 
 
 def test_no_robots_txt_means_no_rules_and_an_unreachable_one_means_nothing_is_allowed():
@@ -195,16 +215,24 @@ def test_the_client_asks_for_robots_txt_first_and_once(site):
 
 def test_a_forbidden_page_stops_the_download_without_asking_for_it(site):
     client, base, requested = site
-    with pytest.raises(RobotsDisallowed, match="no permite /privado/x a rappi-dlab-scraper") as stopped:
+    with pytest.raises(RobotsDisallowed, match=f"no permite /privado/x a {config.UA_PROJECT}") as stopped:
         client.get_json(base + "/privado/x")
     assert isinstance(stopped.value, DownloadStopped)  # la corrida queda abierta, como con un posible bloqueo
     assert requested == ["/robots.txt"]
 
 
-def test_a_redirect_to_a_forbidden_page_also_stops(site):
+def test_a_redirect_to_a_forbidden_page_stops_before_asking_for_it(site):
     client, base, requested = site
     with pytest.raises(RobotsDisallowed, match="/privado/pagina"):
         client.get_json(base + "/redirige")
+    assert requested == ["/robots.txt", "/redirige"]  # el destino nunca se pidió
+
+
+def test_an_allowed_redirect_is_followed(site):
+    client, base, requested = site
+    _FakeSite.robots = "User-agent: *\nDisallow: /nada\n"
+    assert client.get_json(base + "/redirige") == {}
+    assert requested == ["/robots.txt", "/redirige", "/privado/pagina"]
 
 
 @pytest.mark.parametrize("status", [404, 403])
