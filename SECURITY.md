@@ -26,9 +26,9 @@ Si encuentras una clave o un secreto en el repositorio o en su historial, avísa
 ## Datos
 
 - **Personas:** solo simuladas (`source = 'synthetic'`) o del prototipo (`'prototype'`, con id seudónimo del navegador y sin cuenta). Las consultas se guardan con los datos personales redactados (correo, RUT, tarjetas, teléfonos) y su texto se borra a los 90 días; la persona borra lo suyo con «Borrar mis datos».
-- **Secretos:** solo se versionan los `.env.example`. `API_SECRET`, las claves de la base, `ANTHROPIC_API_KEY`, `TYPESAFE_API_KEY` y las de restic viven en los `.env` locales o en `/etc/rappi/rappi.env` del servidor, nunca en git.
+- **Secretos:** solo se versionan los `.env.example`, y el CI revisa los archivos versionados con gitleaks. `API_SECRET`, las claves de la base, `ANTHROPIC_API_KEY`, `TYPESAFE_API_KEY` y las de restic viven en los `.env` locales o en `/etc/rappi/rappi.env` del servidor, nunca en git.
 - **Catálogo:** el contenido descargado de rappi.cl no se versiona; viaja en un respaldo de la base por un canal acordado.
 
 ## Descarga del catálogo
 
-El scraper lee solo páginas públicas de rappi.cl, una a la vez, con pausas de 1,5 a 3 s, y se detiene ante señales de bloqueo. En un servidor, la descarga semanal viene apagada. Si Rappi quiere que se detenga, que cambie su ritmo o que se identifique de otra forma, basta con avisar por el mismo canal: detalle en [rappi-scraper/README.md](rappi-scraper/README.md).
+El scraper lee solo páginas públicas de rappi.cl, una a la vez, con pausas de 1,5 a 3 s. Se presenta con su propio User-Agent (`rappi-dlab-scraper`, con un contacto en `RAPPI_UA_CONTACT`), respeta robots.txt y se detiene ante una página no permitida o ante señales de bloqueo. En un servidor, la descarga semanal viene apagada. Si Rappi quiere que se detenga, que cambie su ritmo o que se identifique de otra forma, basta con avisar por el mismo canal: detalle en [rappi-scraper/README.md](rappi-scraper/README.md).

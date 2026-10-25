@@ -83,7 +83,7 @@ Las fuentes JSON de los diagramas están en [diagramas-fuente/](diagramas-fuente
 | Reporte | Dónde | Cómo se genera |
 |---|---|---|
 | Evaluación del motor multivertical (uno por fuente) | `rappi-ia/data/eval/motor-{fuente}.md` | `make motor` en `rappi-ia/`. La copia versionada está en [resultados/](resultados/) |
-| Evaluación de la búsqueda | `rappi-ia/data/eval/busqueda.md` | `make eval` en `rappi-ia/` (también guarda τ; solo el reporte: `make eval EVAL_ARGS=`). La copia versionada está en [resultados/](resultados/) |
+| Evaluación de la búsqueda | `rappi-ia/data/eval/busqueda.md` | `make eval` en `rappi-ia/` (propone τ en el reporte; `make eval GUARDAR_TAU=1` lo guarda en `eval/thresholds.json`). La copia versionada está en [resultados/](resultados/) |
 | Piloto de Jev (si se corrió) | `rappi-ia/data/eval/jev-piloto.md` | `rappi-ia jev-piloto`, con la clave y las planillas juzgadas (ver [jev.md](jev.md)) |
 | Calidad de cada corrida del scraper | `rappi-scraper/data/reports/` | Al terminar cada corrida, o con `rappi report` |
 | Logs de las corridas | `rappi-scraper/data/logs/` y `rappi-ia/data/logs/` | Automático |
@@ -96,6 +96,5 @@ Reflejan el estado a su fecha y no se actualizan con cada corrida.
 |---|---|---|
 | [historial/decisiones-reemplazadas.md](historial/decisiones-reemplazadas.md) | 26-09 al 24-10-2026 | Las decisiones que ya no rigen (los modos anteriores del prototipo, el pasaporte y el juego de verticales, el chat con voz y foto), cada una con la que la reemplazó |
 | [ecosistema-rappi.md](ecosistema-rappi.md) §1 y §2 | Investigación con fuentes públicas al 26-09-2026 | Los servicios de Rappi en Chile y cómo modelan sus datos otras super-apps comparables. El modelo de datos (§3) sigue vigente |
-| Scraper original a CSV (`rappi-csv`) | Anterior a la base de datos | Sección [«Legado»](../rappi-scraper/README.md#legado-scraper-original-a-csv-rappi-csv) del README del scraper |
 
 Bigotes es el nombre anterior de Mochi (hasta el 09-10-2026); los documentos fechados conservan el nombre de su fecha.

@@ -312,7 +312,7 @@ Notas del modelo:
 - **Jev:** `eval_judgments` guarda los juicios de Jev (migración 030), y el mapa de categorías suma el método `jev`.
 - **Motor multivertical:** siete tablas (migración 036): `user_vertical_affinity` y `replenishment` por persona (se van con «Olvidar»), y `vertical_transitions`, `combo_stats`, `combo_steps`, `cross_sell_rules` y `trends` por población, con `data_source` (`synthetic` o `prototype`). No están en el diagrama: dependen de `app_users`, `app_orders` y `concepts`. Cada una tiene su vista en `capa` ([capa-de-datos.md](capa-de-datos.md#motor-multivertical)).
 - **Capa de datos:** las vistas estables para otras herramientas están en el esquema `capa` ([capa-de-datos.md](capa-de-datos.md)).
-- **Tabla sin uso:** `image_embeddings` (de una versión anterior) sigue en la base, sin que nada la escriba ni la lea; una migración para borrarla se dejó fuera para no tocar el historial.
+- **Tabla borrada:** `image_embeddings` (de cuando Mochi buscaba por foto) quedó sin uso el 10-10-2026 y la migración 042 la borra.
 - **Procedencia:** todo dato inferido guarda `method` (`curado`, `llm`, `regla`, `embedding`, `coocurrencia`), `confidence`, `model_version` y fecha. Los datos de usuario guardan `source`.
 - **H3:** queda para después, porque no lo necesita ninguna vista de este plan.
 

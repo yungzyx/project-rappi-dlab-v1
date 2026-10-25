@@ -130,12 +130,12 @@ Cada cifra dice qué tipo de dato es. El detalle, con los reportes de cada fecha
 
 ## Probarlo
 
-Requisitos (el detalle, en [docs/instalacion.md](docs/instalacion.md)): Python 3.13, Node 22.22+ o 24.15+ y Postgres 17 con pgvector. La instalación local está escrita para macOS con Homebrew; en Linux, el camino probado es el de Docker ([docs/despliegue.md](docs/despliegue.md)).
+Requisitos (el detalle, en [docs/instalacion.md](docs/instalacion.md)): Python 3.13, Node 22.22+ o 24.15+ y Postgres 17 con pgvector, con Homebrew (`make db`) o con Docker (`make db-docker`).
 
 ```bash
-cd rappi-scraper && make db install && cd ..            # Postgres 17 + pgvector (Homebrew), bases rappi y rappi_test, .venv del scraper
-cd rappi-ia && make install install-ml db-test && cd ..  # .venv de la capa de IA, los modelos (~1 GB) y la base rappi_ia_test
-(cd prototipo-app && npm ci) && (cd dashboard-empresa && npm ci)
+make install                                    # desde la raíz: los .venv de rappi-scraper y rappi-ia (con el lock), la app y el panel
+cd rappi-scraper && make db && cd ..            # Postgres 17 + pgvector con Homebrew (o `make db-docker`, con Docker)
+cd rappi-ia && make install-ml db-test && cd .. # los modelos de IA (~1 GB) y la base rappi_ia_test
 ```
 
 ### Sin la base: `make mvp-check`
@@ -175,7 +175,7 @@ Una demo cerrada en un servidor Linux con Docker Compose: Caddy con TLS y una pu
 - **Simulado:** el pago, el seguimiento del pedido (llega a los 20 s) y las personas, eventos y pedidos de los que el motor aprende la población y con los que se calculan segmentos y métricas.
 - **Compartido por Rappi:** la tabla de combinaciones de verticales y su retención (cohortes de enero a junio de 2026), en `rappi-ia/src/rappi_ia/motor/combos.toml`. Es una correlación, no un efecto.
 - **Uso del MVP:** lo que hicieron en la app las pocas personas que la probaron (`source = 'prototype'`). El panel lo rotula «uso del MVP, pocas personas: no es evidencia».
-- **Uso responsable:** solo páginas públicas sin barreras técnicas, sin APIs internas ni inicio de sesión, una descarga a la vez con pausas de 1,5 a 3 s y una actualización por semana. Sin datos personales: los usuarios son simulados o del prototipo (id seudónimo). Los datos descargados no se versionan: llegan en un respaldo de la base. Las páginas de prueba del scraper (`rappi-scraper/tests/fixtures/`) son copias reducidas de páginas públicas. Fines de investigación y demostración; un uso comercial requeriría autorización de Rappi.
+- **Uso responsable:** solo páginas públicas sin barreras técnicas, sin APIs internas ni inicio de sesión, una descarga a la vez con pausas de 1,5 a 3 s y una actualización por semana. El scraper se presenta con su propio User-Agent y respeta robots.txt: si una página no está permitida, la descarga se detiene. Sin datos personales: los usuarios son simulados o del prototipo (id seudónimo). Los datos descargados no se versionan: llegan en un respaldo de la base. Las páginas de prueba del scraper (`rappi-scraper/tests/fixtures/`) son copias reducidas de páginas públicas. Fines de investigación y demostración; un uso comercial requeriría autorización de Rappi.
 
 ## Límites
 
@@ -186,7 +186,7 @@ Una demo cerrada en un servidor Linux con Docker Compose: Caddy con TLS y una pu
 - **Preguntas a Mochi:** las entiende con reglas, no con un LLM, así que una pregunta que las reglas no cubren se busca por palabras. No es un chat: no recuerda la pregunta anterior.
 - **Turbo sin actualizar:** sus tiendas ya no aparecen como Turbo en los listados públicos que recorre el scraper; sus precios son del 27-09-2026.
 - **Evaluación automática:** no hay juicio humano, y el refuerzo por concepto favorece al híbrido. «Sin resultado» detecta 54 de 58 negativas, con un umbral calibrado sobre ese mismo set; el [reporte](docs/resultados/busqueda-2026-10-22.md) explica las demás.
-- **Demo cerrada:** sin cuentas ni lanzamiento abierto. En local la API no tiene puerta de acceso y la instalación está pensada para macOS (Homebrew, launchd); en un servidor, todo el sitio va detrás de usuario y clave.
+- **Demo cerrada:** sin cuentas ni lanzamiento abierto. En local la API no tiene puerta de acceso y la tarea semanal local es de macOS (launchd; en Linux, los timers de systemd de `deploy/`); en un servidor, todo el sitio va detrás de usuario y clave.
 - **Cambios del sitio:** si rappi.cl cambia su frontend, hay que ajustar los parsers; el reporte de cada corrida marca las respuestas anómalas.
 
 ## Panel de negocio

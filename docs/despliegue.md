@@ -12,19 +12,20 @@ Antes de empezar, quien despliega decide o consigue lo siguiente. Todos los valo
 |---|---|
 | **Dominio y DNS:** un registro A (y AAAA si hay IPv6) hacia el servidor. Caddy pide el certificado solo | `DOMAIN` |
 | **Servidor:** mínimo 4 vCPU, 8 GB de RAM y 60 GB de SSD, con Docker Engine y el plugin compose ([§8](#8-tamaño-y-postgres)) | — |
-| **Puerta de acceso:** un usuario y una clave. La clave se guarda solo como hash: `docker run --rm -it caddy:2 caddy hash-password` (la pide dos veces y no queda en el historial) | `BASIC_AUTH_USER` y `BASIC_AUTH_HASH` (entre comillas simples) |
+| **Puerta de acceso:** un usuario y una clave. La clave se guarda solo como hash: `docker run --rm -it caddy:2.11.7-alpine caddy hash-password` (la pide dos veces y no queda en el historial) | `BASIC_AUTH_USER` y `BASIC_AUTH_HASH` (entre comillas simples) |
 | **Claves de la base:** superusuario, dueño de las tablas y rol de la API, cada una con `openssl rand -hex 32` | `POSTGRES_PASSWORD`, `RAPPI_OWNER_PASSWORD` y `RAPPI_API_PASSWORD`, repetidas en `DATABASE_URL_OWNER` y `DATABASE_URL_API` |
 | **Secreto de la sesión anónima:** `openssl rand -hex 32` | `API_SECRET` |
 | **Copia de los respaldos fuera del servidor:** un repositorio de restic (S3, B2…), su clave y las credenciales del almacenamiento. El repositorio se crea una vez a mano con `restic init` ([§3.9](#39-respaldos-y-timers)) | `RESTIC_REPOSITORY`, `RESTIC_PASSWORD` y, por ejemplo, `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` o `B2_ACCOUNT_ID`/`B2_ACCOUNT_KEY`. Solo llegan al servicio `jobs` |
 | **Claude (opcional):** sin clave, el agente responde con plantillas | `ANTHROPIC_API_KEY` |
 | **Tope diario de redacciones con Claude** (por proceso de la API; alcanzado, responden las plantillas) | `LLM_DAILY_CALL_CAP` (300 por defecto) |
 | **Jev (opcional, solo en `jobs`):** ver [jev.md](jev.md) | `TYPESAFE_API_KEY` |
+| **Contacto del scraper** (solo si se activa la descarga semanal en el servidor): una URL o un correo para que Rappi sepa a quién escribir; va en el User-Agent | `RAPPI_UA_CONTACT` (y `RAPPI_UA_PROJECT`, el nombre) |
 
 Decisiones para quien despliega:
 
 - **`VITE_DEMO`:** con `VITE_DEMO=1` la app desplegada trae el interruptor «Prototipo final / Rappi hoy» (tecla D); vacío, no. Se aplica al construir `web`.
 - **El panel:** `WITH_PANEL=1` lo construye en `/panel/` y `API_ENABLE_ANALYTICS=1` enciende `/analytics/*`, que el panel lee. Van juntos: con los dos en 0 se despliega solo la app.
-- **La descarga semanal en el servidor** (`rappi-refresh.timer`, que viene apagado): solo después de decidir la política de User-Agent y robots.txt y de aceptar que rappi.cl pueda frenar una IP de datacenter ([§9](#9-riesgos)). Hasta entonces la descarga semanal corre en el equipo local que ya la tiene programada.
+- **La descarga semanal en el servidor** (`rappi-refresh.timer`, que viene apagado): solo después de poner el contacto del scraper (`RAPPI_UA_CONTACT`) y de aceptar que rappi.cl pueda frenar una IP de datacenter ([§9](#9-riesgos)). Hasta entonces la descarga semanal corre en el equipo local que ya la tiene programada.
 - **Retención:** las personas del prototipo sin actividad se borran a los 180 días (`PROTOTYPE_USER_RETENTION_DAYS`) y el texto de las búsquedas, a los 90 ([§7](#qué-se-guarda-y-cuánto-tiempo)). Los 90 días no son una variable sino una constante del código (`QUERY_RETENTION_DAYS`); otro plazo exige `rappi-ia purge --dias N` en `rappi-purge.service`. Confirmar los dos plazos.
 
 ## 1. Arquitectura
@@ -39,7 +40,7 @@ Un solo servidor y un stack de Docker Compose ([`deploy/docker-compose.yml`](../
 |---|---|---|
 | `web` | `rappi-web` (Caddy con la app, y el panel si `WITH_PANEL=1`) | El único con puertos: 80 y 443 (también 443/udp). TLS, la puerta sobre todo el sitio, cabeceras de seguridad, los archivos de la app en `/` y del panel en `/panel/`, y `/api/*` hacia la API sin el prefijo. Corre sin root (uid 10002) |
 | `api` | `rappi-api` | FastAPI con 1 worker, conectada como `rappi_api`. Con `API_ENV=production`; el modelo de texto va dentro de la imagen |
-| `db` | `pgvector/pgvector:pg17` | Postgres + pgvector en el volumen `pgdata`, sin puertos publicados |
+| `db` | `pgvector/pgvector:0.8.7-pg17-trixie` | Postgres + pgvector en el volumen `pgdata`, sin puertos publicados |
 | `migrate` | `rappi-jobs` | Corre una vez por despliegue, como `rappi_owner`: `rappi-ia deploy-migrate`. La API espera a que termine bien |
 | `jobs` | `rappi-jobs` (perfil `jobs`) | Los trabajos del operador como `rappi_owner`: purga, respaldos, restauración, y la descarga semanal si se activa |
 
@@ -130,6 +131,7 @@ Todas van en `/etc/rappi/rappi.env`, salvo las que fija `docker-compose.yml` o l
 | — (texto de las búsquedas) | jobs (`rappi-ia purge`) | 90 días: constante `QUERY_RETENTION_DAYS`, no variable; `rappi-ia purge --dias N` lo cambia | — | no |
 | `LOG_RETENTION_WEEKS` | jobs (registros de cada comando del scraper) | `8` | `8` | no |
 | `PG_DUMP`, `RAPPI_BIN`, `RAPPI_IA_PY` | jobs (los fija la imagen) | `/usr/lib/postgresql/17/bin/pg_dump`, `rappi`, `python` | — | no |
+| `RAPPI_UA_PROJECT`, `RAPPI_UA_CONTACT` | jobs (solo la descarga: el User-Agent; el proyecto es también su nombre en robots.txt) | `rappi-dlab-scraper`, vacío | —, `https://…` o un correo | no |
 | `RAPPI_DELAY_MIN`, `RAPPI_DELAY_MAX`, `RAPPI_TIMEOUT`, `RAPPI_MAX_RETRIES`, `RAPPI_RETRY_BACKOFF` | jobs (solo la descarga) | `1.5`, `3.0`, `30`, `3`, `10` | — | no |
 
 Las claves de la base van dentro de URLs: usar solo letras y números (`openssl rand -hex 32`). Un valor con `$` va entre comillas simples.
@@ -150,7 +152,7 @@ Todos los comandos van **como root** (o con `sudo`), en **bash**, desde la carpe
 ```bash
 install -d -m 700 /etc/rappi
 install -m 600 /opt/rappi/deploy/.env.example /etc/rappi/rappi.env
-docker run --rm -it caddy:2 caddy hash-password   # pide la clave de la puerta y escribe su hash
+docker run --rm -it caddy:2.11.7-alpine caddy hash-password   # pide la clave de la puerta y escribe su hash
 openssl rand -hex 32                              # una vez por cada clave y para API_SECRET
 ```
 
@@ -184,7 +186,25 @@ Con el volumen `pgdata` vacío, la imagen de Postgres corre una vez [`deploy/db/
 
 ### 3.5 Restaurar el catálogo
 
-El catálogo llega en un respaldo de la base: el de entrega (`make dump-entrega`, sin el uso del MVP; ver [instalacion.md §3](instalacion.md#3-base-de-datos)) o uno del equipo de la descarga semanal (`make backup` en `rappi-scraper/` deja `data/backups/rappi_<fecha>.dump`). Copiarlo al servidor (`scp`) y restaurarlo **como `rappi_owner`**, dentro del contenedor de la base:
+El catálogo llega en un respaldo de la base: el de entrega (`make dump-entrega`, sin el uso del MVP; ver [rappi-ia/README.md](../rappi-ia/README.md#respaldo-de-entrega)) o uno del equipo de la descarga semanal (`make backup` en `rappi-scraper/` deja `data/backups/rappi_<fecha>.dump`). Se copia al servidor (`scp`) y se restaura **como `rappi_owner`**, dentro del contenedor de la base.
+
+**El respaldo de entrega** (la carpeta `entrega_<fecha>/`, con `catalogo.dump` y `poblacion-simulada.sql`) va en tres pasos, como dice su `LEEME.txt`: las tablas y el catálogo, la población simulada, y al final los índices, las claves foráneas y los triggers:
+
+```bash
+$COMPOSE cp ruta/a/entrega_<fecha>/catalogo.dump db:/tmp/catalogo.dump
+$COMPOSE cp ruta/a/entrega_<fecha>/poblacion-simulada.sql db:/tmp/poblacion.sql
+$COMPOSE exec -T db sh -c 'export PGPASSWORD="$RAPPI_OWNER_PASSWORD" \
+  && pg_restore -l /tmp/catalogo.dump | grep -v "COMMENT - EXTENSION" > /tmp/catalogo.list \
+  && pg_restore -h 127.0.0.1 -U rappi_owner -d "$POSTGRES_DB" --no-owner --no-privileges --exit-on-error \
+       --section=pre-data --section=data -L /tmp/catalogo.list /tmp/catalogo.dump \
+  && psql -h 127.0.0.1 -U rappi_owner -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -q -f /tmp/poblacion.sql \
+  && PGOPTIONS="-c maintenance_work_mem=1GB" pg_restore -h 127.0.0.1 -U rappi_owner -d "$POSTGRES_DB" \
+       --no-owner --no-privileges --exit-on-error --section=post-data /tmp/catalogo.dump \
+  && vacuumdb -h 127.0.0.1 -U rappi_owner -d "$POSTGRES_DB" --analyze-only'
+$COMPOSE exec -T db rm /tmp/catalogo.dump /tmp/catalogo.list /tmp/poblacion.sql
+```
+
+**Un respaldo de `make backup`** (un solo `.dump`) va en un paso:
 
 ```bash
 $COMPOSE cp ruta/al/rappi_<fecha>.dump db:/tmp/catalogo.dump
@@ -272,7 +292,7 @@ deploy/smoke.sh https://<dominio>    # con BASIC_AUTH_PASSWORD exportada (§3.8)
 - Un cambio de `VITE_DEMO` o `WITH_PANEL` exige `$COMPOSE build web` y `up -d`.
 - **El motor multivertical en el servidor.** Sus tablas de población (transiciones, combinaciones, compra cruzada y tendencias) llegan con el dump y no se recalculan solas: `jobs` solo purga y respalda, y `rappi-refresh.timer` (cuya capa de IA incluye el motor) viene apagado. La afinidad y la recompra de cada persona del prototipo las recalcula la API después de cada pedido y de «Olvidar». Para recalcular la población: `$COMPOSE --profile jobs run --rm jobs rappi-ia motor` ([capa-de-datos.md](capa-de-datos.md#motor-multivertical)).
 - **`pg_prewarm` en un volumen de antes de la migración 034:** `init-roles.sh` no vuelve a correr y `rappi_owner` no puede crear la extensión, así que `migrate` la salta sin fallar (el aviso de Postgres no aparece en su salida). La señal está en el registro de la API al arrancar: `$COMPOSE logs api | grep -i precarga` muestra «Precarga de la búsqueda: falta la extensión pg_prewarm…», y la API funciona igual, sin precarga (la primera búsqueda de cada vertical lee sus índices del disco). Crearla una vez como superusuario: `$COMPOSE exec db psql -U postgres -d rappi -c 'CREATE EXTENSION IF NOT EXISTS pg_prewarm'` y `$COMPOSE restart api`; el registro dice entonces «Precarga de la búsqueda: N índices en X s». También hace falta antes de restaurar ahí un dump que ya la trae (uno del Mac mini después de la 034): sin ella, `pg_restore` como `rappi_owner` falla. En producción la extensión queda sin el comentario de la 034: solo su dueño (el superusuario que la creó) puede ponerlo, y la migración lo salta.
-- **`rappi_api` precarga solo con Postgres 17.7 o más nuevo:** desde esa versión `pg_prewarm` revisa el permiso SELECT sobre la tabla del índice, que da `grants.sql`; antes lo pedía sobre el índice, y un índice no tiene permisos que dar. La imagen `pgvector/pgvector:pg17` sigue al último 17.x, pero una ya descargada no se actualiza sola (`$COMPOSE exec db postgres --version`; para subirla, `$COMPOSE pull db` y `$COMPOSE up -d db`). Con una anterior, la API anota «No se pudo precargar los índices de la búsqueda (0 leídos): permission denied…» y sigue sin precarga.
+- **`rappi_api` precarga solo con Postgres 17.7 o más nuevo:** desde esa versión `pg_prewarm` revisa el permiso SELECT sobre la tabla del índice, que da `grants.sql`; antes lo pedía sobre el índice, y un índice no tiene permisos que dar. La imagen fijada (`pgvector/pgvector:0.8.7-pg17-trixie`) trae un 17.x reciente; para revisar la versión, `$COMPOSE exec db postgres --version`, y para subirla, cambiar la etiqueta en `docker-compose.yml`, `$COMPOSE pull db` y `$COMPOSE up -d db`. Con una anterior, la API anota «No se pudo precargar los índices de la búsqueda (0 leídos): permission denied…» y sigue sin precarga.
 
 ## 5. Volver atrás
 
@@ -449,7 +469,7 @@ Ni IPs ni cuentas en la base: la cuenta de personas nuevas por IP vive solo en m
 ## 9. Riesgos
 
 - **IP de datacenter:** rappi.cl puede frenar o bloquear descargas desde una IP de un proveedor de nube más rápido que desde una casa. Por eso la descarga semanal sigue en un equipo local y `rappi-refresh.timer` viene apagado; activarlo lo decide quien despliega. Nunca dos descargas a la vez: si se activa en el servidor, antes `make unschedule` en el equipo local.
-- **User-Agent y robots.txt:** el scraper se identifica como `rappi-dlab-scraper/<versión>` (`RAPPI_UA_PROJECT`) y respeta lo que robots.txt diga para ese nombre; `RAPPI_UA_CONTACT` suma una URL o un correo de contacto ([`rappi-scraper/.env.example`](../rappi-scraper/.env.example)). Antes de descargar desde un servidor, conviene poner ese contacto.
+- **User-Agent y robots.txt:** el scraper se identifica como `rappi-dlab-scraper/<versión>` (`RAPPI_UA_PROJECT`) y, antes de cada página, consulta robots.txt para ese nombre. Si una página no está permitida (o robots.txt no responde), la descarga se detiene, la corrida queda abierta y `rappi refresh` sale con el código 7; mientras robots.txt no cambie, la próxima se detiene en la misma página ([rappi-scraper/README.md](../rappi-scraper/README.md)). `RAPPI_UA_CONTACT` suma una URL o un correo de contacto: antes de descargar desde un servidor, conviene ponerlo.
 - **El catálogo del servidor no se actualiza solo:** sin la descarga semanal en el servidor, queda con la fecha del respaldo restaurado. Traer uno más nuevo exige restaurar la base entera, que borra las personas `prototype` y su uso; una sincronización parcial (solo catálogo) no está hecha.
 - **Sin lanzamiento abierto:** los datos son de rappi.cl y de sus comercios, y se usan solo para investigación y demostración. Abrir la demo sin puerta o a cualquiera exige autorización de Rappi; por eso no hay cuentas, pagos ni rutas abiertas.
 - **`make mvp` no es para un servidor:** es la demo local. Migra la base directamente, **sin respaldo**, aunque `API_ENV=production`. En el servidor se migra solo con `$COMPOSE run --rm migrate`.

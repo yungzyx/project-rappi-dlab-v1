@@ -7,16 +7,16 @@ Guía corta para cambiar el código de rappi-dlab. Las convenciones e invariante
 Instalación completa, con la base y la actualización semanal: [docs/instalacion.md](docs/instalacion.md). En corto, desde la raíz:
 
 ```bash
-cd rappi-scraper && make db install && cd ..       # Postgres 17 + pgvector (Homebrew), bases rappi y rappi_test
-cd rappi-ia && make install install-ml db-test && cd ..
-(cd prototipo-app && npm ci) && (cd dashboard-empresa && npm ci)
+make install                                    # los .venv de rappi-scraper y rappi-ia (con el lock), la app y el panel
+cd rappi-scraper && make db && cd ..            # Postgres 17 + pgvector con Homebrew (o `make db-docker`, con Docker)
+cd rappi-ia && make install-ml db-test && cd .. # los modelos de IA (~1 GB) y la base rappi_ia_test
 ```
 
 Requisitos: Python 3.13, Node 22.22+ o 24.15+ (`.nvmrc`) y Postgres 17 con pgvector.
 
 ## Antes de abrir un PR
 
-Corre lo que corresponde a lo que cambiaste. El CI corre todo esto en cada PR.
+Corre lo que corresponde a lo que cambiaste; `make test` y `make lint` en la raíz corren todo lo de los cuatro subproyectos. El CI corre todo esto en cada PR, además de gitleaks sobre los archivos versionados.
 
 | Si tocaste… | Corre |
 |---|---|
