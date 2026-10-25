@@ -51,8 +51,8 @@ class NextOrderContext(Clean):
 
 
 class ToTryContext(Clean):
-    """Sin datos: las verticales ya probadas salen de los pedidos de la persona (un cliente viejo que manda `stamped`
-    recibe un 422)."""
+    """Sin datos: las verticales ya probadas salen de los pedidos de la persona (un contexto con campos recibe un
+    422)."""
 
     model_config = ConfigDict(extra="forbid")
 

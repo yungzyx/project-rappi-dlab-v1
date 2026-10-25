@@ -269,8 +269,8 @@ def test_vertical_to_try_ignores_the_orders_of_other_people(client, db):
     assert offer(client, "vertical_por_probar", {}).json()["vertical"] == "supermercado"
 
 
-def test_vertical_to_try_rejects_the_old_stamped_context(client):
-    reply = offer(client, "vertical_por_probar", {"stamped": []})
+def test_vertical_to_try_rejects_an_unknown_context(client):
+    reply = offer(client, "vertical_por_probar", {"probadas": []})
 
     assert reply.status_code == 422
 

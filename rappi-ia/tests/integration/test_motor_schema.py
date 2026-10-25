@@ -28,7 +28,7 @@ def test_vertical_open_is_a_valid_event(db):
     db.execute("INSERT INTO app_users (user_id, source) VALUES ('u1', 'prototype')")
     db.execute(EVENT, ("vertical_open",))
     with pytest.raises(psycopg.errors.CheckViolation), db.transaction():
-        db.execute(EVENT, ("game_round_finished",))
+        db.execute(EVENT, ("tipo_inventado",))
 
 
 def test_layer_runs_accepts_motor(db):
