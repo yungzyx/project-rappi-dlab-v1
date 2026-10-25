@@ -92,7 +92,7 @@ def test_round_two_occasions(text, occasion):
 
 
 def test_asking_for_a_recommendation_is_not_a_search():
-    for text in ("qué me recomiendas", "oye bigotes me recomiendas algo?"):
+    for text in ("qué me recomiendas", "oye mochi me recomiendas algo?"):
         assert U.understand(None, text, "supermercado").kind == "recomendar", text
 
 
