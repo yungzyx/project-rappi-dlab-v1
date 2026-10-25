@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { fixture, stubApi } from '../../api/testing'
+import { fixture, stubApi } from '../../test/api'
 import { userId } from '../../api/user'
 import { ToastProvider } from '../../components/Toast'
 import { AddressProvider } from '../../state/AddressContext'

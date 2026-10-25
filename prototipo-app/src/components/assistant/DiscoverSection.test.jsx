@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 import { toPrototypeProduct } from '../../api/client'
-import { fixture } from '../../api/testing'
+import { fixture } from '../../test/api'
 import DiscoverSection from './DiscoverSection'
 
 afterEach(cleanup)

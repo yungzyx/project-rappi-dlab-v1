@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
-import { fixture, stubApi } from '../../../api/testing'
+import { fixture, stubApi } from '../../../test/api'
 import { routeForScreen } from '../../../data/verticals'
 import { today } from '../../../utils/today'
 

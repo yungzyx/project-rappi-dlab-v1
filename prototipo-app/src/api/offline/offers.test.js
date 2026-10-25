@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { complementOf, makeOffer, offerableProduct } from './offers'
 import { decodeSnapshot } from './snapshot'
-import { CONCEPTS, META, product, recordedStep } from './testMeta'
+import { CONCEPTS, META, product, recordedStep } from '../../test/offlineMeta'
 
 const NOW = Date.UTC(2026, 9, 17, 15)
 let n = 0

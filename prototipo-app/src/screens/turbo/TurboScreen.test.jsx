@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest'
-import { fixture, stubApi } from '../../api/testing'
+import { fixture, stubApi } from '../../test/api'
 import ProductSheet from '../../components/ProductSheet'
 import { ToastProvider } from '../../components/Toast'
 import { AssistantProvider } from '../../state/AssistantContext'

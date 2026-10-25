@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from 'vitest'
-import { fixture, stubApi } from '../../api/testing'
+import { fixture, stubApi } from '../../test/api'
 import { ToastProvider } from '../../components/Toast'
 import { FavoritesProvider } from '../../state/FavoritesContext'
 import FavoritesScreen from './FavoritesScreen'

@@ -21,7 +21,7 @@ import BackButton from '../BackButton'
 import ForgetConfirm, { FORGET_TITLE } from '../ForgetConfirm'
 import Sheet from '../Sheet'
 import AgentMessage from './AgentMessage'
-import AskMochiRow from './AskMochiRow'
+import AskAgentRow from './AskAgentRow'
 import DiscoverSection from './DiscoverSection'
 import Mascot from './Mascot'
 import { SparkleIcon } from './SmartBar'
@@ -486,7 +486,7 @@ export default function AssistantPanel({ push, vertical, depth = 1 }) {
       <div ref={bodyRef} className="agent-search-body">
         {search.hasQuery ? (
           <div className="agent-block">
-            <AskMochiRow
+            <AskAgentRow
               query={search.query.trim()}
               question={looksLikeQuestion(search.query)}
               hintId={askHintId}

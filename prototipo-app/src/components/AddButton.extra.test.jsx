@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { toPrototypeProduct } from '../api/client'
-import { fixture } from '../api/testing'
+import { fixture } from '../test/api'
 import { AssistantProvider } from '../state/AssistantContext'
 import { CartProvider } from '../state/CartContext'
 import { DemoProvider } from '../state/DemoContext'

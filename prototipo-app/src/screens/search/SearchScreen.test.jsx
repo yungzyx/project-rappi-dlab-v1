@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { fixture, stubApi } from '../../api/testing'
+import { fixture, stubApi } from '../../test/api'
 import ProductSheet from '../../components/ProductSheet'
 import { AssistantProvider } from '../../state/AssistantContext'
 import { CartProvider } from '../../state/CartContext'

@@ -1,7 +1,7 @@
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { ToastProvider } from '../components/Toast'
-import { fixture, stubApi } from './testing'
+import { fixture, stubApi } from '../test/api'
 import { useShopAisles } from './useShopAisles'
 
 afterEach(() => {

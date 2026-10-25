@@ -68,6 +68,14 @@ describe('la tecla D y el interruptor solo en desarrollo o con VITE_DEMO=1', () 
     expect(localStorage.getItem('rappi-proto-demo-mode')).toBeNull()
   })
 
+  it('sin VITE_DEMO, un «Rappi hoy» guardado no se aplica: es solo de la demo', () => {
+    localStorage.setItem('rappi-proto-demo-mode', 'actual')
+    vi.stubEnv('DEV', false)
+    vi.stubEnv('VITE_DEMO', '')
+    const { result } = renderHook(() => useDemo(), { wrapper })
+    expect(result.current.mode).toBe('final')
+  })
+
   it('con VITE_DEMO=1 la tecla D funciona aunque no sea desarrollo', () => {
     vi.stubEnv('DEV', false)
     vi.stubEnv('VITE_DEMO', '1')

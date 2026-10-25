@@ -179,7 +179,7 @@ async function checkKit(page) {
 
 /**
  * Preguntarle a Mochi en texto libre desde el buscador: la ficha de un plato con lo que hay, y una pregunta de salud que
- * no responde con remedios. Los textos son los de la app y la API (AskMochiRow, agent/glosario.toml, rappi_agent.py).
+ * no responde con remedios. Los textos son los de la app y la API (AskAgentRow, agent/glosario.toml, rappi_agent.py).
  */
 async function checkAsk(page) {
   await checkOnline(page)

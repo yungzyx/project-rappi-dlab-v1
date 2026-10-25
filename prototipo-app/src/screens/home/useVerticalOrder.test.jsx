@@ -1,6 +1,6 @@
 import { act, cleanup, render, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, expect, test } from 'vitest'
-import { fixture, stubApi } from '../../api/testing'
+import { fixture, stubApi } from '../../test/api'
 import { ProfileProvider, useProfile } from '../../state/ProfileContext'
 import { useVerticalOrder } from './useVerticalOrder'
 

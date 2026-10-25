@@ -9,7 +9,7 @@ import { ProfileProvider } from '../../state/ProfileContext'
 import AssistantPanel from './AssistantPanel'
 import { routeForScreen } from '../../data/verticals'
 import { trackOrder } from '../../api/orders'
-import { fixture, stubApi } from '../../api/testing'
+import { fixture, stubApi } from '../../test/api'
 import { askAbout } from '../../assistant/agentAsk'
 import { reloadToHome } from '../../state/reloadApp'
 

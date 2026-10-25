@@ -9,7 +9,7 @@ export const ENTER_HINT = `Enter le pregunta a ${AGENT_NAME}`
  * pregunta (`question`): entonces Enter también pregunta y la fila lo dice. No le quita el foco al campo (el blur
  * registraría la búsqueda).
  */
-export default function AskMochiRow({ query, question = false, hintId, onAsk }) {
+export default function AskAgentRow({ query, question = false, hintId, onAsk }) {
   return (
     <button
       type="button"

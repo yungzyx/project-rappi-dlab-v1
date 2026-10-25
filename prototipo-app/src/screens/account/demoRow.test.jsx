@@ -1,7 +1,7 @@
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { ToastProvider } from '../../components/Toast'
-import { stubApi } from '../../api/testing'
+import { stubApi } from '../../test/api'
 import { AddressProvider } from '../../state/AddressContext'
 import { DemoProvider } from '../../state/DemoContext'
 import { OrdersProvider } from '../../state/OrdersContext'

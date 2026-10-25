@@ -7,11 +7,9 @@ import App from './App.jsx'
 import { API_URL } from './api/client.js'
 import ConnectionGate from './components/ConnectionGate.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
-import { removeLegacyKeys } from './legacyStorage.js'
 import { reloadOnPreloadError } from './preloadError.js'
 
 reloadOnPreloadError()
-removeLegacyKeys()
 
 const render = () =>
   createRoot(document.getElementById('root')).render(

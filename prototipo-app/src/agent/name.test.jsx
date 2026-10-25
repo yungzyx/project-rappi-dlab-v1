@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
-import { fixture, stubApi } from '../api/testing'
+import { fixture, stubApi } from '../test/api'
 import AssistantPanel from '../components/assistant/AssistantPanel'
 import SmartBar from '../components/assistant/SmartBar'
 import ConnectionGate from '../components/ConnectionGate'
