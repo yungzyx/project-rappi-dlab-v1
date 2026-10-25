@@ -1,7 +1,7 @@
 # Diseño: RAG, agente Mochi y panel para la empresa
 
 > Cómo se conectan el catálogo (scraper), la búsqueda semántica, el agente, el prototipo y un panel de negocio. Las etapas de diseño 0–8 se construyeron hasta el 30-09-2026, el MVP integrado se armó encima en 7 etapas (10 y 11-10-2026, §7) y el motor multivertical con la Home dinámica, en 6 etapas más (16-10-2026, §4b y §7); lo que el código todavía no cubre se marca como pendiente.
-> Última actualización: 16-10-2026. Contexto: [contexto-y-problema.md](contexto-y-problema.md) · Modelo de datos: [ecosistema-rappi.md](ecosistema-rappi.md) · Resultados vigentes: [README → Resultados](../README.md#resultados).
+> Última actualización: 24-10-2026. Contexto: [contexto-y-problema.md](contexto-y-problema.md) · Modelo de datos: [ecosistema-rappi.md](ecosistema-rappi.md) · Resultados vigentes: [README → Resultados](../README.md#resultados).
 > Diagramas: [flujo de datos por etapas](diagramas/rag-datos.png) y [vista por carriles](diagramas/arquitectura-ia.png). Sus versiones interactivas ([rag-datos.html](diagramas/rag-datos.html), [arquitectura-ia.html](diagramas/arquitectura-ia.html)) se descargan y se abren en el navegador.
 > Lo marcado "datos parciales" se midió el 27-09-2026, antes de terminar la descarga completa.
 > **09-10-2026:** el repo se enfocó en el prototipo final; el panel de negocio (§5 y etapa de diseño 7, `dashboard-empresa/`) quedó fuera de la propuesta; el **11-10-2026** (etapa 6 del MVP) volvió como parte del MVP, conectado a la API, con la vista «Uso del MVP» (§5).
@@ -130,6 +130,8 @@ Decisiones:
 
 Mochi es el nombre que ve el usuario (antes, Bigotes). El código usa nombres neutros porque el nombre puede cambiar: `rappi_ia/agent/rappi_agent.py` y la clase `RappiAgent`; el nombre visible sale de `config.AGENT_NAME` (variable de entorno `AGENT_NAME`, por defecto «Mochi»). El agente responde solo por texto (`POST /agent/ask`); sus ofertas salen de `POST /agent/offer` y `GET /agent/plans`.
 
+**Preguntas en texto libre** (desde el 24-10-2026). En el buscador con Mochi («Busca o pregúntale a Mochi»), lo que parece una pregunta («¿qué llevo para un asado de 6?», «algo dulce y barato») se le pregunta a Mochi con Enter o con la fila «Pregúntale a Mochi «…»»; lo demás se busca como siempre (`prototipo-app/src/assistant/question.js`). Una pregunta, una respuesta: no es un chat. Lo entienden reglas y datos, sin LLM (`agent/understand.py`): para cuántas personas, un presupuesto («con 8 mil»), frases de pregunta que no se buscan literal, ocasiones como picnic o «hace frío», fichas escritas a mano de platos («¿qué es un poke?», `agent/glosario.toml`) y «¿con qué acompaño…?», que responde con el complemento. Ante un pedido de consejo médico («¿qué le doy?», «dosis»), Mochi no muestra remedios ni aconseja: nombra al médico, al químico farmacéutico o al pediatra, el SAMU (131) si es urgente, y deja «Ir a Farmacia». Una ocasión dicha sin nombrar alcohol («algo para el carrete») no lleva a Licores. Detalle y cifras en [decisiones.md](decisiones.md#agente-mochi) (24-10-2026).
+
 **Flujo por turno:** entender → decidir herramienta(s) → recuperar → componer → verificar → registrar.
 
 **Herramientas** (en `rappi-ia/src/rappi_ia/agent/`):
@@ -181,18 +183,18 @@ Mochi es el nombre que ve el usuario (antes, Bigotes). El código usa nombres ne
 
 ### Perfiles de gusto
 
-Quien pide seguido lo mismo recibe un perfil («🥢 Amante de lo asiático») y, con él, ofertas de ese gusto en otras verticales, de a un peldaño. La demo parte con algo simple, el sushi; el carrete es un perfil más, secundario y sin alcohol. Diseño y lo que cambió al construirlo: [especificación](superpowers/specs/2026-10-14-perfiles-de-gusto-design.md).
+Quien pide seguido lo mismo recibe un perfil («🥢 Amante de lo asiático») y, con él, ofertas de ese gusto en otras verticales, de a un peldaño. La demo parte con algo simple, el sushi; el carrete es un perfil más, secundario y sin alcohol. Diseño y lo que cambió al construirlo: [especificación](diseno/2026-10-14-perfiles-de-gusto-design.md).
 
 - **Son datos, no código.** Cada perfil es un `[[perfil]]` de `rappi_ia/offers/perfiles.toml` (nombre, emoji, el «gusto» que dice Mochi, segmentos que lo activan, escalera y un viaje opcional) y sus viajes, «Idea para RappiTravel» con 2 datos verificables y su fuente, están en `destinos.toml`. `offers/profiles.py` los valida al cargar: los conceptos, verticales y segmentos existen y ningún peldaño nombra algo que las guardias rechacen. Hay cinco: asiático (el principal), café, italiano, mascotas y carrete; agregar otro es escribir datos.
 - **Cómo se activa.** Por los segmentos de la capa de datos ([capa-de-datos.md](capa-de-datos.md)): la persona tiene el perfil si algún segmento suyo, de los del perfil, llega al nivel mínimo (`medio`). Solo para personas del prototipo; los simulados no tienen perfil. El «por qué» se cuenta con lo que pidió y buscó en los últimos 120 días («Pediste 🍣 sushi 2 veces…»), y «Olvidar» borra los segmentos, así que el perfil desaparece.
 - **La escalera.** Peldaños de lo más cercano a lo más lejano (el asiático: restaurantes, Turbo, Express, Súper y chocolatería). Cada uno busca en su vertical los productos de sus conceptos, hasta 4, y se salta si no hay ninguno; con menos de 2 peldaños no hay oferta. En restaurantes va un plato por cadena y deja fuera las cadenas donde la persona ya pidió; ningún nombre se repite entre peldaños y no se muestran tiendas de licores. Mochi ofrece de a un peldaño, con su «¿Por qué?» y «Olvidar».
 - **Guardias.** Valen las de siempre (`offers/guards.py`): nada de alcohol, +18, Farmacia, bebé, salud ni sensible por iniciativa de Mochi, ni tiendas Sex shop o Smoking shop. Por eso el carrete no nombra alcohol. Desde el 14-10 la guardia de alcohol también mira el nombre del producto y del plato, porque la marca de la tienda puede estar mal ([decisiones.md](decisiones.md)).
 - **API.** `GET /profile/{user_id}/gustos` (con la identidad firmada) devuelve `{"perfiles": [{id, nombre, emoji, nivel, principal, por_que, basis}]}`, o la lista vacía. `POST /agent/offer` con `moment: "perfil"` y `context: {"perfil": <id>}` devuelve la escalera, el viaje y el `reason`; sin `perfil` usa el primero que la persona tiene, y con `perfil` y sin `user_id` entrega la escalera sin «por qué» personal. Responde 204 si no hay perfil ni escalera y 422 con un id desconocido. El panel cuenta estas ofertas como el momento «Perfil de gusto» (`agent-perfil`).
-- **Estado.** El backend está; la app todavía no lo usa (sus ejemplos viven en `prototipo-app/src/api/fixtures/`). En la base real hace falta `rappi-ia concepts` y `make layers` tras fusionar: sin ellos, los conceptos asiáticos nuevos no tienen productos.
+- **En la app.** Desde el 17-10-2026 el buscador con Mochi muestra el perfil principal y su escalera de verticales, con la idea para RappiTravel (`prototipo-app/src/components/assistant/TasteProfile.jsx`); sin perfil, muestra el panel de siempre. Sus respuestas de ejemplo viven en `prototipo-app/src/api/fixtures/`. En una base nueva hacen falta `rappi-ia concepts` y `make layers`: sin ellos, los conceptos asiáticos no tienen productos.
 
 ## 4b. Motor multivertical y Home dinámica
 
-El motor responde por persona **qué vertical conviene sumarle** y **qué concepto le toca pedir de nuevo**, con siete tablas calculadas en la base (migración 036) y sus vistas en `capa`. Código en `rappi_ia/motor/`; tablas, fórmulas y guardias en [capa-de-datos.md](capa-de-datos.md#motor-multivertical); diseño en la [especificación](superpowers/specs/2026-10-16-motor-multivertical-design.md); cifras en [resultados/motor-2026-10-16.md](resultados/motor-2026-10-16.md).
+El motor responde por persona **qué vertical conviene sumarle** y **qué concepto le toca pedir de nuevo**, con siete tablas calculadas en la base (migración 036) y sus vistas en `capa`. Código en `rappi_ia/motor/`; tablas, fórmulas y guardias en [capa-de-datos.md](capa-de-datos.md#motor-multivertical); diseño en la [especificación](diseno/2026-10-16-motor-multivertical-design.md); cifras en [resultados/motor-2026-10-16.md](resultados/motor-2026-10-16.md).
 
 - **Qué decide.**
   - El orden de los 6 accesos pequeños de la Home (`GET /profile/{id}/verticales`, `motor/home.py`): por la afinidad propia de la persona. Restaurantes y Turbo quedan fijos y, sin historial, el orden de siempre.
@@ -203,7 +205,7 @@ El motor responde por persona **qué vertical conviene sumarle** y **qué concep
     - Farmacia y Licores nunca son paso (cuentan como uso propio de la persona, pero no se empujan).
     - **Supuesto propio, no de Rappi:** cada vertical extra dentro de un grupo reduce la parte que no vuelve, cada vez menos (la 2.ª un 10 %, la 3.ª un 5 %, la 4.ª un 2,5 %…), y cada servicio usado, un 5 % (`combos.toml`, `[rendimiento_decreciente]`). Retención fina esperada = 1 − (1 − gruesa)·Π(1 − f): nunca llega a 1 y no tiene tope, así que la escalera no se detiene. Con al menos 30 personas de una combinación y de su grupo, lo aprendido fino solo corrige la diferencia dentro del grupo; el nivel lo pone la combinación gruesa (la estimación aprendida es la gruesa mezclada más la diferencia fina − gruesa aprendida, y pesa n/(n + 100); sin gruesa aprendida, se mezcla tal cual); un objetivo del mismo grupo sin fina aprendida parte de la combinación actual y solo le aplica el supuesto.
     - La `basis` declara la fuente (`combinacion`, id `<actual>→<objetivo>`): `rappi` (solo la tabla), `rappi+supuesto` (pesó el supuesto), `rappi+poblacion:<fuente>` (pesó lo aprendido, sin supuesto) o `rappi+supuesto+poblacion:<fuente>` (las dos). El texto que ve la persona nunca cita retenciones.
-  - La recompra (`recompra`): «¿Repetimos …?» cuando a un concepto que la persona pide con ritmo le toca (§5, palanca «Recompra por ciclo»).
+  - La recompra (`recompra`): «¿Repetimos …?» cuando a un concepto que la persona pide con ritmo le toca: desde 2 días antes de la fecha esperada (`due_on`, `REPEAT_AHEAD_DAYS` en `offers/winback.py`) hasta un intervalo de atraso, primero el más atrasado (§5, palanca «Recompra por ciclo»).
   - Volver a pedir (`volver`, `offers/winback.py`): «¿Volvemos a …?» cuando la persona dejó de pedir algo que pedía con ritmo (§5, palanca «Reactivación por ritmo»). Empieza justo donde termina la recompra, así que las dos nunca se pisan:
     - Un concepto de su `replenishment` atrasado más de un intervalo (lo que la recompra ya no ofrece), con su último pedido hace entre 14 y 90 días. Texto: «¿Volvemos a café? La última vez que pediste café fue hace 20 días.» y su porqué, «Porque pedías café cada 7 días y la última vez fue hace 20 días.»; `basis` `volver` («<concepto>», `source` «pedidos»). El producto es el de la recompra: el último que compró, si sigue a la venta, o uno del concepto en esa vertical.
     - Si no, una vertical donde pidió al menos 3 días distintos y no pide hace más de 30 días (hasta 90), mientras sigue pidiendo en otra en esos 30 días. Texto: «¿Volvemos a Turbo? Tu último pedido ahí fue hace 40 días.»; `basis` `vuelta` («<vertical>», `source` «pedidos»). El producto es lo último que compró ahí que tenga concepto (sin él la app no registra la mostrada y la pausa no empezaría) y siga a la venta.
@@ -223,7 +225,7 @@ El motor responde por persona **qué vertical conviene sumarle** y **qué concep
 
 ## 5. Panel para la empresa: ¿vale la pena?
 
-> Desde el 11-10-2026 es parte del MVP (`dashboard-empresa/`): `make mvp` lo levanta junto a la app y lee la API. Los datos simulados siguen mostrando solo la mecánica; lo que la gente hace en la app se ve con la fuente del prototipo, rotulado. El **22-10-2026** se rediseñó para la gerencia y RappiAds: 3 vistas alrededor de 4 preguntas ([plan](superpowers/plans/2026-10-22-panel-rediseno.md)).
+> Desde el 11-10-2026 es parte del MVP (`dashboard-empresa/`): `make mvp` lo levanta junto a la app y lee la API. Los datos simulados siguen mostrando solo la mecánica; lo que la gente hace en la app se ve con la fuente del prototipo, rotulado. El **22-10-2026** se rediseñó para la gerencia y RappiAds: 3 vistas alrededor de 4 preguntas ([decisiones.md](decisiones.md#datos-simulados-y-panel), fila del 22-10).
 
 **Sí, si se enfoca en decisiones y no en gráficos.** Las preguntas al agente y las búsquedas son una encuesta continua de lo que la gente quiere. El panel convierte eso, junto con la conducta de compra, en acciones para **subir la frecuencia y bajar el abandono**.
 
@@ -246,13 +248,13 @@ El motor responde por persona **qué vertical conviene sumarle** y **qué concep
 | Búsquedas sin resultado | De las búsquedas (`search`) y preguntas al agente (`ask`, antes `chat`) que saben si encontraron algo, cuántas no y, por vertical y concepto reconocido, cuántas sin resultado (hasta 20 filas). **Nunca el texto buscado**; sin concepto reconocido se rotula «Sin concepto reconocido» y los conceptos sensibles no se muestran. Una fila sin umbral de personas puede reflejar la búsqueda de una sola persona: por eso se lee como demanda que el catálogo no cubre, no como una tendencia |
 | Embudo por vertical | Sesiones que buscan (llegan a la vertical) → agregan al carro → inician pago → piden. La entrada (buscar, preguntarle al agente, navegar, aceptar una sugerencia o agregar al carro desde una lista, que solo manda el agregado) se mira en toda la sesión, porque la sugerencia cruzada lleva el pedido a otra vertical. Una sesión cuenta en una vertical si tuvo ahí algún evento que no sea ver o descartar una sugerencia: ver una sugerencia sin aceptarla no la mete en esa vertical. Por eso una sesión puede contar en dos verticales: la conversión global (el titular) cuenta cada sesión una vez |
 
-**Vistas** (desde el 22-10-2026; antes eran 6 pestañas: el porqué de cada cambio está en el [plan del rediseño](superpowers/plans/2026-10-22-panel-rediseno.md)). El panel se ordena en 4 preguntas para la gerencia general y RappiAds, cada número con su comparación o su tendencia y una acción sugerida:
+**Vistas** (desde el 22-10-2026; antes eran 6 pestañas: el porqué de cada cambio está en [decisiones.md](decisiones.md#datos-simulados-y-panel)). El panel se ordena en 4 preguntas para la gerencia general y RappiAds, cada número con su comparación o su tendencia y una acción sugerida:
 
 1. **Resumen.** «Qué decidir»: las 4 preguntas como tarjetas (¿dónde está la venta cruzada?, ¿a quién estamos perdiendo?, ¿funciona lo que ofrece Mochi?, ¿qué buscan y no encuentran?), cada una con su procedencia y el enlace a su detalle. «Cómo va»: personas activas, pedidos y abandono de carrito contra 4 semanas antes, frecuencia y el % que pide en 2 o más verticales.
 2. **Retención y venta cruzada.** La escalera de la tabla de Rappi (cada combinación, su retención M+1 y la de la combinación con un grupo más que más retiene) y a quién estamos perdiendo: en riesgo, perdidas, quién califica para «¿Volvemos a…?» o «¿Repetimos?» y qué pedían, con la lista seudónima a pedido.
 3. **Mochi y búsquedas.** Ofertas por momento, sugerencias entre verticales (aceptación y pedidos), servicios sin catálogo y el motor contra una regla simple; la demanda no satisfecha agrupada, por concepto, vertical y ciudad en la API, con su acción sugerida («que Mochi lo ofrezca en otra vertical» solo donde el agente lo haría: la misma regla de `available_elsewhere`), o las búsquedas sin resultado si ninguna llega al mínimo; lo que sube (4 semanas contra las 4 anteriores) y dónde hay más personas buscando que ítems en la muestra pública.
 
-El embudo, las cohortes, el ritmo, la afinidad, la retención por estrato, las combinaciones finas, la salud del catálogo y los accesos de la Home salieron del panel: la API los sigue entregando.
+Salió del panel lo que no responde a una de las 4 preguntas, y la API lo sigue entregando: la afinidad A→B (el agente no la usa y es simulada), la retención por cohorte y los días entre pedidos (describen, no deciden; la regla de riesgo queda escrita junto a la cifra), los accesos de la Home (no responden a una decisión; la Home dinámica se ve en la app), el embudo, el ritmo, la retención por estrato, las combinaciones finas y la salud del catálogo. La evaluación del motor pasó de 4 tablas a una: el motor contra una línea base.
 
 **Aristas aprendidas** (alimentan al agente con `method = 'coocurrencia'`):
 - Usan la confianza dirigida P(B | A). El lift > 1 es solo un filtro: el lift es simétrico y no da dirección.
@@ -318,7 +320,7 @@ Notas del modelo:
 
 | Etapa | Entrega | QA | Estado |
 |---|---|---|---|
-| 0. Diseño | Este documento, los diagramas y docs sin contradicciones | Validación Archify y revisión adversarial | Hecha |
+| 0. Diseño | Este documento, los diagramas y docs sin contradicciones | Validación de los diagramas y revisión adversarial | Hecha |
 | 1. Conceptos (capa 2) | `concepts`, `category_map`, `item_concepts`, `concept_edges` y `rappi-ia concepts` | Cobertura ≥ 85% y precisión revisada por muestreo | Hecha |
 | 2. Embeddings y búsqueda híbrida | `embed-text`, `retrieve()` y set de evaluación | P@10, MRR y nDCG@10 (Recall@10 no se calcula): léxico vs vectorial vs híbrido; calibración de τ | Hecha |
 | 3. Agente | Mochi en el backend (solo texto) | Tests de reglas de conducta y escenarios | Hecha |
@@ -328,34 +330,34 @@ Notas del modelo:
 | 7. Panel empresa | `dashboard-empresa/` (parte del MVP) | Vitest y chequeo visual | Hecha |
 | 8. Cierre | CI (4 jobs), docs y corrida completa post-refresh | CI en verde | Hecha (30-09-2026) |
 
-**Revisión:** tres pasadas de revisión adversarial automatizada (agentes de IA) con 66 hallazgos corregidos (27-09-2026) y una auditoría el 28-09-2026, cuyos 4 bloques de mejoras se aplicaron el 29 y 30-09. Resultados de cobertura, precisión y búsqueda en [README → Resultados](../README.md#resultados).
+**Revisión:** tres pasadas de revisión adversarial con 66 hallazgos corregidos (27-09-2026) y una auditoría el 28-09-2026, cuyos 4 bloques de mejoras se aplicaron el 29 y 30-09. Resultados de cobertura, precisión y búsqueda en [README → Resultados](../README.md#resultados).
 
 ### Etapas del MVP (10–11-10-2026)
 
-El MVP integrado se armó encima de las etapas de diseño en 7 etapas, cada una con su plan. La [especificación del MVP](superpowers/specs/2026-10-10-mvp-integrado-design.md) dice qué es el producto completo.
+El MVP integrado se armó encima de las etapas de diseño, en 7 etapas. La [especificación del MVP](diseno/2026-10-10-mvp-integrado-design.md) dice qué es el producto completo.
 
-| Etapa del MVP | Entrega | Plan |
-|---|---|---|
-| 1. Base | `make mvp` levanta API, app y panel; `make mvp-check` los recorre con Chrome | [etapa 1](superpowers/plans/2026-10-10-mvp-etapa-1-base.md) |
-| 2. Catálogo real | Las pantallas de catálogo leen la base (`/catalog`) | [etapa 2](superpowers/plans/2026-10-10-mvp-etapa-2-catalogo.md) |
-| 3. Buscador y agente sobre el RAG | El buscador con Mochi y sus ofertas salen de la API (`/agent`) | [etapa 3](superpowers/plans/2026-10-10-mvp-etapa-3-mochi.md) |
-| 4. Juego en el RAG (historia) | Tarjetas, desafíos y progreso en la base; salió del proyecto el 16-10-2026 (migración 035, ver [decisiones.md](decisiones.md)) | [etapa 4](superpowers/plans/2026-10-10-mvp-etapa-4-juego.md) |
-| 5. Personalización | Lo aprendido, «Para ti» y eventos del prototipo | [etapa 5](superpowers/plans/2026-10-10-mvp-etapa-5-personalizacion.md) |
-| 6. Panel conectado | «Uso del MVP» con lo que la gente hace en la app | [etapa 6](superpowers/plans/2026-10-11-mvp-etapa-6-panel.md) |
-| 7. Jev | Etiquetas de categorías y juez de la búsqueda, listo y apagado hasta el piloto | [etapa 7](superpowers/plans/2026-10-11-mvp-etapa-7-jev.md) |
+| Etapa del MVP | Entrega |
+|---|---|
+| 1. Base | `make mvp` levanta API, app y panel; `make mvp-check` los recorre con Chrome |
+| 2. Catálogo real | Las pantallas de catálogo leen la base (`/catalog`) |
+| 3. Buscador y agente sobre el RAG | El buscador con Mochi y sus ofertas salen de la API (`/agent`) |
+| 4. Juego en el RAG (historia) | Tarjetas, desafíos y progreso en la base; salió del proyecto el 16-10-2026 (migración 035, ver [decisiones.md](decisiones.md)) |
+| 5. Personalización | Lo aprendido, «Para ti» y eventos del prototipo |
+| 6. Panel conectado | «Uso del MVP» con lo que la gente hace en la app |
+| 7. Jev | Etiquetas de categorías y juez de la búsqueda, listo y apagado hasta el piloto ([jev.md](jev.md)) |
 
-Después: la [revisión integral](superpowers/plans/2026-10-11-revision-integral.md) (11-10-2026, decisiones en [decisiones.md](decisiones.md#operación)) y, a continuación, la [etapa de calidad y despliegue](superpowers/plans/2026-10-11-calidad-y-despliegue.md).
+Después vinieron la revisión integral del 11-10-2026 ([decisiones.md](decisiones.md#operación)) y el despliegue en un servidor como demo cerrada ([despliegue.md](despliegue.md)).
 
 ### Etapas del motor multivertical (16-10-2026)
 
-Tras conversar con el equipo de Rappi, el foco pasó a la Home dinámica y al motor de recomendaciones entre verticales ([especificación](superpowers/specs/2026-10-16-motor-multivertical-design.md), §4b).
+Tras conversar con el equipo de Rappi, el foco pasó a la Home dinámica y al motor de recomendaciones entre verticales ([especificación](diseno/2026-10-16-motor-multivertical-design.md), §4b).
 
-| Etapa | Entrega | Plan |
-|---|---|---|
-| 1. Sin pasaporte ni juego | Salen de la app, la API, la base (migración 035), el panel y el despliegue | [etapa 1](superpowers/plans/2026-10-16-etapa-1-sin-pasaporte-ni-juego.md) |
-| 2. Motor | Migración 036, `rappi_ia/motor/`, `make motor` con evaluación por fechas y datos simulados recalibrados con la tabla de Rappi | [etapa 2](superpowers/plans/2026-10-16-etapa-2-motor.md) |
-| 3. Home dinámica | `GET /profile/{id}/verticales`, la Home que pinta ese orden y el evento `vertical_open` | [etapa 3](superpowers/plans/2026-10-16-etapa-3-home.md) |
-| 4. Recomendaciones conectadas | La escalera en `vertical_por_probar`, compra cruzada, «¿Repetimos …?» y, en el panel, las combinaciones, el motor y «Accesos de la Home» | [etapa 4](superpowers/plans/2026-10-16-etapa-4-conectadas.md) |
-| 5. QA y mejora continua | Revisión de las ofertas sobre el catálogo real ([QA](resultados/qa-motor-2026-10-16.md)) e intentos medidos en validación ([resultados](resultados/motor-2026-10-16.md)) | [etapa 5](superpowers/plans/2026-10-16-etapa-5-qa.md) |
-| 6. Pulido | Documentación, diagramas, capturas e higiene del código ([auditoría](superpowers/plans/2026-10-16-auditoria-pulido.md)) | [etapa 6](superpowers/plans/2026-10-16-etapa-6-pulido.md) |
-| 7. Escalera fina | La escalera vertical por vertical con RappiFavor y RappiTravel al final, el supuesto del rendimiento decreciente (migración 037), el paso medido y las combinaciones finas en el panel | [etapa 7](superpowers/plans/2026-10-16-etapa-7-escalera-fina.md) |
+| Etapa | Entrega |
+|---|---|
+| 1. Sin pasaporte ni juego | Salen de la app, la API, la base (migración 035), el panel y el despliegue |
+| 2. Motor | Migración 036, `rappi_ia/motor/`, `make motor` con evaluación por fechas y datos simulados recalibrados con la tabla de Rappi |
+| 3. Home dinámica | `GET /profile/{id}/verticales`, la Home que pinta ese orden y el evento `vertical_open` |
+| 4. Recomendaciones conectadas | La escalera en `vertical_por_probar`, compra cruzada, «¿Repetimos …?» y, en el panel, las combinaciones, el motor y «Accesos de la Home» |
+| 5. QA y mejora continua | Revisión de las ofertas sobre el catálogo real ([QA](resultados/qa-motor-2026-10-16.md)) e intentos medidos en validación ([resultados](resultados/motor-2026-10-16.md)) |
+| 6. Pulido | Documentación, diagramas, capturas e higiene del código |
+| 7. Escalera fina | La escalera vertical por vertical con RappiFavor y RappiTravel al final, el supuesto del rendimiento decreciente (migración 037), el paso medido y las combinaciones finas en el panel ([capa-de-datos.md](capa-de-datos.md#la-escalera-fina)) |

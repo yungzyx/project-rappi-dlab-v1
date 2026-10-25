@@ -153,7 +153,7 @@ El paso (`next_fine_step`) es la vertical que más sube esa retención, entre la
 
 La cobertura dice cuánto se etiquetó, no si está bien. `rappi-ia layer-sample [--seed N]` arma una muestra fija de lo que la capa afirma: 10 ítems por atributo y regla, 3 por atributo declarado por Rappi, 140 marcas y 440 conceptos repartidos por método. En git van solo los ids y las afirmaciones (`rappi-ia/src/rappi_ia/eval/capas-muestra*.json`, con sus juicios en `capas-juicios*.json`); los nombres y descripciones para juzgar quedan en `rappi-ia/data/eval/`, fuera de git. `rappi-ia layer-precision [--seed N]` calcula la precisión por regla con el mínimo que se puede asegurar (límite de Wilson al 95 %), la cifra si los «dudoso» fueran errores, y lista las reglas bajo 80 %.
 
-Se midió dos veces con jueces de modelos de lenguaje (10 agentes independientes por muestra): con las reglas originales (semilla 7) y, después de corregirlas, con una muestra nueva de otros ítems (semilla 11), para no medir con los mismos casos que guiaron los cambios.
+Se midió dos veces con jueces de modelos de lenguaje (10 jueces independientes por muestra): con las reglas originales (semilla 7) y, después de corregirlas, con una muestra nueva de otros ítems (semilla 11), para no medir con los mismos casos que guiaron los cambios.
 
 | Qué | Antes | Después, muestra nueva | Después, si los dudosos fueran errores |
 |---|---|---|---|

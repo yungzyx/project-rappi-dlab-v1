@@ -8,8 +8,8 @@ Después de clonar (paso 2), **todos los comandos parten de la raíz del reposit
 
 | Qué | Cómo llega |
 |---|---|
-| Código (scraper, rappi-ia, prototipo, panel, docs) | Este repositorio (privado): `gh repo clone` |
-| Base de datos (catálogo, precios, menús, conceptos, embeddings) | Un respaldo de Postgres (`.dump`) hecho en otro equipo, o una descarga nueva. **No va al repositorio:** contiene datos de rappi.cl y de sus comercios, que se usan solo con fines de investigación y demostración |
+| Código (scraper, rappi-ia, prototipo, panel, docs) | Este repositorio (privado): `git clone` o `gh repo clone` |
+| Base de datos (catálogo, precios, menús, conceptos, embeddings) | El respaldo de entrega (`make dump-entrega`), otro respaldo de Postgres (`.dump`) o una descarga nueva. **No va al repositorio:** contiene datos de rappi.cl y de sus comercios, que se usan solo con fines de investigación y demostración |
 | Configuración (`.env`) | Se crea sola desde `.env.example` al instalar. `ANTHROPIC_API_KEY` y `TYPESAFE_API_KEY` son opcionales y se agregan a mano en `rappi-ia/.env` |
 | Modelo de IA (e5; ~1 GB) | Se descarga de Hugging Face la primera vez que se usa |
 | `node_modules`, `.venv` | Se instalan con los comandos de abajo; no se copian entre equipos |
@@ -47,7 +47,11 @@ echo 'export PATH="$(brew --prefix)/opt/postgresql@17/bin:$PATH"' >> ~/.zprofile
 source ~/.zprofile
 ```
 
-**Desde un respaldo** (recomendado). En el equipo de origen, `make backup` en `rappi-scraper/` deja `data/backups/rappi_<fecha>.dump`. Cópialo a este equipo y, desde `rappi-scraper/`:
+**Desde el respaldo de entrega** (recomendado para un equipo nuevo). El equipo del proyecto lo arma con `make dump-entrega` y lo entrega por un canal acordado, nunca por git. Trae el catálogo descargado con su historial de precios, los conceptos, los embeddings, la capa de datos, el motor y las personas simuladas; deja fuera el uso del MVP (las personas `prototype` y sus eventos), así que el panel con la fuente del prototipo parte vacío. Como trae los embeddings y la capa de IA ya calculados, después de restaurarlo bastan las migraciones pendientes y `make test`: `make post-refresh` (sección 4) recién hace falta después de una descarga nueva.
+
+**Desde un respaldo del equipo de origen.** `make backup` en `rappi-scraper/` deja `data/backups/rappi_<fecha>.dump`, que sí trae el uso del MVP. Cópialo a este equipo.
+
+En los dos casos, desde `rappi-scraper/` (con la ruta del `.dump` que recibiste):
 
 ```bash
 dropdb --if-exists rappi && createdb rappi
@@ -76,9 +80,10 @@ make test
 caffeinate -i make post-refresh           # purga, categorías nuevas con Jev (si está adoptado), conceptos, embeddings (y limpieza de los que ya no se usan), evaluación, datos simulados y capa de datos al día con la base, y otra purga
 ```
 
+- **Con un respaldo al día** (como el de entrega), `make post-refresh` puede esperar a la próxima descarga: la base ya trae los conceptos, los embeddings y la capa de datos. Basta con `make install install-ml db-test migrate` y `make test`.
 - **τ:** `make post-refresh` también recalibra τ en `src/rappi_ia/eval/thresholds.json` (solo en verticales con negativas que dependen de τ; los demás conservan el suyo). Si cambia, revisar y hacer commit.
 - **Evaluación:** el reporte queda en `data/eval/busqueda.md` (dentro de `rappi-ia/`).
-- **Jev (opcional):** `post-refresh` corre primero `make jev-categorias` (Jev etiqueta las categorías nuevas) y `make eval` suma a Jev como juez, **solo** si `rappi-ia/.env` tiene `TYPESAFE_API_KEY` y el repositorio tiene `src/rappi_ia/eval/jev-adopcion.json` (lo crea el usuario tras el piloto). Sin la clave o sin ese archivo ambos pasos no hacen nada, lo dicen en una línea y terminan bien, así que no hace falta instalar ni configurar nada para el flujo de siempre. Cómo ponerlo en marcha: [jev.md](jev.md).
+- **Jev (opcional):** `post-refresh` corre primero `make jev-categorias` (Jev etiqueta las categorías nuevas) y `make eval` suma a Jev como juez, **solo** si `rappi-ia/.env` tiene `TYPESAFE_API_KEY` y el repositorio tiene `src/rappi_ia/eval/jev-adopcion.json` (se crea tras un piloto aprobado). Sin la clave o sin ese archivo ambos pasos no hacen nada, lo dicen en una línea y terminan bien, así que no hace falta instalar ni configurar nada para el flujo de siempre. Cómo ponerlo en marcha: [jev.md](jev.md).
 - **Memoria de los índices:** `make embed` (parte de `post-refresh`) construye un índice HNSW por vertical con 1 GB de `maintenance_work_mem`, solo durante esa transacción. Se ajusta con `HNSW_MAINTENANCE_WORK_MEM` en `rappi-ia/.env` (ver `.env.example`); bájalo si el equipo tiene poca memoria.
 
 ## 5. El MVP
@@ -99,10 +104,10 @@ make mvp                  # desde la raíz del repositorio
 
 Ctrl-C detiene los tres; si uno se cae solo, detiene el resto. No descarga nada de rappi.cl.
 
-**Desde un iPhone:** `make mvp LAN=1` abre la API, la app y el panel a la red local (`make serve-lan` y `--host`); cada uno busca la API en el host desde el que se abrió la página. Solo en una red de confianza: la API no tiene puerta de acceso (los datos de cada persona sí piden su token de sesión).
+**Desde un celular:** `make mvp LAN=1` abre la API, la app y el panel a la red local (`make serve-lan` y `--host`); cada uno busca la API en el host desde el que se abrió la página. Solo en una red de confianza: la API no tiene puerta de acceso (los datos de cada persona sí piden su token de sesión).
 
 - La app busca la API en el mismo host desde el que se abrió (puerto 8000), así que no hace falta configurarla.
-- Sirve en la wifi de casa (192.168.x, 10.x), con el hotspot del iPhone (el Mac queda en 172.20.10.x) y con el nombre Bonjour del Mac (`http://nombre-del-mac.local:5174`).
+- Sirve en una wifi local (192.168.x, 10.x), con el hotspot de un iPhone (el Mac queda en 172.20.10.x) y con el nombre Bonjour del Mac (`http://nombre-del-mac.local:5174`).
 - macOS pide permiso de red la primera vez.
 
 **Si aparece «Sin conexión con Mochi»:** la app no corre sin la API y no tiene respaldo local.
@@ -116,11 +121,11 @@ Ctrl-C detiene los tres; si uno se cae solo, detiene el resto. No descarga nada 
 **`make mvp-check`** recorre el MVP con Chrome (Playwright, usa el Google Chrome instalado) contra un catálogo de prueba **inventado**, sin tocar la base `rappi`. Siembra `rappi_ia_test` (`rappi-ia seed-demo`, que se niega con cualquier base que no termine en `_test`), levanta una API liviana en :8010, la app en :5184 y el panel en :5185 (que pide sus datos a esa API), y revisa:
 
 1. **En línea:** la app abre en la Home, conectada (la primera visita muestra el aviso de privacidad y la prueba lo cierra).
-2. **Compra:** Home → Grocery → la primera tienda → agregar un producto → carrito → pagar. En `rappi_ia_test` (solo lectura) queda un pedido `prototype` cuyas líneas son productos sembrados.
+2. **Compra:** Home → Súper → la primera tienda → agregar un producto → carrito → pagar. En `rappi_ia_test` (solo lectura) queda un pedido `prototype` cuyas líneas son productos sembrados.
 3. **Kit de Mochi:** «cerveza» en el buscador con Mochi muestra un grupo por vertical; el kit «Carrete» de la Home, agregado y pagado, deja un pedido con productos sembrados y al menos una `suggestion_accepted` con origen `agent-plan` en `app_events`.
 4. **Preguntarle a Mochi:** en el buscador con Mochi, «¿qué es un completo?» trae primero la fila «Pregúntale a Mochi» resaltada; Enter se lo pregunta y la tarjeta de Mochi muestra «Preguntaste «…»», la ficha del completo y el completo del catálogo de prueba. Después, «mi hijo tiene fiebre, ¿qué le doy?»: Mochi no da consejo médico, nombra al químico farmacéutico y ofrece «Ir a Farmacia».
-5. **Home dinámica:** una persona nueva ve los 6 accesos en el orden fijo, con Loyalty y Benefits Pro al final y sin el texto «Ordenadas según lo que más usas»; toca «Retail» (Rappi Mall) tres veces, volviendo a la Home cada vez, espera hasta 30 s a que la API acepte los toques (`vertical_open`; al volver a la Home la app los manda y vuelve a pedir el orden) y, sin recargar, Retail queda primero y el texto aparece.
-6. **Combinación:** una persona nueva pide en Restaurantes (Home → Restaurants → el primer restaurante → agregar un plato → pagar), la app se recarga y Mochi, al tocarlo, propone **Turbo** (el siguiente peldaño de la escalera desde Restaurantes, con la tabla de Rappi como punto de partida) con su «¿Por qué?», que muestra la razón. Solo mira la vertical y que haya una razón: el texto exacto depende de lo que haya aprendido el motor.
+5. **Home dinámica:** una persona nueva ve los 6 accesos en el orden fijo, con Lealtad y Beneficios Pro al final y sin el texto «Ordenadas según lo que más usas»; toca «Rappi Mall» tres veces, volviendo a la Home cada vez, espera hasta 30 s a que la API acepte los toques (`vertical_open`; al volver a la Home la app los manda y vuelve a pedir el orden) y, sin recargar, Rappi Mall queda primero y el texto aparece.
+6. **Combinación:** una persona nueva pide en Restaurantes (Home → Restaurantes → el primer restaurante → agregar un plato → pagar), la app se recarga y Mochi, al tocarlo, propone **Turbo** (el siguiente peldaño de la escalera desde Restaurantes, con la tabla de Rappi como punto de partida) con su «¿Por qué?», que muestra la razón. Solo mira la vertical y que haya una razón: el texto exacto depende de lo que haya aprendido el motor.
 7. **Panel:** abierto en «Mochi y búsquedas» con la fuente del prototipo, la tabla «Ofertas del agente por momento» muestra «Plan» con al menos una oferta aceptada (la del kit) y el rótulo «uso del MVP, pocas personas: no es evidencia», sin el aviso de datos guardados. Espera hasta 30 s a que la API ya cuente los eventos de las revisiones anteriores (la app los manda en lotes cada 5 s).
 8. **Sin API:** al detener la API, la app muestra «Sin conexión con Mochi».
 
@@ -146,7 +151,7 @@ make schedule-status   # ¿está activa? ¿cómo terminó la última vez?
 - **Dormido o apagado:** si a esa hora el equipo estaba **dormido**, la tarea corre al despertar; si estaba **apagado**, esa semana se salta. Por eso conviene:
   - que no se duerma (Ajustes del Sistema → Energía → evitar el reposo automático);
   - que se encienda solo tras un corte de luz (misma pantalla); `sudo pmset -a autorestart 1 sleep 0` deja ambas cosas;
-  - que quede con la sesión iniciada, porque launchd corre la tarea en la sesión del usuario.
+  - que quede con la sesión de macOS iniciada, porque launchd corre la tarea en la sesión de quien la programó.
 - **FileVault:** en el equipo de la tarea semanal se mantiene activo ([decisiones.md](decisiones.md#operación)). Tras un corte de luz el equipo se reenciende pero espera la clave: hasta escribirla no corren Postgres ni la tarea, y si pasa el domingo 03:00 esa semana se salta.
 - **Después de cada semana:** `make schedule-status` debe mostrar `last exit code = 0`. En «Últimas ejecuciones» (sale de `rappi-scraper/data/logs/ultimo-estado.txt`) hay una línea por ejecución:
   - `exit=0`: terminó bien;

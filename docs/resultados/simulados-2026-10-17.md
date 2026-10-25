@@ -4,7 +4,7 @@
 
 **Dónde y cuándo:** el 17-10-2026, sobre `rappi_staging` (una copia del catálogo real; la base `rappi` no se tocó), 3.000 personas simuladas por semilla, 26 semanas hasta el 17-10-2026. La mezcla se mide como el motor (`combo_months` y `combo_stats`, nivel grueso): parte de las **personas-mes** con pedidos en cada combinación y retención M+1 (pide algo el mes siguiente), sobre los meses con el siguiente completo. La tabla de Rappi va sin Favor y renormalizada a 100, porque Favor no tiene catálogo. Las cifras por semilla salen de `rappi-ia/scripts/calibrar_simulados.py` (corre el generador en memoria con el catálogo de la copia, sin escribir); la semilla 7 se corrió además con `rappi-ia synth` + `segments` + `motor` sobre la copia y da lo mismo.
 
-Decisión del usuario del 16-10: «Recalibrar los datos simulados a la mezcla de la tabla de Rappi» ([decisiones](../decisiones.md#datos-simulados-y-panel)).
+Decisión del 16-10-2026: recalibrar los datos simulados a la mezcla de la tabla de Rappi ([decisiones](../decisiones.md#datos-simulados-y-panel)).
 
 ## Qué se cambió en el generador
 

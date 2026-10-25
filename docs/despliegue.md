@@ -4,9 +4,9 @@ Cómo dejar el MVP (la app, la API, el panel opcional y Postgres) en un servidor
 
 La demo local (`make mvp` en un Mac) está en [instalacion.md](instalacion.md#5-el-mvp). Todo lo de este documento vive en [`deploy/`](../deploy/).
 
-## 0. Lo que necesita el usuario
+## 0. Lo que hay que decidir o conseguir
 
-Antes de empezar, el usuario decide o consigue lo siguiente. Todos los valores van en el **archivo de entorno** del servidor, `/etc/rappi/rappi.env`, copiado de [`deploy/.env.example`](../deploy/.env.example) ([§3.2](#32-archivo-de-entorno)). Nunca va a git.
+Antes de empezar, quien despliega decide o consigue lo siguiente. Todos los valores van en el **archivo de entorno** del servidor, `/etc/rappi/rappi.env`, copiado de [`deploy/.env.example`](../deploy/.env.example) ([§3.2](#32-archivo-de-entorno)). Nunca va a git.
 
 | Qué | Dónde va |
 |---|---|
@@ -20,11 +20,11 @@ Antes de empezar, el usuario decide o consigue lo siguiente. Todos los valores v
 | **Tope diario de redacciones con Claude** (por proceso de la API; alcanzado, responden las plantillas) | `LLM_DAILY_CALL_CAP` (300 por defecto) |
 | **Jev (opcional, solo en `jobs`):** ver [jev.md](jev.md) | `TYPESAFE_API_KEY` |
 
-Decisiones pendientes del usuario:
+Decisiones para quien despliega:
 
 - **`VITE_DEMO`:** con `VITE_DEMO=1` la app desplegada trae el interruptor «Prototipo final / Rappi hoy» (tecla D); vacío, no. Se aplica al construir `web`.
 - **El panel:** `WITH_PANEL=1` lo construye en `/panel/` y `API_ENABLE_ANALYTICS=1` enciende `/analytics/*`, que el panel lee. Van juntos: con los dos en 0 se despliega solo la app.
-- **La descarga semanal en el servidor** (`rappi-refresh.timer`, que viene apagado): solo después de decidir la política de User-Agent y robots.txt y de aceptar que rappi.cl pueda frenar una IP de datacenter ([§9](#9-riesgos)). Hasta entonces la descarga sigue en el Mac mini.
+- **La descarga semanal en el servidor** (`rappi-refresh.timer`, que viene apagado): solo después de decidir la política de User-Agent y robots.txt y de aceptar que rappi.cl pueda frenar una IP de datacenter ([§9](#9-riesgos)). Hasta entonces la descarga semanal corre en el equipo local que ya la tiene programada.
 - **Retención:** las personas del prototipo sin actividad se borran a los 180 días (`PROTOTYPE_USER_RETENTION_DAYS`) y el texto de las búsquedas, a los 90 ([§7](#qué-se-guarda-y-cuánto-tiempo)). Los 90 días no son una variable sino una constante del código (`QUERY_RETENTION_DAYS`); otro plazo exige `rappi-ia purge --dias N` en `rappi-purge.service`. Confirmar los dos plazos.
 
 ## 1. Arquitectura
@@ -154,7 +154,7 @@ docker run --rm -it caddy:2 caddy hash-password   # pide la clave de la puerta y
 openssl rand -hex 32                              # una vez por cada clave y para API_SECRET
 ```
 
-Editar `/etc/rappi/rappi.env` y reemplazar cada `cambiar-esto` ([§0](#0-lo-que-necesita-el-usuario)). `DATABASE_URL_OWNER` y `DATABASE_URL_API` llevan las mismas claves que `RAPPI_OWNER_PASSWORD` y `RAPPI_API_PASSWORD`. `BASIC_AUTH_HASH` va entre comillas simples.
+Editar `/etc/rappi/rappi.env` y reemplazar cada `cambiar-esto` ([§0](#0-lo-que-hay-que-decidir-o-conseguir)). `DATABASE_URL_OWNER` y `DATABASE_URL_API` llevan las mismas claves que `RAPPI_OWNER_PASSWORD` y `RAPPI_API_PASSWORD`. `BASIC_AUTH_HASH` va entre comillas simples.
 
 docker compose usa este archivo dos veces, y las dos tienen que ser el mismo: para armar `docker-compose.yml` (`DOMAIN`, la puerta, las URL de cada servicio) y como `env_file` de `db`, `migrate`, `api` y `jobs`. Desde aquí, cada comando usa esta variable:
 
@@ -184,7 +184,7 @@ Con el volumen `pgdata` vacío, la imagen de Postgres corre una vez [`deploy/db/
 
 ### 3.5 Restaurar el catálogo
 
-El catálogo llega en un respaldo del Mac mini: `make backup` en `rappi-scraper/` deja `data/backups/rappi_<fecha>.dump`. Copiarlo al servidor (`scp`) y restaurarlo **como `rappi_owner`**, dentro del contenedor de la base:
+El catálogo llega en un respaldo de la base: el de entrega (`make dump-entrega`, sin el uso del MVP; ver [instalacion.md §3](instalacion.md#3-base-de-datos)) o uno del equipo de la descarga semanal (`make backup` en `rappi-scraper/` deja `data/backups/rappi_<fecha>.dump`). Copiarlo al servidor (`scp`) y restaurarlo **como `rappi_owner`**, dentro del contenedor de la base:
 
 ```bash
 $COMPOSE cp ruta/al/rappi_<fecha>.dump db:/tmp/catalogo.dump
@@ -195,11 +195,12 @@ $COMPOSE exec -T db sh -c 'pg_restore -l /tmp/catalogo.dump | grep -v "COMMENT -
 $COMPOSE exec -T db rm /tmp/catalogo.dump /tmp/catalogo.list
 ```
 
-- **`--no-owner --no-privileges`:** las tablas quedan de `rappi_owner`, no del usuario del Mac. Los permisos de la API los pone el paso siguiente.
+- **`--no-owner --no-privileges`:** las tablas quedan de `rappi_owner`, no del rol que hizo el respaldo. Los permisos de la API los pone el paso siguiente.
 - **Sin `COMMENT - EXTENSION`:** las extensiones las creó el superusuario y `rappi_owner` no puede cambiar su comentario; sin el filtro, `pg_restore` falla con «must be owner of extension».
 - **`maintenance_work_mem=1GB`:** solo para esta sesión; acelera los índices HNSW. Usa la memoria compartida del contenedor, por eso `db` tiene `shm_size: 2g` (con los 64 MB de Docker falla con «No space left on device»).
 - Tarda unos minutos (con el catálogo del 11-10-2026, ~250 mil documentos, unos 2 a 3 min). La clave no pasa por la línea de comandos: el contenedor ya la tiene en su entorno.
-- El dump trae también lo que el Mac mini guardó del uso del MVP (personas `prototype`) y los datos simulados.
+- Un respaldo de `make backup` trae también el uso del MVP (personas `prototype` y sus eventos) y los datos simulados; el de entrega trae los simulados y no el uso del MVP.
+- El catálogo del servidor queda con la fecha de ese respaldo. Restaurar uno más nuevo encima no es una actualización parcial: reemplaza la base entera y borra también las personas `prototype` y lo que hicieron en el servidor (ver [§9](#9-riesgos)).
 
 ### 3.6 Migrar
 
@@ -244,7 +245,7 @@ systemctl enable --now rappi-purge.timer rappi-backup.timer
 systemctl list-timers 'rappi-*'
 ```
 
-`rappi-refresh.timer` se copia pero **no se activa** ([§0](#0-lo-que-necesita-el-usuario), [§9](#9-riesgos)).
+`rappi-refresh.timer` se copia pero **no se activa** ([§0](#0-lo-que-hay-que-decidir-o-conseguir), [§9](#9-riesgos)).
 
 ### 3.10 Si algo falla
 
@@ -447,8 +448,9 @@ Ni IPs ni cuentas en la base: la cuenta de personas nuevas por IP vive solo en m
 
 ## 9. Riesgos
 
-- **IP de datacenter:** rappi.cl puede frenar o bloquear descargas desde una IP de un proveedor de nube más rápido que desde una casa. Por eso la descarga sigue en el Mac mini y `rappi-refresh.timer` viene apagado; activarlo es decisión del usuario. Nunca dos descargas a la vez: si se activa en el servidor, antes `make unschedule` en el Mac mini.
-- **User-Agent:** el scraper se presenta como un Chrome de escritorio (`USER_AGENT` en `rappi-scraper/src/rappi_scraper/config.py`). Antes de descargar desde un servidor, el usuario decide si se identifica y cómo trata robots.txt.
+- **IP de datacenter:** rappi.cl puede frenar o bloquear descargas desde una IP de un proveedor de nube más rápido que desde una casa. Por eso la descarga semanal sigue en un equipo local y `rappi-refresh.timer` viene apagado; activarlo lo decide quien despliega. Nunca dos descargas a la vez: si se activa en el servidor, antes `make unschedule` en el equipo local.
+- **User-Agent y robots.txt:** el scraper se identifica como `rappi-dlab-scraper/<versión>` (`RAPPI_UA_PROJECT`) y respeta lo que robots.txt diga para ese nombre; `RAPPI_UA_CONTACT` suma una URL o un correo de contacto ([`rappi-scraper/.env.example`](../rappi-scraper/.env.example)). Antes de descargar desde un servidor, conviene poner ese contacto.
+- **El catálogo del servidor no se actualiza solo:** sin la descarga semanal en el servidor, queda con la fecha del respaldo restaurado. Traer uno más nuevo exige restaurar la base entera, que borra las personas `prototype` y su uso; una sincronización parcial (solo catálogo) no está hecha.
 - **Sin lanzamiento abierto:** los datos son de rappi.cl y de sus comercios, y se usan solo para investigación y demostración. Abrir la demo sin puerta o a cualquiera exige autorización de Rappi; por eso no hay cuentas, pagos ni rutas abiertas.
 - **`make mvp` no es para un servidor:** es la demo local. Migra la base directamente, **sin respaldo**, aunque `API_ENV=production`. En el servidor se migra solo con `$COMPOSE run --rm migrate`.
 - **Un solo servidor:** sin réplica de la API ni de la base. Si el servidor se pierde, se vuelve a desplegar desde el último respaldo de restic ([§3](#3-primer-despliegue-desde-un-dump) con ese dump).
