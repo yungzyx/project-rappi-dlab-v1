@@ -4,12 +4,11 @@ import pytest
 from psycopg import errors
 
 from conftest import FakeClient, restaurant_block, with_top_section
-from rappi_scraper.legacy.csv_format import CSV_COLUMNS, CSV_ENCODING
-from rappi_scraper.legacy.csv_io import export_catalog_csv, import_legacy_csv
 from rappi_scraper.pipeline.restaurants import process_restaurant_jobs
 from rappi_scraper.scraping.restaurant_parser import parse_restaurant
 from rappi_scraper.storage import repository
 from rappi_scraper.storage.db import connect, database_url
+from rappi_scraper.storage.export import export_catalog_csv
 from rappi_scraper.storage.search import SEARCH_DOCUMENTS_LOCK, build_search_documents, search
 
 
@@ -394,95 +393,6 @@ def test_job_queue_resume_and_done_store_types(db):
     assert repository.open_run(db, "stores") == run
 
 
-def test_import_legacy_csv(db, tmp_path):
-    path = tmp_path / "products_lider_santiago.csv"
-    with path.open("w", newline="", encoding=CSV_ENCODING) as f:
-        writer = csv.DictWriter(f, fieldnames=CSV_COLUMNS)
-        writer.writeheader()
-        for sku, master in (("1", 10), ("2", 10), ("3", 11)):
-            writer.writerow(
-                {c: "" for c in CSV_COLUMNS}
-                | {
-                    "store_id": "5",
-                    "tienda": "Lider",
-                    "ciudad": "Santiago",
-                    "direccion": "x",
-                    "sku": sku,
-                    "master_product_id": str(master),
-                    "nombre": f"P{master}",
-                    "precio": "1000",
-                    "precio_normal": "1200",
-                    "en_stock": "True",
-                }
-            )
-
-    _, total = import_legacy_csv(db, tmp_path)
-
-    assert total == 3
-    assert _count(db, "SELECT count(*) FROM catalog_items") == 2
-    assert float(_count(db, "SELECT discount_pct FROM price_snapshots WHERE sku = '1'")) == 16.7
-
-
-def _legacy_csv(folder, **row):
-    """Un CSV del scraper original con una fila de la tienda 1 (Lider), del 24-09."""
-    defaults = {"fecha_scraping": "2026-09-24", "store_id": "1", "tienda": "Lider", "ciudad": "Santiago",
-                "direccion": "x", "en_stock": "True"}  # fmt: skip
-    with (folder / "products_lider_santiago.csv").open("w", newline="", encoding=CSV_ENCODING) as f:
-        writer = csv.DictWriter(f, fieldnames=CSV_COLUMNS)
-        writer.writeheader()
-        writer.writerow({c: "" for c in CSV_COLUMNS} | defaults | row)
-
-
-def test_legacy_import_keeps_the_category_rappi_already_named(db, tmp_path):
-    """929 productos del CSV del 24-09 quedaron sin categoría: el CSV trae el nombre y no el id."""
-    _store(db, 1, "lider", "supermercado")
-    run = repository.start_run(db, "stores", {})
-    galletas = {"category_id": 123, "category_name": "Galletas"}
-    repository.save_products(db, run, 1, [_product("a", 100, "Galleta Tritón", 990, **galletas)])
-    _legacy_csv(
-        tmp_path, store_id="5", sku="b", master_product_id="906357", nombre="Galleta Club Social", categoria="Galletas"
-    )  # una tienda que solo está en el CSV
-
-    import_legacy_csv(db, tmp_path)
-    build_search_documents(db)
-
-    assert _count(db, "SELECT category_id FROM catalog_items WHERE master_product_id = 906357") == 123
-    assert "Categoría: Galletas" in _count(db, "SELECT content FROM search_documents WHERE entity_id = '906357'")
-
-
-def test_legacy_import_keeps_the_date_of_the_csv_so_it_does_not_replace_newer_prices(db, tmp_path):
-    _store(db, 1, "lider", "supermercado")
-    run = repository.start_run(db, "stores", {})
-    repository.save_products(db, run, 1, [_product("a", 100, "Arroz Tucapel", 1500)])
-    _legacy_csv(tmp_path, sku="a", master_product_id="100", nombre="Arroz Tucapel", precio="1000")
-
-    import_legacy_csv(db, tmp_path)
-    build_search_documents(db)
-
-    assert str(_count(db, "SELECT min(scraped_at)::date FROM price_snapshots")) == "2026-09-24"
-    assert _count(db, "SELECT (metadata->>'precio_min')::int FROM search_documents WHERE entity_id = '100'") == 1500
-
-
-def test_importing_the_same_legacy_csv_twice_keeps_every_offer_current(db, tmp_path):
-    """Las dos importaciones guardan los precios con la misma fecha (la del CSV): el último precio se elegía sin
-    desempate y no coincidía con la corrida que la vigencia toma por última (v_store_format_runs desempata por
-    run_id), así que la mitad de las ofertas salía de la búsqueda al azar."""
-    defaults = {"fecha_scraping": "2026-09-24", "store_id": "5", "tienda": "Lider", "ciudad": "Santiago",
-                "direccion": "x", "en_stock": "True", "precio": "1000"}  # fmt: skip
-    with (tmp_path / "products_lider_santiago.csv").open("w", newline="", encoding=CSV_ENCODING) as f:
-        writer = csv.DictWriter(f, fieldnames=CSV_COLUMNS)
-        writer.writeheader()
-        for i in range(40):
-            product = {"sku": f"s{i}", "master_product_id": str(1000 + i), "nombre": f"Producto {i}"}
-            writer.writerow({c: "" for c in CSV_COLUMNS} | defaults | product)
-
-    import_legacy_csv(db, tmp_path)
-    import_legacy_csv(db, tmp_path)
-    build_search_documents(db)
-
-    assert _count(db, "SELECT count(*) FROM search_documents WHERE entity_type = 'catalog_item'") == 40
-
-
 def test_zero_stock_is_kept_but_zero_ids_are_not(db):
     _store(db, 1, "lider", "supermercado")
     run = repository.start_run(db, "stores", {})
@@ -501,7 +411,7 @@ def test_export_catalog_csv(db, tmp_path):
 
     target = export_catalog_csv(db, tmp_path / "catalogo.csv")
 
-    with target.open(encoding=CSV_ENCODING) as f:
+    with target.open(encoding="utf-8-sig") as f:  # con BOM, para Excel
         rows = list(csv.DictReader(f))
     assert [(r["vertical"], r["nombre"], r["categoria"]) for r in rows] == [
         ("supermercado", "Pañales Babysec", "Pañales")

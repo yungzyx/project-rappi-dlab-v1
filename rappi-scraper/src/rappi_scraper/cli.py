@@ -24,9 +24,7 @@ from pathlib import Path
 
 from . import config
 from .keep_awake import keep_awake
-from .legacy.csv_format import OUTPUT_DIR as LEGACY_CSV_DIR
-from .legacy.csv_io import export_catalog_csv, import_legacy_csv
-from .lock import DownloadInProgress, database_lock, download_lock, file_lock
+from .lock import DownloadInProgress, database_lock, file_lock
 from .pipeline.discover import (
     VERTICAL_LISTINGS,
     city_locations,
@@ -42,6 +40,7 @@ from .scraping.client import DownloadStopped, PossibleBlock, RappiClient
 from .storage import repository
 from .storage.backup import backup_database
 from .storage.db import APPLIED_BY_DEPLOY, PendingMigrations, check_migrations, connect, database_url, migrate
+from .storage.export import export_catalog_csv
 from .storage.search import VERTICALS, build_search_documents, search
 
 log = logging.getLogger("rappi_scraper")
@@ -294,9 +293,6 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--vertical", required=True, choices=VERTICALS)
     p.add_argument("--limit", type=int, default=10)
 
-    p = sub.add_parser("import-csv", help="Importar CSVs del scraper legacy como corrida histórica")
-    p.add_argument("folder", type=Path, nargs="?", default=LEGACY_CSV_DIR)
-
     p = sub.add_parser("export-csv", help="Exportar catálogo por vertical a CSV")
     p.add_argument("--output", type=Path, default=config.EXPORT_DIR / "catalogo_por_vertical.csv")
 
@@ -405,11 +401,6 @@ def _run_simple(args) -> None:
             for hit in search(conn, args.vertical, args.query, args.limit):
                 print(f"{hit['rank']:.3f}  [{hit['entity_type']}] {hit['content'][:110]}")
                 print("       ", json.dumps(hit["metadata"], ensure_ascii=False)[:160])
-        elif args.command == "import-csv":
-            # Escribe precios como una descarga: nunca a la vez que otra. Los triggers de store_last_snapshot (migración
-            # 039) suponen un solo escritor de precios por formato a la vez.
-            with download_lock():
-                import_legacy_csv(conn, args.folder)
         elif args.command == "export-csv":
             print(export_catalog_csv(conn, args.output))
 

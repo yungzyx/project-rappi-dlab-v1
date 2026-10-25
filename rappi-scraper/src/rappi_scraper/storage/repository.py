@@ -315,8 +315,8 @@ def _int_or_none(value) -> int | None:
 
 
 def save_products(conn: Connection, run_id: int, store_id: int, products: list[dict]) -> int:
-    """Guarda productos crudos de Rappi (con `_aisle_id` / `_sub_aisle_id` agregados y, desde un CSV legado, la fecha
-    en que se bajaron en `_scraped_at`; si no, el precio queda con la hora actual).
+    """Guarda productos crudos de Rappi (con `_aisle_id` / `_sub_aisle_id` agregados); el precio queda con la hora
+    actual.
 
     Escribe categorías, catálogo único, oferta por tienda y un snapshot de precio.
     Devuelve cuántos productos se guardaron.
@@ -357,7 +357,6 @@ def save_products(conn: Connection, run_id: int, store_id: int, products: list[d
             p.get("pum") or "",
             bool(p.get("in_stock")),
             _int_or_none(p.get("stock")),
-            p.get("_scraped_at"),
         )
 
     with conn.cursor() as cur:
@@ -402,7 +401,7 @@ def save_products(conn: Connection, run_id: int, store_id: int, products: list[d
             """
             INSERT INTO price_snapshots (run_id, store_id, sku, price, real_price, discount_pct, pum, in_stock, stock,
                                          scraped_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, COALESCE(%s::timestamptz, now()))
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, now())
             ON CONFLICT (run_id, store_id, sku) DO UPDATE SET
                 price = EXCLUDED.price, real_price = EXCLUDED.real_price, discount_pct = EXCLUDED.discount_pct,
                 pum = EXCLUDED.pum, in_stock = EXCLUDED.in_stock, stock = EXCLUDED.stock,

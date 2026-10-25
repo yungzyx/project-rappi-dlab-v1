@@ -95,7 +95,7 @@ make unschedule        # quitarla
 ```
 
 - **Mac dormido o apagado:** si está dormido a esa hora, corre al despertar; si está apagado, esa semana se salta.
-- **Una sola a la vez:** los comandos que descargan (`discover`, `scrape-stores`, `scrape-restaurants`, `refresh`, el legado `rappi-csv`) y `backup` toman el mismo candado de archivo (`data/scraper.lock`, con `flock`: el sistema lo suelta aunque el proceso muera) y se niegan a empezar si otra descarga lo tiene. Además, un candado (`data/refresh-semanal.pid`) impide que corran dos actualizaciones semanales; se borra aunque la tarea se corte con Ctrl+C o una señal. Si hay otra descarga (`discover`, `scrape-*`, `refresh`) o un `make post-refresh` en curso, la tarea se omite y lo anota.
+- **Una sola a la vez:** los comandos que descargan (`discover`, `scrape-stores`, `scrape-restaurants`, `refresh`) y `backup` toman el mismo candado de archivo (`data/scraper.lock`, con `flock`: el sistema lo suelta aunque el proceso muera) y se niegan a empezar si otra descarga lo tiene. Además, un candado (`data/refresh-semanal.pid`) impide que corran dos actualizaciones semanales; se borra aunque la tarea se corte con Ctrl+C o una señal. Si hay otra descarga (`discover`, `scrape-*`, `refresh`) o un `make post-refresh` en curso, la tarea se omite y lo anota.
 - **Ubicación del proyecto:** debe estar fuera de Documentos, Escritorio y Descargas: macOS no deja que launchd lea esas carpetas (detalle en [docs/instalacion.md](../docs/instalacion.md)).
 - **Logs:** cada ejecución deja una línea en `data/logs/ultimo-estado.txt` (`exit=N`, «omitida», «interrumpida», «respaldo fallido», «restaurantes sin actualizar», «restaurantes con la lista de la corrida anterior» o «detenida: posible bloqueo»), que muestra `make schedule-status` junto con el respaldo más nuevo; la salida de launchd queda en `data/logs/launchd.*.log`, y el log detallado y el reporte, como en cualquier corrida.
 - Programarla en **un solo** equipo.
@@ -126,7 +126,7 @@ make unschedule        # quitarla
 
 ```text
 rappi-scraper/
-├── pyproject.toml                dependencias, comandos `rappi`/`rappi-csv`, config de pytest y ruff
+├── pyproject.toml                dependencias, comando `rappi`, config de pytest y ruff
 ├── Makefile                      instalación, tests, operación y tarea semanal
 ├── .env.example                  conexión a Postgres y ritmo de requests
 ├── scripts/
@@ -160,11 +160,8 @@ rappi-scraper/
 │   │   ├── repository.py           escrituras idempotentes y consultas de estado
 │   │   ├── search.py               documentos y búsqueda por vertical
 │   │   ├── backup.py               respaldo con pg_dump, validación y rotación
+│   │   ├── export.py               catálogo por vertical a CSV (`rappi export-csv`)
 │   │   └── migrations/             esquema SQL versionado, un solo historial para toda la base (001–040; las de rappi-ia: 009–013, 016, 020, 022–031, 033–037)
-│   └── legacy/                   scraper original a CSV (ver Legado)
-│       ├── csv_scraper.py          comando `rappi-csv`
-│       ├── csv_format.py           columnas y escritura de CSV
-│       └── csv_io.py               importar CSV a la base / exportar catálogo
 ├── tests/
 │   ├── unit/                     sin red ni base de datos
 │   ├── integration/              contra la base `rappi_test`
@@ -172,8 +169,7 @@ rappi-scraper/
 └── data/                         fuera de git
     ├── exports/                    salida de `rappi export-csv`
     ├── reports/, logs/             reportes y logs de cada corrida
-    ├── backups/                    respaldos de la base (`rappi backup` / `refresh`)
-    └── supermercados_csv/          salida de `rappi-csv` (legado)
+    └── backups/                    respaldos de la base (`rappi backup` / `refresh`)
 ```
 
 ## Modelo de datos
@@ -233,20 +229,3 @@ make format       # aplica el formato
 - Proyecto independiente: no está afiliado a Rappi ni cuenta con su respaldo. Las marcas y el contenido pertenecen a Rappi y a los comercios.
 
 Detalle en [README.md#qué-es-real-y-qué-es-simulado](../README.md#qué-es-real-y-qué-es-simulado).
-
-## Legado: scraper original a CSV (`rappi-csv`)
-
-Primera versión del proyecto, anterior a la base de datos: supermercados por cadena y ciudad, escritos en `data/supermercados_csv/`. Se conserva como referencia; el flujo actual es `rappi`.
-
-```bash
-rappi-csv --list-chains                                                   # cadenas disponibles
-rappi-csv --chains lider --cities santiago --max-stores 1 --max-aisles 2  # prueba rápida (~1 min)
-rappi-csv                                                                 # Lider y Unimarc, todas las ciudades
-rappi import-csv                                                          # carga esos CSV en la base como corrida histórica
-```
-
-Columnas: `fecha_scraping, cadena, ciudad, store_id, tienda, direccion, pasillo, sub_pasillo, sku, master_product_id, ean, nombre, marca, descripcion, presentacion, cantidad, unidad, tipo_venta, precio, precio_normal, descuento_pct, tiene_descuento, precio_por_unidad, categoria, en_stock, imagen_url`.
-
-`rappi import-csv` guarda los precios con su `fecha_scraping` (así no pasan por más nuevos que una descarga posterior) y busca el id de `categoria` entre las categorías que ya vio una descarga; si no la encuentra, el producto queda sin categoría.
-
-Código en `src/rappi_scraper/legacy/`.

@@ -20,7 +20,6 @@ dev = ["pytest>=8", "ruff==0.17.1"]
 
 [project.scripts]
 rappi = "rappi_scraper.cli:main"
-rappi-csv = "rappi_scraper.legacy.csv_scraper:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
