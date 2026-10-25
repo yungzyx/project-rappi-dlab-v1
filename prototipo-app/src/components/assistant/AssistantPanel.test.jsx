@@ -771,7 +771,7 @@ describe('Para ti y Descubre con Mochi', () => {
     const fetchMock = stubCatalog({ '/recommendations': rows() })
     await renderPanel()
 
-    expect(bubbles()[0]).toBe('¡Hola! Soy Mochi, tu asistente Rappi 🧡 ¿Qué se te antoja hoy?')
+    expect(bubbles()[0]).toBe('¡Hola! Soy Mochi, tu asistente de compras 🧡 ¿Qué se te antoja hoy?')
     expect(screen.getByText('Gaseosa cola 500 cc (prueba)')).toBeTruthy()
     expect(document.querySelector('.agent-msg-reason').textContent).toBe('Por tu interés en 🍕 pizza')
     // Una sola petición sirve a «Para ti» y a «Descubre con Mochi».
@@ -812,7 +812,7 @@ describe('Para ti y Descubre con Mochi', () => {
   test('Para ti se oculta si recommendations viene vacío o falla', async () => {
     stubCatalog({ '/recommendations': { user_id: 'u', interests: [], rows: [] } })
     await renderPanel()
-    expect(bubbles()[0]).toBe('¡Hola! Soy Mochi, tu asistente Rappi 🧡 ¿Qué se te antoja hoy?')
+    expect(bubbles()[0]).toBe('¡Hola! Soy Mochi, tu asistente de compras 🧡 ¿Qué se te antoja hoy?')
     expect(document.querySelector('.agent-msg-products')).toBeNull()
     expect(screen.queryByText('Descubre con Mochi')).toBeNull()
 

@@ -1,9 +1,9 @@
 // Línea de tiempo simulada del pedido (segundos desde que se hizo) y ruta del repartidor en el mapa.
 export const STEPS = [
-  { id: 'confirmed', label: 'Order confirmed', at: 0 },
-  { id: 'preparing', label: 'Preparing your order', at: 4 },
-  { id: 'on-the-way', label: 'On the way', at: 9 },
-  { id: 'delivered', label: 'Delivered', at: 20 },
+  { id: 'confirmed', label: 'Pedido confirmado', at: 0 },
+  { id: 'preparing', label: 'Preparando tu pedido', at: 4 },
+  { id: 'on-the-way', label: 'En camino', at: 9 },
+  { id: 'delivered', label: 'Entregado', at: 20 },
 ]
 
 const RIDE_START = STEPS[2].at

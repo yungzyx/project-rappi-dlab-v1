@@ -1,4 +1,4 @@
-/* Medidas tomadas de IMG_9109. */
+/* Medidas tomadas de las capturas de la app iOS del 26-09-2026 (no versionadas). */
 .restaurants {
   padding-bottom: 60px;
 }
@@ -143,11 +143,6 @@
   text-align: left;
 }
 
-.rest-banner-full {
-  width: 100%;
-  height: 100%;
-}
-
 .rest-banner-text {
   position: absolute;
   left: 16px;
@@ -177,7 +172,6 @@
   width: 136px;
   height: 100%;
   object-fit: cover;
-  /* esconde el sello "1 offer" de la foto, que está abajo a la izquierda */
   object-position: right;
 }
 

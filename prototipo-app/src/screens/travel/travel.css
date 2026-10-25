@@ -1,4 +1,4 @@
-/* Medidas de IMG_9127/9128 (px a 600 de ancho × 0,67 = pt). */
+/* Medidas de las capturas de la app iOS del 26-09-2026, no versionadas (px a 600 de ancho × 0,67 = pt). */
 .travel {
   padding-bottom: 60px;
 }
@@ -7,7 +7,6 @@
   position: relative;
   height: 335px;
   margin-top: 62px;
-  touch-action: pan-y;
 }
 
 .travel-hero img {
@@ -16,12 +15,6 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  opacity: 0;
-  transition: opacity 600ms ease;
-}
-
-.travel-hero img.is-active {
-  opacity: 1;
 }
 
 /* Zonas táctiles invisibles sobre los botones dibujados en el banner (medidas sobre 402 × 335, en %) */

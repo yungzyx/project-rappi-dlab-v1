@@ -15,7 +15,7 @@ import { StoreMeta } from '../../components/StoreMeta'
 import RealMenu from './RealMenu'
 import './store.css'
 
-const MODES = ['Delivery', 'Pickup']
+const MODES = ['Envío', 'Retiro']
 const SKELETON_ROWS = 5
 
 /** Las tiendas del catálogo se abren por su id numérico; las que el agente abre solo por nombre no están en la base. */

@@ -62,8 +62,8 @@ export default function TrackingScreen({ back, reset, params }) {
       </div>
 
       <section className="tracking-sheet">
-        <p className="tracking-eta-label">{delivered ? 'Enjoy your order!' : 'Estimated arrival'}</p>
-        <h1 className="tracking-eta">{delivered ? 'Delivered 🎉' : `${minutesLeft(seconds)} min`}</h1>
+        <p className="tracking-eta-label">{delivered ? '¡Disfruta tu pedido!' : 'Llegada estimada'}</p>
+        <h1 className="tracking-eta">{delivered ? 'Entregado 🎉' : `${minutesLeft(seconds)} min`}</h1>
 
         <ol className="tracking-steps">
           {STEPS.map((item, i) => (
@@ -103,7 +103,7 @@ function Courier() {
       <span className="tracking-courier-text">
         <strong>Carlos R.</strong>
         <small>
-          Your Rappitendero · <StarIcon filled size={12} /> 4.9
+          Tu Rappitendero · <StarIcon filled size={12} /> 4,9
         </small>
       </span>
       <button type="button" className="tracking-contact tap" aria-label="Contactar" onClick={() => setChatOpen(true)}>
@@ -171,7 +171,7 @@ function Delivered({ order }) {
   return (
     <>
       <div className="tracking-rate">
-        <p>How was your order?</p>
+        <p>¿Cómo estuvo tu pedido?</p>
         <div className="tracking-stars" role="radiogroup" aria-label="Calificación">
           {STARS.map((value) => (
             <button
@@ -211,7 +211,7 @@ function Delivered({ order }) {
 function OrderSummary({ order }) {
   return (
     <details className="tracking-summary">
-      <summary>Order details · {formatPrice(order.total)}</summary>
+      <summary>Detalle del pedido · {formatPrice(order.total)}</summary>
       <ul>
         {order.items.map((item, i) => (
           <li key={`${i}-${item.name}`}>
@@ -222,7 +222,7 @@ function OrderSummary({ order }) {
           </li>
         ))}
       </ul>
-      <p>{order.pickup ? 'Pickup at the store' : `Deliver to ${order.address}`}</p>
+      <p>{order.pickup ? 'Retiro en tienda' : `Entrega en ${order.address}`}</p>
     </details>
   )
 }

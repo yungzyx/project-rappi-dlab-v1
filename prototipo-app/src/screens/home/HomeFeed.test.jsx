@@ -71,12 +71,12 @@ describe('Home de «Rappi hoy»', () => {
     events.track.mockClear()
     const { fetchMock } = renderHome({ 'GET /profile/*': fixture('profile-verticales') })
     expect([...document.querySelectorAll('.home-shortcut')].map((button) => button.textContent).slice(0, 2)).toEqual([
-      'Grocery',
-      'Pharmacy',
+      'Súper',
+      'Farmacia',
     ])
     expect(fetchMock.mock.calls.some(([url]) => url.includes('/verticales'))).toBe(false)
     expect(screen.queryByText('Ordenadas según lo que más usas')).toBeNull()
-    fireEvent.click(screen.getByText('Pharmacy'))
+    fireEvent.click(screen.getByText('Farmacia'))
     expect(events.track).toHaveBeenCalledWith('vertical_open', { vertical: 'farmacia' })
     // RappiTravel también se anota (en «Rappi hoy» el evento va marcado y el motor no aprende de él).
     fireEvent.click(screen.getByText('RappiTravel'))

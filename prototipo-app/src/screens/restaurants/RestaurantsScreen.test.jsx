@@ -123,7 +123,7 @@ describe('Restaurantes con el catálogo real', () => {
     const push = renderRestaurants()
     await waitFor(() => expect(listed()).toHaveLength(7))
 
-    fireEvent.click(screen.getByRole('button', { name: 'Tung Fong' }))
+    fireEvent.click(screen.getByText('Hasta 40% de descuento'))
     expect(push).not.toHaveBeenCalled()
     expect(await screen.findByText('Esta sección no está en el prototipo')).toBeTruthy()
   })
@@ -148,7 +148,7 @@ describe('Restaurantes con el catálogo real', () => {
     renderRestaurants()
 
     const notice = (await screen.findByText('Sin conexión')).closest('.offline-notice')
-    expect(screen.getByText('Search for dishes or restaurants')).toBeTruthy()
+    expect(screen.getByText('Busca platos o restaurantes')).toBeTruthy()
 
     online = true
     fireEvent.click(within(notice).getByRole('button', { name: 'Reintentar' }))

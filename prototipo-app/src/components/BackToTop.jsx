@@ -1,7 +1,7 @@
 import { ArrowUpIcon } from './Icons'
 import './back-to-top.css'
 
-/** Píldora negra "Back to top" que aparece al volver a subir en listas largas. */
+/** Píldora negra «Volver arriba» que aparece al volver a subir en listas largas. */
 export default function BackToTop({ visible, onClick, top = 178 }) {
   return (
     <button
@@ -12,7 +12,7 @@ export default function BackToTop({ visible, onClick, top = 178 }) {
       tabIndex={visible ? 0 : -1}
     >
       <ArrowUpIcon size={17} />
-      Back to top
+      Volver arriba
     </button>
   )
 }

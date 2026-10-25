@@ -3,10 +3,10 @@ import { loadStored, saveStored } from './storage'
 
 const STORAGE_KEY = 'rappi-proto-address'
 
-// "Home" es la dirección que pidió mostrar el usuario; "Work" es un ejemplo inventado para poder cambiar de dirección.
+// Dos direcciones de ejemplo, inventadas, para poder cambiar de dirección.
 const ADDRESSES = [
-  { id: 'home', label: 'Home', line: 'Casa de Rappitouille' },
-  { id: 'work', label: 'Work', line: 'Avenida Apoquindo # 3000' },
+  { id: 'home', label: 'Casa', line: 'Los Aromos 123, Providencia' },
+  { id: 'work', label: 'Trabajo', line: 'Av. Apoquindo 3000, Las Condes' },
 ]
 
 const AddressContext = createContext(null)

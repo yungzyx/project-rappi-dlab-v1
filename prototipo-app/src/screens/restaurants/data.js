@@ -2,15 +2,14 @@ import rcatTurbo from '../../assets/rcat-turbo.webp'
 import rcatPizza from '../../assets/rcat-pizza.webp'
 import rcatBurger from '../../assets/rcat-burger.webp'
 import rcatCulinaria from '../../assets/rcat-culinaria.webp'
-import bannerTungFong from '../../assets/banner-tungfong.webp'
-import againStreetWrap from '../../assets/again-streetwrap.webp'
-import againMcd from '../../assets/again-mcd.webp'
+import promoWraps from '../../assets/promo-wraps.webp'
+import promoBurger from '../../assets/promo-hamburguesa.webp'
 
 export const FILTERS = [
-  { id: 'sort', label: 'Sort', kind: 'menu' },
-  { id: 'top', label: 'Top', icon: 'trophy', kind: 'toggle' },
-  { id: 'fast', label: '35 mins', icon: 'bolt', kind: 'toggle' },
-  { id: 'rating', label: '+ 4.5', icon: 'star', kind: 'toggle' },
+  { id: 'sort', label: 'Ordenar', kind: 'menu' },
+  { id: 'top', label: 'Destacados', icon: 'trophy', kind: 'toggle' },
+  { id: 'fast', label: '35 min', icon: 'bolt', kind: 'toggle' },
+  { id: 'rating', label: '+ 4,5', icon: 'star', kind: 'toggle' },
 ]
 
 // "Experiencia Culinaria" queda cortada en el borde de la captura; se recorta igual.
@@ -28,9 +27,8 @@ export const CATEGORIES = [
   },
 ]
 
-// En la captura solo se ve el primer banner (Tung Fong). Son publicidad de la app, no tiendas del catálogo: no abren ninguna.
+// Promociones genéricas de ejemplo, sin marcas: no son tiendas del catálogo y no abren ninguna.
 export const BANNERS = [
-  { id: 'tungfong', label: 'Tung Fong', img: bannerTungFong },
-  { id: 'streetwrap', title: 'Enjoy Up to 40% Off', place: 'at Street Wrap', img: againStreetWrap },
-  { id: 'mcd', title: 'Enjoy Up to 33% Off', place: "at Mcdonald's - Turbo", img: againMcd },
+  { id: 'wraps', title: 'Hasta 40% de descuento', place: 'en wraps y bowls seleccionados', img: promoWraps },
+  { id: 'hamburguesas', title: 'Hasta 30% de descuento', place: 'en hamburguesas para la cena', img: promoBurger },
 ]

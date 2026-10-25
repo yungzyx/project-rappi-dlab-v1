@@ -65,7 +65,7 @@ function renderVertical(id) {
 const shown = () => events.track.mock.calls.filter(([type]) => type === 'suggestion_shown').map(([, fields]) => fields)
 
 beforeAll(() => {
-  Element.prototype.scrollTo = () => {} // jsdom no lo implementa (carrusel de banners)
+  Element.prototype.scrollTo = () => {} // jsdom no lo implementa
   Element.prototype.scrollIntoView = () => {} // ni este (pestañas del menú de la tienda)
 })
 afterAll(() => {
@@ -94,8 +94,8 @@ describe('catálogo real en la vertical', () => {
     }
     expect(deals.queryByText('Cerveza rubia lata 470 cc (prueba)')).toBeNull() // la baja de otra vertical no entra
     // El resto de la pantalla es la de siempre: búsqueda y categorías.
-    expect(screen.getByText('Meat & Seafood')).toBeTruthy()
-    expect(screen.getByText('Search stores or products')).toBeTruthy()
+    expect(screen.getByText('Carnes y pescados')).toBeTruthy()
+    expect(screen.getByText('Busca tiendas o productos')).toBeTruthy()
 
     const urls = fetchMock.mock.calls.map(([url]) => new URL(url))
     expect(urls.find((url) => url.pathname === '/catalog/deals').searchParams.get('vertical')).toBe('grocery')
@@ -108,11 +108,11 @@ describe('catálogo real en la vertical', () => {
     expect(screen.queryByText('Bajaron de precio')).toBeNull()
   })
 
-  test('la categoría Beers and ciders busca «cerveza» en Licores (en «Rappi hoy», el buscador plano)', async () => {
+  test('la categoría Cervezas y sidras busca «cerveza» en Licores (en «Rappi hoy», el buscador plano)', async () => {
     stubVertical('liquor')
     localStorage.setItem('rappi-proto-demo-mode', 'actual')
     const push = renderVertical('liquor')
-    fireEvent.click(screen.getByText('Beers and ciders'))
+    fireEvent.click(screen.getByText('Cervezas y sidras'))
     expect(push).toHaveBeenCalledWith('search', { query: 'cerveza', vertical: 'liquor' })
   })
 
@@ -138,7 +138,7 @@ describe('catálogo real en la vertical', () => {
   test('en la Propuesta, la categoría abre el buscador con Mochi ya con «cerveza»', async () => {
     stubVertical('liquor')
     const push = renderVertical('liquor')
-    fireEvent.click(screen.getByText('Beers and ciders'))
+    fireEvent.click(screen.getByText('Cervezas y sidras'))
     expect(push).not.toHaveBeenCalled()
     expect(window.history.state).toMatchObject({ assistant: true })
   })
@@ -226,8 +226,8 @@ describe('sin la API', () => {
 
     expect(await screen.findByText('Sin conexión')).toBeTruthy()
     // El resto de la pantalla sigue usable: se puede buscar y abrir una categoría.
-    expect(screen.getByText('Search stores or products')).toBeTruthy()
-    expect(screen.getByText('Meat & Seafood')).toBeTruthy()
+    expect(screen.getByText('Busca tiendas o productos')).toBeTruthy()
+    expect(screen.getByText('Carnes y pescados')).toBeTruthy()
     expect(screen.queryByText('Tiendas')).toBeNull()
 
     online = true
@@ -258,14 +258,14 @@ describe('entradas al embudo desde una vertical', () => {
     stubVertical('liquor')
     localStorage.setItem('rappi-proto-demo-mode', 'actual')
     const push = renderVertical('liquor')
-    fireEvent.click(screen.getByText('Search stores or products'))
+    fireEvent.click(screen.getByText('Busca tiendas o productos'))
     expect(push).toHaveBeenCalledWith('search', { vertical: 'liquor' })
   })
 
   test('en la Propuesta, el buscador de la vertical es el de Mochi', () => {
     stubVertical('liquor')
     const push = renderVertical('liquor')
-    fireEvent.click(screen.getByText('Search stores or products'))
+    fireEvent.click(screen.getByText('Busca tiendas o productos'))
     expect(push).not.toHaveBeenCalled()
     expect(window.history.state).toMatchObject({ assistant: true })
   })

@@ -35,7 +35,7 @@ describe('SearchResults sin resultados', () => {
     const fetchMock = stubApi({})
     render(<SearchResults query="chela" data={EMPTY} />)
     await flush()
-    expect(screen.getByText('No results for “chela”.')).toBeTruthy()
+    expect(screen.getByText('Sin resultados para «chela».')).toBeTruthy()
     expect(document.querySelector('.mascot')).toBeNull()
     expect(fetchMock).not.toHaveBeenCalled()
   })
@@ -149,7 +149,7 @@ describe('SearchResults sin resultados', () => {
     )
     await flush()
     expect(screen.queryByRole('button', { name: /^Ver en/ })).toBeNull()
-    expect(screen.queryByText(/No results|No encontré/)).toBeNull()
+    expect(screen.queryByText(/Sin resultados|No encontré/)).toBeNull()
   })
 })
 
