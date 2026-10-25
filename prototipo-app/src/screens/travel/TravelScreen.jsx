@@ -11,7 +11,7 @@ import proWeek from '../../assets/v/travel-proweek.webp'
 import './travel.css'
 
 // Los botones del hero (volver, campana, Ayuda, Mis Viajes, "Ver destinos") vienen dibujados en la imagen; encima van
-// zonas táctiles invisibles (medidas en % del hero de 402 × 335, para que sigan sobre el botón en un teléfono más angosto).
+// zonas táctiles invisibles (en % del hero de 402 × 335, para que sigan sobre el botón en un teléfono más angosto).
 const HERO_CTA = { left: '9%', top: '71%', width: '20.4%', height: '6%' }
 
 const TILES = [

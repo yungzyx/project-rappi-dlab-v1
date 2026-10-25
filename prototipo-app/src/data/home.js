@@ -25,8 +25,8 @@ export const MAIN_TILES = [
   { id: 'turbo', label: 'Turbo', img: catTurbo, screen: 'turbo', vertical: 'turbo' },
 ]
 
-// RappiFavor aparece deshabilitado como en la app (la imagen trae el sello «No disponible»); en el prototipo final se habilita
-// con su pantalla (`proposalRoute`).
+// RappiFavor aparece deshabilitado como en la app (la imagen trae el sello «No disponible»); en el prototipo final se
+// habilita con su pantalla (`proposalRoute`).
 // `route` dice a qué pantalla lleva cada acceso (ver HomeFeed); `service`, el servicio sin catálogo que abre
 // (`payload.servicio` de `service_opened`).
 export const SHORTCUTS = [
