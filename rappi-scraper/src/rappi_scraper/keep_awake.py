@@ -1,4 +1,4 @@
-"""Evita que el Mac se duerma durante una corrida larga (`caffeinate`, solo macOS)."""
+"""Evita que el equipo se duerma durante una corrida larga (`caffeinate`, solo macOS)."""
 
 import logging
 import os
@@ -18,7 +18,7 @@ def keep_awake() -> Iterator[None]:
         yield
         return
     process = subprocess.Popen([caffeinate, "-i", "-w", str(os.getpid())])
-    log.info("Mac despierto mientras dure la corrida (caffeinate)")
+    log.info("Equipo despierto mientras dure la corrida (caffeinate)")
     try:
         yield
     finally:

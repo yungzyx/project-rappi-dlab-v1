@@ -93,7 +93,7 @@ app = FastAPI(
 
 
 def cors_origin_regex(allow_lan: bool) -> str:
-    """Solo este Mac por defecto. La red local (iPhone) se abre con API_ALLOW_LAN=1 (`make serve-lan`): fuera de los
+    """Solo este equipo por defecto. La red local (iPhone) se abre con API_ALLOW_LAN=1 (`make serve-lan`): fuera de los
     datos de cada persona (que piden su token) la API es abierta, así que solo en una red de confianza. Redes
     privadas: 192.168/16, 10/8 y 172.16/12 (el hotspot del iPhone da 172.20.10.x), más nombres `.local` (Bonjour)."""
     hosts = r"localhost|127\.0\.0\.1"
@@ -124,7 +124,7 @@ def is_same_origin(origin: str, host: str | None) -> bool:
     return bool(host) and parts.scheme in ("http", "https") and parts.netloc.lower() == host.lower()
 
 
-# Sin tope por IP: en local, este Mac (la demo y `make mvp-check`). En producción nadie: tras un proxy que no pasa la
+# Sin tope por IP: en local, este equipo (la demo y `make mvp-check`). En producción nadie: tras un proxy que no pasa la
 # IP del cliente, todos llegarían como 127.0.0.1.
 NO_LIMIT_HOSTS = () if config.API_PRODUCTION else ("127.0.0.1", "::1")
 

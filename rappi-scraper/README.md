@@ -55,7 +55,7 @@ La primera descarga completa (24–27-09-2026) tomó **unos 3 días para las tie
 .venv/bin/rappi scrape-restaurants     # ~4 h
 ```
 
-- **Sin supervisión:** el Mac no se duerme mientras corre (`caffeinate` automático) y todo queda en `data/logs/<comando>_<fecha>.log`. La terminal debe quedar abierta.
+- **Sin supervisión:** en macOS el equipo no se duerme mientras corre (`caffeinate` automático) y todo queda en `data/logs/<comando>_<fecha>.log`. La terminal debe quedar abierta.
 - **Progreso:** cada línea muestra `[i/N · transcurrido · faltan ~X]`.
 - **Errores transitorios:** cada job fallido se reintenta una vez, automáticamente, al final de la corrida.
 - **Ctrl+C:** detiene sin perder nada; se retoma con el mismo comando.
@@ -94,7 +94,7 @@ make schedule-status   # ¿está activa? ¿cómo terminaron las últimas semanas
 make unschedule        # quitarla
 ```
 
-- **Mac dormido o apagado:** si está dormido a esa hora, corre al despertar; si está apagado, esa semana se salta.
+- **Equipo dormido o apagado:** si está dormido a esa hora, corre al despertar; si está apagado, esa semana se salta.
 - **Una sola a la vez:** los comandos que descargan (`discover`, `scrape-stores`, `scrape-restaurants`, `refresh`) y `backup` toman el mismo candado de archivo (`data/scraper.lock`, con `flock`: el sistema lo suelta aunque el proceso muera) y se niegan a empezar si otra descarga lo tiene. Además, un candado (`data/refresh-semanal.pid`) impide que corran dos actualizaciones semanales; se borra aunque la tarea se corte con Ctrl+C o una señal. Si hay otra descarga (`discover`, `scrape-*`, `refresh`) o un `make post-refresh` en curso, la tarea se omite y lo anota.
 - **Ubicación del proyecto:** debe estar fuera de Documentos, Escritorio y Descargas: macOS no deja que launchd lea esas carpetas (detalle en [docs/instalacion.md](../docs/instalacion.md)).
 - **Logs:** cada ejecución deja una línea en `data/logs/ultimo-estado.txt` (`exit=N`, «omitida», «interrumpida», «respaldo fallido», «restaurantes sin actualizar», «restaurantes con la lista de la corrida anterior» o «detenida: posible bloqueo»), que muestra `make schedule-status` junto con el respaldo más nuevo; la salida de launchd queda en `data/logs/launchd.*.log`, y el log detallado y el reporte, como en cualquier corrida.
@@ -137,7 +137,7 @@ rappi-scraper/
 │   ├── __main__.py               `python -m rappi_scraper`
 │   ├── cli.py                    comandos de `rappi`
 │   ├── config.py                 URLs, ritmo de peticiones (configurable por entorno) y rutas
-│   ├── keep_awake.py             evita que el Mac se duerma durante una corrida (`caffeinate`)
+│   ├── keep_awake.py             evita que el equipo se duerma durante una corrida (`caffeinate`, macOS)
 │   ├── lock.py                   candado de «una descarga a la vez» (`flock` sobre `data/scraper.lock`)
 │   ├── pricing.py                cálculo de descuentos
 │   ├── reporting.py              reporte de cada corrida: conteos, errores frecuentes y validaciones de calidad

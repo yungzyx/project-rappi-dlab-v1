@@ -15,7 +15,7 @@ def test_only_this_mac_by_default():
 
 
 def test_lan_mode_admits_the_iphone_hotspot_and_local_hostnames():
-    """Con el hotspot del iPhone el Mac queda en 172.20.10.x; en la red de casa también sirve `nombre.local`."""
+    """Con el hotspot del iPhone el equipo queda en 172.20.10.x; en la red de casa también sirve `nombre.local`."""
     for origin in (
         "http://192.168.1.20:5174",
         "http://10.0.0.7:5175",

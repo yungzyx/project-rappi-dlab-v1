@@ -1,7 +1,7 @@
 """Actualización completa: tiendas → restaurantes → búsqueda → reportes → respaldo.
 
 Pensada para correr sola cada semana. Si una corrida anterior quedó a medias (se cortó
-la luz, se durmió el Mac), la retoma en vez de empezar otra.
+la luz, se durmió el equipo), la retoma en vez de empezar otra.
 """
 
 import logging

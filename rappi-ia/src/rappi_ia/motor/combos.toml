@@ -1,4 +1,4 @@
-# Combinaciones de verticales de Rappi Chile (docs/superpowers/specs/2026-10-16-motor-multivertical-design.md, §3).
+# Combinaciones de verticales de Rappi Chile (docs/diseno/2026-10-16-motor-multivertical-design.md, §3).
 # Una fila es el conjunto de verticales que una persona usó en el mes base (M0). La retención es la fracción que vuelve
 # a pedir al mes siguiente (M+1); el gasto está en la moneda de la fuente. Es una correlación, no un efecto.
 version = "2026-10-16"
@@ -83,7 +83,7 @@ pedidos_por_usuario = 3.0
 retencion_m1 = 0.55
 gasto_por_usuario = 68
 
-# Escalera fina (docs/superpowers/plans/2026-10-16-etapa-7-escalera-fina.md). Supuesto propio, no viene de Rappi: la
+# Escalera fina (docs/capa-de-datos.md#la-escalera-fina). Supuesto propio, no viene de Rappi: la
 # tabla de arriba solo distingue grupos. La retención fina esperada es 1 − (1 − gruesa)·Π(1 − f): la j-ésima vertical
 # de un grupo (j ≥ 2) quita f = reduccion_base·decaimiento^(j−2) de la parte que no vuelve (10 %, 5 %, 2,5 %…) y cada
 # servicio usado (RappiFavor, RappiTravel), f = servicio. Como cada f es menor que 1, nunca llega a 100 %.

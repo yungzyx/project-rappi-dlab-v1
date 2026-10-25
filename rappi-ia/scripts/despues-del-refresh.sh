@@ -9,7 +9,7 @@ LOGS=${RAPPI_IA_DATA_DIR:-data}/logs
 LOG="$LOGS/despues-del-refresh_$(date +%Y%m%d-%H%M%S).log"
 mkdir -p "$LOGS"
 echo "Log: $LOG"
-# caffeinate (macOS) evita que el Mac se duerma; en Linux no existe ni hace falta.
+# caffeinate (macOS) evita que el equipo se duerma; en Linux no existe ni hace falta.
 AWAKE=()
 if command -v caffeinate >/dev/null; then AWAKE=(caffeinate -i); fi
 # "python -m rappi_scraper refresh" (Terminal), ".venv/bin/rappi refresh" o la tarea semanal completa (launchd). Sin

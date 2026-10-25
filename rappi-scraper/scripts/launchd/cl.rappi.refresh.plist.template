@@ -13,7 +13,7 @@
     </array>
     <key>WorkingDirectory</key>
     <string>__PROJECT__</string>
-    <!-- Domingos 03:00. Si el Mac estaba dormido, corre al despertar; si estaba apagado, esa semana se salta. -->
+    <!-- Domingos 03:00. Si el equipo estaba dormido, corre al despertar; si estaba apagado, esa semana se salta. -->
     <key>StartCalendarInterval</key>
     <dict>
         <key>Weekday</key>

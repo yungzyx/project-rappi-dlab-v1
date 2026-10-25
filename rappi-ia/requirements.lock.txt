@@ -1,4 +1,5 @@
-# Versiones fijadas de rappi-ia: pip freeze del Mac mini que calculó los embeddings de la base (30-09-2026).
+# Versiones fijadas de rappi-ia: parten del pip freeze del equipo que calculó los embeddings de la base (30-09-2026)
+# y se actualizan con los PR de Dependabot.
 # `make install` y `make install-ml` las usan como restricción (-c): una versión nueva de torch o
 # sentence-transformers no entra sola. Para actualizar: cambiar la versión aquí, correr make install-ml y,
 # si cambió la librería de embeddings, volver a embeber (la caché de vectores no guarda la versión).

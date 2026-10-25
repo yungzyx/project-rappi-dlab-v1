@@ -48,7 +48,7 @@ log = logging.getLogger("rappi_scraper")
 LOGS_DIR = config.DATA_DIR / "logs"
 # Los logs de cada comando largo (`refresh_…log`, `backup_…log`) se borran pasadas estas semanas (LOG_RETENTION_WEEKS).
 LOG_RETENTION_WEEKS = 8
-# Log a archivo, Mac despierto y el candado de descargas: los que descargan de rappi.cl, y `backup`, que no debe correr
+# Log a archivo, equipo despierto y el candado de descargas: los que descargan de rappi.cl, y `backup`, que no debe correr
 # junto al respaldo de `refresh` (se pisaban al rotar).
 LONG_COMMANDS = {"discover", "scrape-stores", "scrape-restaurants", "refresh", "backup"}
 # Códigos de salida de `refresh` que refresh-semanal.sh distingue:

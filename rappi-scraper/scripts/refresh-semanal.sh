@@ -14,7 +14,7 @@ DATA=${RAPPI_DATA_DIR:-data}
 LOGS=$DATA/logs
 RAPPI_BIN=${RAPPI_BIN:-.venv/bin/rappi}
 mkdir -p "$LOGS"
-# caffeinate (macOS) evita que el Mac se duerma a mitad de la descarga; en Linux no existe ni hace falta.
+# caffeinate (macOS) evita que el equipo se duerma a mitad de la descarga; en Linux no existe ni hace falta.
 AWAKE=()
 if command -v caffeinate >/dev/null; then AWAKE=(caffeinate -i); fi
 

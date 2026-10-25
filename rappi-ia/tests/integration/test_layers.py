@@ -1,4 +1,4 @@
-"""Capa de perfiles (docs/superpowers/specs/2026-10-06-capa-perfiles-design.md) contra `rappi_ia_test`."""
+"""Capa de perfiles (docs/diseno/2026-10-06-capa-perfiles-design.md) contra `rappi_ia_test`."""
 
 from dataclasses import replace
 

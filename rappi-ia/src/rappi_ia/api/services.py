@@ -47,7 +47,7 @@ def services() -> Services:
 
 @cache
 def _load_services() -> Services:
-    """`RAPPI_IA_LIGHT=1` evita cargar modelos (tests, o un Mac sin el extra `ml`)."""
+    """`RAPPI_IA_LIGHT=1` evita cargar modelos (tests, o un equipo sin el extra `ml`)."""
     light = os.environ.get("RAPPI_IA_LIGHT") == "1"
     missing: dict[str, str] = {}
     embedder = None

@@ -2,7 +2,7 @@
 # make build deja prototipo-app/dist y dashboard-empresa/dist; esto revisa que no lleven rastros de desarrollo.
 # Sale con 1 si encuentra alguno. Qué revisa y por qué:
 #  1. Siempre: la dirección de la API local (":8000", "localhost"). Un build de producción habla con "/api" (o con
-#     VITE_API_URL); si aparecen, la app quedó apuntando al Mac de quien la construyó.
+#     VITE_API_URL); si aparecen, la app quedó apuntando al equipo de quien la construyó.
 #     También siempre: la API simulada y el «Panel de la demo» de la demo sin conexión («Prototipo MVP.html», `npm run
 #     demo:html`, `vite build --mode demo`): solo entran a dist-demo/, nunca a un build normal ni al de VITE_DEMO=1.
 #  2. Salvo con VITE_DEMO=1: los textos de desarrollador y los controles de la demo. La app los deja detrás de
