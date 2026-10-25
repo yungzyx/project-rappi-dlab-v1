@@ -24,9 +24,7 @@ from pathlib import Path
 
 from . import config
 from .keep_awake import keep_awake
-from .legacy.csv_format import OUTPUT_DIR as LEGACY_CSV_DIR
-from .legacy.csv_io import export_catalog_csv, import_legacy_csv
-from .lock import DownloadInProgress, database_lock, download_lock, file_lock
+from .lock import DownloadInProgress, database_lock, file_lock
 from .pipeline.discover import (
     VERTICAL_LISTINGS,
     city_locations,
@@ -34,15 +32,15 @@ from .pipeline.discover import (
     discover_stores,
     failed_listings,
 )
-from .pipeline.queue import PossibleBlock
 from .pipeline.refresh import JOB_TYPES, finish_and_report, refresh
 from .pipeline.restaurants import process_restaurant_jobs
 from .pipeline.stores import process_store_jobs
 from .reporting import render_markdown, write_run_report
-from .scraping.client import RappiClient
+from .scraping.client import DownloadStopped, PossibleBlock, RappiClient, RobotsDisallowed
 from .storage import repository
 from .storage.backup import backup_database
 from .storage.db import APPLIED_BY_DEPLOY, PendingMigrations, check_migrations, connect, database_url, migrate
+from .storage.export import export_catalog_csv
 from .storage.search import VERTICALS, build_search_documents, search
 
 log = logging.getLogger("rappi_scraper")
@@ -50,8 +48,8 @@ log = logging.getLogger("rappi_scraper")
 LOGS_DIR = config.DATA_DIR / "logs"
 # Los logs de cada comando largo (`refresh_…log`, `backup_…log`) se borran pasadas estas semanas (LOG_RETENTION_WEEKS).
 LOG_RETENTION_WEEKS = 8
-# Log a archivo, Mac despierto y el candado de descargas: los que descargan de rappi.cl, y `backup`, que no debe correr
-# junto al respaldo de `refresh` (se pisaban al rotar).
+# Log a archivo, equipo despierto y el candado de descargas: los que descargan de rappi.cl, y `backup`, que no debe
+# correr junto al respaldo de `refresh` (se pisaban al rotar).
 LONG_COMMANDS = {"discover", "scrape-stores", "scrape-restaurants", "refresh", "backup"}
 # Códigos de salida de `refresh` que refresh-semanal.sh distingue:
 # 3: terminó todo menos el respaldo; se anota («respaldo fallido») y sigue con la capa de IA.
@@ -64,6 +62,9 @@ POSSIBLE_BLOCK_EXIT = 4
 RESTAURANTS_FAILED_EXIT = 5
 # 6: las dos cosas, restaurantes sin actualizar y respaldo fallido: la tarea semanal anota ambas y sigue.
 RESTAURANTS_AND_BACKUP_FAILED_EXIT = 6
+# 7: robots.txt no permite una página (o no respondió); como con el 4, la corrida queda abierta y la tarea semanal se
+# detiene ahí, hasta que alguien revise la regla.
+ROBOTS_EXIT = 7
 # Avisos que no cambian el código de salida: si la variable trae una ruta, `refresh` escribe ahí una marca fija por
 # línea, y refresh-semanal.sh la anota en ultimo-estado.txt. La única por ahora: los restaurantes se bajaron con la
 # lista de una corrida anterior porque el sitemap no respondió (sale con 0).
@@ -137,10 +138,11 @@ def _finish_and_report(conn, run_id: int, kind: str) -> None:
 
 
 def _scrape_or_stop(conn, run_id: int, kind: str, process) -> None:
-    """Como `refresh`: ante un posible bloqueo deja el reporte con la alerta y un mensaje claro, no una traza."""
+    """Como `refresh`: ante un posible bloqueo o robots.txt deja el reporte con la alerta y un mensaje claro, no una
+    traza."""
     try:
         process()
-    except PossibleBlock as exc:
+    except DownloadStopped as exc:
         report, _ = finish_and_report(conn, run_id, kind, alert=str(exc))
         print(render_markdown(report))
         raise SystemExit(
@@ -162,13 +164,15 @@ def cmd_refresh(conn, args) -> None:
             backup=None if args.no_backup else lambda: backup_database(database_url()),
             resume_only=args.resume_only,
         )
-    except PossibleBlock as exc:
+    except DownloadStopped as exc:
         if exc.run_left_open:
             state = "El reporte está en data/reports/; la corrida quedó abierta y la próxima actualización la retoma."
         else:  # al descubrir: la corrida se cerró y no hay qué retomar
             state = "Fue al descubrir: la corrida se cerró como fallida y la próxima actualización empieza otra."
+        if isinstance(exc, RobotsDisallowed):  # la próxima vuelve a pedir lo mismo: alguien tiene que decidir antes
+            state += " Si robots.txt sigue sin permitir esa página, la próxima se detendrá en el mismo lugar."
         print(f"Descarga detenida: {exc}. {state}", file=sys.stderr)
-        raise SystemExit(POSSIBLE_BLOCK_EXIT) from exc
+        raise SystemExit(POSSIBLE_BLOCK_EXIT if isinstance(exc, PossibleBlock) else ROBOTS_EXIT) from exc
     for report in reports:
         print(render_markdown(report))
     _write_refresh_notes(reports)
@@ -291,9 +295,6 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--vertical", required=True, choices=VERTICALS)
     p.add_argument("--limit", type=int, default=10)
 
-    p = sub.add_parser("import-csv", help="Importar CSVs del scraper legacy como corrida histórica")
-    p.add_argument("folder", type=Path, nargs="?", default=LEGACY_CSV_DIR)
-
     p = sub.add_parser("export-csv", help="Exportar catálogo por vertical a CSV")
     p.add_argument("--output", type=Path, default=config.EXPORT_DIR / "catalogo_por_vertical.csv")
 
@@ -379,6 +380,8 @@ def main(argv: list[str] | None = None) -> None:
             _run_simple(args)
     except (DownloadInProgress, PendingMigrations) as exc:
         raise SystemExit(str(exc)) from exc
+    except DownloadStopped as exc:  # al descubrir, fuera de `refresh`: un mensaje y no una traza
+        raise SystemExit(f"Descarga detenida: {exc}.") from exc
     except KeyboardInterrupt:
         log.warning("Interrumpido. Lo avanzado quedó guardado: retoma con el mismo comando.")
         sys.exit(130)
@@ -400,11 +403,6 @@ def _run_simple(args) -> None:
             for hit in search(conn, args.vertical, args.query, args.limit):
                 print(f"{hit['rank']:.3f}  [{hit['entity_type']}] {hit['content'][:110]}")
                 print("       ", json.dumps(hit["metadata"], ensure_ascii=False)[:160])
-        elif args.command == "import-csv":
-            # Escribe precios como una descarga: nunca a la vez que otra. Los triggers de store_last_snapshot (migración
-            # 039) suponen un solo escritor de precios por formato a la vez.
-            with download_lock():
-                import_legacy_csv(conn, args.folder)
         elif args.command == "export-csv":
             print(export_catalog_csv(conn, args.output))
 

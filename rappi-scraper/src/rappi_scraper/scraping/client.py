@@ -1,4 +1,5 @@
-"""Cliente HTTP prudente para rappi.cl: pausas, reintentos y ubicación de despacho."""
+"""Cliente HTTP prudente para rappi.cl: se identifica, respeta robots.txt, hace pausas y reintentos y fija la ubicación
+de despacho."""
 
 import base64
 import contextlib
@@ -8,12 +9,13 @@ import random
 import time
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
-from urllib.parse import quote, urlparse
+from urllib.parse import quote, urljoin, urlparse
 
 import requests
 
 from .. import config
 from .next_data import MissingNextData, ParseError, extract_next_data
+from .robots import RobotsPolicy
 
 log = logging.getLogger(__name__)
 
@@ -32,19 +34,29 @@ class PageNotFound(Exception):
     """La página no existe (p. ej. un sub-pasillo cuyo slug no coincide)."""
 
 
-class PossibleBlock(Exception):
-    """rappi.cl podría estar bloqueando la descarga: demasiados requests (o jobs) seguidos rechazados.
-
-    No es un error de página (no está en PAGE_ERRORS): ningún pasillo, sucursal ni job lo atrapa, y la corrida se
-    detiene abierta para retomarla más tarde. Si pasa al descubrir, la corrida se cierra como fallida
-    (`run_left_open = False`)."""
+class DownloadStopped(Exception):
+    """La descarga se detiene entera. No es un error de página (no está en PAGE_ERRORS): ningún pasillo, sucursal ni
+    job lo atrapa, y la corrida queda abierta para retomarla más tarde. Si pasa al descubrir, la corrida se cierra como
+    fallida (`run_left_open = False`)."""
 
     run_left_open = True
+
+
+class PossibleBlock(DownloadStopped):
+    """rappi.cl podría estar bloqueando la descarga: demasiados requests (o jobs) seguidos rechazados."""
+
+
+class RobotsDisallowed(DownloadStopped):
+    """robots.txt no permite una página a este programa, o no respondió (y entonces se asume que no permite nada). No
+    se salta la regla ni se sigue con otras páginas: la descarga se detiene y lo dice."""
 
 
 # Errores esperables al bajar y leer una página: se registran y se sigue con la siguiente.
 PAGE_ERRORS = (PageNotFound, ParseError, requests.RequestException, RuntimeError)
 RETRY_STATUSES = (429, 500, 502, 503, 504)
+# Las redirecciones se siguen a mano, hasta este tope (RFC 9309 pide al menos 5 para robots.txt): robots.txt se revisa
+# antes de pedir cada destino, no después de bajarlo.
+MAX_REDIRECTS = 5
 BLOCK_STATUSES = (403, 429)
 
 
@@ -91,6 +103,9 @@ class RappiClient:
                 "Accept-Language": "es-CL,es;q=0.9",
             }
         )
+        self._robots = RobotsPolicy(config.UA_PROJECT, self._robots_txt)
+        if not config.UA_CONTACT:
+            log.warning("Sin RAPPI_UA_CONTACT: el User-Agent dice quién descarga, pero no a quién escribirle")
 
     def set_location(self, lat: float, lng: float, city: str, address: str) -> None:
         self._session.cookies.set(
@@ -146,12 +161,48 @@ class RappiClient:
                 f"posible bloqueo: {self._blocked_streak} requests seguidos rechazados (último: {reason} en {url})"
             )
 
-    def _request(self, url: str) -> requests.Response:
+    def _robots_txt(self, url: str) -> str | None:
+        """El robots.txt de un sitio, con los mismos reintentos que una página; None si no existe (cualquier 4xx)."""
+        try:
+            text = self._request(url, check_robots=False).content.decode("utf-8", errors="replace")
+        except PageNotFound:
+            text = None
+        except requests.HTTPError as exc:
+            if exc.response is None or not 400 <= exc.response.status_code < 500:
+                raise
+            text = None
+        self._blocked_streak = 0  # el sitio respondió
+        return text
+
+    def _check_robots(self, url: str) -> None:
+        reason = self._robots.denial(url)
+        if reason:
+            raise RobotsDisallowed(f"{reason}: la descarga se detiene sin bajar esa página")
+
+    def _get(self, url: str, check_robots: bool) -> requests.Response:
+        """Un GET que sigue las redirecciones a mano: con `check_robots`, cada destino pasa por robots.txt antes de
+        pedirlo. La respuesta final trae en `url` adónde llegó (así se ve una tienda que redirige al listado)."""
+        response = self._session.get(url, timeout=config.TIMEOUT_SECONDS, allow_redirects=False)
+        for _ in range(MAX_REDIRECTS):
+            if not response.is_redirect:
+                return response
+            url = urljoin(response.url, response.headers["Location"])
+            response.close()
+            if check_robots:
+                self._check_robots(url)
+            response = self._session.get(url, timeout=config.TIMEOUT_SECONDS, allow_redirects=False)
+        if response.is_redirect:
+            raise requests.TooManyRedirects(f"más de {MAX_REDIRECTS} redirecciones hasta {url}")
+        return response
+
+    def _request(self, url: str, check_robots: bool = True) -> requests.Response:
+        if check_robots:
+            self._check_robots(url)
         for attempt in range(1, config.MAX_RETRIES + 1):
             time.sleep(random.uniform(*config.REQUEST_DELAY_RANGE))
             wait = None
             try:
-                response = self._session.get(url, timeout=config.TIMEOUT_SECONDS)
+                response = self._get(url, check_robots)
             except requests.RequestException as exc:
                 log.warning("Error de red en %s (intento %d): %s", url, attempt, exc)
             else:

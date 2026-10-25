@@ -6,10 +6,9 @@ from collections.abc import Callable
 from pathlib import Path
 
 import psycopg
-from rappi_scraper.storage.db import MIGRATIONS_DIR
 
 from ..config import PROJECT_ROOT
-from ..db import changed_migrations, connect
+from ..db import changed_migrations, connect, pending_migrations
 
 # La base con los datos descargados: no se le aplican migraciones desde una rama sin fusionar.
 PROTECTED_DATABASE = "rappi"
@@ -50,14 +49,6 @@ def check_database(url: str) -> tuple[bool, str]:
         )
     documents = sum(count for _, count in rows)
     return True, f"Base lista: {documents} documentos en {len(rows)} verticales"
-
-
-def pending_migrations(conn: psycopg.Connection) -> list[str]:
-    """Migraciones del repositorio que la base aún no tiene, en orden (la misma regla de `migrate`: por nombre)."""
-    applied: set[str] = set()
-    if conn.execute("SELECT to_regclass('schema_migrations')").fetchone()[0] is not None:
-        applied = {row[0] for row in conn.execute("SELECT name FROM schema_migrations")}
-    return [path.name for path in sorted(MIGRATIONS_DIR.glob("*.sql")) if path.name not in applied]
 
 
 def head_is_merged(repo: Path = PROJECT_ROOT) -> bool | None:

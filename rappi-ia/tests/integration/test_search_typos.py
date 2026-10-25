@@ -112,8 +112,8 @@ def test_the_correction_keeps_what_the_person_wrote_where_it_was_right(catalog):
     assert spelling.correct_query(db, "pañales talla m", "supermercado") is None  # nada que corregir
     assert spelling.correct_query(db, "nutella bajo 3000", "supermercado") is None  # un número no se corrige
     assert spelling.correct_query(db, "xyzzy", None) is None
-    # Quien le habla al asistente conversa: «recomiendas» no se corrige ni «bigotes» se salta como un saludo.
-    assert spelling.correct_query(db, "oye bigotes me recomiendas algo", "turbo") is None
+    # Quien le habla al asistente conversa: «recomiendas» no se corrige ni «mochi» se salta como un saludo.
+    assert spelling.correct_query(db, "oye mochi me recomiendas algo", "turbo") is None
     assert spelling.correct_query(db, "ok gracias", None) is None  # solo cortesía: nada que buscar
     # «pasajes» está en 20 documentos del catálogo (en el mall): es una palabra real, y en Turbo no pasa a «masajes».
     assert spelling.correct_query(db, "pasajes", "turbo") is None

@@ -6,20 +6,29 @@ Flujo típico (después de cada `rappi refresh` del scraper):
     rappi-ia concepts --solo-reporte # cobertura sin recalcular
     rappi-ia map-categories          # categorías sin mapeo revisado, con concepto sugerido, a un CSV para revisar
     rappi-ia map-categories --jev    # Jev propone su concepto (solo con clave y adopción); --exportar para revisarlas
+    rappi-ia measures | brands | canonical | attributes | relations
+                                     # capa de datos: medidas, marcas, canónicos, atributos y grafo (`make layers`)
+    rappi-ia segments --source synthetic   # segmentos de usuario por fuente (con historia)
+    rappi-ia motor                   # motor multivertical de las dos fuentes (transiciones, combinaciones, afinidad…)
+    rappi-ia layer-report            # calidad de las capas (data/eval/capas.md)
+    rappi-ia layer-sample | layer-precision   # muestra fija de la capa para juzgar / precisión por regla
     rappi-ia embed-text              # embeddings e5 de search_documents (incremental) + HNSW por vertical
     rappi-ia prune-embeddings        # borra del caché los vectores que ya no usa ningún documento ni nombre
     rappi-ia search "algo para el carrete" --vertical licores
     rappi-ia eval-search             # léxico vs vectorial vs híbrido + calibración de τ ("sin resultado")
     rappi-ia eval-typos              # errores de tipeo (eval/typos.json): cuántos recupera la corrección
+    rappi-ia eval-sample | eval-human   # muestra de pares para juzgar a mano / el juez automático contra esos juicios
     rappi-ia jev-planillas           # planillas CSV (data/eval/) para juzgar a mano; luego `eval-human` da el κ
     rappi-ia jev-piloto              # con clave y planillas juzgadas: mide a Jev y propone adoptarlo (o no)
     rappi-ia synth                   # usuarios y eventos SIMULADOS para el panel (reemplaza los anteriores)
     rappi-ia analytics               # resumen de métricas del panel (frecuencia, abandono, oportunidades…)
+    rappi-ia purge                   # borra consultas de más de 90 días y personas del prototipo sin actividad
     rappi-ia multivertical           # mapa multivertical (docs/mapas/)
     rappi-ia seed-demo               # catálogo de prueba inventado, SOLO en la base DATABASE_URL_TEST (_test)
     rappi-ia doctor                  # revisa (solo lectura) que DATABASE_URL tenga catálogo; sale 1 si no
     rappi-ia check-migrations        # se niega a migrar la base real desde una rama sin fusionar (MIGRATE=1 lo fuerza)
     rappi-ia deploy-migrate          # paso del despliegue: respalda si hay pendientes, migra y da permisos
+    rappi-ia dump-entrega            # respaldo para entregar, sin las personas del prototipo (solo lee la base)
     rappi-ia token proto-…           # token (X-User-Token) de una persona, firmado con el secreto de la API
 """
 
@@ -40,8 +49,8 @@ from . import config
 from .concepts.pipeline import build_concepts
 from .concepts.report import coverage_report, jev_review_path, render_text, write_category_proposals
 from .concepts.taxonomy import load_taxonomy
-from .db import changed_migrations, connect, database_url, migrate
-from .demo.doctor import check_database, check_pending_migrations, pending_migrations
+from .db import changed_migrations, connect, database_url, migrate, pending_migrations
+from .demo.doctor import check_database, check_pending_migrations
 from .demo.seed import ensure_test_database, reset_test_database, seed_demo
 from .layers.attributes import build_attributes
 from .layers.brands import build_brands
@@ -546,13 +555,12 @@ def cmd_analytics(conn, args) -> None:
 
 
 def cmd_multivertical(conn, args) -> None:
-    from pathlib import Path
-
     from .analytics import multivertical
 
-    path = Path(args.salida) if args.salida else multivertical.OUTPUT
-    data = multivertical.write(conn, path)
-    print(f"Mapa multivertical: {len(data['concepts'])} conceptos, {len(data['shared'])} pares de verticales → {path}")
+    paths = (Path(args.salida),) if args.salida else multivertical.OUTPUTS
+    data = multivertical.write(conn, *paths)
+    shared = f"{len(data['concepts'])} conceptos, {len(data['shared'])} pares de verticales"
+    print(f"Mapa multivertical: {shared} → {', '.join(map(str, paths))}")
 
 
 def cmd_seed_demo(conn, args) -> None:
@@ -663,6 +671,18 @@ def cmd_deploy_migrate(conn, args) -> None:
     deploy_migrate(conn, None if args.sin_respaldo else backup)
 
 
+def cmd_dump_entrega(conn, args) -> None:
+    """Abre su propia conexión (`conn` llega vacío) y solo lee DATABASE_URL: ver `delivery.py`."""
+    from .delivery import README_FILE, build_delivery
+
+    try:
+        target = build_delivery(database_url(), Path(args.salida) if args.salida else None)
+    except RuntimeError as exc:
+        raise SystemExit(str(exc)) from exc
+    print((target / README_FILE).read_text(encoding="utf-8"))
+    print(f"Respaldo de entrega en {target}")
+
+
 def cmd_token(conn, args) -> None:
     """Para herramientas del operador que leen rutas de una persona (su perfil): no toca la base."""
     from .api.identity import sign
@@ -674,12 +694,13 @@ def cmd_token(conn, args) -> None:
 
 
 # Comandos que no usan la conexión de DATABASE_URL (la abren ellos, usan otra o no la necesitan).
-OWN_CONNECTION = {"seed-demo", "doctor", "check-migrations", "token"}
+OWN_CONNECTION = {"seed-demo", "doctor", "check-migrations", "token", "dump-entrega"}
 
 COMMANDS = {
     "token": cmd_token,
     "check-migrations": cmd_check_migrations,
     "deploy-migrate": cmd_deploy_migrate,
+    "dump-entrega": cmd_dump_entrega,
     "doctor": cmd_doctor,
     "seed-demo": cmd_seed_demo,
     "measures": cmd_measures,
@@ -807,7 +828,7 @@ def build_parser() -> argparse.ArgumentParser:
     mv = sub.add_parser(
         "multivertical", help="mapa de productos y conceptos compartidos entre verticales (presentación)"
     )
-    mv.add_argument("--salida", help="archivo HTML (por defecto docs/mapas/)")
+    mv.add_argument("--salida", help="un solo archivo HTML (por defecto docs/mapas/ y el del panel)")
     analytics = sub.add_parser("analytics", help="resumen de métricas del panel")
     analytics.add_argument("--fuente", choices=("synthetic", "prototype"), default="synthetic")
     sub.add_parser(
@@ -824,6 +845,12 @@ def build_parser() -> argparse.ArgumentParser:
         "DB_API_ROLE, los permisos de la API (deploy/db/grants.sql)",
     )
     dm.add_argument("--sin-respaldo", action="store_true", help="migra sin respaldar antes")
+    de = sub.add_parser(
+        "dump-entrega",
+        help="respaldo para entregar: catálogo, capas, embeddings y población simulada, sin las personas del "
+        "prototipo; solo lee DATABASE_URL",
+    )
+    de.add_argument("--salida", help="carpeta donde dejarlo (por defecto data/entrega/)")
     token = sub.add_parser(
         "token", help="token (X-User-Token) de una persona para las herramientas del operador; no toca la base"
     )

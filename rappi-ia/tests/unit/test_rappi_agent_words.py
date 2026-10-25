@@ -55,7 +55,7 @@ def test_without_x_is_a_free_from_detail(agent):
     assert agent._detail(intent) == ("alcohol", "sin alcohol", True)
 
 
-# El nombre del agente (C1): sale de config.AGENT_NAME, más el antiguo «bigotes». Se quita solo como vocativo: al lado
+# El nombre del agente sale de config.AGENT_NAME. Se quita solo como vocativo: al lado
 # de un saludo o un «gracias», o antes de un pedido; si es todo el pedido («quiero mochi»), se busca el postre.
 @pytest.fixture(scope="module")
 def understander():
@@ -115,7 +115,6 @@ def test_follows_agent_name_env(understander, monkeypatch):
     assert understander.understand(None, "hola pelusa", "restaurantes").kind == "saludo"
     assert understander.understand(None, "gracias Pelusa", "restaurantes").kind == "gracias"
     assert understander.understand(None, "hola pelusa quiero sushi", "restaurantes").query == "sushi"
-    assert understander.understand(None, "hola bigotes quiero sushi", "restaurantes").query == "sushi"  # el antiguo
 
 
 @pytest.mark.parametrize(

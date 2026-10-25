@@ -1,4 +1,4 @@
-# Atributos de ítem (capa de perfiles, docs/superpowers/specs/2026-10-06-capa-perfiles-design.md §4.1).
+# Atributos de ítem (capa de perfiles, docs/diseno/2026-10-06-capa-perfiles-design.md §4.1).
 #
 # Cada atributo se detecta, en este orden de confianza (gana la primera fuente que responde):
 #   1. `rappi`: campos de `catalog_items.attributes`. `keys` lista los nombres posibles del campo; sin `values` el campo

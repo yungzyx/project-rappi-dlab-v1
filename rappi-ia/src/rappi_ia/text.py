@@ -12,7 +12,6 @@ _NON_WORD = re.compile(r"[^a-z0-9]+")
 # también es un postre).
 GREETING_WORDS = {"hola", "holi", "buenas", "buenos", "dias", "tardes", "noches", "hey", "wena", "alo", "ola"}
 THANKS_WORDS = {"gracias", "muchas", "vale", "listo", "ok", "okay", "perfecto", "genial", "bacan", "buenisimo"}
-LEGACY_ASSISTANT_NAME = "bigotes"  # el nombre anterior de la mascota: hay quien todavía la llama así
 REQUEST_WORDS = {
     "quiero",
     "queria",
@@ -39,7 +38,7 @@ REQUEST_WORDS = {
 # Muletillas de quien escribe como habla («eh quiero este una coca»): solo las salta la corrección de errores de tipeo
 # (retrieval/spelling.py), que corre cuando la búsqueda queda «sin resultado». «este» y «pues» también son palabras.
 MUTTER_WORDS = {"eh", "ehh", "ehm", "em", "emm", "mm", "mmm", "este", "oye", "po", "pos", "pues", "osea"}
-FILLER_WORDS = frozenset(GREETING_WORDS | THANKS_WORDS | {LEGACY_ASSISTANT_NAME} | REQUEST_WORDS)
+FILLER_WORDS = frozenset(GREETING_WORDS | THANKS_WORDS | REQUEST_WORDS)
 
 
 def normalize(text: str) -> str:
@@ -64,9 +63,9 @@ def contract_articles(text: str) -> str:
 
 
 def assistant_words() -> frozenset[str]:
-    """Los nombres con que la persona llama al agente: `config.AGENT_NAME` (leído al usarlo, no al importar) y el
-    antiguo «bigotes», normalizados."""
-    return frozenset({LEGACY_ASSISTANT_NAME, normalize(config.AGENT_NAME)})
+    """Los nombres con que la persona llama al agente: `config.AGENT_NAME` (leído al usarlo, no al importar),
+    normalizado."""
+    return frozenset({normalize(config.AGENT_NAME)})
 
 
 # Desde aquí el prospecto de un medicamento ya no dice para qué sirve: «consulte si presenta fiebre» no vuelve

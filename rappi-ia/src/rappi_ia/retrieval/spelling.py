@@ -13,7 +13,7 @@ avenas» no calza). Palabra por palabra:
   saludos de dos palabras también son palabras («tardes de lluvia», «buenos aires»). Lo que queda solo con palabras de
   saludo o cortesía («ok gracias») no se busca;
 - una palabra que nombra un concepto queda como está: «cerveza» en una chocolatería es lo que no hay, no «cereza»;
-- una consulta que le habla al asistente («oye bigotes, ¿me recomiendas algo?», «hola mochi»: su nombre junto a un
+- una consulta que le habla al asistente («oye mochi, ¿me recomiendas algo?», «hola mochi»: su nombre junto a un
   saludo, una muletilla o un pedido) no se corrige: es una conversación, no una búsqueda mal escrita;
 - una consulta que nombra una ocasión no se corrige: pide cosas que su nombre no dice («regalo para mi polola» no
   calza todas sus palabras a propósito, y «polola» no es un error de «polla»);

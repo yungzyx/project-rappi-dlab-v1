@@ -1,4 +1,4 @@
-# Segmentos de usuario por comportamiento (docs/superpowers/specs/2026-10-06-capa-perfiles-design.md §4.2 y §5).
+# Segmentos de usuario por comportamiento (docs/diseno/2026-10-06-capa-perfiles-design.md §4.2 y §5).
 #
 # Cada regla combina piezas genéricas; el motor (layers/segments.py) no conoce segmentos por nombre.
 # Contenido (basta una): concepts, groups, attributes, brands, occasions, services, query_words. Ninguna regla usa

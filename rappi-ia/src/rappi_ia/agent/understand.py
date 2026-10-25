@@ -495,7 +495,7 @@ class Understander:
         )
 
         explicit = bool(concepts)
-        # Sobre lo dicho si la limpieza se comió la pregunta: «oye bigotes me recomiendas…» queda «recomiendas…».
+        # Sobre lo dicho si la limpieza se comió la pregunta: «oye mochi me recomiendas…» queda «recomiendas…».
         question = None if explicit or occasion else self.app_questions.best(body) or self.app_questions.best(said)
         if question:  # «hacen delivery?», «quien eres»: se contesta, no se busca
             return Intent(question.target, text, current_vertical, confidence=1.0)
@@ -723,7 +723,7 @@ def _price(text: str) -> tuple[float | None, str]:
 
 def _clean(body: str) -> str:
     """Quita saludo, nombre del asistente y verbos de pedido al inicio, y la cortesía al final:
-    "hola bigotes quiero sushi porfa" → "sushi". El nombre se quita solo como vocativo: después de un saludo, un
+    "hola mochi quiero sushi porfa" → "sushi". El nombre se quita solo como vocativo: después de un saludo, un
     «gracias» o un «oye», o antes de un pedido («mochi, quiero sushi»). Si no, es lo que se pide («quiero mochi»,
     «mochi de matcha»)."""
     names = assistant_words()

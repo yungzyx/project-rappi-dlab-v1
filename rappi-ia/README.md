@@ -43,7 +43,7 @@ make post-refresh                 # migrate + purge + jev-categorias + concepts 
 ./scripts/despues-del-refresh.sh  # lo mismo, pero espera a que termine un `rappi refresh` lanzado a mano
 ```
 
-La tarea semanal del scraper (`make schedule` en `rappi-scraper/`) ya lo hace sola, con una diferencia: evalúa sin guardar τ.
+La tarea semanal del scraper (`make schedule` en `rappi-scraper/`) ya lo hace sola. Ninguno de los dos guarda τ: eso es a mano, con `make eval GUARDAR_TAU=1`.
 
 | Objetivo | Qué hace |
 |---|---|
@@ -51,12 +51,13 @@ La tarea semanal del scraper (`make schedule` en `rappi-scraper/`) ya lo hace so
 | `make concepts` | Capa 2: conceptos por producto y plato (con kNN si está el extra `ml`) |
 | `make embed` | Embeddings de texto (incrementales) + índices HNSW por vertical. No corre si hay una descarga del scraper en curso |
 | `make prune-embeddings` | Borra del caché `text_embeddings` los vectores de más de 7 días que no usa ningún documento de búsqueda ni el kNN de conceptos (los nombres de productos y platos). Un hash en uso conserva sus vectores de todos los modelos, también los de un modelo viejo. Va al final de `post-refresh` (después de `layers`: si falla, lo demás ya quedó al día). Corre `ANALYZE`; el espacio lo reusa autovacuum, y para devolverlo al disco hay que correr `VACUUM FULL text_embeddings` a mano (la salida lo sugiere desde 10.000 borrados) |
-| `make eval` | Evalúa la búsqueda (léxico, vectorial, híbrido y ablación sin refuerzo), guarda τ en `src/rappi_ia/eval/thresholds.json` (solo en verticales con negativas que dependen de τ; los demás conservan el suyo; `make eval EVAL_ARGS=` no guarda) y deja el reporte en `data/eval/busqueda.md`. Con `--jev-auto` (lo que usa `make eval`) suma a Jev como tercer juez solo si hay clave y adopción |
+| `make eval` | Evalúa la búsqueda (léxico, vectorial, híbrido y ablación sin refuerzo), propone τ y deja el reporte en `data/eval/busqueda.md`. `make eval GUARDAR_TAU=1` además guarda τ en `src/rappi_ia/eval/thresholds.json` (solo en verticales con negativas que dependen de τ; los demás conservan el suyo): está en git, así que después se revisa el cambio y se hace commit. Con `--jev-auto` (lo que usa `make eval`) suma a Jev como tercer juez solo si hay clave y adopción |
 | `make synth` | Usuarios y eventos **simulados** para métricas y segmentos (3.000 usuarios × 26 semanas, semilla 7; reemplaza los anteriores) |
 | `make purge` | Borra el texto de las consultas con más de 90 días y a las personas del prototipo sin actividad en 180 (`PROTOTYPE_USER_RETENTION_DAYS`) |
 | `make layers` / `make layer-report` | Capa de datos (medidas, marcas, canónicos, atributos, grafo, segmentos y motor) / su reporte de calidad |
 | `make motor` | Motor multivertical (`rappi-ia motor --source synthetic` o `prototype`; sin `--source`, las dos): transiciones entre verticales, combinaciones de grupos con su retención, compra cruzada, tendencias, y la afinidad y la recompra de cada persona; además evalúa por fechas contra líneas base, elige solo los pesos del próximo vertical y escribe un informe por fuente en `data/eval/motor-{fuente}.md` (`--sin-evaluar` lo salta y deja los pesos anteriores). La población de la que aprende la predicción es `MOTOR_POBLACION` (por defecto `synthetic`). La afinidad y la recompra de una persona del prototipo se recalculan solas después de cada pedido y de «Olvidar» ([docs/capa-de-datos.md](../docs/capa-de-datos.md#motor-multivertical)) |
 | `make migrate` / `make db-test` | Aplica las migraciones pendientes / crea la base de tests `rappi_ia_test` |
+| `make dump-entrega` | Respaldo para pasarle la base a otro equipo, sin las personas del prototipo (ver [Respaldo de entrega](#respaldo-de-entrega)) |
 | `make deploy-migrate` | El paso de migrar de un despliegue: respalda si hay pendientes (`pre-migracion_<fecha>.dump`), migra y, con `DB_API_ROLE`, aplica los permisos de la API ([docs/despliegue.md](../docs/despliegue.md)) |
 | `make analytics` | Resumen de las métricas de negocio en la terminal |
 | `make contract` | Reescribe las respuestas de ejemplo de la API para la app y el panel (el CI falla si quedan desactualizadas) |
@@ -77,7 +78,7 @@ La tarea semanal del scraper (`make schedule` en `rappi-scraper/`) ya lo hace so
 - `rappi-ia eval-search --juez-jev`: suma a Jev como juez (exige la clave). `--jev-auto` lo suma solo si hay clave y adopción, y si no sigue sin él.
 - `rappi-ia eval-typos`: los errores de tipeo de `src/rappi_ia/eval/typos.json`, buscados sin corregir y corrigiendo, y las negativas de `queries.json` con la corrección; escribe `data/eval/tipeo.md`.
 - `rappi-ia eval-human`: con esos juicios, cuánto acierta el juez automático (precisión, recall, acuerdo) y si los ítems que solo trae el refuerzo son relevantes más o menos seguido que los que solo trae sin él.
-- `rappi-ia multivertical`: regenera el mapa multivertical (`docs/mapas/mapa-multivertical.html`): productos compartidos entre verticales, conceptos junto a la vertical donde son más típicos (la regla de Mochi) y los productos y cadenas en más verticales. Página autocontenida, sin internet. La imagen `mapa-conceptos.jpg` se captura de esa página con `#figura` al final de la URL.
+- `rappi-ia multivertical`: regenera el mapa multivertical (`docs/mapas/mapa-multivertical.html` y la copia que sirve el panel, `dashboard-empresa/public/presentacion/`): productos compartidos entre verticales, conceptos junto a la vertical donde son más típicos (la regla de Mochi) y los productos y cadenas en más verticales. Página autocontenida, sin internet. La imagen `mapa-conceptos.jpg` se captura de esa página con `#figura` al final de la URL.
 
 ## API (`make serve` → http://localhost:8000/docs)
 
@@ -103,7 +104,7 @@ La tarea semanal del scraper (`make schedule` en `rappi-scraper/`) ya lo hace so
 - **Para el iPhone:** `make serve-lan` abre la API a la red local. Solo en una red de confianza.
 - **CORS:** por defecto solo acepta `localhost` y `127.0.0.1` en los puertos 51xx; con `serve-lan`, también 192.168/16, 10/8, 172.16/12 (el hotspot del iPhone) y nombres `.local`.
 - **Identidad:** los datos de cada persona piden su token (`POST /session`, `X-User-Token`), también en local; sin `API_SECRET`, la API crea una vez `data/api-secret` (fuera de git).
-- **Límites:** cupos por ruta cara (503), cuerpo máximo (413) y requests por IP (429; este Mac no tiene tope en local).
+- **Límites:** cupos por ruta cara (503), cuerpo máximo (413) y requests por IP (429; este equipo no tiene tope en local).
 - **Tiempos:** Claude tiene 6 s (si no, responde la plantilla); la conexión a Postgres, 3 s, y cada consulta, 5 s (30 s en `/analytics/*`; `API_TIMEOUT_INTERACTIVE_MS` y `API_TIMEOUT_ANALYTICS_MS`). Con la base caída, la API responde 503, y con una consulta que pasa su tope, 504.
 - **En un servidor** (`API_ENV=production`): detrás de Caddy con TLS y puerta de acceso, CORS exacto, sin `/docs` ni `/analytics` salvo que se enciendan, `API_SECRET` obligatorio y la API nunca migra. Ver [docs/despliegue.md](../docs/despliegue.md).
 
@@ -117,7 +118,7 @@ La tarea semanal del scraper (`make schedule` en `rappi-scraper/`) ya lo hace so
 | `API_ENABLE_ANALYTICS` / `API_DOCS` | `1` / `1` | `0` / `0` |
 | `API_POOL_MAX` · `API_POOL_TIMEOUT_S` | `10` · `3` | igual |
 | `API_PREWARM` | `1`: precarga los índices de la búsqueda al arrancar, sin esperarla | igual |
-| `API_RATE_PER_MIN` · `API_RATE_WRITE_PER_MIN` · `API_NEW_USERS_PER_IP_DAY` | `120` · `60` · `20` (este Mac sin tope) | igual, para todas las IP |
+| `API_RATE_PER_MIN` · `API_RATE_WRITE_PER_MIN` · `API_NEW_USERS_PER_IP_DAY` | `120` · `60` · `20` (este equipo sin tope) | igual, para todas las IP |
 | `API_REQUIRE_SEMANTIC` | `0` | `1` en el stack |
 | `LLM_DAILY_CALL_CAP` | `300` | igual |
 | `LOG_LEVEL` | `INFO` | igual |
@@ -161,10 +162,34 @@ La cobertura por vertical sale de `rappi-ia concepts --solo-reporte`. La precisi
 
 ### Calidad
 
-- **Revisión:** 3 rondas de revisión adversarial automatizada (agentes de IA especializados en lógica, seguridad y privacidad, frontend, rendimiento y contratos entre piezas) el 27-09-2026: 66 hallazgos confirmados y corregidos, con tests de regresión. El 28-09 hubo una auditoría, cuyos 4 bloques de mejoras se aplicaron el 29 y 30-09, y el 11-10 una revisión integral del MVP (ver [docs/decisiones.md](../docs/decisiones.md)).
+- **Revisión:** el 27-09-2026, tres rondas de revisión de lógica, seguridad y privacidad, frontend, rendimiento y contratos entre piezas: 66 hallazgos confirmados y corregidos, con tests de regresión. El 28-09 hubo una auditoría, cuyos 4 bloques de mejoras se aplicaron el 29 y 30-09, y el 11-10 una revisión integral del MVP (ver [docs/decisiones.md](../docs/decisiones.md)).
 - **Tests:** las cifras vigentes están en [README.md#resultados](../README.md#resultados) (fila «Calidad»); los de integración corren contra la base `rappi_ia_test`. CI en GitHub Actions (`.github/workflows/ci.yml`) con Postgres + pgvector y las versiones de `requirements.lock.txt`; un job semanal (`modelos-semanal.yml`) instala los modelos.
 - **Candado de la base de prueba:** `make test`, `make contract` y `make mvp-check` (raíz) toman `.git/rappi-ia-test-db.lock` (en la carpeta común de git: lo comparten los worktrees; fuera de git, `rappi-ia/.test-db.lock`) para no pisarse en `rappi_ia_test`; correr `pytest` directamente se salta el candado, así que no lo lances mientras corre alguno de ellos.
 - **Optimizaciones del 28-09-2026:** textos por embeber ordenados por largo, índices HNSW con `maintenance_work_mem` de 1 GB (`HNSW_MAINTENANCE_WORK_MEM`) y kNN de conceptos que lee los vectores del caché en binario y por bloques.
+
+## Respaldo de entrega
+
+`make dump-entrega` arma, en `data/entrega/entrega_<fecha>/`, la base lista para entregar: el catálogo (tiendas, productos, menús y precios), los conceptos, las capas de datos, los embeddings y documentos de búsqueda, y la población simulada (`source = 'synthetic'`). **No** lleva a las personas del prototipo (`source = 'prototype'`), ni sus eventos, búsquedas y pedidos, ni lo que el motor y el grafo aprendieron de ellas (`data_source = 'prototype'`). Lee `DATABASE_URL` sin escribir en ella (para probarlo, `DATABASE_URL=postgresql:///rappi_staging make dump-entrega`).
+
+Todo sale de una sola foto de la base: una transacción de solo lectura exporta su snapshot, `pg_dump` vuelca con él todo salvo los datos de las tablas de personas (`PERSON_TABLES` en `src/rappi_ia/delivery.py`) y la misma transacción copia de esas tablas solo las filas simuladas. Nada del prototipo pasa por un archivo. Si una migración agrega una tabla con `user_id`, `session_id` o `data_source`, o con una clave foránea hacia las tablas de personas, que no está en `PERSON_TABLES`, el comando se niega a armar el respaldo. Del registro de corridas de las capas (`layer_runs`) quedan fuera las del motor sobre el prototipo (sus conteos y pesos). La carpeta trae:
+
+| Archivo | Qué es |
+|---|---|
+| `catalogo.dump` | `pg_dump` en formato custom, sin dueño ni permisos, con las tablas de personas vacías |
+| `poblacion-simulada.sql` | Las filas simuladas de esas tablas, para `psql` |
+| `LEEME.txt` | Qué trae (con los conteos), qué quedó fuera y cómo restaurarlo |
+
+Para restaurarlo, en Postgres 17 con pgvector 0.8, en este orden: las tablas y el catálogo, la población, y al final los índices, las claves foráneas y los triggers (así validan todo junto):
+
+```bash
+createdb rappi
+pg_restore --no-owner --no-privileges --section=pre-data --section=data --dbname=rappi catalogo.dump
+psql --dbname=rappi --file=poblacion-simulada.sql
+pg_restore --no-owner --no-privileges --section=post-data --dbname=rappi catalogo.dump
+vacuumdb --analyze-only --dbname=rappi
+```
+
+Con un rol que no es superusuario se saltan los comentarios de las extensiones (`pg_restore --list catalogo.dump | grep -v 'COMMENT - EXTENSION' > lista.txt` y `--use-list=lista.txt` en el primer `pg_restore`). Después, en `rappi-ia/` con `DATABASE_URL` apuntando a esa base: `make migrate` (no debería quedar nada pendiente) y `make serve`. El respaldo se entrega por un canal acordado, nunca por git.
 
 ## Límites
 
@@ -177,11 +202,17 @@ La cobertura por vertical sale de `rappi-ia concepts --solo-reporte`. La precisi
 ```text
 rappi-ia/
 ├── Makefile, pyproject.toml, requirements.lock.txt, .env.example
-├── scripts/despues-del-refresh.sh   espera a que termine una descarga y corre make post-refresh
+├── scripts/
+│   ├── despues-del-refresh.sh   espera a que termine una descarga y corre make post-refresh
+│   ├── with-test-db-lock.sh     el candado de rappi_ia_test (make test, make contract, make mvp-check)
+│   ├── probar_agente.py         make probar-agente: las frases de usuarios contra la API
+│   ├── qa_motor.py              QA de las ofertas sobre una base real, en solo lectura
+│   └── calibrar_simulados.py    mide (y ajusta) la mezcla de los simulados contra la tabla de Rappi, sin escribir
 ├── src/rappi_ia/
 │   ├── cli.py         comandos de `rappi-ia`
 │   ├── config.py      modelos, rutas y parámetros (por entorno)
 │   ├── db.py          conexión a Postgres y migraciones (las de rappi-scraper)
+│   ├── delivery.py    respaldo de entrega (`dump-entrega`), sin las personas del prototipo
 │   ├── text.py        normalización de texto (sin tildes ni ñ)
 │   ├── concepts/      taxonomía (taxonomy.toml), complementos (complements.toml), mapa de categorías (category_map.csv), reglas, kNN
 │   ├── embeddings/    e5, caché de texto, índices HNSW
@@ -208,7 +239,7 @@ rappi-ia/
 | Migración | Qué agrega |
 |---|---|
 | `009_concepts.sql` | Taxonomía de conceptos, mapeo de categorías, complementos y concepto por ítem (con método, confianza y versión) |
-| `010_embeddings.sql` | Caché de embeddings de texto, embeddings de imágenes y búsqueda léxica sin tildes ni ñ |
+| `010_embeddings.sql` | Caché de embeddings de texto, una tabla de embeddings de imágenes que nunca se usó (la 042 la borra) y búsqueda léxica sin tildes ni ñ |
 | `011_app_events.sql` | Usuarios, eventos y pedidos de la app (`synthetic` o `prototype`, nunca mezclados), con ids seudónimos |
 | `012_concept_assortment.sql` | Surtido materializado por concepto, índice de eventos por fuente y aristas aprendidas por fuente |
 | `013_search_price.sql` | Precio de cada documento como columna indexada: el filtro de precio de la búsqueda vectorial revisa todos los documentos cuando el tope deja pocos |
@@ -224,5 +255,7 @@ rappi-ia/
 | `035_sin_juego.sql` | El pasaporte y el juego salen del proyecto: borra `knowledge_cards`, `knowledge_card_concepts`, `game_state` y los eventos del juego |
 | `036_motor.sql` | Motor multivertical: 7 tablas (`user_vertical_affinity`, `vertical_transitions`, `combo_stats`, `combo_steps`, `cross_sell_rules`, `trends`, `replenishment`) con sus vistas en `capa`, el evento `vertical_open` y la capa `motor` en `layer_runs`. Las de población llevan `data_source`; las de cada persona se borran con ella |
 | `037_combos_finos.sql` | Escalera fina: `combo_stats` y `combo_steps` guardan dos niveles (`nivel`: `grueso`, los grupos de la tabla de Rappi, y `fino`, las verticales una por una más RappiFavor y RappiTravel) y sus vistas en `capa` lo exponen |
+| `041_search_vocabulary.sql` | Vocabulario del catálogo por vertical (`search_vocabulary`, con `pg_trgm`) para corregir errores de tipeo en `/search` (`retrieval/spelling.py`) |
+| `042_sin_image_embeddings.sql` | Borra `image_embeddings` (de la 010), que ningún código usaba |
 
-`014`–`015` (limpieza del HTML de los documentos de búsqueda), `017`–`019` y `021` (formatos de tienda, Turbo, vigencia y platos por local) y `032` (`latest_prices` y `latest_menu_prices`, el último precio mantenido por triggers, y la vista `v_latest_offers`, la definición única de oferta vigente, que esta capa también lee) y `038`–`039` (`store_last_snapshot`, el último snapshot de cada tienda con su formato y la última corrida del formato, que es `v_store_format_runs`) son del scraper.
+`014`–`015` (limpieza del HTML de los documentos de búsqueda), `017`–`019` y `021` (formatos de tienda, Turbo, vigencia y platos por local) y `032` (`latest_prices` y `latest_menu_prices`, el último precio mantenido por triggers, y la vista `v_latest_offers`, la definición única de oferta vigente, que esta capa también lee) `038`–`039` (`store_last_snapshot`, el último snapshot de cada tienda con su formato y la última corrida del formato, que es `v_store_format_runs`) y `040` (las otras secciones del menú donde aparece un plato, `extra_section_ids`) son del scraper.

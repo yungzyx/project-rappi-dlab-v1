@@ -1,7 +1,7 @@
-.PHONY: help install install-ml db-test migrate check-migrations verify-migrations deploy-migrate test lint format jev-categorias concepts embed eval synth analytics serve serve-lan warm warm-catalog probar-agente purge post-refresh prune-embeddings layers layer-report motor contract
+.PHONY: help install install-ml db-test migrate check-migrations verify-migrations deploy-migrate dump-entrega test lint format jev-categorias concepts embed eval synth analytics serve serve-lan warm warm-catalog probar-agente purge post-refresh prune-embeddings layers layer-report motor contract
 
 PY := .venv/bin/python
-# Python ≥ 3.12 para crear el .venv. En un Mac nuevo `python3` es el 3.9 de macOS: se prefiere python3.13
+# Python ≥ 3.13 para crear el .venv. En un macOS nuevo `python3` es el 3.9 del sistema: se prefiere python3.13
 # (Homebrew: `brew install python@3.13`, que solo instala `python3.13`).
 PYTHON ?= $(shell command -v python3.13 || command -v python3)
 # Los comandos de Postgres: en macOS, los de postgresql@17 de Homebrew (no quedan en el PATH); sin brew (Linux, el
@@ -9,7 +9,7 @@ PYTHON ?= $(shell command -v python3.13 || command -v python3)
 PG_BIN := $(if $(shell command -v brew),$(shell brew --prefix)/opt/postgresql@17/bin,$(patsubst %/,%,$(dir $(shell command -v createdb))))
 
 help:  ## Muestra esta ayuda
-	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-14s %s\n", $$1, $$2}'
+	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-17s %s\n", $$1, $$2}'
 
 install:  ## Crea .venv con rappi-scraper (esquema) + API + dev (sin modelos)
 	$(PYTHON) -m venv .venv
@@ -28,6 +28,9 @@ migrate:  ## Aplica migraciones pendientes (viven en rappi-scraper)
 
 deploy-migrate:  ## Paso del despliegue: respalda si hay migraciones pendientes, migra y da permisos (DB_API_ROLE)
 	$(PY) -m rappi_ia deploy-migrate
+
+dump-entrega:  ## Respaldo para entregar (data/entrega/): catálogo, capas, embeddings y simulados, sin el prototipo
+	$(PY) -m rappi_ia dump-entrega
 
 # Sin «##»: no sale en `make help` (la guardia de serve, serve-lan y make mvp; no se corre a mano). MIGRATE=1 la fuerza.
 check-migrations:
@@ -60,12 +63,14 @@ embed:  ## Embeddings de texto (incrementales) + índices HNSW por vertical
 prune-embeddings:  ## Borra del caché de embeddings los vectores sin uso (de más de 7 días)
 	$(PY) -m rappi_ia prune-embeddings
 
-# La tarea semanal (rappi-scraper/scripts/refresh-semanal.sh) pasa EVAL_ARGS= para no tocar eval/thresholds.json
-EVAL_ARGS ?= --guardar-tau
+# eval/thresholds.json está en git: `make eval` propone τ en el reporte y solo lo guarda con GUARDAR_TAU=1 (después,
+# revisar el cambio y hacer commit). EVAL_ARGS suma otras opciones de `rappi-ia eval-search`.
+GUARDAR_TAU ?=
+EVAL_ARGS ?=
 
 # --jev-auto suma a Jev como tercer juez solo con clave y adopción (docs/jev.md); si no, evalúa igual que siempre
-eval:  ## Evalúa la búsqueda (léxico vs vectorial vs híbrido) y calibra τ
-	$(PY) -m rappi_ia eval-search $(EVAL_ARGS) --jev-auto
+eval:  ## Evalúa la búsqueda (léxico vs vectorial vs híbrido) y propone τ; GUARDAR_TAU=1 lo guarda en eval/thresholds.json
+	$(PY) -m rappi_ia eval-search $(if $(filter 1,$(GUARDAR_TAU)),--guardar-tau) $(EVAL_ARGS) --jev-auto
 
 synth:  ## Usuarios y eventos SIMULADOS para el panel y el motor (reemplaza los anteriores)
 	$(PY) -m rappi_ia synth
@@ -89,7 +94,7 @@ DOTENV ?= $(or $(RAPPI_ENV_FILE),.env)
 API_ENV ?= $(shell sed -n 's/^API_ENV=//p' $(DOTENV) 2>/dev/null | tr -d "\"'" | tail -n 1)
 SERVE_PREP := $(if $(filter production,$(API_ENV)),,check-migrations migrate)
 
-serve: $(SERVE_PREP)  ## API en http://localhost:8000, solo este Mac (docs en /docs)
+serve: $(SERVE_PREP)  ## API en http://localhost:8000, solo este equipo (docs en /docs)
 	$(HF_OFFLINE) $(PY) -m uvicorn rappi_ia.api.app:app --no-access-log --host 127.0.0.1 --port 8000
 
 serve-lan: $(SERVE_PREP)  ## API en la red local (iPhone). Sin puerta de acceso (cada persona, su token firmado): solo red de confianza
@@ -159,7 +164,7 @@ verify-migrations:
 # para los eventos simulados que synth acaba de generar: también si falla un paso (p. ej. el motor, al final de
 # layers), y entonces post-refresh sale con error. En producción (API_ENV=production) no migra: solo revisa.
 # prune-embeddings va al final: si la limpieza falla, conceptos, embeddings, evaluación y capas ya quedaron al día.
-post-refresh: $(if $(filter production,$(API_ENV)),verify-migrations,migrate) purge  ## Todo lo que sigue a un `rappi refresh` (sin imágenes)
+post-refresh: $(if $(filter production,$(API_ENV)),verify-migrations,migrate) purge  ## Todo lo que sigue a un `rappi refresh`
 	$(MAKE) jev-categorias concepts embed eval synth layers prune-embeddings || { $(MAKE) purge; exit 1; }
 	$(MAKE) purge
 	@echo "Listo: conceptos, embeddings, evaluación y datos simulados al día."

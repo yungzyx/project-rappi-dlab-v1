@@ -14,7 +14,6 @@ from rappi_scraper.storage import db as scraper_db
 from rappi_ia import cli
 from rappi_ia.config import PROJECT_ROOT
 from rappi_ia.db import connect
-from rappi_ia.demo import doctor
 
 PROBE = "999_prueba.sql"
 
@@ -31,7 +30,6 @@ def add_pending(tmp_path, monkeypatch):
             (folder / path.name).symlink_to(path)
         (folder / PROBE).write_text(text, encoding="utf-8")
         monkeypatch.setattr(scraper_db, "MIGRATIONS_DIR", folder)
-        monkeypatch.setattr(doctor, "MIGRATIONS_DIR", folder)
 
     return add
 

@@ -10,6 +10,7 @@ import threading
 import time
 from contextlib import asynccontextmanager, nullcontext
 from dataclasses import replace
+from importlib.metadata import version
 from typing import Annotated, Literal
 from urllib.parse import urlsplit
 
@@ -29,7 +30,7 @@ from ..agent.rappi_agent import PROTOTYPE_VERTICALS, Context
 from ..agent.tools import VERTICAL_LABELS, search_products, suggest_complement
 from ..analytics import queries
 from ..concepts.taxonomy import load_taxonomy
-from ..demo.doctor import pending_migrations
+from ..db import pending_migrations
 from ..events import store as events
 from ..layers.segments import recalculate_user_segments
 from ..motor.build import refresh_user, refresh_user_conn
@@ -83,7 +84,7 @@ async def lifespan(app: FastAPI):
 # Con API_DOCS apagado (producción) no hay /docs, /redoc ni /openapi.json: el esquema no se publica.
 app = FastAPI(
     title="rappi-ia",
-    version="0.1.0",
+    version=version("rappi-ia"),
     description="El agente, búsqueda por vertical y panel empresa",
     lifespan=lifespan,
     docs_url="/docs" if config.API_DOCS else None,
@@ -93,7 +94,7 @@ app = FastAPI(
 
 
 def cors_origin_regex(allow_lan: bool) -> str:
-    """Solo este Mac por defecto. La red local (iPhone) se abre con API_ALLOW_LAN=1 (`make serve-lan`): fuera de los
+    """Solo este equipo por defecto. La red local (iPhone) se abre con API_ALLOW_LAN=1 (`make serve-lan`): fuera de los
     datos de cada persona (que piden su token) la API es abierta, así que solo en una red de confianza. Redes
     privadas: 192.168/16, 10/8 y 172.16/12 (el hotspot del iPhone da 172.20.10.x), más nombres `.local` (Bonjour)."""
     hosts = r"localhost|127\.0\.0\.1"
@@ -124,7 +125,7 @@ def is_same_origin(origin: str, host: str | None) -> bool:
     return bool(host) and parts.scheme in ("http", "https") and parts.netloc.lower() == host.lower()
 
 
-# Sin tope por IP: en local, este Mac (la demo y `make mvp-check`). En producción nadie: tras un proxy que no pasa la
+# Sin tope por IP: en local, este equipo (la demo y `make mvp-check`). En producción nadie: tras un proxy que no pasa la
 # IP del cliente, todos llegarían como 127.0.0.1.
 NO_LIMIT_HOSTS = () if config.API_PRODUCTION else ("127.0.0.1", "::1")
 

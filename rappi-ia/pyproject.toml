@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rappi-ia"
-version = "0.1.0"
+version = "1.0.0"
 description = "Conceptos, embeddings, búsqueda híbrida por vertical, agente de recomendaciones y analítica sobre el catálogo de Rappi Chile"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.13"  # la del CI, Docker y los .venv
 dependencies = [
     "rappi-scraper",  # esquema y migraciones de la base (se instala desde ../rappi-scraper)
     "psycopg[binary]>=3.2,<4",
@@ -20,7 +20,7 @@ dependencies = [
 ml = ["sentence-transformers>=3.0", "torch>=2.5"]
 llm = ["anthropic>=0.40"]
 api = ["fastapi>=0.121", "uvicorn[standard]>=0.30", "psycopg-pool>=3.2,<4"]
-dev = ["pytest>=8", "ruff==0.17.0", "httpx2>=2.13"]
+dev = ["pytest>=8", "ruff==0.17.1", "httpx2>=2.13"]
 
 [project.scripts]
 rappi-ia = "rappi_ia.cli:main"
@@ -42,7 +42,7 @@ addopts = "-q"
 
 [tool.ruff]
 line-length = 120
-target-version = "py312"
+target-version = "py313"
 src = ["src", "tests"]
 
 [tool.ruff.lint]

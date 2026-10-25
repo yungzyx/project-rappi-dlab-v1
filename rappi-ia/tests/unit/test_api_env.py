@@ -1,4 +1,4 @@
-"""La API según su entorno (`API_ENV`): local para la demo en este Mac, producción para un servidor tras un proxy."""
+"""La API según su entorno (`API_ENV`): local para la demo en este equipo, producción para un servidor tras un proxy."""
 
 import importlib
 
@@ -167,7 +167,7 @@ def rate_limit(module) -> dict:
 
 
 def test_local_limits_by_ip_except_this_mac(load_api):
-    """120 por minuto y 60 escrituras por IP. En local este Mac no tiene tope: la demo y `make mvp-check` piden mucho
+    """120 por minuto y 60 escrituras por IP. En local este equipo no tiene tope: la demo y `make mvp-check` piden mucho
     desde 127.0.0.1 (los tests de la suite tampoco: conftest lo apaga)."""
     limits = rate_limit(load_api())
 

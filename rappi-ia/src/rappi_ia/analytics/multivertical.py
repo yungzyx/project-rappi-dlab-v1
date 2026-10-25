@@ -1,6 +1,7 @@
 """Mapa multivertical: qué productos y conceptos comparten las verticales del catálogo.
 
-`rappi-ia multivertical` escribe una página autocontenida (sin internet) en docs/mapas/:
+`rappi-ia multivertical` escribe una página autocontenida (sin internet) en docs/mapas/ y donde la sirve el panel
+(dashboard-empresa/public/presentacion/):
 productos compartidos entre verticales, el mapa radial de conceptos (cada uno junto a la vertical donde es más
 típico, la misma regla del agente) y los productos y cadenas que están en más verticales.
 """
@@ -15,7 +16,10 @@ from ..agent.verticals import typical_verticals
 from ..concepts.taxonomy import load_taxonomy
 
 TEMPLATE = Path(__file__).resolve().parent / "multivertical.html"
-OUTPUT = config.PROJECT_ROOT.parent / "docs" / "mapas" / "mapa-multivertical.html"
+OUTPUTS = (
+    config.PROJECT_ROOT.parent / "docs" / "mapas" / "mapa-multivertical.html",
+    config.PROJECT_ROOT.parent / "dashboard-empresa" / "public" / "presentacion" / "mapa-multivertical.html",
+)
 ORDER = ["supermercado", "conveniencia", "turbo", "licores", "chocolateria", "restaurantes", "farmacia", "mall"]
 LABELS = {
     "supermercado": "Súper",
@@ -161,8 +165,11 @@ def render(data: dict) -> str:
     return page.replace("/*__DATA__*/null", payload)
 
 
-def write(conn: Connection, path: Path = OUTPUT) -> dict:
+def write(conn: Connection, *paths: Path) -> dict:
+    """Escribe la página en cada ruta (por defecto, OUTPUTS) y devuelve los datos."""
     data = collect(conn)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(render(data), encoding="utf-8")
+    page = render(data)
+    for path in paths or OUTPUTS:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(page, encoding="utf-8")
     return data

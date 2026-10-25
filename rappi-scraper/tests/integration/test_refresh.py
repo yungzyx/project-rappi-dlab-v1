@@ -9,6 +9,7 @@ from conftest import FakeClient
 from rappi_scraper import cli
 from rappi_scraper.pipeline.queue import PossibleBlock
 from rappi_scraper.pipeline.refresh import refresh
+from rappi_scraper.scraping.client import RobotsDisallowed
 from rappi_scraper.storage import repository
 from rappi_scraper.storage.db import PendingMigrations, connect, database_url
 
@@ -358,3 +359,26 @@ def test_refresh_exits_4_on_a_possible_block(db, monkeypatch, tmp_path, capsys):
     assert "quedó abierta" not in message
     assert "cerró como fallida" in message
     assert repository.open_run(db, "restaurants") is None
+
+
+def test_refresh_stops_with_7_when_robots_txt_forbids_a_page(db, monkeypatch, tmp_path, capsys):
+    """robots.txt no permite una página: no se la salta ni sigue con las demás. Se detiene, lo dice y la corrida de
+    tiendas queda abierta, con el motivo en su reporte."""
+    run = repository.start_run(db, "stores", {})
+    repository.add_jobs(db, run, [{**STORE_JOB, "job_key": f"type:{i:02}"} for i in range(3)])
+
+    class Forbidden(FakeClient):
+        def get_next_data(self, path):
+            self.requested.append(path)
+            raise RobotsDisallowed(f"robots.txt de www.rappi.cl no permite {path} a rappi-dlab-scraper")
+
+    monkeypatch.setattr(cli, "RappiClient", Forbidden)
+    monkeypatch.setattr(cli, "refresh", lambda *args, **kwargs: refresh(*args, reports_dir=tmp_path, **kwargs))
+    with pytest.raises(SystemExit) as stop:
+        cli.cmd_refresh(db, Namespace(no_backup=True, resume_only=False))
+
+    assert stop.value.code == cli.ROBOTS_EXIT == 7
+    assert "robots.txt de www.rappi.cl no permite" in capsys.readouterr().err
+    assert db.execute("SELECT status, count(*) FROM scrape_jobs GROUP BY 1").fetchall() == [("pending", 3)]
+    assert repository.open_run(db, "stores") == run
+    assert "robots.txt" in (tmp_path / f"run_{run}_stores.md").read_text(encoding="utf-8")

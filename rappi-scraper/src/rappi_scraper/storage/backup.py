@@ -39,7 +39,7 @@ def rotate_backups(backups_dir: Path, keep: int, prefix: str = "rappi") -> list[
     return removed
 
 
-def _connection_args(database_url: str) -> tuple[list[str], dict[str, str]]:
+def connection_args(database_url: str) -> tuple[list[str], dict[str, str]]:
     """Argumentos de conexión de `pg_dump` y su entorno. La clave va en PGPASSWORD y nunca en el argv, que `ps` muestra
     durante todo el volcado y que un error dejaba escrito en los logs. Lo que no es host, puerto ni usuario (la base y
     opciones como sslmode) va en `--dbname` como conninfo, sin la clave."""
@@ -62,11 +62,11 @@ def backup_database(
     target = backups_dir / f"{prefix}_{datetime.now():%Y%m%d-%H%M%S}.dump"
     partial = target.with_name(target.name + ".part")
     pg_dump = find_pg_dump()
-    connection_args, env = _connection_args(database_url)
+    args, env = connection_args(database_url)
     try:
-        _run("pg_dump", [pg_dump, "--format=custom", "--no-owner", f"--file={partial}", *connection_args], env=env)
+        run_tool("pg_dump", [pg_dump, "--format=custom", "--no-owner", f"--file={partial}", *args], env=env)
         pg_restore = str(Path(pg_dump).with_name("pg_restore"))
-        _run("pg_restore --list", [pg_restore, "--list", str(partial)], stdout=subprocess.DEVNULL)
+        run_tool("pg_restore --list", [pg_restore, "--list", str(partial)], stdout=subprocess.DEVNULL)
     except BaseException:
         partial.unlink(missing_ok=True)
         raise
@@ -76,7 +76,7 @@ def backup_database(
     return target
 
 
-def _run(name: str, cmd: list[str], **kwargs) -> None:
+def run_tool(name: str, cmd: list[str], **kwargs) -> None:
     """Como `subprocess.run(check=True)`, pero el error dice solo el código: el de subprocess trae el argv entero."""
     try:
         subprocess.run(cmd, check=True, **kwargs)
