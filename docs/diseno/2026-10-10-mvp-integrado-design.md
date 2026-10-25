@@ -1,6 +1,7 @@
 # MVP integrado: base de datos, RAG, Mochi, buscador, ofertas y juego conectados
 
-> Especificación · 10-10-2026 · Estado: **para revisión del usuario** (diseño aprobado en conversación en 3 secciones)
+> Especificación · 10-10-2026 · Construido en 7 etapas, del 10 al 11-10-2026.
+> Lo que cambió después: el juego y el pasaporte salieron el 16-10-2026 ([diseño del motor](2026-10-16-motor-multivertical-design.md)), Mochi responde por `POST /agent/ask` en vez de `/chat` y no tiene voz ni foto ([decisiones](../decisiones.md#agente-mochi)). Las partes del juego quedan como registro del diseño original.
 
 ## 1. Para qué
 
@@ -17,14 +18,13 @@ El repo pasa a contener **un MVP funcional** donde todo está conectado:
 - **El catálogo** que se ve, el que Mochi ofrece y el que se pide es uno solo.
 - **Lo que hace la persona** vuelve a la base y cambia lo que Mochi le ofrece después.
 
-### Decisiones del usuario (10-10-2026)
+### Decisiones de partida (10-10-2026)
 
 | Tema | Decisión |
 |---|---|
 | Productos en las pantallas | Catálogo real de la base (imagen y precio de Postgres) |
 | Sin API | API obligatoria: la app muestra «sin conexión»; se eliminan las reglas locales de Mochi |
 | Alcance extra | Jev en el proceso semanal y el panel de negocio conectado. Voz y foto quedan fuera |
-| Aprobación | Una especificación completa. Después, plan, ejecución, revisión y PR por etapa sin detenerse; el usuario solo aprueba fusionar cada PR |
 | Arquitectura | Enfoque A: una sola API (rappi-ia) extendida; la app es solo cliente |
 
 ### Criterios de éxito (del MVP completo)
@@ -39,7 +39,7 @@ El repo pasa a contener **un MVP funcional** donde todo está conectado:
    5. jugar una ronda;
    6. ver el uso en el panel (fuente «prototipo»).
 4. **Las guardias siguen igual.** Mochi nunca propone por su cuenta Farmacia, salud, bebé ni alcohol. Los segmentos sensibles nunca se usan para ofrecer. La búsqueda no se personaliza.
-5. **Cada etapa termina con tests verdes en CI**, revisión en el navegador, revisión de un revisor nuevo sobre la rama completa y un PR que el usuario aprueba fusionar.
+5. **Cada etapa termina con tests verdes en CI**, revisión en el navegador y una revisión de código independiente.
 
 ## 2. Arquitectura
 
@@ -125,7 +125,7 @@ La ciudad queda fija en Santiago (Región Metropolitana) para la demo; el filtro
 
 ## 4. Etapas
 
-Cada etapa es un PR sobre `main`, con su plan en `docs/superpowers/plans/`. Una etapa puede empezar encima de la anterior mientras esa espera que se fusione.
+Cada etapa se integra a `main` por separado, con sus tests.
 
 ### Etapa 1: base del MVP
 
@@ -199,10 +199,10 @@ Cada etapa es un PR sobre `main`, con su plan en `docs/superpowers/plans/`. Una 
 ### Etapa 7: Jev en el proceso semanal
 
 1. **Sin clave:**
-   - armo las planillas para juzgar: 200 pares de búsqueda (`eval-sample` / `eval-human`) y 100 categorías;
+   - las planillas para juzgar: 200 pares de búsqueda (`eval-sample` / `eval-human`) y 100 categorías;
    - el cliente fino de Jev, opcional, en `rappi_ia/jev.py`, probado con un `FakeJev`;
    - la caché `eval_judgments`.
-2. **Con la clave del usuario y las planillas juzgadas:** el piloto (menos de 1 US$), con los criterios de `~/Documents/Rappi-jev/diseno-jev.md`.
+2. **Con la clave de TypeSafe y las planillas juzgadas:** el piloto (menos de 1 US$), con los criterios de [jev.md](../jev.md).
    - Juez de búsqueda: κ ≥ 0,6 y mayor que la del juez por concepto.
    - Etiquetado de categorías: precisión ≥ 90 % y cobertura ≥ 50 %.
 3. **Si pasa:**
@@ -212,7 +212,7 @@ Cada etapa es un PR sobre `main`, con su plan en `docs/superpowers/plans/`. Una 
    - el diagrama `rag-datos` se regenera con Jev.
 
    Sin clave, todo sigue igual. Jev nunca reordena resultados en vivo.
-- **Se detiene en:** las acciones del usuario (juzgar las planillas, crear la cuenta en TypeSafe, poner `TYPESAFE_API_KEY`). Lo demás queda listo antes.
+- **Queda a cargo del responsable del proyecto:** juzgar las planillas, crear la cuenta en TypeSafe y poner `TYPESAFE_API_KEY`. Lo demás queda listo antes.
 
 ## 5. Pruebas y revisión
 
@@ -224,10 +224,9 @@ Cada etapa es un PR sobre `main`, con su plan en `docs/superpowers/plans/`. Una 
   2. `make test` y `make lint` (rappi-scraper y rappi-ia);
   3. `npm test` y `npm run lint` (app y panel);
   4. revisión en el navegador a 375 × 812 y en escritorio;
-  5. un revisor Opus nuevo sobre la rama completa, con los arreglos Críticos e Importantes hechos con un test que falle primero;
-  6. PR con CI en verde;
-  7. el usuario aprueba fusionar.
-- **Documentación por etapa:** README, `docs/demo.md`, `docs/decisiones.md`, `docs/instalacion.md` y los diagramas que cambien (Archify).
+  5. una revisión de código independiente, con los arreglos críticos e importantes hechos con un test que falle primero;
+  6. CI en verde antes de integrar.
+- **Documentación por etapa:** README, `docs/demo.md`, `docs/decisiones.md`, `docs/instalacion.md` y los diagramas que cambien.
 
 ## 6. Reglas que no cambian
 
@@ -236,7 +235,6 @@ Cada etapa es un PR sobre `main`, con su plan en `docs/superpowers/plans/`. Una 
 - Nunca dos descargas a la vez contra rappi.cl (candado `scraper.lock`). `make mvp` no descarga nada.
 - `build_search_documents` borra lo que no regenera, así que las tablas nuevas (conocimiento, juego) son propias.
 - Datos de usuarios: solo `source = 'synthetic'` o `'prototype'`; las métricas simuladas nunca se presentan como evidencia.
-- No se borra nada de forma permanente (Papelera). No se fusiona sin el OK del usuario.
 
 ## 7. Fuera de alcance
 
@@ -253,5 +251,5 @@ Cada etapa es un PR sobre `main`, con su plan en `docs/superpowers/plans/`. Una 
 | La app y la API se desalinean | Respuestas de ejemplo generadas por el backend; el CI revisa que estén al día |
 | Imágenes del CDN de Rappi no cargan sin internet | Imagen de reemplazo neutra; la demo se hace con internet |
 | Segmentos recalculados en cada pedido son lentos | Recalcular solo los del usuario, en segundo plano; medir |
-| Muchos PRs grandes | Una etapa por PR, con commits separados por pieza |
+| Cambios grandes difíciles de revisar | Una etapa por vez, con commits separados por pieza |
 | Jev no pasa el piloto | Se reporta «lo medimos y no alcanzó»; todo sigue sin Jev |

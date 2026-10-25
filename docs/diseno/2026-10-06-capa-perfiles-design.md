@@ -1,7 +1,7 @@
 # Capa de perfiles: atributos, medidas, marcas, producto canónico, grafo y segmentos
 
-> Especificación · 06-10-2026 · Estado: **para revisión**
-> Contexto: [diseno-ia.md](../../diseno-ia.md) (capas 1 y 2) · [decisiones.md](../../decisiones.md)
+> Especificación · 06-10-2026 · Construida en 5 etapas el 06-10-2026; cómo se usa hoy, en [capa-de-datos.md](../capa-de-datos.md).
+> Contexto: [diseno-ia.md](../diseno-ia.md) (capas 1 y 2) · [decisiones.md](../decisiones.md)
 
 ## 1. Para qué
 
@@ -253,7 +253,7 @@ fitness, oficinista, nocturno, cazaofertas, gamer…) para que el panel y los te
 - Sinónimos aprendidos de consultas reales y popularidad por eventos (con datos simulados no son evidencia).
 - Extracción con modelos de lenguaje.
 
-## 10. Etapas (un PR cada una)
+## 10. Etapas
 
 | Etapa | Contenido |
 |---|---|

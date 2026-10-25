@@ -1,20 +1,8 @@
 # Perfiles de gusto en el backend (diseño)
 
-Fecha: 14-10-2026. Estado: escrito de noche, a partir de decisiones ya aprobadas por el usuario. Queda para su revisión en el PR, que no se fusiona solo.
+Fecha: 14-10-2026. Construido en el backend el 14-10-2026; desde el 17-10-2026 el buscador con Mochi muestra el perfil principal y su escalera (`prototipo-app/src/components/assistant/TasteProfile.jsx`). Cómo funciona hoy, en [diseno-ia.md](../diseno-ia.md) y [decisiones.md](../decisiones.md).
 
-> **Lo construido (14-10-2026).** Todo lo de abajo está en el backend, en la rama `feat/backend-perfiles-y-calidad` (PR sin fusionar, a la espera de la revisión del usuario):
->
-> | Parte | Commits |
-> |---|---|
-> | Datos, cargador y matcher | `1da56f23`, corregido por `edce5519` |
-> | Motor (`offers/profiles.py`) | `0e0c09de`, y `33676d95` (la guardia de alcohol por nombre, también en los platos) |
-> | API y contrato (`GET /profile/{id}/gustos`, momento `perfil`) | `169c737e`, y `9729f3e3` (mascotas sin comida de gato) |
-> | Persona simulada, ayuda del agente, etiqueta del panel y ejemplos simulados del panel | `532c14c8`, `3c8f3437`, `c2b117c5` y `aed3fade` |
-> | Correcciones de la revisión del motor | `4ad8d3fc` (más nombres de tragos y secciones de menú) y `c1b25dbc` (consulta por palabras clave, cadenas, tiendas de licores y `gusto`) |
->
-> **La app todavía no lo usa.** Los ejemplos `profile-gustos.json` y `agent-offer-perfil.json` están en `prototipo-app/src/api/fixtures/`, pero ninguna pantalla los lee: llevar la demo al MVP es otra etapa. En la base real faltan `rappi-ia concepts` y `make layers` tras fusionar; sin eso, el asiático solo tiene dos peldaños (restaurantes y chocolatería).
->
-> **Lo que cambió al construirlo** (el texto de abajo es el diseño aprobado, sin tocar):
+> **Lo que cambió al construirlo** (el texto de abajo es el diseño original):
 > - Un peldaño sirve con 1 a 4 productos, no 2 a 4: la chocolatería asiática solo tiene un matcha. Con menos de 2 peldaños sigue sin haber escalera.
 > - Cada peldaño puede llevar `evitar`, además de `palabras`: nombres que dicen la palabra sin ser lo que promete el peldaño («Limpia Ollas En Pasta», un juguete «Cafetera»). Las palabras calzan al comienzo de una palabra del nombre.
 > - Mascotas es un perfil de perro: su peldaño del súper no trae `alimento-gato`.
@@ -24,16 +12,16 @@ Fecha: 14-10-2026. Estado: escrito de noche, a partir de decisiones ya aprobadas
 > - El texto del momento dice «Como te gusta {gusto}…» con el campo opcional `gusto` de cada perfil (sin él, nombra al perfil). La `basis` de una oferta sin persona trae `{kind: "perfil", source: "contexto"}`; con persona, sus segmentos y lo que pidió y buscó, en la forma de `offers/personal.py`.
 > - La consulta de un peldaño sin `palabras` son los nombres de sus conceptos y sus primeras palabras clave, para que la búsqueda por texto sirva aun sin embeddings. Una escalera no repite un nombre entre peldaños, no muestra tiendas cuyo nombre o marca dice «licor» o «botillería» («Turbo Licores») y en restaurantes pone un plato por cadena.
 
-## Qué pidió el usuario y qué ya aprobó (13-10)
+## Punto de partida (13-10)
 - **Narrativa:** la demo deja de partir con «armar carrete» y parte con algo simple, el sushi. Cuando la persona pide mucho sushi o comida china, Mochi arma un perfil «🥢 Amante de lo asiático» y, con él, ofrece en otras verticales. El sushi es el principal. Café, italiano y mascotas son perfiles adicionales. Carrete se menciona también, como secundario y sin alcohol.
 - **Enfoque A:** perfiles de gusto como capa propia, definidos en datos. Cada uno tiene una escalera de verticales que Mochi ofrece de a un peldaño, siempre con su «¿Por qué?» y con «Olvidar». Es un mecanismo general: el asiático va primero; agregar otro perfil es escribir datos, no código.
-- **Parte 1 (datos), aprobada:**
+- **Parte 1 (datos):**
   - 3 conceptos nuevos: `despensa-asiatica`, `snacks-asiaticos` y `bebidas-asiaticas`, con reglas de nombre y `avoid`.
   - `perfiles.toml`.
   - Destinos curados, rotulados «Idea para RappiTravel», sin precios ni fechas, con 2 datos verificables con fuente.
   - Aristas nuevas en el grafo: sushi → despensa-asiatica, sushi → bebidas-asiaticas y asiatica → snacks-asiaticos.
 - **Licores:** se mantiene la regla. Mochi no ofrece alcohol por iniciativa propia; si la persona lo busca, aparece con el aviso +18. Lo mismo vale para Farmacia, bebé, salud y lo sensible (`offers/guards.py`).
-- **Demo hecha:** `prototipo-sushi.html` (rama local `demo/prototipo-sushi`). Esta especificación lleva esa demo a la API de verdad, sin tocar la app.
+- **Demo previa:** una maqueta en HTML (`prototipo-sushi.html`, fuera del repositorio). Esta especificación lleva esa demo a la API de verdad, sin tocar la app.
 
 ## Alcance
 **Dentro:**
@@ -45,8 +33,8 @@ Fecha: 14-10-2026. Estado: escrito de noche, a partir de decisiones ya aprobadas
 - documentación y contrato (fixtures).
 
 **Fuera:**
-- la UI de la app, porque la demo ya existe y llevarla al MVP es otra etapa;
-- volver a etiquetar la base real, que es un paso de la mañana (`rappi-ia concepts` y `make layers` tras fusionar);
+- la UI de la app, porque la demo ya existía y llevarla al MVP era otra etapa (se hizo el 17-10-2026);
+- volver a etiquetar la base real (`rappi-ia concepts` y `make layers` después de integrar el cambio);
 - el panel. Si sobra tiempo: conteo por perfil en `/analytics`, rotulado como uso del MVP.
 
 ## Datos
@@ -58,7 +46,7 @@ Fecha: 14-10-2026. Estado: escrito de noche, a partir de decisiones ya aprobadas
     - matcha, bubble tea y té con leche de estilo asiático.
   - `avoid` deja fuera shampoo, vapeo y útiles escolares (Staedtler «Noris»).
   - Se sube la `version`.
-- **`concepts/complements.toml`:** las 3 aristas aprobadas.
+- **`concepts/complements.toml`:** las 3 aristas nuevas.
 - **`offers/perfiles.toml` (nuevo):** un `[[perfil]]` por gusto, con estos campos:
   - `id`, `nombre`, `emoji`;
   - `principal` (true solo en el asiático);
@@ -112,16 +100,16 @@ Fecha: 14-10-2026. Estado: escrito de noche, a partir de decisiones ya aprobadas
   - Con `user_id` (dueño validado) y sin `perfil`, usa el primer perfil activo. Con `perfil` explícito y sin `user_id`, devuelve la escalera sin «por qué» personal: la demo y el contrato la usan.
   - Respuesta: `{moment, text, perfil{id, nombre, emoji, nivel?, por_que?}, escalera: [{vertical, prototype_vertical, texto, products[]}], viaje: {id, nombre, texto, hechos[], etiqueta: "Idea para RappiTravel", route: ["travel"]} | null, reason{text, basis}, actions[]}`.
   - Devuelve 204 si no hay perfil o escalera, igual que los otros momentos.
-- Ejemplos nuevos en `prototipo-app/src/api/fixtures/` vía `make contract` (`profile-gustos.json` y `agent-offer-perfil.json`). La app todavía no los usa.
+- Ejemplos nuevos en `prototipo-app/src/api/fixtures/` vía `make contract` (`profile-gustos.json` y `agent-offer-perfil.json`).
 
 ## Simulados y textos
 - **`events/synth.py`:** nueva persona `asiatico` (sushi, asiatica, despensa-asiatica, bebidas-asiaticas en Restaurantes, Súper, Turbo y Express). Su participación sale de `carrete`, que baja.
 - **Ayuda del agente:** la acción «🎉 Arma un carrete» pasa a «🍣 Algo de sushi» (consulta «sushi»). Carrete queda más abajo en la lista, no se borra. `compose.py` usa ejemplos de sushi. La ocasión `carrete` sigue existiendo.
 - **Documentación:**
-  - una línea en CLAUDE.md;
+  - una línea en las convenciones del repositorio (`CLAUDE.md`);
   - una sección en `docs/diseno-ia.md`;
   - una fila en `docs/decisiones.md`;
-  - un paso de la mañana en el informe: `rappi-ia concepts` y `make layers` en la base real.
+  - `rappi-ia concepts` y `make layers` en la base real.
 
 ## Pruebas
 - **Cargador:**

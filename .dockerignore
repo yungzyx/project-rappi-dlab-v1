@@ -2,12 +2,13 @@
 # (Las imágenes se construyen con la raíz del repo como contexto: deploy/Dockerfile.api y deploy/Dockerfile.web.)
 .git
 .github
+docs
+# Carpetas locales de herramientas de desarrollo
 .superpowers
 .claude
 Proyecto
-docs
 
-# Datos y respaldos (el catálogo llega a la base por un dump que copia el usuario, nunca por la imagen)
+# Datos y respaldos (el catálogo llega a la base por un respaldo que se restaura a mano, nunca por la imagen)
 data
 rappi-scraper/data
 rappi-ia/data
