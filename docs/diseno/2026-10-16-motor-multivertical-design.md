@@ -6,7 +6,7 @@ Fecha: 16-10-2026. Diseño vigente del motor, construido en seis etapas entre el
 
 Una conversación con el equipo de Rappi cambió el foco del proyecto hacia la Home y las recomendaciones entre verticales:
 
-1. **Home dinámica.** Restaurantes y Turbo son los dos bloques grandes y no se mueven. Debajo, el motor aprende de la persona y ordena los accesos chicos: si pide más en Farmacia, Farmacia pasa al primer lugar. Loyalty y Benefits Pro quedan siempre al final.
+1. **Home dinámica.** Restaurantes y Turbo son los dos bloques grandes y no se mueven. Debajo, el motor aprende de la persona y ordena los accesos chicos: si pide más en Farmacia, Farmacia pasa al primer lugar. Lealtad y Beneficios Pro (entonces Loyalty y Benefits Pro) quedan siempre al final.
 2. **Recomendaciones conectadas entre verticales.** Según una tabla de Rappi, quien usa Restaurantes + Turbo + Retail en el mismo mes vuelve en un 93 % al mes siguiente. El motor conecta todas las verticales en la base, aprende la tendencia (lo más pedido) y el comportamiento de cada persona, y predice qué vertical sumarle y qué le toca pedir de nuevo.
 3. **Menos superficie.** El pasaporte Rappi y el juego de verticales, que se habían probado antes, salen del proyecto para dejar el foco en lo anterior.
 
@@ -38,7 +38,7 @@ Tabla compartida por el equipo de Rappi (cohortes de enero a junio de 2026, junt
 
 **Lectura honesta.** La tabla es una correlación: quien ya pide mucho usa más verticales y además vuelve más. No prueba que sumar un vertical cause retención; eso solo lo mide un experimento A/B con grupo de control. El motor la usa como **punto de partida** (qué combinación conviene buscar), no como promesa de efecto.
 
-**Agrupación gruesa del proyecto** (supuesto propio, en `combos.toml`): `rest` = restaurantes; `turbo` = turbo; `retail` = supermercado, conveniencia (Express), farmacia, licores, mall (Retail) y chocolatería. La tabla no tiene filas de Súper ni de Farmacia, y la suma de las filas mostradas (≈95 %) solo cierra si «Retail» agrupa todo el comercio que no es restaurante ni Turbo. Favor (RappiFavor) es un servicio sin catálogo y queda fuera del motor.
+**Agrupación gruesa del proyecto** (supuesto propio, en `combos.toml`): `rest` = restaurantes; `turbo` = turbo; `retail` = supermercado, conveniencia (Express), farmacia, licores, mall (Rappi Mall) y chocolatería. La tabla no tiene filas de Súper ni de Farmacia, y la suma de las filas mostradas (≈95 %) solo cierra si «Retail» agrupa todo el comercio que no es restaurante ni Turbo. Favor (RappiFavor) es un servicio sin catálogo y queda fuera del motor.
 
 ## 4. Etapas
 
@@ -95,7 +95,7 @@ Al implementarlo (16-10) se dejaron fuera el 5 % «otras» y el «perfil vecino�
 ### Etapa 3: Home dinámica
 
 - `GET /profile/{user_id}/verticales` devuelve `{"fixed": ["restaurantes", "turbo"], "order": [{"id", "score", "reason"}], "personalized": bool}` con los 6 verticales de los accesos chicos (supermercado, farmacia, mall, licores, conveniencia, chocolatería) en el orden de la predicción; exige el token de la persona, como `/profile/{id}`.
-- La app (modo Prototipo final) pinta los accesos en ese orden: primero los 6 verticales, después RappiTravel y RappiFavor, y al final **Loyalty y Benefits Pro, siempre**. Sin historial o si la API falla, el orden de hoy. «Rappi hoy» no cambia.
+- La app (modo Prototipo final) pinta los accesos en ese orden: primero los 6 verticales, después RappiTravel y RappiFavor, y al final **Lealtad y Beneficios Pro, siempre**. Sin historial o si la API falla, el orden de hoy. «Rappi hoy» no cambia.
 - Tocar un acceso manda `vertical_open` con su vertical (los servicios mandan el suyo en `payload.servicio`); en «Rappi hoy» no enseña, como el resto.
 - Una línea bajo la fila dice por qué, solo cuando el orden es personal («Ordenadas según lo que más pides»).
 
