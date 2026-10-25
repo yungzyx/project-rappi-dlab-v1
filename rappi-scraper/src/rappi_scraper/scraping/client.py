@@ -1,4 +1,5 @@
-"""Cliente HTTP prudente para rappi.cl: pausas, reintentos y ubicación de despacho."""
+"""Cliente HTTP prudente para rappi.cl: se identifica, respeta robots.txt, hace pausas y reintentos y fija la ubicación
+de despacho."""
 
 import base64
 import contextlib
@@ -14,6 +15,7 @@ import requests
 
 from .. import config
 from .next_data import MissingNextData, ParseError, extract_next_data
+from .robots import RobotsPolicy
 
 log = logging.getLogger(__name__)
 
@@ -32,14 +34,21 @@ class PageNotFound(Exception):
     """La página no existe (p. ej. un sub-pasillo cuyo slug no coincide)."""
 
 
-class PossibleBlock(Exception):
-    """rappi.cl podría estar bloqueando la descarga: demasiados requests (o jobs) seguidos rechazados.
-
-    No es un error de página (no está en PAGE_ERRORS): ningún pasillo, sucursal ni job lo atrapa, y la corrida se
-    detiene abierta para retomarla más tarde. Si pasa al descubrir, la corrida se cierra como fallida
-    (`run_left_open = False`)."""
+class DownloadStopped(Exception):
+    """La descarga se detiene entera. No es un error de página (no está en PAGE_ERRORS): ningún pasillo, sucursal ni
+    job lo atrapa, y la corrida queda abierta para retomarla más tarde. Si pasa al descubrir, la corrida se cierra como
+    fallida (`run_left_open = False`)."""
 
     run_left_open = True
+
+
+class PossibleBlock(DownloadStopped):
+    """rappi.cl podría estar bloqueando la descarga: demasiados requests (o jobs) seguidos rechazados."""
+
+
+class RobotsDisallowed(DownloadStopped):
+    """robots.txt no permite una página a este programa, o no respondió (y entonces se asume que no permite nada). No
+    se salta la regla ni se sigue con otras páginas: la descarga se detiene y lo dice."""
 
 
 # Errores esperables al bajar y leer una página: se registran y se sigue con la siguiente.
@@ -91,6 +100,9 @@ class RappiClient:
                 "Accept-Language": "es-CL,es;q=0.9",
             }
         )
+        self._robots = RobotsPolicy(config.UA_PROJECT, self._robots_txt)
+        if not config.UA_CONTACT:
+            log.warning("Sin RAPPI_UA_CONTACT: el User-Agent dice quién descarga, pero no a quién escribirle")
 
     def set_location(self, lat: float, lng: float, city: str, address: str) -> None:
         self._session.cookies.set(
@@ -146,7 +158,27 @@ class RappiClient:
                 f"posible bloqueo: {self._blocked_streak} requests seguidos rechazados (último: {reason} en {url})"
             )
 
-    def _request(self, url: str) -> requests.Response:
+    def _robots_txt(self, url: str) -> str | None:
+        """El robots.txt de un sitio, con los mismos reintentos que una página; None si no existe (cualquier 4xx)."""
+        try:
+            text = self._request(url, check_robots=False).content.decode("utf-8", errors="replace")
+        except PageNotFound:
+            text = None
+        except requests.HTTPError as exc:
+            if exc.response is None or not 400 <= exc.response.status_code < 500:
+                raise
+            text = None
+        self._blocked_streak = 0  # el sitio respondió
+        return text
+
+    def _check_robots(self, url: str) -> None:
+        reason = self._robots.denial(url)
+        if reason:
+            raise RobotsDisallowed(f"{reason}: la descarga se detiene sin bajar esa página")
+
+    def _request(self, url: str, check_robots: bool = True) -> requests.Response:
+        if check_robots:
+            self._check_robots(url)
         for attempt in range(1, config.MAX_RETRIES + 1):
             time.sleep(random.uniform(*config.REQUEST_DELAY_RANGE))
             wait = None
@@ -159,6 +191,8 @@ class RappiClient:
                     self._blocked_streak = 0
                     raise PageNotFound(url)
                 if response.status_code < 400:
+                    if check_robots and response.history:  # una redirección: también vale para donde terminó
+                        self._check_robots(response.url)
                     return response
                 if response.status_code in BLOCK_STATUSES:
                     self._count_rejection(url, f"HTTP {response.status_code}")

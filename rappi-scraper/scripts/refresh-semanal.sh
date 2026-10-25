@@ -1,12 +1,10 @@
 #!/usr/bin/env bash
-# La tarea de launchd instalada antes en el Mac mini lo llama con /bin/zsh: se vuelve a lanzar con bash.
-if [ -n "${ZSH_VERSION:-}" ] && [ -z "${BASH_VERSION:-}" ]; then exec /bin/bash "$0" "$@"; fi
 # Tarea semanal (domingos 03:00): descarga y capa de IA, en orden. En macOS la programa launchd (`make schedule`); en
 # un servidor Linux, el timer de systemd deploy/systemd/rappi-refresh.timer, dentro del contenedor jobs.
 #   1. rappi migrate (migraciones pendientes, p. ej. tras un git pull; en producción solo las revisa) y rappi refresh:
 #      tiendas, restaurantes, búsqueda, reportes y respaldo.
 #   2. Si rappi-ia está instalado al lado: conceptos, embeddings, evaluación, datos simulados y purga.
-# La evaluación no guarda τ (eval/thresholds.json está en git: recalibrar es a mano, con `make eval`).
+# La evaluación no guarda τ (eval/thresholds.json está en git: recalibrar es a mano, con `make eval GUARDAR_TAU=1`).
 # Las opciones pasan a `rappi refresh`: tras `retry-failed`, `refresh-semanal.sh --resume-only` retoma solo lo reencolado.
 # Variables: RAPPI_BIN (por defecto .venv/bin/rappi), RAPPI_IA_PY (el python de rappi-ia, por defecto su .venv) y
 # RAPPI_DATA_DIR (por defecto data/). Compatible con el bash 3.2 de macOS: sin mapfile ni arreglos asociativos.
@@ -124,9 +122,9 @@ if [ "${API_ENV:-}" = production ]; then "$RAPPI_BIN" migrate --solo-revisar; el
 # Código 3: todo terminó salvo el respaldo (quedan los anteriores). Código 5: los restaurantes no se actualizaron
 # (tiendas, búsqueda y respaldo sí; con el sitemap caído y una corrida anterior se usa su lista y sale con 0). Código
 # 6: las dos cosas. En los tres la capa de IA corre igual, pero queda anotado. Código 4: posible bloqueo de rappi.cl;
-# aquí se detiene. Los avisos que no cambian el código (restaurantes bajados con la lista de una corrida anterior, con
-# 0 o 3) los deja `rappi refresh` como marcas fijas en RAPPI_REFRESH_NOTES; se borra antes para no anotar los de otra
-# semana.
+# código 7: robots.txt no permite una página (o no respondió). Con esos dos se detiene aquí. Los avisos que no cambian
+# el código (restaurantes bajados con la lista de una corrida anterior, con 0 o 3) los deja `rappi refresh` como marcas
+# fijas en RAPPI_REFRESH_NOTES; se borra antes para no anotar los de otra semana.
 export RAPPI_REFRESH_NOTES=$LOGS/refresh-avisos.txt
 rm -f "$RAPPI_REFRESH_NOTES"
 refresh_rc=0
@@ -140,6 +138,9 @@ elif [ "$refresh_rc" -eq 6 ]; then
 elif [ "$refresh_rc" -eq 4 ]; then
   nota="detenida: posible bloqueo"
   exit "$refresh_rc"
+elif [ "$refresh_rc" -eq 7 ]; then
+  nota="detenida: robots.txt no lo permite"
+  exit "$refresh_rc"
 elif [ "$refresh_rc" -ne 0 ]; then
   exit "$refresh_rc"
 fi
@@ -149,5 +150,5 @@ fi
 # El python de rappi-ia: RAPPI_IA_PY (en el contenedor, el del sistema) o su .venv, si está instalado al lado.
 if [ -n "${RAPPI_IA_PY:-}" ] || [ -x ../rappi-ia/.venv/bin/python ]; then
   echo "$(date '+%F %T') refresh terminado: actualizando rappi-ia"
-  ${AWAKE[@]+"${AWAKE[@]}"} make -C ../rappi-ia post-refresh PY="${RAPPI_IA_PY:-.venv/bin/python}" EVAL_ARGS=
+  ${AWAKE[@]+"${AWAKE[@]}"} make -C ../rappi-ia post-refresh PY="${RAPPI_IA_PY:-.venv/bin/python}"
 fi

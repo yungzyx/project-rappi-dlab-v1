@@ -34,12 +34,11 @@ from .pipeline.discover import (
     discover_stores,
     failed_listings,
 )
-from .pipeline.queue import PossibleBlock
 from .pipeline.refresh import JOB_TYPES, finish_and_report, refresh
 from .pipeline.restaurants import process_restaurant_jobs
 from .pipeline.stores import process_store_jobs
 from .reporting import render_markdown, write_run_report
-from .scraping.client import RappiClient
+from .scraping.client import DownloadStopped, PossibleBlock, RappiClient
 from .storage import repository
 from .storage.backup import backup_database
 from .storage.db import APPLIED_BY_DEPLOY, PendingMigrations, check_migrations, connect, database_url, migrate
@@ -64,6 +63,9 @@ POSSIBLE_BLOCK_EXIT = 4
 RESTAURANTS_FAILED_EXIT = 5
 # 6: las dos cosas, restaurantes sin actualizar y respaldo fallido: la tarea semanal anota ambas y sigue.
 RESTAURANTS_AND_BACKUP_FAILED_EXIT = 6
+# 7: robots.txt no permite una página (o no respondió); como con el 4, la corrida queda abierta y la tarea semanal se
+# detiene ahí, hasta que alguien revise la regla.
+ROBOTS_EXIT = 7
 # Avisos que no cambian el código de salida: si la variable trae una ruta, `refresh` escribe ahí una marca fija por
 # línea, y refresh-semanal.sh la anota en ultimo-estado.txt. La única por ahora: los restaurantes se bajaron con la
 # lista de una corrida anterior porque el sitemap no respondió (sale con 0).
@@ -137,10 +139,11 @@ def _finish_and_report(conn, run_id: int, kind: str) -> None:
 
 
 def _scrape_or_stop(conn, run_id: int, kind: str, process) -> None:
-    """Como `refresh`: ante un posible bloqueo deja el reporte con la alerta y un mensaje claro, no una traza."""
+    """Como `refresh`: ante un posible bloqueo o robots.txt deja el reporte con la alerta y un mensaje claro, no una
+    traza."""
     try:
         process()
-    except PossibleBlock as exc:
+    except DownloadStopped as exc:
         report, _ = finish_and_report(conn, run_id, kind, alert=str(exc))
         print(render_markdown(report))
         raise SystemExit(
@@ -162,13 +165,13 @@ def cmd_refresh(conn, args) -> None:
             backup=None if args.no_backup else lambda: backup_database(database_url()),
             resume_only=args.resume_only,
         )
-    except PossibleBlock as exc:
+    except DownloadStopped as exc:
         if exc.run_left_open:
             state = "El reporte está en data/reports/; la corrida quedó abierta y la próxima actualización la retoma."
         else:  # al descubrir: la corrida se cerró y no hay qué retomar
             state = "Fue al descubrir: la corrida se cerró como fallida y la próxima actualización empieza otra."
         print(f"Descarga detenida: {exc}. {state}", file=sys.stderr)
-        raise SystemExit(POSSIBLE_BLOCK_EXIT) from exc
+        raise SystemExit(POSSIBLE_BLOCK_EXIT if isinstance(exc, PossibleBlock) else ROBOTS_EXIT) from exc
     for report in reports:
         print(render_markdown(report))
     _write_refresh_notes(reports)
@@ -379,6 +382,8 @@ def main(argv: list[str] | None = None) -> None:
             _run_simple(args)
     except (DownloadInProgress, PendingMigrations) as exc:
         raise SystemExit(str(exc)) from exc
+    except DownloadStopped as exc:  # al descubrir, fuera de `refresh`: un mensaje y no una traza
+        raise SystemExit(f"Descarga detenida: {exc}.") from exc
     except KeyboardInterrupt:
         log.warning("Interrumpido. Lo avanzado quedó guardado: retoma con el mismo comando.")
         sys.exit(130)

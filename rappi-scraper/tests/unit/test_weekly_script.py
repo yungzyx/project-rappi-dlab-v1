@@ -1,6 +1,5 @@
 """scripts/refresh-semanal.sh (y despues-del-refresh.sh de rappi-ia), corridos de verdad en una copia del proyecto con
-un `rappi` falso. Con /bin/bash (el 3.2 de macOS; en el CI de Ubuntu, bash 5) y con zsh, que es como lo llama la tarea
-de launchd ya instalada en el Mac mini: el script se vuelve a lanzar con bash."""
+un `rappi` falso, con /bin/bash (el 3.2 de macOS; en el CI de Ubuntu, bash 5)."""
 
 import logging
 import os
@@ -17,10 +16,7 @@ from rappi_scraper import cli
 SCRIPTS = Path(__file__).resolve().parents[2] / "scripts"
 SCRIPT = SCRIPTS / "refresh-semanal.sh"
 AFTER_REFRESH = Path(__file__).resolve().parents[3] / "rappi-ia" / "scripts" / "despues-del-refresh.sh"
-SHELLS = [
-    "/bin/bash",
-    pytest.param("zsh", marks=pytest.mark.skipif(shutil.which("zsh") is None, reason="sin zsh")),
-]
+SHELLS = ["/bin/bash"]
 # Lo que usan los scripts, sin caffeinate (no existe en Linux): para probar que no hace falta también en macOS.
 TOOLS = [
     "bash",
@@ -93,7 +89,7 @@ def _tools(tmp_path: Path, without: tuple[str, ...] = ()) -> str:
     """Un PATH solo con las herramientas que usa el script (sin caffeinate, y sin lo que diga `without`)."""
     tools = tmp_path / "tools"
     tools.mkdir()
-    for tool in [*TOOLS, "zsh"]:
+    for tool in TOOLS:
         if tool not in without and (found := shutil.which(tool)):
             (tools / tool).symlink_to(found)
     return str(tools)
@@ -111,7 +107,7 @@ BLOCKING_REFRESH = (
 )
 
 
-POST_REFRESH = "make -C ../rappi-ia post-refresh PY=.venv/bin/python EVAL_ARGS="
+POST_REFRESH = "make -C ../rappi-ia post-refresh PY=.venv/bin/python"
 
 
 def test_runs_without_caffeinate_exit0(tmp_path, shell):
@@ -127,7 +123,7 @@ def test_runs_without_caffeinate_exit0(tmp_path, shell):
     assert not (project / "data" / "refresh-semanal.lock").exists()
 
 
-@pytest.mark.parametrize("code", [0, 7])
+@pytest.mark.parametrize("code", [0, 8])
 def test_each_run_leaves_its_exit_code(tmp_path, shell, code):
     """Un fallo del domingo no queda solo en launchd.err.log: `make schedule-status` lo muestra."""
     project = _project(tmp_path, f"exit {code}")
@@ -425,7 +421,7 @@ def test_rappi_bin_data_dir_and_ia_python_come_from_the_environment(tmp_path, sh
     result = _run(project, shell, RAPPI_BIN="rappi-del-contenedor", RAPPI_IA_PY="python", RAPPI_DATA_DIR=str(data))
 
     assert result.returncode == 0, result.stderr
-    assert _calls(project) == ["migrate", "refresh", "make -C ../rappi-ia post-refresh PY=python EVAL_ARGS="]
+    assert _calls(project) == ["migrate", "refresh", "make -C ../rappi-ia post-refresh PY=python"]
     [line] = (data / "logs" / "ultimo-estado.txt").read_text().splitlines()
     assert line.endswith("exit=0")
     assert not (project / "data").exists()
@@ -449,14 +445,16 @@ def test_a_failed_migration_stops_before_downloading(tmp_path, shell):
         (3, 0, True, " (respaldo fallido: se conservan los anteriores)"),
         # Posible bloqueo: no es un fallo cualquiera; la línea lo dice y no sigue con la IA.
         (4, 4, False, " (detenida: posible bloqueo)"),
+        # robots.txt no permite una página: igual, se detiene y lo dice.
+        (7, 7, False, " (detenida: robots.txt no lo permite)"),
         # Tiendas, búsqueda y respaldo quedaron; solo los restaurantes no se actualizaron.
         (5, 0, True, " (restaurantes sin actualizar)"),
         (6, 0, True, " (restaurantes sin actualizar; respaldo fallido: se conservan los anteriores)"),
         # Cualquier otro fallo detiene la ejecución, sin capa de IA.
-        (7, 7, False, ""),
+        (8, 8, False, ""),
     ],
 )
-def test_exit_codes_3_4_5_noted(tmp_path, shell, code, exit_code, ai_layer_runs, note):
+def test_exit_codes_3_to_7_noted(tmp_path, shell, code, exit_code, ai_layer_runs, note):
     project = _project(tmp_path, f"[[ $1 == refresh ]] && exit {code}; exit 0", ai_layer=True)
 
     result = _run(project, shell)
@@ -611,7 +609,7 @@ def test_after_refresh_script_runs_post_refresh(tmp_path, shell):
     _write_fake(project / "bin" / "make", 'echo "make $*" >> calls.txt')
     tools = tmp_path / "tools"
     tools.mkdir()
-    for tool in [*TOOLS, "zsh"]:
+    for tool in TOOLS:
         if found := shutil.which(tool):
             (tools / tool).symlink_to(found)
 

@@ -7,7 +7,7 @@ import psycopg
 from psycopg import Connection
 
 from .. import config
-from ..scraping.client import PossibleBlock, RestaurantGone, StoreUnavailable
+from ..scraping.client import DownloadStopped, PossibleBlock, RestaurantGone, StoreUnavailable
 from ..storage import repository
 from .progress import Progress
 
@@ -38,9 +38,9 @@ def _process(
         try:
             status, result, error = handler(job)
             site_answered = status != "failed" or error in SITE_ANSWERED
-        except PossibleBlock:
-            # El cliente vio demasiados requests rechazados seguidos: este job queda pendiente y los fallidos de la
-            # racha vuelven a la cola, como cuando la racha es de jobs.
+        except DownloadStopped:
+            # Un posible bloqueo (demasiados requests rechazados seguidos) o una página que robots.txt no permite: este
+            # job queda pendiente y los fallidos de la racha vuelven a la cola, como cuando la racha es de jobs.
             _rollback(conn)
             repository.requeue_failed(conn, run_id, config.MAX_BLOCKED_JOB_ATTEMPTS, streak)
             raise
@@ -96,7 +96,8 @@ def process_with_retry(
 ) -> None:
     """Procesa los jobs y, al final, reintenta una vez los que fallaron (errores transitorios de Rappi).
 
-    Lanza `PossibleBlock` si demasiados jobs seguidos fallan sin respuesta útil: los que quedan siguen pendientes.
+    Lanza `PossibleBlock` si demasiados jobs seguidos fallan sin respuesta útil, y deja subir un `DownloadStopped` del
+    cliente: los que quedan siguen pendientes.
     """
     _process(conn, run_id, jobs, handler, describe, log_every)
     retry_keys = set(repository.requeue_failed(conn, run_id, config.MAX_JOB_ATTEMPTS, [j["job_key"] for j in jobs]))

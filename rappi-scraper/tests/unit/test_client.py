@@ -15,6 +15,7 @@ from rappi_scraper.scraping.client import (
     StoreUnavailable,
     location_cookie,
 )
+from rappi_scraper.scraping.robots import RobotsPolicy
 
 NEXT_DATA_HTML = '<script id="__NEXT_DATA__" type="application/json">{"props": {"pageProps": {}}}</script>'
 
@@ -26,6 +27,7 @@ class _Response:
         self.text = text
         self.headers = headers or {}
         self.encoding = "utf-8"
+        self.history = []
 
     def raise_for_status(self):
         raise requests.HTTPError(f"HTTP {self.status_code}")
@@ -34,8 +36,9 @@ class _Response:
 @pytest.fixture
 def client(monkeypatch):
     """Cliente sin pausas reales (quedan en `sleeps`; la pausa al azar entre requests vale 0); `responses` define lo que
-    devuelve cada GET, en orden."""
+    devuelve cada GET, en orden. Sin robots.txt que pedir: aquí todo está permitido (test_robots.py lo prueba)."""
     c = RappiClient()
+    c._robots = RobotsPolicy(config.UA_PROJECT, lambda url: None)
     c.responses = []
     c.calls = 0
     c.sleeps = []

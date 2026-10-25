@@ -1,6 +1,7 @@
-# NO SE ACTIVA TODAVÍA. Se copia con los demás, pero `systemctl enable --now rappi-refresh.timer` solo cuando el
-# usuario haya decidido el User-Agent y robots.txt, aceptado el riesgo de la IP de datacenter y apagado la tarea
-# semanal del Mac mini (`make unschedule` allá): nunca dos descargas a la vez contra rappi.cl.
+# NO SE ACTIVA SOLO. Se copia con los demás, pero `systemctl enable --now rappi-refresh.timer` solo cuando quien
+# despliega haya puesto el contacto del User-Agent (RAPPI_UA_CONTACT), aceptado el riesgo de la IP de datacenter y
+# apagado la tarea semanal de cualquier otro equipo (`make unschedule` allá): nunca dos descargas a la vez contra
+# rappi.cl.
 [Unit]
 Description=Rappi: descarga semanal (domingos 03:00, hora de Chile)
 

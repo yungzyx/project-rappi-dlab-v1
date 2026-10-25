@@ -1,8 +1,8 @@
 # Tarea semanal en el servidor: la descarga de rappi.cl y la capa de IA (rappi-scraper/scripts/refresh-semanal.sh),
-# dentro del contenedor jobs. La dispara rappi-refresh.timer, que se instala SIN ACTIVAR: antes el usuario decide el
-# User-Agent y robots.txt y acepta que rappi.cl pueda frenar una IP de datacenter. Mientras tanto la descarga sigue
-# en el Mac mini (docs/despliegue.md). Nunca dos descargas a la vez: si el Mac mini sigue descargando, este timer no se
-# activa.
+# dentro del contenedor jobs. El scraper se identifica (RAPPI_UA_PROJECT y RAPPI_UA_CONTACT en el archivo de entorno)
+# y respeta robots.txt: si una página no está permitida, se detiene con el código 7. La dispara rappi-refresh.timer,
+# que se instala SIN ACTIVAR: antes, quien despliega acepta que rappi.cl pueda frenar una IP de datacenter y se asegura
+# de que ningún otro equipo descargue (nunca dos descargas a la vez; docs/despliegue.md).
 [Unit]
 Description=Rappi: descarga semanal del catálogo y capa de IA
 Requires=docker.service

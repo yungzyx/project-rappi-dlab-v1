@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Roles de la base (F-I6). El entrypoint de la imagen de Postgres lo corre una sola vez, como superusuario, cuando el
+# Roles de la base. El entrypoint de la imagen de Postgres lo corre una sola vez, como superusuario, cuando el
 # volumen pgdata está vacío. Las claves vienen del archivo de entorno (RAPPI_OWNER_PASSWORD, RAPPI_API_PASSWORD) y
 # psql las lee con \getenv: no pasan por la línea de comandos.
 #   rappi_owner: dueño de la base y de las tablas; lo usan la migración y los trabajos (restaurar, descargar, respaldar).

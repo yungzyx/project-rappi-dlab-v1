@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
-# Lanzado con zsh (`zsh scripts/despues-del-refresh.sh`, como antes): se vuelve a lanzar con bash.
-if [ -n "${ZSH_VERSION:-}" ] && [ -z "${BASH_VERSION:-}" ]; then exec /bin/bash "$0" "$@"; fi
 # Espera a que termine `rappi refresh` (scraper) y actualiza la capa de IA con el catálogo nuevo:
-# conceptos (con kNN), embeddings de texto, evaluación de la búsqueda y datos simulados del panel.
+# conceptos (con kNN), embeddings de texto, evaluación de la búsqueda (sin guardar τ) y datos simulados del panel.
 # Uso:  ./scripts/despues-del-refresh.sh            (en otra pestaña de la Terminal; se puede cerrar con Ctrl+C)
 # Variables: RAPPI_IA_PY (el python de rappi-ia, por defecto .venv/bin/python) y RAPPI_IA_DATA_DIR (por defecto data/).
 set -euo pipefail

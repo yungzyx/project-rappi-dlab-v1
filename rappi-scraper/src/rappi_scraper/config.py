@@ -1,10 +1,12 @@
-"""Configuración: URLs de Rappi, ritmo de requests y rutas del proyecto.
+"""Configuración: URLs de Rappi, cómo se presenta el scraper, ritmo de requests y rutas del proyecto.
 
-El ritmo de requests se puede ajustar con variables de entorno (o en `.env`) sin tocar código:
-RAPPI_DELAY_MIN, RAPPI_DELAY_MAX, RAPPI_TIMEOUT, RAPPI_MAX_RETRIES, RAPPI_RETRY_BACKOFF.
+Se ajustan con variables de entorno (o en `.env`) sin tocar código: RAPPI_UA_PROJECT y RAPPI_UA_CONTACT (el
+User-Agent) y el ritmo de requests, RAPPI_DELAY_MIN, RAPPI_DELAY_MAX, RAPPI_TIMEOUT, RAPPI_MAX_RETRIES y
+RAPPI_RETRY_BACKOFF.
 """
 
 import os
+from importlib.metadata import version
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -29,10 +31,20 @@ BASE_URL = "https://www.rappi.cl"
 STORES_METADATA_URL = (
     "https://cpgs-br.s3.amazonaws.com/web-assets/public/indexedData/country/cl/storefronts-metadata.json"
 )
-USER_AGENT = (
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
-)
+
+
+def user_agent(project: str, contact: str) -> str:
+    """El User-Agent: un programa con nombre y versión, no un navegador. Sin contacto, igual dice quién descarga."""
+    about = "prototipo de investigacion dLab, no afiliado a Rappi"  # sin tildes: va en una cabecera HTTP
+    contact_part = f"+{contact}; " if contact else ""
+    return f"{project}/{version('rappi-scraper')} ({contact_part}{about})"
+
+
+# Cómo se presenta ante rappi.cl. RAPPI_UA_PROJECT es también el nombre con que se buscan sus reglas en robots.txt;
+# RAPPI_UA_CONTACT (una URL o un correo) le dice a Rappi a quién escribir.
+UA_PROJECT = os.environ.get("RAPPI_UA_PROJECT", "").strip() or "rappi-dlab-scraper"
+UA_CONTACT = os.environ.get("RAPPI_UA_CONTACT", "").strip()
+USER_AGENT = user_agent(UA_PROJECT, UA_CONTACT)
 
 # Ritmo prudente: pausa aleatoria entre requests (segundos) y reintentos ante 429/5xx, con espera exponencial
 # (10, 20, 40 s…) o la que pida rappi.cl en `Retry-After`, hasta un tope.

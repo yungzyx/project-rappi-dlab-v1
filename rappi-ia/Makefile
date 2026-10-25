@@ -60,12 +60,14 @@ embed:  ## Embeddings de texto (incrementales) + índices HNSW por vertical
 prune-embeddings:  ## Borra del caché de embeddings los vectores sin uso (de más de 7 días)
 	$(PY) -m rappi_ia prune-embeddings
 
-# La tarea semanal (rappi-scraper/scripts/refresh-semanal.sh) pasa EVAL_ARGS= para no tocar eval/thresholds.json
-EVAL_ARGS ?= --guardar-tau
+# eval/thresholds.json está en git: `make eval` propone τ en el reporte y solo lo guarda con GUARDAR_TAU=1 (después,
+# revisar el cambio y hacer commit). EVAL_ARGS suma otras opciones de `rappi-ia eval-search`.
+GUARDAR_TAU ?=
+EVAL_ARGS ?=
 
 # --jev-auto suma a Jev como tercer juez solo con clave y adopción (docs/jev.md); si no, evalúa igual que siempre
-eval:  ## Evalúa la búsqueda (léxico vs vectorial vs híbrido) y calibra τ
-	$(PY) -m rappi_ia eval-search $(EVAL_ARGS) --jev-auto
+eval:  ## Evalúa la búsqueda (léxico vs vectorial vs híbrido) y propone τ; GUARDAR_TAU=1 lo guarda en eval/thresholds.json
+	$(PY) -m rappi_ia eval-search $(if $(filter 1,$(GUARDAR_TAU)),--guardar-tau) $(EVAL_ARGS) --jev-auto
 
 synth:  ## Usuarios y eventos SIMULADOS para el panel y el motor (reemplaza los anteriores)
 	$(PY) -m rappi_ia synth
