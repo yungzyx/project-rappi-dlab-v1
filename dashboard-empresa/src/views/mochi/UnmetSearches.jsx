@@ -1,3 +1,4 @@
+import { AGENT_NAME } from '../../lib/agentName.js'
 import { DataTable } from '../../components/DataTable.jsx'
 import { EmptyState } from '../../components/States.jsx'
 import { formatNumber } from '../../lib/format.js'
@@ -31,7 +32,7 @@ export function UnmetSearches({ data, table = true }) {
           {
             label: 'Sin resultado',
             value: `${formatNumber(unmet)} de ${formatNumber(busquedas)}`,
-            note: `${plural(busquedas, 'búsqueda o pregunta', 'búsquedas y preguntas')} a Mochi que saben si encontraron algo.`,
+            note: `${plural(busquedas, 'búsqueda o pregunta', 'búsquedas y preguntas')} a ${AGENT_NAME} que saben si encontraron algo.`,
           },
           { label: 'Personas que buscaron', value: formatNumber(personas) },
         ]}

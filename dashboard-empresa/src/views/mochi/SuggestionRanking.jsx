@@ -1,3 +1,4 @@
+import { AGENT_NAME } from '../../lib/agentName.js'
 import { useState } from 'react'
 import { DataTable } from '../../components/DataTable.jsx'
 import { Meter } from '../../components/Meter.jsx'
@@ -18,7 +19,7 @@ export function SuggestionRanking({ rows }) {
   if (!rows.length) {
     return (
       <EmptyState title="Sin sugerencias entre verticales que evaluar">
-        Aparecen cuando Mochi sugiere un producto de otra vertical.
+        Aparecen cuando {AGENT_NAME} sugiere un producto de otra vertical.
       </EmptyState>
     )
   }
@@ -72,7 +73,8 @@ export function SuggestionRanking({ rows }) {
         rowKey={(row) => `${row.concepto}-${row.vertical}`}
       />
       <p className="cell-sub">
-        Incluye lo que la persona pidió al preguntarle: Mochi no propone por su cuenta alcohol, Farmacia, bebé ni salud.
+        Incluye lo que la persona pidió al preguntarle: {AGENT_NAME} no propone por su cuenta alcohol, Farmacia, bebé ni
+        salud.
       </p>
       {sorted.length > PREVIEW_ROWS && (
         <div className="view-switch">

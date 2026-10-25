@@ -1,3 +1,4 @@
+import { AGENT_NAME } from '../../lib/agentName.js'
 import { DataTable } from '../../components/DataTable.jsx'
 import { EmptyState } from '../../components/States.jsx'
 import { formatNumber, formatPct } from '../../lib/format.js'
@@ -5,7 +6,7 @@ import { MIN_SHOWN_FOR_RATE } from './offers.js'
 
 const COLUMNS = [
   { key: 'nombre', header: 'Servicio', primary: true },
-  { key: 'ofrecido', header: 'Mochi lo ofreció', numeric: true, render: (row) => formatNumber(row.ofrecido) },
+  { key: 'ofrecido', header: `${AGENT_NAME} lo ofreció`, numeric: true, render: (row) => formatNumber(row.ofrecido) },
   {
     key: 'abierto',
     header: 'Se abrió',
@@ -31,7 +32,7 @@ const COLUMNS = [
 export function ServiceEngagement({ rows }) {
   if (!rows.some((row) => row.ofrecido)) {
     return (
-      <EmptyState title="Mochi todavía no ofreció servicios">
+      <EmptyState title={`${AGENT_NAME} todavía no ofreció servicios`}>
         Aparecen cuando alguien habla de un viaje o de un envío, o no encuentra lo que busca.
       </EmptyState>
     )

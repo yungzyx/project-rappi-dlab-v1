@@ -1,3 +1,4 @@
+import { AGENT_NAME } from '../../lib/agentName.js'
 import { SNAPSHOT_INFO } from '../../lib/api.js'
 import { formatDate } from '../../lib/format.js'
 import { useAnalytics } from '../../lib/useAnalytics.js'
@@ -29,7 +30,7 @@ export function Header({ source, onSourceChange, onRefresh }) {
             <path className="brand-bar" d="M23 22v-8" />
           </svg>
           <div>
-            <p className="eyebrow">Rappi Chile · propuesta</p>
+            <p className="eyebrow">Prototipo independiente, no afiliado a Rappi</p>
             <h1>Panel de negocio</h1>
           </div>
         </div>
@@ -38,7 +39,8 @@ export function Header({ source, onSourceChange, onRefresh }) {
           <ThemeToggle />
         </div>
         <p className="masthead-lede">
-          Para la <strong>gerencia</strong> y <strong>RappiAds</strong>: venta cruzada, retención y lo que ofrece Mochi.
+          Para la <strong>gerencia</strong> y <strong>RappiAds</strong>: venta cruzada, retención y lo que ofrece{' '}
+          {AGENT_NAME}.
         </p>
         <div className="masthead-meta">
           <Async fallback={<span>Cargando fecha de corte…</span>}>

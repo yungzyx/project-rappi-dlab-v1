@@ -1,14 +1,14 @@
-// «Panel Rappi.html» (npm run panel:html): el panel en un solo archivo que abre con doble clic (file://), sin la API ni
+// «Panel de negocio (demo).html» (npm run panel:html): el panel en un solo archivo que abre con doble clic (file://), sin la API ni
 // internet. Construye el modo panel-html (`vite build --mode panel-html`: las respuestas de snapshot/panel.json en vez de
 // la API, ver vite.config.js) y mete el JS, el CSS (con las fuentes ya en base64), el tema y el ícono dentro del HTML.
-// Escribe dist-html/Panel Rappi.html y, con PANEL_HTML_COPY=<ruta>, también una copia ahí.
+// Escribe dist-html/Panel de negocio (demo).html y, con PANEL_HTML_COPY=<ruta>, también una copia ahí.
 import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { build } from 'vite'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
 const DIST = `${ROOT}dist-html/`
-const OUT = `${DIST}Panel Rappi.html`
+const OUT = `${DIST}Panel de negocio (demo).html`
 const SNAPSHOT = `${ROOT}snapshot/panel.json`
 
 if (!existsSync(SNAPSHOT)) {
