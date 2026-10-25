@@ -1,26 +1,23 @@
-# Motor multivertical, Home dinámica y salida del juego: diseño
+# Motor multivertical y Home dinámica: diseño
 
-Fecha: 16-10-2026. Estado: aprobado por el usuario (pidió avanzar por etapas sin revisión intermedia; decisiones abajo).
+Fecha: 16-10-2026. Diseño vigente del motor, construido en seis etapas entre el 16 y el 17-10-2026. Lo que cambió después (la escalera fina, el rendimiento decreciente, «¿Volvemos a…?») está en [capa-de-datos.md](../capa-de-datos.md#motor-multivertical) y en [decisiones.md](../decisiones.md).
 
-## 1. Pedido
+## 1. Para qué
 
-El usuario pidió, a partir de una conversación con el equipo de Rappi:
+Una conversación con el equipo de Rappi cambió el foco del proyecto hacia la Home y las recomendaciones entre verticales:
 
-1. **Quitar el pasaporte Rappi y el juego de verticales de todo el proyecto**, y dejarlo registrado en `rappi-evolucion-proyecto`.
-2. **Home dinámica.** Restaurantes y Turbo son los dos bloques grandes y no se mueven. Debajo, el agente aprende de la persona y ordena los accesos chicos: si pide más en Farmacia, Farmacia pasa al primer lugar. Loyalty y Benefits Pro quedan siempre al final.
-3. **Recomendaciones conectadas entre verticales.** Según una tabla de Rappi, quien usa Restaurantes + Turbo + Retail en el mismo mes retiene 93 % al mes siguiente. El motor debe conectar todos los verticales en la base, aprender la tendencia (lo más pedido), el comportamiento de cada persona y predecir más cosas.
-4. Planear, implementar por etapas, hacer QA y mejorar de forma continua sin su revisión.
-5. Al final, revisar el repo de punta a punta y dejarlo pulido.
+1. **Home dinámica.** Restaurantes y Turbo son los dos bloques grandes y no se mueven. Debajo, el motor aprende de la persona y ordena los accesos chicos: si pide más en Farmacia, Farmacia pasa al primer lugar. Loyalty y Benefits Pro quedan siempre al final.
+2. **Recomendaciones conectadas entre verticales.** Según una tabla de Rappi, quien usa Restaurantes + Turbo + Retail en el mismo mes vuelve en un 93 % al mes siguiente. El motor conecta todas las verticales en la base, aprende la tendencia (lo más pedido) y el comportamiento de cada persona, y predice qué vertical sumarle y qué le toca pedir de nuevo.
+3. **Menos superficie.** El pasaporte Rappi y el juego de verticales, que se habían probado antes, salen del proyecto para dejar el foco en lo anterior.
 
 La base de datos y los mecanismos de recomendación son la innovación central del proyecto.
 
-## 2. Decisiones del usuario (16-10-2026)
+## 2. Decisiones de partida (16-10-2026)
 
 | Tema | Decisión |
 |---|---|
-| Fusión | Cada PR se fusiona cuando su CI está en verde; se sigue con la etapa siguiente sin esperar. |
-| Base real | Las migraciones nuevas se aplican a `rappi`, con un `pg_dump -Fc` manual antes de cada una. |
-| Tabla de Rappi | Sus cifras pueden ir en el repo, rotuladas «dato compartido por Rappi». |
+| Base real | Las migraciones nuevas se aplican a `rappi` con un `pg_dump -Fc` manual antes de cada una. |
+| Tabla de Rappi | Sus cifras pueden ir en el repositorio, rotuladas «dato compartido por Rappi». |
 | Datos simulados | Se recalibran para parecerse a la mezcla de la tabla; siguen rotulados como simulados y nunca como evidencia. |
 
 ## 3. Dato de partida: «Chile · verticals used together»
@@ -45,25 +42,23 @@ Tabla compartida por el equipo de Rappi (cohortes de enero a junio de 2026, junt
 
 ## 4. Etapas
 
-Cada etapa sale en su rama, con su PR y su CI en verde, y deja el MVP funcionando.
+Cada etapa dejó el MVP funcionando, con sus tests y el CI en verde.
 
-| Etapa | Rama | Entrega |
-|---|---|---|
-| 1 | `chore/sin-pasaporte-ni-juego` | Salida del pasaporte y del juego; registro en `rappi-evolucion-proyecto`; este diseño. |
-| 2 | `feat/motor-multivertical` | La capa del motor en la base, los datos simulados recalibrados y la evaluación. |
-| 3 | `feat/home-dinamica` | La Home ordenada por el motor y el evento de tocar un acceso. |
-| 4 | `feat/recomendaciones-conectadas` | Ofertas que buscan la combinación que retiene, recompra, «lo más pedido» y el panel. |
-| 5 | `chore/qa-motor` | QA sobre la base real, ciclo de mejora y ajustes. |
-| 6 | `chore/pulido-final` | Revisión del repo de punta a punta. |
+| Etapa | Entrega |
+|---|---|
+| 1 | Salida del pasaporte y del juego, y este diseño. |
+| 2 | La capa del motor en la base, los datos simulados recalibrados y la evaluación. |
+| 3 | La Home ordenada por el motor y el evento de tocar un acceso. |
+| 4 | Ofertas que buscan la combinación que retiene, recompra, «lo más pedido» y el panel. |
+| 5 | QA sobre la base real, ciclo de mejora y ajustes. |
+| 6 | Revisión del repositorio de punta a punta. |
 
 ### Etapa 1: salida del pasaporte y del juego
 
 - **Se va todo el juego:** `rappi_ia/game/`, las rutas `/game/*`, el comando `rappi-ia knowledge`, `GAME_MIN_ITEMS`, «¿Sabías que…?» en `/agent/ask`, la métrica `game` del panel, las pantallas, el contexto y la lógica del juego en la app, el pasaporte de la Home, «Juega mientras llega tu pedido» y las revisiones del juego y del dato en `mvp-check`.
 - **Migración 035** (`035_sin_juego.sql`): borra `game_state`, `knowledge_card_concepts` y `knowledge_cards`; borra los eventos `game_round_finished` y `game_card_discovered` (no hay en la base real) y deja el `CHECK` de `app_events.type` sin esos tipos. Las migraciones 028 y 029 no se editan: ya están aplicadas.
-- **`vertical_por_probar` deja de depender de los sellos.** El servidor deduce los verticales que la persona ya probó de sus pedidos (`mode = 'propuesta'`) y la app ya no manda `stamped`. La razón pasa a «Porque aún no pides en {vertical}». En la etapa 4 este momento pasa a buscar la combinación que falta.
-- **Se conserva lo compartido:** `today()` sale de `src/game/progress.js` a un módulo propio de la app; `ConnectionNotice`, los guardias de ofertas y el grafo (`knowledge_edges`) no son del juego.
-- **Documentos:** se actualizan los vigentes (CLAUDE.md, README, `docs/`); los planes y specs fechados quedan como historia. `docs/decisiones.md` suma una fila.
-- **Historial:** en `rappi-evolucion-proyecto`, la etiqueta `etapa-12-pasaporte-y-juego` apunta a `3e08f589` (último `main` con el juego) y `EVOLUCION.md` suma la fila y la entrada en «Lo que salió de rappi-dlab».
+- **`vertical_por_probar` deja de depender de los sellos.** El servidor deduce las verticales que la persona ya probó de sus pedidos (`mode = 'propuesta'`) y la app ya no manda `stamped`. La razón pasa a «Porque aún no pides en {vertical}». En la etapa 4 este momento pasa a buscar la combinación que falta.
+- **Se conserva lo compartido:** `today()` sale de `src/game/progress.js` a un módulo propio de la app; `ConnectionNotice`, las guardias de ofertas y el grafo (`knowledge_edges`) no son del juego.
 
 ### Etapa 2: el motor multivertical en la base
 
@@ -120,7 +115,7 @@ Al implementarlo (16-10) se dejaron fuera el 5 % «otras» y el «perfil vecino�
 
 ### Etapa 6: pulido final
 
-README, índice de documentos, CLAUDE.md, decisiones, diagramas (Archify), código muerto y coherencia de nombres, de principio a fin.
+README, índice de documentos, convenciones, decisiones, diagramas, código muerto y coherencia de nombres, de principio a fin.
 
 ## 5. Reglas que no cambian
 
