@@ -158,7 +158,7 @@ def test_latest_prices_follows_newest_snapshot(db):
 
 def test_same_scraped_at_prefers_newer_run(db):
     """Con la misma fecha (un CSV antiguo importado dos veces), el último precio es el de la corrida más nueva, llegue
-    en el orden que llegue: el desempate de v_store_format_runs (D-M6)."""
+    en el orden que llegue: el desempate de v_store_format_runs."""
     r1, r2 = _runs(db, 2)
     _store(db, 1, "lider")
     _product(db, 1, "a")

@@ -1,7 +1,7 @@
 .PHONY: help install db db-docker migrate test test-unit test-integration lint format status report refresh backup schedule unschedule schedule-status
 
 PY := .venv/bin/python
-# Python ≥ 3.12 para crear el .venv. En un macOS nuevo `python3` es el 3.9 del sistema: se prefiere python3.13
+# Python ≥ 3.13 para crear el .venv. En un macOS nuevo `python3` es el 3.9 del sistema: se prefiere python3.13
 # (Homebrew: `brew install python@3.13`, que solo instala `python3.13`).
 PYTHON ?= $(shell command -v python3.13 || command -v python3)
 PLIST := $(HOME)/Library/LaunchAgents/cl.rappi.refresh.plist

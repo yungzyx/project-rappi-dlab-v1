@@ -244,7 +244,7 @@ def test_other_sections_are_not_blocked(section):
         "Margarita frozen",
         "Terremoto",
         "Aperol Spritz",
-        # Lo que se escapaba en la base real (revisión de P2), con concepto ofrecible y precio.
+        # Lo que se escapaba en la base real, con concepto ofrecible y precio.
         "Chelada",
         "Negroni",
         "Mango Sour 480ml",

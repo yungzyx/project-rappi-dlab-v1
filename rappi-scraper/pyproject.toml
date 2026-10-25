@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rappi-scraper"
-version = "0.2.0"
+version = "1.0.0"
 description = "Contenido de Rappi Chile por vertical: scraping de páginas públicas → Postgres + pgvector"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.13"  # la del CI, Docker y los .venv
 dependencies = [
     "requests>=2.31,<3",
     "psycopg[binary]>=3.2,<4",
@@ -33,7 +33,7 @@ addopts = "-q"
 
 [tool.ruff]
 line-length = 120
-target-version = "py312"
+target-version = "py313"
 src = ["src", "tests"]
 
 [tool.ruff.lint]

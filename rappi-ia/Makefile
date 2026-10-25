@@ -1,7 +1,7 @@
 .PHONY: help install install-ml db-test migrate check-migrations verify-migrations deploy-migrate dump-entrega test lint format jev-categorias concepts embed eval synth analytics serve serve-lan warm warm-catalog probar-agente purge post-refresh prune-embeddings layers layer-report motor contract
 
 PY := .venv/bin/python
-# Python ≥ 3.12 para crear el .venv. En un macOS nuevo `python3` es el 3.9 del sistema: se prefiere python3.13
+# Python ≥ 3.13 para crear el .venv. En un macOS nuevo `python3` es el 3.9 del sistema: se prefiere python3.13
 # (Homebrew: `brew install python@3.13`, que solo instala `python3.13`).
 PYTHON ?= $(shell command -v python3.13 || command -v python3)
 # Los comandos de Postgres: en macOS, los de postgresql@17 de Homebrew (no quedan en el PATH); sin brew (Linux, el
@@ -9,7 +9,7 @@ PYTHON ?= $(shell command -v python3.13 || command -v python3)
 PG_BIN := $(if $(shell command -v brew),$(shell brew --prefix)/opt/postgresql@17/bin,$(patsubst %/,%,$(dir $(shell command -v createdb))))
 
 help:  ## Muestra esta ayuda
-	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-14s %s\n", $$1, $$2}'
+	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-17s %s\n", $$1, $$2}'
 
 install:  ## Crea .venv con rappi-scraper (esquema) + API + dev (sin modelos)
 	$(PYTHON) -m venv .venv
@@ -164,7 +164,7 @@ verify-migrations:
 # para los eventos simulados que synth acaba de generar: también si falla un paso (p. ej. el motor, al final de
 # layers), y entonces post-refresh sale con error. En producción (API_ENV=production) no migra: solo revisa.
 # prune-embeddings va al final: si la limpieza falla, conceptos, embeddings, evaluación y capas ya quedaron al día.
-post-refresh: $(if $(filter production,$(API_ENV)),verify-migrations,migrate) purge  ## Todo lo que sigue a un `rappi refresh` (sin imágenes)
+post-refresh: $(if $(filter production,$(API_ENV)),verify-migrations,migrate) purge  ## Todo lo que sigue a un `rappi refresh`
 	$(MAKE) jev-categorias concepts embed eval synth layers prune-embeddings || { $(MAKE) purge; exit 1; }
 	$(MAKE) purge
 	@echo "Listo: conceptos, embeddings, evaluación y datos simulados al día."

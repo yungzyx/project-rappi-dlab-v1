@@ -78,7 +78,7 @@ La tarea semanal del scraper (`make schedule` en `rappi-scraper/`) ya lo hace so
 - `rappi-ia eval-search --juez-jev`: suma a Jev como juez (exige la clave). `--jev-auto` lo suma solo si hay clave y adopción, y si no sigue sin él.
 - `rappi-ia eval-typos`: los errores de tipeo de `src/rappi_ia/eval/typos.json`, buscados sin corregir y corrigiendo, y las negativas de `queries.json` con la corrección; escribe `data/eval/tipeo.md`.
 - `rappi-ia eval-human`: con esos juicios, cuánto acierta el juez automático (precisión, recall, acuerdo) y si los ítems que solo trae el refuerzo son relevantes más o menos seguido que los que solo trae sin él.
-- `rappi-ia multivertical`: regenera el mapa multivertical (`docs/mapas/mapa-multivertical.html`): productos compartidos entre verticales, conceptos junto a la vertical donde son más típicos (la regla de Mochi) y los productos y cadenas en más verticales. Página autocontenida, sin internet. La imagen `mapa-conceptos.jpg` se captura de esa página con `#figura` al final de la URL.
+- `rappi-ia multivertical`: regenera el mapa multivertical (`docs/mapas/mapa-multivertical.html` y la copia que sirve el panel, `dashboard-empresa/public/presentacion/`): productos compartidos entre verticales, conceptos junto a la vertical donde son más típicos (la regla de Mochi) y los productos y cadenas en más verticales. Página autocontenida, sin internet. La imagen `mapa-conceptos.jpg` se captura de esa página con `#figura` al final de la URL.
 
 ## API (`make serve` → http://localhost:8000/docs)
 
@@ -201,11 +201,17 @@ Con un rol que no es superusuario se saltan los comentarios de las extensiones (
 ```text
 rappi-ia/
 ├── Makefile, pyproject.toml, requirements.lock.txt, .env.example
-├── scripts/despues-del-refresh.sh   espera a que termine una descarga y corre make post-refresh
+├── scripts/
+│   ├── despues-del-refresh.sh   espera a que termine una descarga y corre make post-refresh
+│   ├── with-test-db-lock.sh     el candado de rappi_ia_test (make test, make contract, make mvp-check)
+│   ├── probar_agente.py         make probar-agente: las frases de usuarios contra la API
+│   ├── qa_motor.py              QA de las ofertas sobre una base real, en solo lectura
+│   └── calibrar_simulados.py    mide (y ajusta) la mezcla de los simulados contra la tabla de Rappi, sin escribir
 ├── src/rappi_ia/
 │   ├── cli.py         comandos de `rappi-ia`
 │   ├── config.py      modelos, rutas y parámetros (por entorno)
 │   ├── db.py          conexión a Postgres y migraciones (las de rappi-scraper)
+│   ├── delivery.py    respaldo de entrega (`dump-entrega`), sin las personas del prototipo
 │   ├── text.py        normalización de texto (sin tildes ni ñ)
 │   ├── concepts/      taxonomía (taxonomy.toml), complementos (complements.toml), mapa de categorías (category_map.csv), reglas, kNN
 │   ├── embeddings/    e5, caché de texto, índices HNSW

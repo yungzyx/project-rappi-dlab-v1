@@ -2,7 +2,7 @@
 
 Descarga el catálogo público de Rappi Chile de **todos los verticales** (productos, menús, tiendas y precios) y lo guarda en **Postgres + pgvector**. Con esa base arma los documentos de búsqueda por vertical que usa [`rappi-ia`](../rappi-ia/) para la búsqueda híbrida y el asistente Mochi.
 
-**Fuentes:** solo páginas públicas de rappi.cl (el JSON `__NEXT_DATA__` que trae cada página), los sitemaps públicos de restaurantes y el JSON público de metadatos de tiendas. No usa APIs internas ni login. Ver [Uso responsable](#uso-responsable).
+**Fuentes:** solo páginas públicas de rappi.cl (el JSON `__NEXT_DATA__` que trae cada página), los sitemaps públicos de restaurantes y el JSON público de metadatos de tiendas. No usa APIs internas ni login, se presenta con su propio nombre y respeta robots.txt. Ver [Uso responsable](#uso-responsable).
 
 ![Flujo del scraper: descubrir, descargar, guardar y armar la búsqueda](../docs/diagramas/scraper-flujo.png)
 
@@ -10,12 +10,13 @@ Versión interactiva: [scraper-flujo.html](../docs/diagramas/scraper-flujo.html)
 
 ## Instalación
 
-Requiere macOS con Homebrew y Python ≥ 3.12 (el Makefile prefiere `python3.13`). Desde la raíz del repositorio:
+Requiere Python ≥ 3.13 y Postgres 17 con pgvector: con Homebrew (`make db`, macOS) o con Docker (`make db-docker`, sin Homebrew). Desde la raíz del repositorio:
 
 ```bash
 cd rappi-scraper
 make db        # Postgres 17 + pgvector (Homebrew), bases `rappi` y `rappi_test`
-make install   # .venv + proyecto en modo editable + herramientas de desarrollo; crea .env desde .env.example
+               # …o `make db-docker`: lo mismo en Docker, con la imagen del CI (y `rappi_ia_test`); la URL va en .env
+make install   # .venv + proyecto en modo editable + herramientas de desarrollo (versiones del lock); crea .env
 make migrate   # aplica el esquema
 ```
 
@@ -45,6 +46,8 @@ rappi migrate                           # aplica migraciones pendientes (lo mism
 - **Historial:** cada corrida agrega un snapshot de precios; el catálogo no se duplica.
 - **Una descarga a la vez:** dos en paralelo duplicarían la carga sobre rappi.cl.
 - **Ritmo:** pausa aleatoria de 1,5–3 s entre páginas. Se ajusta con `RAPPI_DELAY_MIN` / `RAPPI_DELAY_MAX` en `.env` (ver `.env.example`).
+- **Se identifica:** el User-Agent es `rappi-dlab-scraper/<versión> (+<contacto>; prototipo de investigacion dLab, no afiliado a Rappi)`, no el de un navegador. `RAPPI_UA_PROJECT` cambia el nombre (también el que se busca en robots.txt) y `RAPPI_UA_CONTACT` pone una URL o un correo para que Rappi sepa a quién escribir; sin contacto, el log lo avisa.
+- **Respeta robots.txt:** antes de cada página consulta el robots.txt del sitio (RFC 9309, con comodines; `scraping/robots.py`) y lo guarda 24 horas. Busca el grupo de su nombre y, si no hay, el de `*`. Un sitio sin robots.txt (cualquier 4xx, como el bucket S3 de los metadatos) no tiene reglas; uno que no responde (5xx o red, tras los reintentos) no permite nada. Si robots.txt no permite una página (también el destino de una redirección), la descarga no se la salta: se detiene, la corrida queda abierta y `rappi refresh` sale con el código 7. El robots.txt de rappi.cl del 24-10-2026 está en `tests/fixtures/robots.txt`: permite todo lo que el scraper pide (prohíbe la cuenta, el carro, las APIs y las páginas de una farmacia, Farmacias San Pablo, que hoy no está en el catálogo).
 
 ## Descarga completa
 
@@ -84,7 +87,7 @@ Una tienda se recorre así: portada → pasillos → sub-pasillos. Cuando algo f
 - **Retomar:** si una actualización se cortó con las tiendas ya terminadas, retoma en los restaurantes sin volver a bajar tiendas. Con `--resume-only` solo retoma las corridas abiertas (las que reabrió `retry-failed`) y nunca empieza una nueva.
 - **Respaldo:** se escribe a un `.part`, se valida con `pg_restore --list` y recién entonces rota. Si falla, se conservan los anteriores y la actualización sigue, pero `rappi refresh` termina con código 3 (la tarea semanal lo anota como «respaldo fallido» y corre igual la capa de IA). La clave de la base va a `pg_dump` por `PGPASSWORD`, nunca en sus argumentos.
 - **Sitemap de restaurantes caído o bloqueado:** si un sitemap no responde (un 403, un 429, una caída, un archivo ilegible), la corrida de restaurantes no se pierde: completa su cola con la lista de la última corrida de restaurantes terminada que empezó `rappi refresh` (no una de `discover` a mano; lo que se descubrió entonces, se haya bajado o no, sin los que ya no existían en Rappi) y baja esos menús y precios con los mismos jobs, pausas y detección de bloqueos de siempre (un bloqueo en la descarga sale con 4, como siempre). Si el que falló fue el de independientes, las cadenas recién descubiertas quedan y se suman los independientes de esa lista, salvo los que hoy son sucursales de esas cadenas. `--max-chains` y `--max-independents` también limitan la lista copiada. El log y el reporte lo dicen («⚠ sitemap bloqueado o caído: se usó la lista de la corrida N (X restaurantes)», con el error) y restaurantes nuevos no entran esa semana. Si la corrida termina, la próxima actualización vuelve a descubrir; si se detuvo por un bloqueo, la próxima la retoma con la misma lista. Un 403 a una parte numerada (-1, -2…) después de una parte que no llegó a las 50.000 URLs se toma como el final del sitemap, no como un error, con un aviso en el log (si fuera un bloqueo a mitad del sitemap, faltarían las partes siguientes): el 18-10 rappi.cl respondió 403, y no 404, a la parte -1 de cadenas (con la -0 muy lejos del tope), y lo más probable es que esa parte no exista.
-- **Códigos de salida:** 4 = posible bloqueo (la corrida queda abierta, salvo si fue al descubrir, y la tarea semanal anota «detenida: posible bloqueo»); 5 = falló el descubrimiento de restaurantes y no había una corrida anterior terminada de la que usar la lista: tiendas, búsqueda y respaldo sí se hicieron, la corrida de restaurantes queda cerrada como fallida con el error en su reporte, y la tarea semanal anota «restaurantes sin actualizar» y corre igual la capa de IA; 6 = eso y además el respaldo fallido (se anotan los dos). Con la lista anterior la corrida termina bien y sale con 0 (o 3 si falló el respaldo): el aviso queda en el reporte y, para la tarea semanal, `rappi refresh` deja la marca fija `restaurantes_con_lista_anterior` en el archivo de `RAPPI_REFRESH_NOTES` y `ultimo-estado.txt` anota «restaurantes con la lista de la corrida anterior».
+- **Códigos de salida:** 4 = posible bloqueo (la corrida queda abierta, salvo si fue al descubrir, y la tarea semanal anota «detenida: posible bloqueo»); 7 = robots.txt no permite una página o no respondió (igual que el 4: se detiene y anota «detenida: robots.txt no lo permite»); 5 = falló el descubrimiento de restaurantes y no había una corrida anterior terminada de la que usar la lista: tiendas, búsqueda y respaldo sí se hicieron, la corrida de restaurantes queda cerrada como fallida con el error en su reporte, y la tarea semanal anota «restaurantes sin actualizar» y corre igual la capa de IA; 6 = eso y además el respaldo fallido (se anotan los dos). Con la lista anterior la corrida termina bien y sale con 0 (o 3 si falló el respaldo): el aviso queda en el reporte y, para la tarea semanal, `rappi refresh` deja la marca fija `restaurantes_con_lista_anterior` en el archivo de `RAPPI_REFRESH_NOTES` y `ultimo-estado.txt` anota «restaurantes con la lista de la corrida anterior».
 - **Migraciones:** la tarea semanal aplica las pendientes (`rappi migrate`) antes de descargar, para que una migración que trajo un `git pull` no haga fallar la descarga al final.
 - **Capa de IA:** la tarea semanal (`scripts/refresh-semanal.sh`) la corre los domingos a las 03:00 y, si la descarga terminó bien (aunque hayan fallado el respaldo o los restaurantes: códigos 3, 5 y 6) y `../rappi-ia` está instalado, sigue con `make -C ../rappi-ia post-refresh` (los pasos, en [rappi-ia/README.md](../rappi-ia/README.md#correr)).
 
@@ -97,7 +100,7 @@ make unschedule        # quitarla
 - **Equipo dormido o apagado:** si está dormido a esa hora, corre al despertar; si está apagado, esa semana se salta.
 - **Una sola a la vez:** los comandos que descargan (`discover`, `scrape-stores`, `scrape-restaurants`, `refresh`) y `backup` toman el mismo candado de archivo (`data/scraper.lock`, con `flock`: el sistema lo suelta aunque el proceso muera) y se niegan a empezar si otra descarga lo tiene. Además, un candado (`data/refresh-semanal.pid`) impide que corran dos actualizaciones semanales; se borra aunque la tarea se corte con Ctrl+C o una señal. Si hay otra descarga (`discover`, `scrape-*`, `refresh`) o un `make post-refresh` en curso, la tarea se omite y lo anota.
 - **Ubicación del proyecto:** debe estar fuera de Documentos, Escritorio y Descargas: macOS no deja que launchd lea esas carpetas (detalle en [docs/instalacion.md](../docs/instalacion.md)).
-- **Logs:** cada ejecución deja una línea en `data/logs/ultimo-estado.txt` (`exit=N`, «omitida», «interrumpida», «respaldo fallido», «restaurantes sin actualizar», «restaurantes con la lista de la corrida anterior» o «detenida: posible bloqueo»), que muestra `make schedule-status` junto con el respaldo más nuevo; la salida de launchd queda en `data/logs/launchd.*.log`, y el log detallado y el reporte, como en cualquier corrida.
+- **Logs:** cada ejecución deja una línea en `data/logs/ultimo-estado.txt` (`exit=N`, «omitida», «interrumpida», «respaldo fallido», «restaurantes sin actualizar», «restaurantes con la lista de la corrida anterior», «detenida: posible bloqueo» o «detenida: robots.txt no lo permite»), que muestra `make schedule-status` junto con el respaldo más nuevo; la salida de launchd queda en `data/logs/launchd.*.log`, y el log detallado y el reporte, como en cualquier corrida.
 - Programarla en **un solo** equipo.
 
 ## Objetivos del Makefile
@@ -106,8 +109,9 @@ make unschedule        # quitarla
 
 | Objetivo | Qué hace |
 |---|---|
-| `make install` | Crea `.venv` e instala el proyecto con dependencias de desarrollo; crea `.env` |
+| `make install` | Crea `.venv` e instala el proyecto con dependencias de desarrollo y las versiones de `rappi-ia/requirements.lock.txt` (como el CI); crea `.env` |
 | `make db` | Instala y levanta Postgres 17 + pgvector (Homebrew) y crea `rappi` y `rappi_test` |
+| `make db-docker` | Lo mismo sin Homebrew: Postgres 17 + pgvector en Docker (la imagen del CI y el despliegue), en `127.0.0.1:5432` (`DB_DOCKER_PORT`), con `rappi`, `rappi_test` y `rappi_ia_test` |
 | `make migrate` | Aplica migraciones pendientes |
 | `make test` | Todos los tests (unitarios + integración contra `rappi_test`) |
 | `make test-unit` | Solo unitarios, sin base de datos |
@@ -128,7 +132,7 @@ make unschedule        # quitarla
 rappi-scraper/
 ├── pyproject.toml                dependencias, comando `rappi`, config de pytest y ruff
 ├── Makefile                      instalación, tests, operación y tarea semanal
-├── .env.example                  conexión a Postgres y ritmo de requests
+├── .env.example                  conexión a Postgres, User-Agent y ritmo de requests
 ├── scripts/
 │   ├── refresh-semanal.sh          tarea semanal: `rappi refresh` y luego la capa de IA
 │   └── launchd/
@@ -136,13 +140,14 @@ rappi-scraper/
 ├── src/rappi_scraper/
 │   ├── __main__.py               `python -m rappi_scraper`
 │   ├── cli.py                    comandos de `rappi`
-│   ├── config.py                 URLs, ritmo de peticiones (configurable por entorno) y rutas
+│   ├── config.py                 URLs, User-Agent, ritmo de peticiones (configurable por entorno) y rutas
 │   ├── keep_awake.py             evita que el equipo se duerma durante una corrida (`caffeinate`, macOS)
 │   ├── lock.py                   candado de «una descarga a la vez» (`flock` sobre `data/scraper.lock`)
 │   ├── pricing.py                cálculo de descuentos
 │   ├── reporting.py              reporte de cada corrida: conteos, errores frecuentes y validaciones de calidad
 │   ├── scraping/                 todo lo que habla con rappi.cl
-│   │   ├── client.py               HTTP con pausas, reintentos y ubicación de despacho
+│   │   ├── client.py               HTTP con pausas, reintentos, robots.txt y ubicación de despacho
+│   │   ├── robots.py               reglas de robots.txt por sitio, con caché de 24 horas
 │   │   ├── next_data.py            lectura del JSON __NEXT_DATA__
 │   │   ├── store_parser.py         tienda, pasillos, sub-pasillos y productos
 │   │   ├── listing_parser.py       listados por vertical y cadenas de restaurantes
@@ -161,11 +166,11 @@ rappi-scraper/
 │   │   ├── search.py               documentos y búsqueda por vertical
 │   │   ├── backup.py               respaldo con pg_dump, validación y rotación
 │   │   ├── export.py               catálogo por vertical a CSV (`rappi export-csv`)
-│   │   └── migrations/             esquema SQL versionado, un solo historial para toda la base (001–040; las de rappi-ia: 009–013, 016, 020, 022–031, 033–037)
+│   │   └── migrations/             esquema SQL versionado, un solo historial para toda la base (001–042; las de rappi-ia: 009–013, 016, 020, 022–031, 033–037, 041 y 042)
 ├── tests/
 │   ├── unit/                     sin red ni base de datos
 │   ├── integration/              contra la base `rappi_test`
-│   └── fixtures/                 páginas reales de rappi.cl guardadas
+│   └── fixtures/                 páginas reales de rappi.cl guardadas y su robots.txt
 └── data/                         fuera de git
     ├── exports/                    salida de `rappi export-csv`
     ├── reports/, logs/             reportes y logs de cada corrida
@@ -222,7 +227,7 @@ make format       # aplica el formato
 
 ## Uso responsable
 
-- Solo páginas públicas sin barreras técnicas, sitemaps públicos y el JSON público de metadatos de tiendas. Sin APIs internas, sin login y sin evasión de protecciones.
+- Solo páginas públicas sin barreras técnicas, sitemaps públicos y el JSON público de metadatos de tiendas. Sin APIs internas, sin login y sin evasión de protecciones: se presenta con su propio User-Agent (no como un navegador) y respeta robots.txt; si una página no está permitida, se detiene.
 - Una descarga a la vez, con pausas de 1,5–3 s entre páginas, y actualización semanal.
 - Sin datos personales: catálogo, precios y datos públicos de tiendas y restaurantes.
 - Fines de investigación y demostración. Un uso comercial requeriría autorización de Rappi. Los datos descargados no se suben al repositorio.
