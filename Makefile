@@ -24,9 +24,9 @@ lint:  ## Estilo de los cuatro subproyectos (ruff, eslint y prettier)
 	$(MAKE) -C rappi-scraper lint
 	$(MAKE) -C rappi-ia lint
 	npm --prefix prototipo-app run lint
-	npm --prefix prototipo-app exec -- prettier --check src scripts
+	cd prototipo-app && npx prettier --check src scripts
 	npm --prefix dashboard-empresa run lint
-	npm --prefix dashboard-empresa exec -- prettier --check src scripts
+	cd dashboard-empresa && npx prettier --check src scripts
 
 mvp:  ## Demo local con servidores de desarrollo (base real, API :8000, app :5174, panel :5175; LAN=1 abre a la red local); para un servidor, ver docs/despliegue.md
 	@LAN="$(LAN)" scripts/mvp.sh
