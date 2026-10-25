@@ -9,7 +9,7 @@ __pycache__/
 .ruff_cache/
 *.egg-info/
 
-# Datos descargados de rappi.cl: no se versionan (tamaño y uso responsable; ver README.md#uso-responsable-de-los-datos).
+# Datos descargados de rappi.cl: no se versionan (tamaño y uso responsable; ver README.md#qué-es-real-y-qué-es-simulado).
 # Se traspasan con un respaldo de la base (ver docs/instalacion.md).
 rappi-scraper/data/
 # Respaldos de la base (docs/instalacion.md): traen el catálogo descargado y los eventos; no se suben, estén donde estén
@@ -17,15 +17,12 @@ rappi-scraper/data/
 *.sql.gz
 *.backup
 
-# Evidencia generada por archify al verificar diagramas
+# Evidencia que deja la verificación visual de los diagramas
 docs/diagramas/*.visual-check.*
 
-# Carpeta local fuera del proyecto
+# Carpetas y archivos locales de herramientas de desarrollo (no se versionan; no se ignora .claude/ entero)
 Proyecto/
-
-# Planes y reportes de trabajo de superpowers (herramienta local)
 .superpowers/
-
-# Configuración local de Claude Code y sus worktrees (no se ignora .claude/ entero)
 .claude/settings.local.json
+.claude/launch.json
 .claude/worktrees/
