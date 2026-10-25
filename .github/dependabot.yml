@@ -60,6 +60,13 @@ updates:
       imagenes:
         patterns: ["*"]
         update-types: [minor, patch]
+    # Python y Node del servidor van con los de desarrollo y el CI (3.13 y .nvmrc): solo parches. Subir de versión es
+    # una decisión aparte, en los tres lugares a la vez.
+    ignore:
+      - dependency-name: python
+        update-types: [version-update:semver-major, version-update:semver-minor]
+      - dependency-name: node
+        update-types: [version-update:semver-major]
   - package-ecosystem: docker-compose
     directory: /deploy
     schedule:
