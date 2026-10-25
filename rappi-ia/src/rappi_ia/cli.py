@@ -663,6 +663,18 @@ def cmd_deploy_migrate(conn, args) -> None:
     deploy_migrate(conn, None if args.sin_respaldo else backup)
 
 
+def cmd_dump_entrega(conn, args) -> None:
+    """Abre su propia conexión (`conn` llega vacío) y solo lee DATABASE_URL: ver `delivery.py`."""
+    from .delivery import README_FILE, build_delivery
+
+    try:
+        target = build_delivery(database_url(), Path(args.salida) if args.salida else None)
+    except RuntimeError as exc:
+        raise SystemExit(str(exc)) from exc
+    print((target / README_FILE).read_text(encoding="utf-8"))
+    print(f"Respaldo de entrega en {target}")
+
+
 def cmd_token(conn, args) -> None:
     """Para herramientas del operador que leen rutas de una persona (su perfil): no toca la base."""
     from .api.identity import sign
@@ -674,12 +686,13 @@ def cmd_token(conn, args) -> None:
 
 
 # Comandos que no usan la conexión de DATABASE_URL (la abren ellos, usan otra o no la necesitan).
-OWN_CONNECTION = {"seed-demo", "doctor", "check-migrations", "token"}
+OWN_CONNECTION = {"seed-demo", "doctor", "check-migrations", "token", "dump-entrega"}
 
 COMMANDS = {
     "token": cmd_token,
     "check-migrations": cmd_check_migrations,
     "deploy-migrate": cmd_deploy_migrate,
+    "dump-entrega": cmd_dump_entrega,
     "doctor": cmd_doctor,
     "seed-demo": cmd_seed_demo,
     "measures": cmd_measures,
@@ -824,6 +837,12 @@ def build_parser() -> argparse.ArgumentParser:
         "DB_API_ROLE, los permisos de la API (deploy/db/grants.sql)",
     )
     dm.add_argument("--sin-respaldo", action="store_true", help="migra sin respaldar antes")
+    de = sub.add_parser(
+        "dump-entrega",
+        help="respaldo para entregar: catálogo, capas, embeddings y población simulada, sin las personas del "
+        "prototipo; solo lee DATABASE_URL",
+    )
+    de.add_argument("--salida", help="carpeta donde dejarlo (por defecto data/entrega/)")
     token = sub.add_parser(
         "token", help="token (X-User-Token) de una persona para las herramientas del operador; no toca la base"
     )

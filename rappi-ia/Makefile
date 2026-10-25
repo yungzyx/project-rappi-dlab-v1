@@ -1,7 +1,7 @@
-.PHONY: help install install-ml db-test migrate check-migrations verify-migrations deploy-migrate test lint format jev-categorias concepts embed eval synth analytics serve serve-lan warm warm-catalog probar-agente purge post-refresh prune-embeddings layers layer-report motor contract
+.PHONY: help install install-ml db-test migrate check-migrations verify-migrations deploy-migrate dump-entrega test lint format jev-categorias concepts embed eval synth analytics serve serve-lan warm warm-catalog probar-agente purge post-refresh prune-embeddings layers layer-report motor contract
 
 PY := .venv/bin/python
-# Python ≥ 3.12 para crear el .venv. En un Mac nuevo `python3` es el 3.9 de macOS: se prefiere python3.13
+# Python ≥ 3.12 para crear el .venv. En un macOS nuevo `python3` es el 3.9 del sistema: se prefiere python3.13
 # (Homebrew: `brew install python@3.13`, que solo instala `python3.13`).
 PYTHON ?= $(shell command -v python3.13 || command -v python3)
 # Los comandos de Postgres: en macOS, los de postgresql@17 de Homebrew (no quedan en el PATH); sin brew (Linux, el
@@ -28,6 +28,9 @@ migrate:  ## Aplica migraciones pendientes (viven en rappi-scraper)
 
 deploy-migrate:  ## Paso del despliegue: respalda si hay migraciones pendientes, migra y da permisos (DB_API_ROLE)
 	$(PY) -m rappi_ia deploy-migrate
+
+dump-entrega:  ## Respaldo para entregar (data/entrega/): catálogo, capas, embeddings y simulados, sin el prototipo
+	$(PY) -m rappi_ia dump-entrega
 
 # Sin «##»: no sale en `make help` (la guardia de serve, serve-lan y make mvp; no se corre a mano). MIGRATE=1 la fuerza.
 check-migrations:
@@ -91,7 +94,7 @@ DOTENV ?= $(or $(RAPPI_ENV_FILE),.env)
 API_ENV ?= $(shell sed -n 's/^API_ENV=//p' $(DOTENV) 2>/dev/null | tr -d "\"'" | tail -n 1)
 SERVE_PREP := $(if $(filter production,$(API_ENV)),,check-migrations migrate)
 
-serve: $(SERVE_PREP)  ## API en http://localhost:8000, solo este Mac (docs en /docs)
+serve: $(SERVE_PREP)  ## API en http://localhost:8000, solo este equipo (docs en /docs)
 	$(HF_OFFLINE) $(PY) -m uvicorn rappi_ia.api.app:app --no-access-log --host 127.0.0.1 --port 8000
 
 serve-lan: $(SERVE_PREP)  ## API en la red local (iPhone). Sin puerta de acceso (cada persona, su token firmado): solo red de confianza
