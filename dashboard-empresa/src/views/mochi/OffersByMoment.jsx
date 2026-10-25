@@ -1,3 +1,4 @@
+import { AGENT_NAME } from '../../lib/agentName.js'
 import { DataTable } from '../../components/DataTable.jsx'
 import { Meter } from '../../components/Meter.jsx'
 import { EmptyState } from '../../components/States.jsx'
@@ -12,7 +13,9 @@ export function OffersByMoment({ data, source }) {
   const { momentos } = data
   if (!momentos.length) {
     return (
-      <EmptyState title="Mochi todavía no hizo ofertas">Aparecen cuando una oferta se muestra en la app.</EmptyState>
+      <EmptyState title={`${AGENT_NAME} todavía no hizo ofertas`}>
+        Aparecen cuando una oferta se muestra en la app.
+      </EmptyState>
     )
   }
   // El simulador no guarda en qué momento se hizo cada oferta: todo cae en «sin momento».

@@ -1,4 +1,4 @@
-/* Medidas del video de Account (px del cuadro de 600 × 0,67 = pt). */
+/* Medidas del video de Cuenta (px del cuadro de 600 × 0,67 = pt). */
 .account {
   background: var(--surface);
 }
@@ -144,7 +144,8 @@
 
 /* ---------- Parte blanca: pedidos, listas y cierre de sesión ---------- */
 .account-body {
-  padding: 27px var(--gutter) 0;
+  /* abajo, el espacio de la barra de navegación */
+  padding: 27px var(--gutter) 140px;
 }
 
 .account-section-head {
@@ -173,6 +174,12 @@
 .account-order img {
   width: 31px;
   height: 31px;
+}
+
+.account-orders-empty {
+  margin-top: 12px;
+  font-size: 14.5px;
+  color: var(--ink-muted);
 }
 
 .account-order img.account-order-photo {
@@ -292,12 +299,6 @@
 
 .account-version:first-of-type {
   margin-top: 21px;
-}
-
-.account-footer {
-  width: 100%;
-  margin-top: 30px;
-  padding-bottom: 110px;
 }
 
 /* ---------- Hojas (idioma, notificaciones, cierre de sesión) ---------- */

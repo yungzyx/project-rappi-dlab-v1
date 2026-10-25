@@ -40,7 +40,7 @@ export default defineConfig(({ mode }) => ({
   build:
     mode === 'panel-html'
       ? HTML_BUILD
-      : { rollupOptions: { input: { panel: 'index.html', presentacion: 'presentacion.html' } } },
+      : { rolldownOptions: { input: { panel: 'index.html', presentacion: 'presentacion.html' } } },
   test: {
     environment: 'jsdom',
   },

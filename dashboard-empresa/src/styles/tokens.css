@@ -8,7 +8,8 @@
  *  - el acento es de marca y de magnitud (línea principal, barras, pestaña activa);
  *  - el carmesí es solo para tendencias malas y riesgo, distinto del acento para que no se confundan;
  *  - el ámbar rayado marca lo simulado (nunca solo por color: siempre con texto).
- * Colores de datos validados con la skill dataviz (ramas ordinales, contraste de texto >= 4,5:1).
+ * Colores de datos: ramas ordinales, contraste de texto >= 4,5:1 y de marcas >= 3:1 con el fondo, separables con
+ * daltonismo.
  */
 :root {
   color-scheme: light dark;

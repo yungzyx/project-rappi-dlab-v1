@@ -9,10 +9,10 @@ import HomeFeed from './HomeFeed'
 import LiveHomeFeed from './live/LiveHomeFeed'
 
 const NAV_ITEMS = [
-  { id: 'home', label: 'Home', Icon: HomeIcon },
-  { id: 'offers', label: 'Offers', Icon: OffersIcon },
-  { id: 'favorites', label: 'Favorites', Icon: FavoritesIcon },
-  { id: 'account', label: 'Account', Icon: AccountIcon },
+  { id: 'home', label: 'Inicio', Icon: HomeIcon },
+  { id: 'offers', label: 'Ofertas', Icon: OffersIcon },
+  { id: 'favorites', label: 'Favoritos', Icon: FavoritesIcon },
+  { id: 'account', label: 'Cuenta', Icon: AccountIcon },
 ]
 
 /** Contenedor de las 4 pestañas de la barra inferior. La pestaña activa la guarda App. */

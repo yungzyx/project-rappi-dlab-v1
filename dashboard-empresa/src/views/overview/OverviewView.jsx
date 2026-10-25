@@ -1,3 +1,4 @@
+import { AGENT_NAME } from '../../lib/agentName.js'
 import { Async } from '../../components/Async.jsx'
 import { ProvenanceBadge } from '../../components/ProvenanceBadge.jsx'
 import { SourceNote } from '../../components/SourceNote.jsx'
@@ -60,7 +61,7 @@ export function OverviewView({ source, onNavigate }) {
           </DecisionCard>
           <DecisionCard
             id="decision-mochi"
-            question="¿Funciona lo que ofrece Mochi?"
+            question={`¿Funciona lo que ofrece ${AGENT_NAME}?`}
             badge={source}
             linkLabel="Ver las ofertas"
             onOpen={() => onNavigate('mochi', 'ofertas')}

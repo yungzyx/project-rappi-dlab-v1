@@ -1,4 +1,4 @@
-/* Medidas de IMG_9129 (px a 600 de ancho × 0,67 = pt). */
+/* Medidas de las capturas de la app iOS del 26-09-2026, no versionadas (px a 600 de ancho × 0,67 = pt). */
 .loyalty {
   padding: 0 0 60px 16px;
   background: #f9f9fb;
@@ -64,11 +64,22 @@
   text-align: left;
 }
 
-.loyalty-row img,
-.loyalty-active img {
+.loyalty-logo {
+  display: grid;
+  place-items: center;
+  flex: none;
   width: 48px;
   height: 48px;
   border-radius: 9px;
+  background: #fff1e8;
+  font-size: 26px;
+}
+
+.loyalty-logo--large {
+  width: 72px;
+  height: 72px;
+  border-radius: 14px;
+  font-size: 38px;
 }
 
 .loyalty-row strong {
@@ -100,7 +111,7 @@
   }
 }
 
-.loyalty-active > span {
+.loyalty-active > span:not(.loyalty-logo) {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -127,19 +138,8 @@
   color: var(--agent-orange);
 }
 
-.loyalty-banner {
-  display: block;
-  width: 342px;
-  margin-top: 60px;
-}
-
-.loyalty-banner img {
-  width: 100%;
-  border-radius: 16px;
-}
-
 .loyalty-terms {
-  margin: 6px 0 0 29px;
+  margin: 40px 0 0 29px;
   font-size: 17px;
   text-decoration: underline;
   color: #2b2724;
@@ -151,12 +151,6 @@
   align-items: center;
   gap: 16px;
   text-align: center;
-}
-
-.loyalty-sheet img {
-  width: 72px;
-  height: 72px;
-  border-radius: 14px;
 }
 
 .loyalty-sheet p {

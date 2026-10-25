@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { toPrototypeProduct } from '../../api/client'
 import { ordersSettled } from '../../api/orders'
-import { fixture } from '../../api/testing'
+import { fixture } from '../../test/api'
 import { ToastProvider } from '../../components/Toast'
 import { AddressProvider } from '../../state/AddressContext'
 import { AssistantProvider } from '../../state/AssistantContext'
@@ -94,7 +94,7 @@ afterEach(() => {
 })
 
 describe('inicio de pago', () => {
-  test('abrir el checkout ya es iniciar el pago: uno por vertical del carro, antes de «Place order»', () => {
+  test('abrir el checkout ya es iniciar el pago: uno por vertical del carro, antes de «Hacer pedido»', () => {
     renderCheckout()
     const starts = checkoutStarts()
     expect(starts.map((fields) => fields.vertical).sort()).toEqual(['licores', 'supermercado'])
@@ -110,14 +110,14 @@ describe('inicio de pago', () => {
 
   test('pagar no repite el inicio de pago', async () => {
     renderCheckout()
-    fireEvent.click(screen.getByText(/Place order/))
+    fireEvent.click(screen.getByText(/Hacer pedido/))
     await vi.waitFor(() => expect(api.sendOrder).toHaveBeenCalledTimes(2))
     expect(checkoutStarts()).toHaveLength(2)
   })
 
   test('el pedido guardado lleva el tipo y el id de cada línea (con ellos Mochi arma el próximo pedido)', async () => {
     renderCheckout()
-    fireEvent.click(screen.getByText(/Place order/))
+    fireEvent.click(screen.getByText(/Hacer pedido/))
     await vi.waitFor(() => expect(api.sendOrder).toHaveBeenCalledTimes(2))
     const [order] = JSON.parse(localStorage.getItem('rappi-proto-orders'))
     expect(order.items.find((item) => item.entityId === '94001')).toMatchObject({ entityType: 'catalog_item' })
@@ -129,7 +129,7 @@ describe('inicio de pago', () => {
     events.flush.mockReturnValueOnce(queued.promise)
     events.settled.mockReturnValueOnce(inFlight.promise)
     renderCheckout()
-    fireEvent.click(screen.getByText(/Place order/))
+    fireEvent.click(screen.getByText(/Hacer pedido/))
     await tick()
     expect(api.sendOrder).not.toHaveBeenCalled()
 
@@ -149,7 +149,7 @@ describe('pedidos en vuelo', () => {
     events.settled.mockReturnValueOnce(inFlight.promise)
     api.sendOrder.mockReturnValue(sending.promise)
     renderCheckout()
-    fireEvent.click(screen.getByText(/Place order/))
+    fireEvent.click(screen.getByText(/Hacer pedido/))
 
     let settled = false
     const waiting = ordersSettled().then(() => (settled = true))
@@ -188,8 +188,8 @@ describe('carrito vacío', () => {
         </ProfileProvider>
       </DemoProvider>,
     )
-    expect(screen.getByText('Your cart is empty.')).toBeTruthy()
-    fireEvent.click(screen.getByText('Keep shopping'))
+    expect(screen.getByText('Tu carro está vacío.')).toBeTruthy()
+    fireEvent.click(screen.getByText('Seguir comprando'))
     expect(back).toHaveBeenCalled()
   })
 })

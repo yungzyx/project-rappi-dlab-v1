@@ -49,7 +49,7 @@ export default function RestaurantsScreen({ back, push }) {
       <div className="rest-search-wrap">
         <button type="button" className="search-bar tap" onClick={() => openSearch('restaurants')}>
           <SearchIcon size={21} />
-          <span className="search-hint">Search for dishes or restaurants</span>
+          <span className="search-hint">Busca platos o restaurantes</span>
         </button>
       </div>
 
@@ -107,24 +107,12 @@ export default function RestaurantsScreen({ back, push }) {
 
       <Carousel className="rest-banners" autoplayMs={4500} onIndexChange={setBannerIndex}>
         {BANNERS.map((banner) => (
-          <button
-            key={banner.id}
-            type="button"
-            className="rest-banner"
-            aria-label={banner.title ? undefined : banner.label}
-            onClick={() => toast()}
-          >
-            {banner.title ? (
-              <>
-                <span className="rest-banner-text">
-                  <strong>{banner.title}</strong>
-                  <span>{banner.place}</span>
-                </span>
-                <img className="rest-banner-photo" src={banner.img} alt="" draggable="false" loading="lazy" />
-              </>
-            ) : (
-              <img className="rest-banner-full" src={banner.img} alt="" draggable="false" loading="lazy" />
-            )}
+          <button key={banner.id} type="button" className="rest-banner" onClick={() => toast()}>
+            <span className="rest-banner-text">
+              <strong>{banner.title}</strong>
+              <span>{banner.place}</span>
+            </span>
+            <img className="rest-banner-photo" src={banner.img} alt="" draggable="false" loading="lazy" />
           </button>
         ))}
       </Carousel>

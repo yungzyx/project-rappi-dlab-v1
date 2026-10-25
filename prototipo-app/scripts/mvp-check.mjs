@@ -2,7 +2,7 @@
 // Uso: node scripts/mvp-check.mjs --app http://localhost:5184 [--api http://localhost:8010] [--shop | --kit | --ask | --home | --combo | --expect-offline | --panel http://localhost:5185]
 //   sin banderas: la app abre en la Home conectada, con la barra «Busca o pídele ideas a <agente>» y el aviso de privacidad
 //     de la primera visita (que se cierra con «Entendido»);
-//   con --shop: Home → vertical Grocery → primera tienda → agregar un producto → carrito → pagar, y la API recibe el
+//   con --shop: Home → vertical Súper → primera tienda → agregar un producto → carrito → pagar, y la API recibe el
 //     pedido (que después verifica scripts/mvp-check.sh en la base de prueba);
 //   con --kit: busca «cerveza» en el buscador con Mochi (ve la búsqueda agrupada por vertical), vuelve a la Home, elige
 //     la ocasión «Carrete», agrega el kit que arma Mochi (`plan`) y paga; scripts/mvp-check.sh verifica después en la base
@@ -11,11 +11,11 @@
 //     es «Pregúntale a <agente>», resaltada; Enter se lo pregunta y la tarjeta de Mochi muestra «Preguntaste «…»», la
 //     ficha del plato y el completo del catálogo de prueba. Después «mi hijo tiene fiebre, ¿qué le doy?»: Mochi no da
 //     consejo médico, nombra al químico farmacéutico y ofrece «Ir a Farmacia», sin productos;
-//   con --home: Home dinámica. Una persona nueva ve los 6 accesos en el orden fijo, con Loyalty y Benefits Pro al final y
-//     sin el texto «Ordenadas según lo que más usas»; toca «Retail» (Rappi Mall) tres veces, volviendo a la Home cada
+//   con --home: Home dinámica. Una persona nueva ve los 6 accesos en el orden fijo, con Lealtad y Beneficios Pro al final y
+//     sin el texto «Ordenadas según lo que más usas»; toca «Rappi Mall» tres veces, volviendo a la Home cada
 //     vez, espera a que la API acepte los toques (`vertical_open`; al volver a la Home la app los manda y vuelve a pedir
-//     el orden) y, sin recargar, Retail queda primero y el texto aparece;
-//   con --combo: combinación de verticales. Una persona nueva pide en Restaurantes (Home → Restaurants → primer
+//     el orden) y, sin recargar, Rappi Mall queda primero y el texto aparece;
+//   con --combo: combinación de verticales. Una persona nueva pide en Restaurantes (Home → Restaurantes → primer
 //     restaurante → agregar un plato → pagar), vuelve a la Home y toca a Mochi: la oferta es de Turbo (el siguiente peldaño
 //     de la escalera desde Restaurantes, según la tabla de Rappi) y su «¿Por qué?» muestra la razón. Solo se mira la
 //     vertical y que haya una razón: el texto exacto depende de lo que haya aprendido el motor;
@@ -89,14 +89,12 @@ function watchProblems(page) {
   return problems
 }
 
-/** Recorre una compra real contra el catálogo de prueba. Los textos son los de la app (Grocery, View cart, Place order). */
+/** Recorre una compra real contra el catálogo de prueba. Los textos son los de la app (Súper, Ver carro, Hacer pedido). */
 async function checkShop(page) {
   await checkOnline(page)
-  await step(page, 'abrir Grocery desde la Home', () =>
-    page.getByRole('button', { name: 'Grocery', exact: true }).click(),
-  )
+  await step(page, 'abrir Súper desde la Home', () => page.getByRole('button', { name: 'Súper', exact: true }).click())
   const stores = page.getByRole('region', { name: 'Tiendas' })
-  await step(page, 'ver las tiendas de Grocery', () => stores.waitFor())
+  await step(page, 'ver las tiendas de Súper', () => stores.waitFor())
   await step(page, 'abrir la primera tienda', () =>
     stores
       .getByRole('button', { name: /de prueba/ })
@@ -115,9 +113,9 @@ async function checkShop(page) {
     .first()
   await step(page, 'ver productos en la tienda', () => product.waitFor())
   await step(page, 'agregar un producto', () => product.click())
-  await step(page, 'abrir el carrito', () => page.getByRole('button', { name: /View cart/ }).click())
-  await step(page, 'ir al checkout', () => page.getByRole('button', { name: 'Go to checkout' }).click())
-  const place = page.getByRole('button', { name: /^Place order/ })
+  await step(page, 'abrir el carrito', () => page.getByRole('button', { name: /Ver carro/ }).click())
+  await step(page, 'ir a pagar', () => page.getByRole('button', { name: 'Ir a pagar' }).click())
+  const place = page.getByRole('button', { name: /^Hacer pedido/ })
   await step(page, 'ver el botón de pagar', () => place.waitFor())
   const posted = page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/orders')
   await place.click()
@@ -130,7 +128,7 @@ async function checkShop(page) {
 
 /**
  * Busca «cerveza» con Mochi (grupos por vertical), pide el kit de «Carrete» en la Home, lo agrega y paga. Los textos son
- * los de la app (Buscador con Mochi, Plan de hoy, Agregar el kit, Ir a pagar, Place order).
+ * los de la app (Buscador con Mochi, Plan de hoy, Agregar el kit, Ir a pagar, Hacer pedido).
  */
 async function checkKit(page) {
   await checkOnline(page)
@@ -165,7 +163,7 @@ async function checkKit(page) {
   accepted.catch(() => {}) // si no llega, falla abajo con su propio mensaje
   await step(page, 'agregar el kit', () => page.getByRole('button', { name: /^Agregar el kit/ }).click())
   await step(page, 'ir a pagar', () => page.getByRole('button', { name: /Ir a pagar/ }).click())
-  const place = page.getByRole('button', { name: /^Place order/ })
+  const place = page.getByRole('button', { name: /^Hacer pedido/ })
   await step(page, 'ver el botón de pagar', () => place.waitFor())
   const posted = page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/orders')
   await place.click()
@@ -181,7 +179,7 @@ async function checkKit(page) {
 
 /**
  * Preguntarle a Mochi en texto libre desde el buscador: la ficha de un plato con lo que hay, y una pregunta de salud que
- * no responde con remedios. Los textos son los de la app y la API (AskMochiRow, agent/glosario.toml, rappi_agent.py).
+ * no responde con remedios. Los textos son los de la app y la API (AskAgentRow, agent/glosario.toml, rappi_agent.py).
  */
 async function checkAsk(page) {
   await checkOnline(page)
@@ -226,14 +224,14 @@ const COMBO_WAIT_MS = 25_000
 
 /**
  * Combinación de verticales: pide en Restaurantes y, al volver a la Home, Mochi propone Turbo con su «¿Por qué?».
- * Los textos son los de la app (Restaurants, View cart, Place order, «¿Por qué?»). Tras pagar se recarga la app y se
+ * Los textos son los de la app (Restaurantes, Ver carro, Hacer pedido, «¿Por qué?»). Tras pagar se recarga la app y se
  * vuelve al inicio: la Home se monta de nuevo con la misma persona (su identificador queda en el navegador) y Mochi
  * saluda; tocarlo antes de que termine no hace nada, así que se vuelve a tocar hasta que responda.
  */
 async function checkCombo(page) {
   await checkOnline(page)
-  await step(page, 'abrir Restaurants desde la Home', () =>
-    page.getByRole('button', { name: 'Restaurants', exact: true }).click(),
+  await step(page, 'abrir Restaurantes desde la Home', () =>
+    page.getByRole('button', { name: 'Restaurantes', exact: true }).click(),
   )
   const list = page.locator('.rest-list')
   await step(page, 'ver la lista de restaurantes', () => list.waitFor())
@@ -249,9 +247,9 @@ async function checkCombo(page) {
     .first()
   await step(page, 'ver platos en el menú', () => dish.waitFor())
   await step(page, 'agregar un plato', () => dish.click())
-  await step(page, 'abrir el carrito', () => page.getByRole('button', { name: /View cart/ }).click())
-  await step(page, 'ir al checkout', () => page.getByRole('button', { name: 'Go to checkout' }).click())
-  const place = page.getByRole('button', { name: /^Place order/ })
+  await step(page, 'abrir el carrito', () => page.getByRole('button', { name: /Ver carro/ }).click())
+  await step(page, 'ir a pagar', () => page.getByRole('button', { name: 'Ir a pagar' }).click())
+  const place = page.getByRole('button', { name: /^Hacer pedido/ })
   await step(page, 'ver el botón de pagar', () => place.waitFor())
   const posted = page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/orders')
   await place.click()
@@ -298,15 +296,15 @@ async function checkCombo(page) {
 }
 
 const ORDER_CAPTION = 'Ordenadas según lo que más usas'
-const FIXED_LABELS = ['Grocery', 'Pharmacy', 'Retail', 'Liquor', 'Express', 'Chocolates']
-const TAIL_LABELS = ['Loyalty', 'Benefits Pro']
+const FIXED_LABELS = ['Súper', 'Farmacia', 'Rappi Mall', 'Licores', 'Express', 'Chocolates']
+const TAIL_LABELS = ['Lealtad', 'Beneficios Pro']
 
 /** Los nombres de los accesos de la fila de la Home, en el orden en que se ven. */
 const shortcutLabels = (page) =>
   page.locator('.home-shortcut').evaluateAll((nodes) => nodes.map((node) => node.innerText.trim()))
 
 /**
- * Home dinámica: sin historial, el orden fijo; tras tocar Retail tres veces, Retail va primero y la Home dice por qué.
+ * Home dinámica: sin historial, el orden fijo; tras tocar Rappi Mall tres veces, Rappi Mall va primero y la Home dice por qué.
  * Los toques se cuentan en las respuestas 200 de `POST /events` (al volver a la Home la app los manda y después vuelve a
  * pedir el orden): la Home se reordena sin recargar.
  */
@@ -329,8 +327,8 @@ async function checkHome(page) {
       opens += (request.postData() ?? '').split('"vertical_open"').length - 1
   })
   for (let tap = 1; tap <= 3; tap++) {
-    await step(page, `tocar «Retail» (${tap} de 3)`, () =>
-      page.locator('.home-shortcut', { hasText: 'Retail' }).first().click(),
+    await step(page, `tocar «Rappi Mall» (${tap} de 3)`, () =>
+      page.locator('.home-shortcut', { hasText: 'Rappi Mall' }).first().click(),
     )
     await step(page, 'volver a la Home', () => page.locator('[aria-label="Volver"]').first().click())
     await step(page, 'ver la Home de nuevo', () => row.waitFor())
@@ -341,10 +339,10 @@ async function checkHome(page) {
 
   await step(page, `ver el texto «${ORDER_CAPTION}»`, () => page.getByText(ORDER_CAPTION).waitFor())
   const after = await shortcutLabels(page)
-  if (after[0] !== 'Retail') throw new Error(`tras tocar Retail 3 veces el primero es «${after[0]}»`)
+  if (after[0] !== 'Rappi Mall') throw new Error(`tras tocar Rappi Mall 3 veces el primero es «${after[0]}»`)
   if (after.slice(-2).join() !== TAIL_LABELS.join())
     throw new Error(`con el orden personal, la fila debe terminar en ${TAIL_LABELS.join(' y ')}`)
-  return `orden fijo sin historial; tras 3 toques a Retail queda primero (${after.slice(0, 3).join(', ')}…) con el texto «${ORDER_CAPTION}»`
+  return `orden fijo sin historial; tras 3 toques a Rappi Mall queda primero (${after.slice(0, 3).join(', ')}…) con el texto «${ORDER_CAPTION}»`
 }
 
 /** Cuánto se espera a que la API cuente los eventos de las revisiones anteriores (la app los manda en lotes cada 5 s). */

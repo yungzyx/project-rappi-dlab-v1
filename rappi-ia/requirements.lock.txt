@@ -36,7 +36,7 @@ narwhals==2.27.1
 networkx==3.7
 numpy==2.5.4
 packaging==26.3
-pillow==12.3.0
+pillow==13.0.0
 pluggy==1.6.0
 protego==0.7.0
 psycopg==3.3.6

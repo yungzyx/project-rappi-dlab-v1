@@ -1,4 +1,5 @@
-/* Medidas tomadas de IMG_9106–9108 y del video del 26-09-2026 (px del cuadro × 0,437 = pt). */
+/* Medidas tomadas de las capturas y el video de la app iOS del 26-09-2026, no versionados
+   (px del cuadro × 0,437 = pt). */
 .home {
   padding-bottom: 150px;
 }
@@ -63,6 +64,7 @@
 .credits-banner img {
   width: 58px;
   height: 61px;
+  object-fit: contain;
 }
 
 .credits-text {

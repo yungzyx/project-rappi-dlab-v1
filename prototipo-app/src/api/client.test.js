@@ -17,7 +17,7 @@ import {
   toPrototypeProduct,
 } from './client'
 import { lineKey } from '../state/CartContext'
-import { fixture, stubApi } from './testing'
+import { fixture, stubApi } from '../test/api'
 import { userId, userToken } from './user'
 
 const API_PRODUCT = {

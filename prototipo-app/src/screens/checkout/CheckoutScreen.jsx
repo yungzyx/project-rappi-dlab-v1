@@ -16,7 +16,7 @@ import { useDemo } from '../../state/DemoContext'
 import { DEFAULT_TIP, TIPS, priceBreakdown } from './pricing'
 import './checkout.css'
 
-const MODES = ['Delivery', 'Pickup']
+const MODES = ['Envío', 'Retiro']
 
 /** Checkout (funcionalidad agregada). El medio de pago es solo un texto de ejemplo: no se ingresan datos. */
 export default function CheckoutScreen({ back, push }) {
@@ -28,7 +28,7 @@ export default function CheckoutScreen({ back, push }) {
   const demo = useDemo()
   const [mode, setMode] = useState(MODES[0])
   const [tip, setTip] = useState(DEFAULT_TIP)
-  const pickup = mode === 'Pickup'
+  const pickup = mode === 'Retiro'
   const price = priceBreakdown({ subtotal: cart.total, tip, pickup })
   const stores = [...new Set(cart.items.map(({ product }) => product.store).filter(Boolean))]
 
@@ -88,9 +88,9 @@ export default function CheckoutScreen({ back, push }) {
     return (
       <div className="screen checkout">
         <CheckoutHeader back={back} />
-        <p className="checkout-empty">Your cart is empty.</p>
+        <p className="checkout-empty">Tu carro está vacío.</p>
         <button type="button" className="checkout-continue tap" onClick={back}>
-          Keep shopping
+          Seguir comprando
         </button>
       </div>
     )
@@ -119,14 +119,14 @@ export default function CheckoutScreen({ back, push }) {
         <button type="button" className="checkout-card tap" onClick={address.openSheet}>
           <PinIcon size={24} />
           <span>
-            <strong>{pickup ? 'Pick up at the store' : address.selected.label}</strong>
+            <strong>{pickup ? 'Retiro en tienda' : address.selected.label}</strong>
             <small>{pickup ? stores.join(', ') : address.selected.line}</small>
           </span>
           <ChevronRight size={18} />
         </button>
-        <p className="checkout-eta">{pickup ? 'Ready in 15–20 min' : 'Arrives in 25–35 min'}</p>
+        <p className="checkout-eta">{pickup ? 'Listo en 15–20 min' : 'Llega en 25–35 min'}</p>
 
-        <h2 className="checkout-title">Your order</h2>
+        <h2 className="checkout-title">Tu pedido</h2>
         <ul className="checkout-items">
           {cart.items.map(({ product }) => (
             <ProductRow key={lineKey(product)} product={product} showStore />
@@ -136,7 +136,7 @@ export default function CheckoutScreen({ back, push }) {
 
         {!pickup && (
           <>
-            <h2 className="checkout-title">Tip for your Rappitendero</h2>
+            <h2 className="checkout-title">Propina para tu Rappitendero</h2>
             <div className="checkout-tips">
               {TIPS.map((amount) => (
                 <button
@@ -146,34 +146,34 @@ export default function CheckoutScreen({ back, push }) {
                   aria-pressed={amount === tip}
                   onClick={() => setTip(amount)}
                 >
-                  {amount === 0 ? 'No tip' : formatPrice(amount)}
+                  {amount === 0 ? 'Sin propina' : formatPrice(amount)}
                 </button>
               ))}
             </div>
           </>
         )}
 
-        <h2 className="checkout-title">Payment method</h2>
+        <h2 className="checkout-title">Medio de pago</h2>
         <button type="button" className="checkout-card tap" onClick={() => toast('Medio de pago de ejemplo')}>
           <CardIcon size={24} />
           <span>
             <strong>Visa •••• 4242</strong>
-            <small>Demo card</small>
+            <small>Tarjeta de ejemplo</small>
           </span>
-          <span className="checkout-change">Change</span>
+          <span className="checkout-change">Cambiar</span>
         </button>
 
         <dl className="checkout-summary">
           <SummaryRow label="Subtotal" value={formatPrice(price.subtotal)} />
           {!pickup && (
             <SummaryRow
-              label="Delivery"
-              value={price.delivery === 0 ? 'Free with Pro' : formatPrice(price.delivery)}
+              label="Envío"
+              value={price.delivery === 0 ? 'Gratis con Pro' : formatPrice(price.delivery)}
               accent={price.delivery === 0}
             />
           )}
-          <SummaryRow label="Service fee" value={formatPrice(price.service)} />
-          {!pickup && <SummaryRow label="Tip" value={formatPrice(price.tip)} />}
+          <SummaryRow label="Tarifa de servicio" value={formatPrice(price.service)} />
+          {!pickup && <SummaryRow label="Propina" value={formatPrice(price.tip)} />}
           <SummaryRow label="Total" value={formatPrice(price.total)} total />
         </dl>
       </div>
@@ -181,7 +181,7 @@ export default function CheckoutScreen({ back, push }) {
       {/* Fuera del contenedor con scroll para que quede fijo abajo */}
       <div className="checkout-footer">
         <button type="button" className="checkout-place tap" onClick={placeOrder}>
-          Place order · {formatPrice(price.total)}
+          Hacer pedido · {formatPrice(price.total)}
         </button>
       </div>
     </>
@@ -192,7 +192,7 @@ function CheckoutHeader({ back }) {
   return (
     <header className="checkout-header">
       <BackButton className="round-button" onClick={back} />
-      <h1>Checkout</h1>
+      <h1>Tu pedido</h1>
     </header>
   )
 }

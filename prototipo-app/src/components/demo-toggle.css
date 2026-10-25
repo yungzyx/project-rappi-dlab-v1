@@ -45,7 +45,7 @@
   color: var(--ink-3);
 }
 
-/* En el teléfono el modo se cambia desde Account → Settings → Modo demo */
+/* En el teléfono el modo se cambia desde Cuenta → Configuración → Modo demo */
 @media (max-width: 500px) {
   .demo-toggle {
     display: none;

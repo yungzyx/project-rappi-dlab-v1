@@ -11,13 +11,11 @@ import { useOrders } from '../../state/OrdersContext'
 import { formatPrice } from '../../state/CartContext'
 import { relativeDay } from '../orders/dates'
 import dealsCrown from '../../assets/deals-crown.webp'
-import logoStreetWrap from '../../assets/logo-streetwrap.webp'
-import footer from '../../assets/account-footer.webp'
 import AccountSheets from './AccountSheets'
-import { APP_VERSION, PRO_PLAN, PROFILE, RECENT_ORDER, SECTIONS } from './data'
+import { APP_VERSION, PRO_PLAN, PROFILE, SECTIONS } from './data'
 import './account.css'
 
-/** Pestaña Account. `onBack` vuelve a la pestaña Home. */
+/** Pestaña Cuenta. `onBack` vuelve a la pestaña Inicio. */
 export default function AccountScreen({ onBack, push }) {
   const toast = useToast()
   const address = useAddress()
@@ -45,7 +43,7 @@ export default function AccountScreen({ onBack, push }) {
       <div className="screen account">
         <header className="account-header">
           <BackButton className="account-back" onClick={onBack} size={18} />
-          <h1>Account</h1>
+          <h1>Cuenta</h1>
         </header>
 
         <section className="account-top">
@@ -54,13 +52,13 @@ export default function AccountScreen({ onBack, push }) {
             <span>
               <strong>{PROFILE.name}</strong>
               <span className="account-edit">
-                Edit profile <ChevronRight size={13} />
+                Editar perfil <ChevronRight size={13} />
               </span>
             </span>
           </button>
 
           <button type="button" className="account-pro tap" onClick={() => toast()}>
-            <span className="account-pro-label">Your plan</span>
+            <span className="account-pro-label">Tu plan</span>
             <span className="account-pro-name">
               <img src={dealsCrown} alt="" />
               Rappi Pro
@@ -72,9 +70,9 @@ export default function AccountScreen({ onBack, push }) {
 
           <div className="account-quick">
             {[
-              { id: 'orders', label: 'Orders', Icon: OrdersIcon },
-              { id: 'help', label: 'Help', Icon: HeadsetIcon },
-              { id: 'payment', label: 'Payment methods', Icon: CardIcon },
+              { id: 'orders', label: 'Pedidos', Icon: OrdersIcon },
+              { id: 'help', label: 'Ayuda', Icon: HeadsetIcon },
+              { id: 'payment', label: 'Medios de pago', Icon: CardIcon },
             ].map(({ id, label, Icon }) => (
               <button
                 key={id}
@@ -91,12 +89,13 @@ export default function AccountScreen({ onBack, push }) {
 
         <section className="account-body">
           <div className="account-section-head">
-            <h2>Recent orders</h2>
+            <h2>Pedidos recientes</h2>
             <button type="button" className="see-more tap" onClick={() => push('orders')}>
-              See all
+              Ver todos
             </button>
           </div>
-          {/* Pedidos hechos en la demo primero (abren su seguimiento), después el de las capturas */}
+          {/* Los pedidos hechos en la demo (abren su seguimiento) */}
+          {orders.length === 0 && <p className="account-orders-empty">Aún no tienes pedidos.</p>}
           {orders.map((order) => (
             <button
               key={order.id}
@@ -106,7 +105,7 @@ export default function AccountScreen({ onBack, push }) {
             >
               <Img src={order.items[0]?.img} className="account-order-photo" />
               <span>
-                <strong>{order.stores.join(', ') || 'Your order'}</strong>
+                <strong>{order.stores.join(', ') || 'Tu pedido'}</strong>
                 <span>
                   {relativeDay(order.placedAt)} · {formatPrice(order.total)}
                 </span>
@@ -114,18 +113,6 @@ export default function AccountScreen({ onBack, push }) {
               <ChevronRight size={18} />
             </button>
           ))}
-          <button
-            type="button"
-            className="account-order tap"
-            onClick={() => push('store', { store: { name: RECENT_ORDER.store, img: logoStreetWrap, logo: true } })}
-          >
-            <img src={logoStreetWrap} alt="" loading="lazy" />
-            <span>
-              <strong>{RECENT_ORDER.store}</strong>
-              <span>{RECENT_ORDER.date}</span>
-            </span>
-            <ChevronRight size={18} />
-          </button>
 
           {SECTIONS.map((section) => (
             <div key={section.title} className="account-section">
@@ -168,7 +155,7 @@ export default function AccountScreen({ onBack, push }) {
           </button>
           <button type="button" className="account-logout tap" onClick={() => setSheet('logout')}>
             <LogoutIcon size={25} />
-            Log out
+            Cerrar sesión
           </button>
           <button
             type="button"
@@ -176,13 +163,11 @@ export default function AccountScreen({ onBack, push }) {
             onClick={() => setSheet('logout-all')}
           >
             <LogoutIcon size={25} />
-            Log out all sessions
+            Cerrar todas las sesiones
           </button>
           <p className="account-version">{APP_VERSION}</p>
-          <p className="account-version">Made with 🧡 in LATAM</p>
+          <p className="account-version">Hecho con 🧡 en Latinoamérica</p>
         </section>
-
-        <img className="account-footer" src={footer} alt="Made with Love in Latin America" loading="lazy" />
       </div>
 
       <AccountSheets sheet={sheet} onClose={() => setSheet(null)} />

@@ -72,7 +72,7 @@ function Step({ step, toX, ticks }) {
 }
 
 /**
- * La escalera de la tabla de Rappi como gráfico de pesas (skill dataviz: antes → después por fila, un tono y gris):
+ * La escalera de la tabla de Rappi como gráfico de pesas (antes → después por fila, un tono y gris):
  * para cada combinación, la retención M+1 de hoy y la de la combinación con un grupo más que más retiene. Su tabla es
  * la tabla completa que compartió Rappi, con el total.
  */

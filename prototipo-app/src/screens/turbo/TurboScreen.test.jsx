@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest'
-import { fixture, stubApi } from '../../api/testing'
+import { fixture, stubApi } from '../../test/api'
 import ProductSheet from '../../components/ProductSheet'
 import { ToastProvider } from '../../components/Toast'
 import { AssistantProvider } from '../../state/AssistantContext'
@@ -157,17 +157,17 @@ describe('Turbo con el catálogo real', () => {
     expect(screen.queryByRole('button', { name: 'Ver más' })).toBeNull() // era la última página
   })
 
-  test('Offers muestra las bajas de precio de Turbo y Categories lista los pasillos', async () => {
+  test('Ofertas muestra las bajas de precio de Turbo y Categorías lista los pasillos', async () => {
     const fetchMock = stubTurbo()
     renderTurbo()
     await waitFor(() => expect(names()).toHaveLength(24))
 
-    fireEvent.click(screen.getByRole('button', { name: 'Offers' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Ofertas' }))
     await waitFor(() => expect(names()).toEqual(['Helado de vainilla 1 L (prueba)']))
     expect(requests(fetchMock).find(({ path }) => path === '/catalog/deals').query).toEqual({ vertical: 'turbo' })
     expect(screen.queryByText('Esta sección no está en el prototipo')).toBeNull()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Categories' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Categorías' }))
     expect(screen.getByRole('button', { name: /^Despensa/ }).textContent).toContain('30 productos')
     expect(screen.getByRole('button', { name: /^Cervezas/ }).textContent).toContain('1 producto') // en singular
     expect(screen.getByRole('button', { name: /^Cervezas/ }).textContent).not.toContain('productos')
@@ -176,13 +176,13 @@ describe('Turbo con el catálogo real', () => {
     expect(screen.getByRole('tab', { name: 'Bebidas' }).getAttribute('aria-selected')).toBe('true')
   })
 
-  test('Offers sin bajas dice que no hay, y si la API cae avisa con Reintentar', async () => {
+  test('Ofertas sin bajas dice que no hay, y si la API cae avisa con Reintentar', async () => {
     let online = false
     stubTurbo({ '/catalog/deals': () => (online ? [] : 'offline') })
     renderTurbo()
     await waitFor(() => expect(names()).toHaveLength(24))
 
-    fireEvent.click(screen.getByRole('button', { name: 'Offers' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Ofertas' }))
     const notice = (await screen.findByText('Sin conexión')).closest('.offline-notice')
     online = true
     fireEvent.click(within(notice).getByRole('button', { name: 'Reintentar' }))
@@ -198,7 +198,7 @@ describe('Turbo con el catálogo real', () => {
     fireEvent.click(screen.getByText('sumar'))
     expect(screen.getByText('$9.900')).toBeTruthy()
     fireEvent.click(screen.getByText('sumar'))
-    expect(screen.getByText('Discount unlocked.')).toBeTruthy()
+    expect(screen.getByText('Descuento activado.')).toBeTruthy()
   })
 
   test('las promos ya no apuntan a pestañas que no existen: avisan que no están en el prototipo', async () => {
@@ -229,7 +229,7 @@ describe('Turbo con el catálogo real', () => {
     renderTurbo()
     expect(await screen.findByText('Todavía no hay productos de Turbo en el catálogo.')).toBeTruthy()
     expect(screen.queryAllByRole('tab')).toEqual([])
-    expect(screen.getByText('Search in Turbo 20')).toBeTruthy()
+    expect(screen.getByText('Busca en Turbo')).toBeTruthy()
   })
 
   test('sin conexión avisa dentro de la pantalla, y Reintentar la carga', async () => {
@@ -238,7 +238,7 @@ describe('Turbo con el catálogo real', () => {
     renderTurbo()
 
     const notice = (await screen.findByText('Sin conexión')).closest('.offline-notice')
-    expect(screen.getByText('Search in Turbo 20')).toBeTruthy() // el resto de la pantalla sigue
+    expect(screen.getByText('Busca en Turbo')).toBeTruthy() // el resto de la pantalla sigue
     online = true
     fireEvent.click(within(notice).getByRole('button', { name: 'Reintentar' }))
     await waitFor(() => expect(names()).toHaveLength(24))

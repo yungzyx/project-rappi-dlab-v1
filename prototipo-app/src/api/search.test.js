@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { ApiError } from './client'
 import { searchAll } from './search'
-import { fixture, stubApi } from './testing'
+import { fixture, stubApi } from '../test/api'
 
 afterEach(() => vi.unstubAllGlobals())
 

@@ -37,10 +37,11 @@ describe('App', () => {
     expect(screen.getByText('Usuarios y eventos SIMULADOS:')).toBeTruthy()
   })
 
-  test('the footer says it is an unofficial demo and links the presentation under the site base', async () => {
+  test('the header and the footer say it is an independent prototype, and the footer links the presentation', async () => {
     serveFixtures()
     await renderWithData(<App />)
 
+    expect(document.querySelector('.masthead').textContent).toContain('Prototipo independiente, no afiliado a Rappi')
     expect(screen.getByText('Demo no oficial · prototipo independiente, no afiliado a Rappi.')).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Presentación de la propuesta' }).getAttribute('href')).toBe(
       `${import.meta.env.BASE_URL}presentacion.html`,
@@ -56,20 +57,13 @@ describe('App', () => {
     expect(document.getElementById('panel-resumen')).toBe(screen.getByRole('tabpanel'))
   })
 
-  test.each([
-    ['mvp', 'mochi'],
-    ['oportunidades', 'mochi'],
-    ['catalogo', 'mochi'],
-    ['frecuencia', 'clientes'],
-    ['verticales', 'clientes'],
-    ['otra', 'resumen'],
-  ])('an old link (?vista=%s) opens the view that has its content (%s)', async (old, view) => {
-    window.history.replaceState(null, '', `/?vista=${old}&fuente=prototipo`)
+  test('an unknown view in the link (?vista=otra) opens the Resumen and keeps the source', async () => {
+    window.history.replaceState(null, '', '/?vista=otra&fuente=prototipo')
     serveFixtures()
     await renderWithData(<App />)
 
-    expect(screen.getByRole('tabpanel').id).toBe(`panel-${view}`)
-    expect(window.location.search).toBe(`?vista=${view}&fuente=prototipo`)
+    expect(screen.getByRole('tabpanel').id).toBe('panel-resumen')
+    expect(window.location.search).toBe('?vista=resumen&fuente=prototipo')
   })
 
   test('a decision links to its detail: the view changes and the section heading gets the focus', async () => {

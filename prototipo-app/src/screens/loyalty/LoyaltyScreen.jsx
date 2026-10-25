@@ -4,20 +4,26 @@ import Sheet from '../../components/Sheet'
 import { useToast } from '../../components/Toast'
 import { ChevronRight } from '../../components/Icons'
 import { useLoyalty } from '../../state/LoyaltyContext'
-import latam from '../../assets/v/loy-latam.webp'
-import marriott from '../../assets/v/loy-marriott.webp'
-import iberia from '../../assets/v/loy-iberia.webp'
-import banner from '../../assets/v/loy-banner.webp'
 import './loyalty.css'
 
+// Programas ficticios: la app real muestra los de aerolíneas y hoteles asociados, que aquí no se nombran.
 const PROGRAMS = [
-  { id: 'latam', name: 'LATAM Pass', logo: latam, unit: 'millas' },
-  { id: 'marriott', name: 'Marriott Bonvoy', logo: marriott, unit: 'puntos' },
-  { id: 'iberia', name: 'Iberia Club', logo: iberia, unit: 'Avios' },
+  { id: 'millas', name: 'Millas Aéreas (ejemplo)', emoji: '✈️', unit: 'millas' },
+  { id: 'hoteles', name: 'Puntos Hoteleros (ejemplo)', emoji: '🏨', unit: 'puntos' },
+  { id: 'viajes', name: 'Club de Viajes (ejemplo)', emoji: '🧳', unit: 'puntos' },
 ]
 
+/** Logo de un programa: su emoji en un cuadro de color (los programas son de ejemplo). */
+function ProgramLogo({ program, large = false }) {
+  return (
+    <span className={large ? 'loyalty-logo loyalty-logo--large' : 'loyalty-logo'} aria-hidden="true">
+      {program.emoji}
+    </span>
+  )
+}
+
 /**
- * Loyalty (captura IMG_9129). Funcionalidad agregada: vincular un programa y cambiarlo;
+ * Lealtad (de las capturas de la app iOS). Funcionalidad agregada: vincular un programa y cambiarlo;
  * el vinculado pasa a "Tu programa" y sale de "Otros programas disponibles".
  */
 export default function LoyaltyScreen({ back }) {
@@ -38,7 +44,7 @@ export default function LoyaltyScreen({ back }) {
     <div className="screen loyalty">
       <header className="loyalty-header">
         <BackButton className="loyalty-back" onClick={back} />
-        <h1>Loyalty</h1>
+        <h1>Lealtad</h1>
       </header>
 
       <h2 className="loyalty-title">Elige un programa</h2>
@@ -53,7 +59,7 @@ export default function LoyaltyScreen({ back }) {
         <>
           <h3 className="loyalty-subtitle">Tu programa</h3>
           <div className="loyalty-active">
-            <img src={active.logo} alt="" />
+            <ProgramLogo program={active} />
             <span>
               <strong>{active.name}</strong>
               <span className="loyalty-badge">Acumulando {active.unit}</span>
@@ -70,7 +76,7 @@ export default function LoyaltyScreen({ back }) {
         {others.map((program) => (
           <li key={program.id}>
             <button type="button" className="loyalty-row" onClick={() => setPendingId(program.id)}>
-              <img src={program.logo} alt="" loading="lazy" />
+              <ProgramLogo program={program} />
               <strong>{program.name}</strong>
               <ChevronRight size={20} />
             </button>
@@ -78,9 +84,6 @@ export default function LoyaltyScreen({ back }) {
         ))}
       </ul>
 
-      <button type="button" className="loyalty-banner tap" onClick={() => setPendingId('iberia')}>
-        <img src={banner} alt="Europa te espera: vincula tu cuenta Iberia Club" loading="lazy" />
-      </button>
       <button type="button" className="loyalty-terms" onClick={() => toast()}>
         Ver términos y condiciones
       </button>
@@ -88,7 +91,7 @@ export default function LoyaltyScreen({ back }) {
       <Sheet open={Boolean(pending)} onClose={() => setPendingId(null)} title={pending && `Vincular ${pending.name}`}>
         {pending && (
           <div className="loyalty-sheet">
-            <img src={pending.logo} alt="" loading="lazy" />
+            <ProgramLogo program={pending} large />
             <p>
               {active
                 ? `Dejarás de acumular en ${active.name} y empezarás a acumular ${pending.unit} en ${pending.name}.`

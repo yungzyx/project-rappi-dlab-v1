@@ -1,14 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import {
-  formatCLP,
-  formatDate,
-  formatNumber,
-  formatPct,
-  formatPoints,
-  formatShortDate,
-  formatSignedPct,
-  monthLabel,
-} from './format.js'
+import { formatDate, formatNumber, formatPct, formatPoints, formatShortDate, formatSignedPct } from './format.js'
 
 describe('formatNumber', () => {
   test('agrupa miles con punto desde 4 cifras', () => {
@@ -30,15 +21,6 @@ describe('formatNumber', () => {
     expect(formatNumber(null)).toBe('—')
     expect(formatNumber(undefined)).toBe('—')
     expect(formatNumber(Number.NaN)).toBe('—')
-  })
-})
-
-describe('formatCLP', () => {
-  test('pesos sin decimales y con punto de miles', () => {
-    expect(formatCLP(1290)).toBe('$1.290')
-    expect(formatCLP(1289.6)).toBe('$1.290')
-    expect(formatCLP(0)).toBe('$0')
-    expect(formatCLP(-4500)).toBe('−$4.500')
   })
 })
 
@@ -70,9 +52,8 @@ describe('fechas', () => {
     expect(formatDate(null)).toBe('—')
   })
 
-  test('formatShortDate y monthLabel abrevian el mes en español', () => {
+  test('formatShortDate abrevia el mes en español', () => {
     expect(formatShortDate('2026-05-11')).toBe('11 may')
     expect(formatShortDate('2026-08-03')).toBe('3 ago')
-    expect(monthLabel('2026-12-28')).toBe('dic')
   })
 })

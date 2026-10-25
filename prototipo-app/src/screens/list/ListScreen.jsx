@@ -20,7 +20,7 @@ export default function ListScreen({ back, push, params }) {
       {stores.length > 0 && (
         <>
           <h2 className="list-heading">
-            Stores <span>{stores.length}</span>
+            Tiendas <span>{stores.length}</span>
           </h2>
           <StoreList stores={stores} onOpen={(store) => push('store', { store })} />
         </>
@@ -29,7 +29,7 @@ export default function ListScreen({ back, push, params }) {
       {products.length > 0 && (
         <>
           <h2 className="list-heading">
-            Products <span>{products.length}</span>
+            Productos <span>{products.length}</span>
           </h2>
           <ul className="list-products">
             {products.map((product) => (

@@ -1,3 +1,4 @@
+import { AGENT_NAME } from '../lib/agentName.js'
 import { useEffect, useRef, useState } from 'react'
 import snapshot from 'virtual:panel-snapshot'
 import { Icon } from '../components/Icon.jsx'
@@ -7,7 +8,7 @@ import './demo.css'
 
 const INTRO = {
   title: 'Así reacciona el panel al uso de la app',
-  text: 'Sigue a una persona nueva en el prototipo: Mochi le ofrece un kit, lo acepta, paga y busca algo que no hay. Cada paso suma un evento de ejemplo a lo grabado y te lleva a donde cambia.',
+  text: `Sigue a una persona nueva en el prototipo: ${AGENT_NAME} le ofrece un kit, lo acepta, paga y busca algo que no hay. Cada paso suma un evento de ejemplo a lo grabado y te lleva a donde cambia.`,
   view: 'mochi',
   section: 'ofertas',
 }

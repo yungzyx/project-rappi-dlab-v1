@@ -3,19 +3,9 @@ import { useEffect, useState } from 'react'
 // La vista y la fuente viven en la URL (?vista=clientes&fuente=prototipo) para compartir un enlace exacto.
 const SOURCE_PARAMS = { synthetic: 'simulados', prototype: 'prototipo' }
 
-/** Las vistas de antes del rediseño (22-10-2026) abren la vista nueva que tiene su contenido. */
-const LEGACY_VIEWS = {
-  oportunidades: 'mochi',
-  frecuencia: 'clientes',
-  verticales: 'clientes',
-  catalogo: 'mochi',
-  mvp: 'mochi',
-}
-
 function readUrlState(search, viewIds) {
   const params = new URLSearchParams(search)
-  const asked = params.get('vista')
-  const requested = LEGACY_VIEWS[asked] ?? asked
+  const requested = params.get('vista')
   const view = viewIds.includes(requested) ? requested : viewIds[0]
   const source = params.get('fuente') === SOURCE_PARAMS.prototype ? 'prototype' : 'synthetic'
   return { view, source }

@@ -28,12 +28,12 @@ const PROMOS = [
 
 const NAV_ITEMS = [
   { id: 'turbo', label: 'Turbo', Icon: SpeedBoltIcon },
-  { id: 'favorites', label: 'Favorites', Icon: HeartIcon },
-  { id: 'offers', label: 'Offers', Icon: BadgePercentIcon },
-  { id: 'categories', label: 'Categories', Icon: GridIcon },
+  { id: 'favorites', label: 'Favoritos', Icon: HeartIcon },
+  { id: 'offers', label: 'Ofertas', Icon: BadgePercentIcon },
+  { id: 'categories', label: 'Categorías', Icon: GridIcon },
 ]
 
-// Monto del carro para el 100 % de descuento en la tarifa de servicio (captura 9110).
+// Monto del carro para el 100 % de descuento en la tarifa de servicio (el de la app iOS del 26-09-2026).
 const FEE_GOAL = 29900
 
 export default function TurboScreen({ back, push }) {
@@ -43,7 +43,7 @@ export default function TurboScreen({ back, push }) {
   const [tab, setTab] = useState('turbo')
   // Con el producto tocado: la tienda registra que se vio.
   const openStore = (item) => push('store', { store: storeOfProduct(item), item })
-  // Categories lleva al pasillo que se tocó.
+  // Categorías lleva al pasillo que se tocó.
   const showAisle = (id) => {
     shop.setAisle(id)
     setTab('turbo')
@@ -57,7 +57,7 @@ export default function TurboScreen({ back, push }) {
       {tab === 'favorites' && <FavoritesScreen push={push} />}
       {tab === 'offers' && <TurboOffers onOpenStore={openStore} />}
       {tab === 'categories' && (
-        <TabPage title="Categories" color="#3e7b4b" className="turbo-page">
+        <TabPage title="Categorías" color="#3e7b4b" className="turbo-page">
           <ShopStatus shop={shop} />
           <ul className="turbo-categories">
             {shop.aisles.map((aisle) => (
@@ -84,11 +84,11 @@ export default function TurboScreen({ back, push }) {
   )
 }
 
-/** Las bajas de precio de los productos Turbo (pestaña Offers). */
+/** Las bajas de precio de los productos Turbo (pestaña Ofertas). */
 function TurboOffers({ onOpenStore }) {
   const offers = useApi(() => loadDeals('turbo'), [])
   return (
-    <TabPage title="Offers" color="#3e7b4b" className="turbo-page">
+    <TabPage title="Ofertas" color="#3e7b4b" className="turbo-page">
       <p className="turbo-page-note">Productos con descuento en Turbo</p>
       {offers.error && <OfflineNotice onRetry={offers.retry} />}
       {offers.data?.length === 0 && <p className="turbo-page-note">Todavía no hay ofertas en Turbo.</p>}
@@ -139,13 +139,13 @@ function TurboFeed({ back, toast, shop, onOpenStore, onSearch }) {
         {eta && (
           <div className="turbo-eta">
             <SpeedBoltIcon size={22} />
-            Delivery in <strong>{eta}</strong>
+            Llega en <strong>{eta}</strong>
           </div>
         )}
 
         <button type="button" className="turbo-search tap" onClick={onSearch}>
           <SearchIcon size={21} />
-          Search in Turbo 20
+          Busca en Turbo
         </button>
 
         <HScroll className="turbo-tabs" role="tablist">
@@ -171,14 +171,14 @@ function TurboFeed({ back, toast, shop, onOpenStore, onSearch }) {
       <div className="turbo-fee">
         <img src={turboCrown} alt="" loading="lazy" />
         <div>
-          <p className="turbo-fee-title">100% OFF on Service Fee</p>
+          <p className="turbo-fee-title">100% de descuento en la tarifa de servicio</p>
           <p className="turbo-fee-sub">
             {remaining > 0 ? (
               <>
-                Add <strong>{formatPrice(remaining)}</strong> to enjoy this discount.
+                Agrega <strong>{formatPrice(remaining)}</strong> para tener este descuento.
               </>
             ) : (
-              <>Discount unlocked.</>
+              <>Descuento activado.</>
             )}
           </p>
         </div>

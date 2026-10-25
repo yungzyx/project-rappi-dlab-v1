@@ -3,13 +3,13 @@ import { SearchIcon } from './Icons'
 
 // Textos que rota el buscador de la Home real (capturas y video del 26-09-2026).
 const HINTS = [
-  'Find anything in 10 min with Turbo',
-  'Search "Banana"',
-  'What do you want today?',
-  'Search "Water"',
-  'Search "Chocolate"',
-  'Search "Burger"',
-  'Search "Beer"',
+  'Encuentra lo que sea en 10 min con Turbo',
+  'Busca "Plátano"',
+  '¿Qué quieres hoy?',
+  'Busca "Agua"',
+  'Busca "Chocolate"',
+  'Busca "Hamburguesa"',
+  'Busca "Cerveza"',
 ]
 const ROTATE_MS = 3000
 

@@ -50,7 +50,7 @@ const SIX = ['grocery', 'pharmacy', 'retail', 'liquor', 'express', 'chocolates']
 const ENGINE = ['farmacia', 'mall', 'supermercado', 'licores', 'conveniencia', 'chocolateria']
 const labels = () => [...document.querySelectorAll('.home-shortcut')].map((button) => button.textContent)
 
-test('orderShortcuts pone Loyalty y Benefits Pro al final en el Prototipo final', () => {
+test('orderShortcuts pone Lealtad y Beneficios Pro al final en el Prototipo final', () => {
   const result = ids(orderShortcuts(SHORTCUTS, null, { final: true }))
   expect(result.slice(-2)).toEqual(['loyalty', 'benefitspro'])
   expect(result.slice(0, 6)).toEqual(SIX)
@@ -80,21 +80,21 @@ test('Shortcuts con `proposal` pinta el orden recibido y el texto de debajo; sin
       wrapper: ToastProvider,
     },
   )
-  expect(labels().slice(0, 3)).toEqual(['Pharmacy', 'Retail', 'Grocery'])
+  expect(labels().slice(0, 3)).toEqual(['Farmacia', 'Rappi Mall', 'Súper'])
   expect(screen.getByText('Ordenadas según lo que más usas')).toBeTruthy()
   unmount()
   render(<Shortcuts push={vi.fn()} order={ENGINE} />, { wrapper: ToastProvider })
-  expect(labels()[0]).toBe('Grocery')
+  expect(labels()[0]).toBe('Súper')
   expect(screen.queryByText(/Ordenadas/)).toBeNull()
 })
 
 test('un acceso con vertical llama a onOpen con su código del backend; los demás no', () => {
   const onOpen = vi.fn()
   render(<Shortcuts push={vi.fn()} proposal onOpen={onOpen} />, { wrapper: ToastProvider })
-  fireEvent.click(screen.getByText('Pharmacy'))
+  fireEvent.click(screen.getByText('Farmacia'))
   expect(onOpen).toHaveBeenCalledExactlyOnceWith('farmacia')
   onOpen.mockClear()
-  for (const name of ['RappiTravel', 'RappiFavor', 'Loyalty', 'Benefits Pro']) fireEvent.click(screen.getByText(name))
+  for (const name of ['RappiTravel', 'RappiFavor', 'Lealtad', 'Beneficios Pro']) fireEvent.click(screen.getByText(name))
   expect(onOpen).not.toHaveBeenCalled()
 })
 
@@ -108,7 +108,7 @@ test('abrir RappiTravel o RappiFavor llama a onService una vez con su servicio; 
   unmount()
   onService.mockClear()
   render(<Shortcuts push={vi.fn()} proposal onService={onService} />, { wrapper: ToastProvider })
-  for (const name of ['RappiFavor', 'RappiTravel', 'Pharmacy', 'Loyalty']) fireEvent.click(screen.getByText(name))
+  for (const name of ['RappiFavor', 'RappiTravel', 'Farmacia', 'Lealtad']) fireEvent.click(screen.getByText(name))
   expect(onService.mock.calls).toEqual([['rappifavor'], ['rappitravel']])
 })
 
@@ -116,7 +116,7 @@ test('los dos accesos grandes llaman a onOpen con restaurantes y turbo', () => {
   const onOpen = vi.fn()
   const push = vi.fn()
   render(<MainTiles push={push} onOpen={onOpen} />)
-  fireEvent.click(screen.getByText('Restaurants'))
+  fireEvent.click(screen.getByText('Restaurantes'))
   fireEvent.click(screen.getByText('Turbo'))
   expect(onOpen.mock.calls).toEqual([['restaurantes'], ['turbo']])
   expect(push).toHaveBeenCalledTimes(2)

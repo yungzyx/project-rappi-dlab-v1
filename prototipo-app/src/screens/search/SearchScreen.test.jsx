@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { fixture, stubApi } from '../../api/testing'
+import { fixture, stubApi } from '../../test/api'
 import ProductSheet from '../../components/ProductSheet'
 import { AssistantProvider } from '../../state/AssistantContext'
 import { CartProvider } from '../../state/CartContext'
@@ -56,7 +56,7 @@ describe('SearchScreen', () => {
     const push = vi.fn()
     const fetchMock = stubApi({ '/search': searchRoute, '/catalog/home': fixture('catalog-home'), ...routes })
     render(<SearchScreen back={() => {}} push={push} params={params} />, { wrapper: Providers })
-    return { input: screen.getByPlaceholderText('What do you want today?'), push, fetchMock }
+    return { input: screen.getByPlaceholderText('¿Qué quieres hoy?'), push, fetchMock }
   }
   const type = async (input, text) => {
     fireEvent.change(input, { target: { value: text } })
@@ -90,7 +90,7 @@ describe('SearchScreen', () => {
     expect(searches().at(-1).payload).toBeUndefined()
     const last = new URL(fetchMock.mock.calls.at(-1)[0])
     expect(last.searchParams.get('correct')).toBe('false')
-    expect(screen.getByText('No results for “cervezaaaa”.')).toBeTruthy()
+    expect(screen.getByText('Sin resultados para «cervezaaaa».')).toBeTruthy()
     expect(screen.queryByText(/Mostrando resultados/)).toBeNull()
 
     await type(input, 'cervezaaa') // con otro texto, la API vuelve a poder corregir
@@ -99,7 +99,7 @@ describe('SearchScreen', () => {
 
   test('el título de sugerencias no dice recientes: son ideas fijas, no un historial', () => {
     setup()
-    expect(screen.getByRole('heading', { name: 'Search ideas' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Ideas para buscar' })).toBeTruthy()
     expect(screen.queryByText(/recent/i)).toBeNull()
   })
 
@@ -137,7 +137,7 @@ describe('SearchScreen', () => {
   test('sin resultados del catálogo dice que no hay (sin Mochi en «Rappi hoy»)', async () => {
     const { input } = setup()
     await type(input, 'xyzzy')
-    expect(screen.getByText('No results for “xyzzy”.')).toBeTruthy()
+    expect(screen.getByText('Sin resultados para «xyzzy».')).toBeTruthy()
     expect(document.querySelector('.mascot')).toBeNull()
   })
 
@@ -145,7 +145,7 @@ describe('SearchScreen', () => {
     setup()
     await advance(0)
     expect(screen.getByText('Botillería de prueba Oriente')).toBeTruthy()
-    expect(screen.getByText('Popular stores')).toBeTruthy()
+    expect(screen.getByText('Tiendas populares')).toBeTruthy()
   })
 
   test('sin API el buscador muestra Sin conexión y Reintentar vuelve a buscar', async () => {

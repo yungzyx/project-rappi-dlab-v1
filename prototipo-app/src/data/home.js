@@ -1,6 +1,5 @@
 import catRestaurants from '../assets/cat-restaurants.webp'
 import catTurbo from '../assets/cat-turbo.webp'
-import creditsCoin from '../assets/credits-coin.webp'
 import chipGrocery from '../assets/chip-grocery.webp'
 import chipPharmacy from '../assets/chip-pharmacy.webp'
 import chipRetail from '../assets/chip-retail.webp'
@@ -15,38 +14,38 @@ import bannerDescuentos from '../assets/banner-descuentos.webp'
 import bannerCena from '../assets/banner-cena.webp'
 
 export const CREDITS = {
-  logo: creditsCoin,
-  title: '$1.900 Credits',
-  subtitle: 'in Todofarma Market',
+  logo: chipLoyalty,
+  title: '$1.900 en créditos',
+  subtitle: 'para tu próximo pedido',
   expiresInMinutes: 116,
 }
 
 export const MAIN_TILES = [
-  { id: 'restaurants', label: 'Restaurants', img: catRestaurants, screen: 'restaurants', vertical: 'restaurantes' },
+  { id: 'restaurants', label: 'Restaurantes', img: catRestaurants, screen: 'restaurants', vertical: 'restaurantes' },
   { id: 'turbo', label: 'Turbo', img: catTurbo, screen: 'turbo', vertical: 'turbo' },
 ]
 
-// RappiFavor aparece deshabilitado como en la app (la imagen trae el sello "Unavailable"); en el prototipo final se habilita
-// con su pantalla (`proposalRoute`).
+// RappiFavor aparece deshabilitado como en la app (la imagen trae el sello «No disponible»); en el prototipo final se
+// habilita con su pantalla (`proposalRoute`).
 // `route` dice a qué pantalla lleva cada acceso (ver HomeFeed); `service`, el servicio sin catálogo que abre
 // (`payload.servicio` de `service_opened`).
 export const SHORTCUTS = [
   {
     id: 'grocery',
-    label: 'Grocery',
+    label: 'Súper',
     img: chipGrocery,
     vertical: 'supermercado',
     route: ['vertical', { id: 'grocery' }],
   },
   {
     id: 'pharmacy',
-    label: 'Pharmacy',
+    label: 'Farmacia',
     img: chipPharmacy,
     vertical: 'farmacia',
     route: ['vertical', { id: 'pharmacy' }],
   },
-  { id: 'retail', label: 'Retail', img: chipRetail, vertical: 'mall', route: ['vertical', { id: 'retail' }] },
-  { id: 'liquor', label: 'Liquor', img: chipLiquor, vertical: 'licores', route: ['vertical', { id: 'liquor' }] },
+  { id: 'retail', label: 'Rappi Mall', img: chipRetail, vertical: 'mall', route: ['vertical', { id: 'retail' }] },
+  { id: 'liquor', label: 'Licores', img: chipLiquor, vertical: 'licores', route: ['vertical', { id: 'liquor' }] },
   {
     id: 'express',
     label: 'Express',
@@ -62,8 +61,8 @@ export const SHORTCUTS = [
     route: ['vertical', { id: 'chocolates' }],
   },
   { id: 'rappitravel', label: 'RappiTravel', img: chipRappiTravel, route: ['travel'], service: 'rappitravel' },
-  { id: 'loyalty', label: 'Loyalty', img: chipLoyalty, route: ['loyalty'] },
-  { id: 'benefitspro', label: 'Benefits Pro', img: chipBenefitsPro },
+  { id: 'loyalty', label: 'Lealtad', img: chipLoyalty, route: ['loyalty'] },
+  { id: 'benefitspro', label: 'Beneficios Pro', img: chipBenefitsPro },
   {
     id: 'rappifavor',
     label: 'RappiFavor',
@@ -76,7 +75,7 @@ export const SHORTCUTS = [
 ]
 
 // Cola fija de la fila en el prototipo final: tras los 6 verticales (en el orden del motor), siempre en este orden y
-// con Loyalty y Benefits Pro al final.
+// con Lealtad y Beneficios Pro al final.
 const FINAL_TAIL = ['rappitravel', 'rappifavor', 'loyalty', 'benefitspro']
 
 /**

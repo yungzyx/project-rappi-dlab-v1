@@ -10,7 +10,7 @@
   line-height: 42px;
 }
 
-/* Botón de la esquina (corona de Pro en Deals): fijo, no se mueve al colapsar */
+/* Botón de la esquina (corona de Pro en Ofertas): fijo, no se mueve al colapsar */
 .tab-action {
   position: absolute;
   top: 77px;

@@ -623,7 +623,7 @@
   font-weight: 800;
 }
 
-/* «Pregúntale a Mochi»: primera fila del buscador mientras se escribe (AskMochiRow) */
+/* «Pregúntale a Mochi»: primera fila del buscador mientras se escribe (AskAgentRow) */
 .agent-ask-row {
   display: flex;
   align-items: center;

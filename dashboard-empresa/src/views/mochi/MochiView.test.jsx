@@ -77,7 +77,12 @@ describe('MochiView', () => {
     expect(await screen.findByText('Los datos simulados no registran el momento de la oferta')).toBeTruthy()
     expect(screen.queryByRole('table', { name: 'Ofertas del agente por momento' })).toBeNull()
     const suggestions = screen.getByRole('table', { name: 'Sugerencias entre verticales' })
-    expect(cells(bodyRows(suggestions)[0])).toEqual(['🍺 Cervezaen Licores', '411 de 1.705', '24,1%', '300 (73%)'])
+    expect(cells(bodyRows(suggestions)[0])).toEqual([
+      '🥤 Bebidas gaseosasen Conveniencia',
+      '212 de 944',
+      '22,5%',
+      '150 (71%)',
+    ])
     expect(bodyRows(suggestions)).toHaveLength(8)
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Ver las 30' })))
     expect(bodyRows(suggestions)).toHaveLength(30)
@@ -97,8 +102,19 @@ describe('MochiView', () => {
     expect(within(offers).getByText('Plan')).toBeTruthy()
   })
 
-  test('services without catalog: offered, opened and the catalog hook', async () => {
+  test('services without catalog: offered and opened, and the catalog hook when there is one', async () => {
     serveFixtures()
+    await renderWithData(<MochiView source="synthetic" />)
+
+    const services = screen.getByRole('table', { name: 'Servicios sin catálogo' })
+    expect(cells(bodyRows(services)[0])).toEqual(['✈️ RappiTravel', '442', '157 (36%)', '—'])
+  })
+
+  test('a service with a catalog hook shows how many accepted it', async () => {
+    const travel = { servicio: 'rappitravel', nombre: '✈️ RappiTravel', ofrecido: 556, abierto: 186, desde_home: 0 }
+    serveFixturesWith({
+      services: { source: 'synthetic', data: [{ ...travel, ganchos_mostrados: 556, ganchos_aceptados: 126 }] },
+    })
     await renderWithData(<MochiView source="synthetic" />)
 
     const services = screen.getByRole('table', { name: 'Servicios sin catálogo' })
@@ -143,7 +159,7 @@ describe('MochiView', () => {
     expect(bodyRows(rising).length).toBeLessThanOrEqual(5)
     expect(within(rising).getAllByText('sin surtido').length).toBeGreaterThan(0) // la comida peruana sube sin surtido
     const thin = screen.getByRole('table', { name: 'Poco surtido para lo que se busca' })
-    expect(cells(bodyRows(thin)[0])[0]).toBe('🚗 Autoen Rappi Mall')
+    expect(cells(bodyRows(thin)[0])[0]).toBe('🦴 Accesorios para mascotasen Turbo')
   })
 
   test('without grouped demand (prototype), the unmet searches by vertical and concept', async () => {

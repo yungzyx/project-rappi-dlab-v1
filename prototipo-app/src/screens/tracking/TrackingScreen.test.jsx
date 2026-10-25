@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { fixture, stubApi } from '../../api/testing'
+import { fixture, stubApi } from '../../test/api'
 import { ToastProvider } from '../../components/Toast'
 import { AssistantProvider, useAssistant } from '../../state/AssistantContext'
 import { DemoProvider } from '../../state/DemoContext'

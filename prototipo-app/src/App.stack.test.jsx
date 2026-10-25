@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
-import { fixture, stubApi } from './api/testing'
+import { fixture, stubApi } from './test/api'
 import App from './App'
 
 vi.mock('./api/client', async (importOriginal) => ({
@@ -39,7 +39,7 @@ describe('pila de pantallas montada', () => {
     expect(home.hasAttribute('inert')).toBe(true)
 
     // Las pantallas (salvo la Home) se bajan al abrirse: se espera a que el buscador aparezca.
-    const input = await screen.findByPlaceholderText('What do you want today?')
+    const input = await screen.findByPlaceholderText('¿Qué quieres hoy?')
     fireEvent.change(input, { target: { value: 'cerveza' } })
     fireEvent.click(await screen.findByText('Cerveza negra botella 330 cc (prueba)')) // la hoja del producto
     fireEvent.click(document.querySelector('.product-sheet-store')) // «Ver tienda»
@@ -59,7 +59,7 @@ describe('pila de pantallas montada', () => {
     }
     act(() => window.dispatchEvent(new PopStateEvent('popstate', { state: searchEntry })))
     expect(wraps()).toHaveLength(2)
-    expect(screen.getByPlaceholderText('What do you want today?').value).toBe('cerveza')
+    expect(screen.getByPlaceholderText('¿Qué quieres hoy?').value).toBe('cerveza')
     expect(wraps()[1].hasAttribute('inert')).toBe(false)
     expect(wraps()[0]).toBe(home)
   })

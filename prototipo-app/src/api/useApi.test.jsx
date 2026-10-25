@@ -3,7 +3,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest'
 import OfflineNotice from '../components/OfflineNotice'
 import { store } from './catalog'
 import { ApiError } from './client'
-import { fixture, stubApi } from './testing'
+import { fixture, stubApi } from '../test/api'
 import { useApi } from './useApi'
 
 afterEach(() => {

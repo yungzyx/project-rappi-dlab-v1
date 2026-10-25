@@ -1,10 +1,9 @@
-// Lo que no es catálogo de las verticales abiertas desde los accesos de la Home (capturas IMG_9119–9126 del 26-09-2026):
-// título, filas de categorías y banners. Las tiendas y los productos salen de la API (`/catalog`).
+// Lo que no es catálogo de las verticales abiertas desde los accesos de la Home (capturas de la app iOS del 26-09-2026,
+// no versionadas): título y filas de categorías. Las tiendas y los productos salen de la API (`/catalog`).
 const v = import.meta.glob('../../assets/v/*.webp', { eager: true, import: 'default' })
 const a = (name) => v[`../../assets/v/${name}.webp`]
 
-// Cada categoría es `[etiqueta de la captura (en inglés), consulta en español]`: tocarla busca esa consulta en el
-// catálogo, con la vertical de la pantalla.
+// Cada categoría es `[etiqueta, consulta]`: tocarla busca esa consulta en el catálogo, con la vertical de la pantalla.
 function catRow(prefix, items, partialLast = false) {
   return items.map(([label, query], i) => ({
     id: `${prefix}-${i}`,
@@ -17,53 +16,44 @@ function catRow(prefix, items, partialLast = false) {
 
 export const VERTICALS = {
   grocery: {
-    title: 'Grocery',
+    title: 'Súper',
     categoryRows: [
       catRow(
         'gro',
         [
-          ['Groceries', 'despensa'],
+          ['Despensa', 'despensa'],
           ['Express', 'snacks'],
-          ['Produce', 'frutas y verduras'],
-          ['Meat & Seafood', 'carnes y pescados'],
-          ['Drugstore', 'medicamentos'],
+          ['Frutas y verduras', 'frutas y verduras'],
+          ['Carnes y pescados', 'carnes y pescados'],
+          ['Farmacia', 'medicamentos'],
         ],
         true,
       ),
     ],
-    banners: [
-      {
-        id: 'bancoestado',
-        label: 'Promoción BancoEstado',
-        img: a('banner-bancoestado'),
-        toast: 'Promoción válida con Tarjeta Visa BancoEstado',
-      },
-      { id: 'bancobice', label: 'Cupón Banco BICE', img: a('banner-bancobice'), toast: 'Cupón BSRAPPISEP26 copiado' },
-    ],
   },
 
   pharmacy: {
-    title: 'Pharmacy',
+    title: 'Farmacia',
     categoryRows: [
       catRow(
         'pha',
         [
-          ['Beauty', 'belleza'],
-          ['Sexual health', 'salud sexual'],
-          ['Pain relief', 'analgésicos'],
-          ['Vitamins and supplements', 'vitaminas'],
-          ['First-aid medical', 'primeros auxilios'],
+          ['Belleza', 'belleza'],
+          ['Salud sexual', 'salud sexual'],
+          ['Analgésicos', 'analgésicos'],
+          ['Vitaminas y suplementos', 'vitaminas'],
+          ['Primeros auxilios', 'primeros auxilios'],
         ],
         true,
       ),
       catRow(
         'pha2',
         [
-          ['Personal care', 'cuidado personal'],
-          ['Flu and allergies', 'resfrío y alergias'],
-          ['Digestive health', 'salud digestiva'],
-          ['Baby care', 'cuidado del bebé'],
-          ['Visual health', 'salud visual'],
+          ['Cuidado personal', 'cuidado personal'],
+          ['Resfrío y alergias', 'resfrío y alergias'],
+          ['Salud digestiva', 'salud digestiva'],
+          ['Cuidado del bebé', 'cuidado del bebé'],
+          ['Salud visual', 'salud visual'],
         ],
         true,
       ),
@@ -71,36 +61,36 @@ export const VERTICALS = {
   },
 
   retail: {
-    title: 'Retail',
+    title: 'Rappi Mall',
     scrollCategories: true,
     categoryRows: [
       catRow('ret', [
-        ['Beauty and health', 'belleza'],
-        ['Stationery and office', 'útiles de oficina'],
-        ['Fashion', 'ropa'],
-        ['Tools and garden', 'herramientas y jardín'],
+        ['Belleza y salud', 'belleza'],
+        ['Librería y oficina', 'útiles de oficina'],
+        ['Moda', 'ropa'],
+        ['Herramientas y jardín', 'herramientas y jardín'],
         ['Sex shop', 'sex shop'],
       ]),
       catRow('ret2', [
-        ['Technology', 'tecnología'],
-        ['Decoration and home', 'decoración del hogar'],
-        ['Flowers and plants', 'flores y plantas'],
-        ['Baby and kids accessories', 'accesorios para bebé'],
-        ['Parties', 'fiesta'],
+        ['Tecnología', 'tecnología'],
+        ['Hogar y decoración', 'decoración del hogar'],
+        ['Flores y plantas', 'flores y plantas'],
+        ['Bebés y niños', 'accesorios para bebé'],
+        ['Fiestas', 'fiesta'],
       ]),
     ],
   },
 
   liquor: {
-    title: 'Liquor',
+    title: 'Licores',
     scrollCategories: true,
     categoryRows: [
       catRow('liq', [
-        ['Beers and ciders', 'cerveza'],
-        ['Wines', 'vino'],
-        ['Liquors', 'licores'],
-        ['Mixers and drinks', 'bebidas'],
-        ['Ready to drink', 'cócteles'],
+        ['Cervezas y sidras', 'cerveza'],
+        ['Vinos', 'vino'],
+        ['Destilados', 'licores'],
+        ['Bebidas y mixers', 'bebidas'],
+        ['Listos para tomar', 'cócteles'],
       ]),
     ],
   },
@@ -111,11 +101,11 @@ export const VERTICALS = {
       catRow(
         'exp',
         [
-          ['Specialized', 'productos especiales'],
-          ['Market', 'mercado'],
-          ['Kiosk', 'kiosco'],
-          ['Pets', 'mascotas'],
-          ['Meat', 'carne'],
+          ['Especialidades', 'productos especiales'],
+          ['Almacén', 'mercado'],
+          ['Kiosco', 'kiosco'],
+          ['Mascotas', 'mascotas'],
+          ['Carnes', 'carne'],
         ],
         true,
       ),

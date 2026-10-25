@@ -3,7 +3,7 @@ import { homeVerticals, targetStep } from './motor'
 import { makeOffer } from './offers'
 import { ladderReadout, personaHistory, personas } from './personas'
 import { profileOffer, tastesReply } from './tastes'
-import { COMBOS, LABELS, META, product } from './testMeta'
+import { COMBOS, LABELS, META, product } from '../../test/offlineMeta'
 
 const NOW = Date.UTC(2026, 9, 17, 15)
 const VERTICALS = ['restaurantes', 'turbo', 'supermercado', 'conveniencia', 'mall', 'chocolateria', 'farmacia']
