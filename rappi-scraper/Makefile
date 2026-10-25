@@ -1,4 +1,4 @@
-.PHONY: help install db migrate test test-unit test-integration lint format status report refresh backup schedule unschedule schedule-status
+.PHONY: help install db db-docker migrate test test-unit test-integration lint format status report refresh backup schedule unschedule schedule-status
 
 PY := .venv/bin/python
 # Python ≥ 3.12 para crear el .venv. En un macOS nuevo `python3` es el 3.9 del sistema: se prefiere python3.13
@@ -13,10 +13,10 @@ PG_BIN := $(shell brew --prefix 2>/dev/null)/opt/postgresql@17/bin
 help:  ## Muestra esta ayuda
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-17s %s\n", $$1, $$2}'
 
-install:  ## Crea .venv e instala el proyecto con dependencias de desarrollo
+install:  ## Crea .venv e instala el proyecto con dependencias de desarrollo (versiones del lock, como el CI)
 	$(PYTHON) -m venv .venv
 	$(PY) -m pip install -q --upgrade pip
-	$(PY) -m pip install -q -e ".[dev]"
+	$(PY) -m pip install -q -c ../rappi-ia/requirements.lock.txt -e ".[dev]"
 	@test -f .env || cp .env.example .env
 
 db:  ## Instala y levanta Postgres 17 + pgvector (Homebrew) y crea las bases
@@ -24,6 +24,19 @@ db:  ## Instala y levanta Postgres 17 + pgvector (Homebrew) y crea las bases
 	brew services start postgresql@17
 	-$(PG_BIN)/createdb rappi
 	-$(PG_BIN)/createdb rappi_test
+
+# Sin Homebrew (Linux, o macOS sin brew): la misma imagen que el CI y el despliegue, publicada solo en 127.0.0.1. Espera
+# por TCP: mientras la imagen inicializa la base, su servidor temporal solo escucha en el socket interno.
+PG_IMAGE := pgvector/pgvector:0.8.7-pg17-trixie
+DB_DOCKER_PORT ?= 5432
+db-docker:  ## Postgres 17 + pgvector en Docker (sin Homebrew), con rappi, rappi_test y rappi_ia_test; ver .env.example
+	docker start rappi-postgres 2>/dev/null || docker run -d --name rappi-postgres -e POSTGRES_PASSWORD=postgres \
+	  -p 127.0.0.1:$(DB_DOCKER_PORT):5432 -v rappi-pgdata:/var/lib/postgresql/data $(PG_IMAGE)
+	until docker exec rappi-postgres pg_isready -h 127.0.0.1 -U postgres -q; do sleep 1; done
+	for db in rappi rappi_test rappi_ia_test; do \
+	  docker exec rappi-postgres psql -U postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '$$db'" | grep -q 1 \
+	    || docker exec rappi-postgres createdb -U postgres $$db; done
+	@echo "En .env: DATABASE_URL=postgresql://postgres:postgres@localhost:$(DB_DOCKER_PORT)/rappi (y …/rappi_test)"
 
 migrate:  ## Aplica migraciones pendientes
 	$(PY) -m rappi_scraper migrate

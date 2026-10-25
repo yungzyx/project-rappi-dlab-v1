@@ -50,3 +50,21 @@ updates:
       scraper-menores:
         patterns: ["*"]
         update-types: [minor, patch]
+  # Las imágenes de deploy/ (Dockerfile.api, Dockerfile.web y docker-compose.yml), fijadas en una versión exacta. Las de
+  # los servicios del CI (.github/workflows/ci.yml) se suben a mano, a la misma de docker-compose.yml.
+  - package-ecosystem: docker
+    directory: /deploy
+    schedule:
+      interval: weekly
+    groups:
+      imagenes:
+        patterns: ["*"]
+        update-types: [minor, patch]
+  - package-ecosystem: docker-compose
+    directory: /deploy
+    schedule:
+      interval: weekly
+    groups:
+      compose:
+        patterns: ["*"]
+        update-types: [minor, patch]

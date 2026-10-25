@@ -24,7 +24,7 @@ jobs:
 
     services:
       postgres:
-        image: pgvector/pgvector:pg17  # misma versión que el Postgres local (Homebrew)
+        image: pgvector/pgvector:0.8.7-pg17-trixie  # la de deploy/docker-compose.yml (Dependabot no sube las del CI)
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -70,7 +70,7 @@ jobs:
 
     services:
       postgres:
-        image: pgvector/pgvector:pg17  # trae unaccent (contrib) para la búsqueda sin tildes
+        image: pgvector/pgvector:0.8.7-pg17-trixie  # trae unaccent (contrib) para la búsqueda sin tildes
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -99,7 +99,15 @@ jobs:
             rappi-scraper/pyproject.toml
 
       - name: Instalar (sin extras de modelos)
-        run: python -m pip install -c requirements.lock.txt -e ../rappi-scraper -e ".[api,dev]"  # mismas versiones que en el Mac
+        run: python -m pip install -c requirements.lock.txt -e ../rappi-scraper -e ".[api,dev]"  # las versiones del lock
+
+      # pg_dump, pg_restore y psql 17, los de la base (los del runner pueden ser de otra versión): el test de punta a
+      # punta de `dump-entrega` los usa, y sin ellos se salta.
+      - name: Cliente de Postgres 17
+        run: |
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -q postgresql-client-17
+          echo "PG_DUMP=/usr/lib/postgresql/17/bin/pg_dump" >> "$GITHUB_ENV"
 
       - name: Lint
         run: |
@@ -195,6 +203,28 @@ jobs:
       - name: shellcheck
         run: shellcheck -x scripts/*.sh rappi-scraper/scripts/*.sh rappi-ia/scripts/*.sh deploy/*.sh deploy/db/*.sh deploy/scripts/*.sh
 
+  # Claves, tokens y contraseñas en los archivos versionados del commit (git archive: sin .git ni lo ignorado), con
+  # gitleaks en una versión fija. Solo lee el repo. Las excepciones, revisadas una por una, en .github/gitleaks.toml.
+  secretos:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: gitleaks
+        run: |
+          set -euo pipefail
+          tree="$RUNNER_TEMP/arbol"
+          mkdir -p "$tree"
+          git archive HEAD | tar -x -C "$tree"
+          docker run --rm -w /repo -v "$tree:/repo:ro" ghcr.io/gitleaks/gitleaks:v8.30.1 \
+            dir . --config .github/gitleaks.toml --redact --no-banner --verbose
+
   # El stack de deploy/ de punta a punta, como en un servidor: construye las imágenes (la API sin hornear el modelo,
   # BAKE_MODEL=0: lo descarga al arrancar), levanta Postgres con sus roles, restaura como rappi_owner un dump del
   # catálogo de prueba (seed-demo, inventado), deja que migrate corra deploy-migrate y pasa deploy/smoke.sh contra Caddy
@@ -218,7 +248,7 @@ jobs:
           owner=$(openssl rand -hex 24)
           api=$(openssl rand -hex 24)
           echo "::add-mask::$gate"
-          hash=$(docker run --rm caddy:2 caddy hash-password --plaintext "$gate")
+          hash=$(docker run --rm caddy:2.11.7-alpine caddy hash-password --plaintext "$gate")
           cat > "$env_file" <<EOF
           DOMAIN=localhost
           BASIC_AUTH_USER=ci
@@ -304,7 +334,7 @@ jobs:
         if: failure()
         run: $COMPOSE logs --no-color --tail 300
 
-  # La única prueba de punta a punta (app + panel + API + base): lo mismo que `make mvp-check` en el Mac, con Chrome y
+  # La única prueba de punta a punta (app + panel + API + base): lo mismo que `make mvp-check` en un equipo local, con Chrome y
   # Postgres de la imagen. Sin modelos (RAPPI_IA_LIGHT=1: embeddings falsos y redacción por plantilla).
   mvp-check:
     runs-on: ubuntu-latest
@@ -312,7 +342,7 @@ jobs:
 
     services:
       postgres:
-        image: pgvector/pgvector:pg17
+        image: pgvector/pgvector:0.8.7-pg17-trixie
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
