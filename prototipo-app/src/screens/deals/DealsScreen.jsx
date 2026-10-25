@@ -40,7 +40,7 @@ export default function DealsScreen({ push }) {
 
   return (
     <TabPage
-      title="Deals"
+      title="Ofertas"
       color="#1f84f5"
       className="deals"
       action={

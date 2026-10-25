@@ -28,13 +28,6 @@ export function formatNumber(value, decimals = 0) {
   return numberFormat(decimals).format(value).replace('-', MINUS)
 }
 
-/** Pesos chilenos, sin decimales: 1290 → "$1.290". */
-export function formatCLP(value) {
-  if (isMissing(value)) return EMPTY
-  const sign = value < 0 ? MINUS : ''
-  return `${sign}$${formatNumber(Math.abs(Math.round(value)))}`
-}
-
 /** Porcentaje ya multiplicado por 100: 28.6 → "28,6%". */
 export function formatPct(value, decimals = 1) {
   if (isMissing(value)) return EMPTY
@@ -74,10 +67,4 @@ export function formatShortDate(iso) {
   const parts = dateParts(iso)
   if (!parts) return EMPTY
   return `${parts.day} ${MONTHS[parts.month - 1]}`
-}
-
-/** "2026-05-11" → "may" (para marcar el inicio de cada mes en un eje). */
-export function monthLabel(iso) {
-  const parts = dateParts(iso)
-  return parts ? MONTHS[parts.month - 1] : EMPTY
 }

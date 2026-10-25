@@ -1,6 +1,7 @@
 // «Ver cómo funciona» (solo en el panel en un solo HTML, `npm run panel:html`): un recorrido corto de una persona en la
 // app, aplicado como eventos de ejemplo sobre las respuestas grabadas de la fuente del prototipo. Es una demostración:
 // las cifras que cambian no son datos reales. Funciones puras: cada paso recibe las respuestas y devuelve otras nuevas.
+import { AGENT_NAME } from '../lib/agentName.js'
 
 const round = (value, decimals) => Math.round(value * 10 ** decimals) / 10 ** decimals
 // La misma regla que la API: la tasa aparece desde 10 mostradas.
@@ -56,8 +57,8 @@ function unmetSearch(responses, vertical) {
  */
 export const TOUR = [
   {
-    title: 'Mochi le hace una oferta',
-    text: 'Una persona nueva abre la app y Mochi le ofrece el kit «Carrete», el momento «Plan». En la tabla por momento, «Plan» suma una mostrada.',
+    title: `${AGENT_NAME} le hace una oferta`,
+    text: `Una persona nueva abre la app y ${AGENT_NAME} le ofrece el kit «Carrete», el momento «Plan». En la tabla por momento, «Plan» suma una mostrada.`,
     view: 'mochi',
     section: 'ofertas',
     apply: (responses) => ({

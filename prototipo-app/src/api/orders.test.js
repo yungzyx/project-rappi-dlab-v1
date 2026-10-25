@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { toPrototypeProduct } from './client'
 import { buildOrders, conceptOf, ordersSettled, trackOrder } from './orders'
-import { fixture } from './testing'
+import { fixture } from '../test/api'
 
 const ctx = { userId: 'proto-1', sessionId: 's-1', cartId: 'c-1' }
 // Verticales que acepta POST /orders (códigos del backend).

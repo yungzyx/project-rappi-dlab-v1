@@ -1,14 +1,12 @@
-import { useId, useState } from 'react'
+import { useId } from 'react'
 import { deals as loadDeals, verticalStores } from '../../api/catalog'
 import { useApi } from '../../api/useApi'
 import BackButton from '../../components/BackButton'
-import Carousel, { Dots } from '../../components/Carousel'
 import HScroll from '../../components/HScroll'
 import Img from '../../components/Img'
 import OfflineNotice from '../../components/OfflineNotice'
 import { ProductCard } from '../../components/ProductCard'
 import { StoreMeta } from '../../components/StoreMeta'
-import { useToast } from '../../components/Toast'
 import { ChevronDown, SearchIcon } from '../../components/Icons'
 import { useOpenSearch } from '../../hooks/useOpenSearch'
 import { useAddress } from '../../state/AddressContext'
@@ -18,11 +16,10 @@ import './vertical.css'
 // Las tiendas que se ven en la pantalla; «Ver más» abre la lista con todas.
 const VISIBLE_STORES = 4
 
-/** Plantilla común de Grocery, Pharmacy, Retail, Liquor, Express y Chocolates: la UI es de aquí, las tiendas y las bajas de precio, de la API. */
+/** Plantilla común de Súper, Farmacia, Rappi Mall, Licores, Express y Chocolates: la UI es de aquí, las tiendas y las bajas de precio, de la API. */
 export default function VerticalScreen({ back, push, params }) {
   // Un id desconocido (enlace viejo) no rompe la pantalla: muestra un estado vacío más abajo y no pide nada.
   const vertical = VERTICALS[params.id]
-  const toast = useToast()
   const address = useAddress()
   const openSearch = useOpenSearch(push)
   const stores = useApi(() => (vertical ? verticalStores(params.id) : null), [params.id])
@@ -61,15 +58,13 @@ export default function VerticalScreen({ back, push, params }) {
       <div className="vertical-search-wrap">
         <button type="button" className="search-bar tap" onClick={() => openSearch(params.id)}>
           <SearchIcon size={21} />
-          <span className="vertical-search-hint">Search stores or products</span>
+          <span className="vertical-search-hint">Busca tiendas o productos</span>
         </button>
       </div>
 
       {vertical.categoryRows.length > 0 && (
         <CategoryGrid rows={vertical.categoryRows} scrollable={vertical.scrollCategories} onOpen={openCategory} />
       )}
-
-      {vertical.banners && <BannerCarousel banners={vertical.banners} onOpen={(banner) => toast(banner.toast)} />}
 
       {stores.error && stores.error.status !== 404 && <OfflineNotice onRetry={retry} />}
       {(stores.error?.status === 404 || stores.data?.stores.length === 0) && (
@@ -110,28 +105,6 @@ function CategoryGrid({ rows, scrollable, onOpen }) {
   )
   // Filas cortadas en el borde de la captura no hacen scroll: al deslizar se vería el recorte.
   return scrollable ? <HScroll className="vertical-cats">{grid}</HScroll> : <div className="vertical-cats">{grid}</div>
-}
-
-function BannerCarousel({ banners, onOpen }) {
-  const [index, setIndex] = useState(0)
-  return (
-    <>
-      <Carousel className="vertical-banners" autoplayMs={banners.length > 1 ? 4500 : 0} onIndexChange={setIndex}>
-        {banners.map((banner) => (
-          <button
-            key={banner.id}
-            type="button"
-            className="vertical-banner"
-            aria-label={banner.label}
-            onClick={() => onOpen(banner)}
-          >
-            <img src={banner.img} alt="" draggable="false" loading="lazy" />
-          </button>
-        ))}
-      </Carousel>
-      {banners.length > 1 && <Dots count={banners.length} active={index} className="vertical-banner-dots" />}
-    </>
-  )
 }
 
 function DealsSection({ deals, onOpenStore, onSeeAll }) {

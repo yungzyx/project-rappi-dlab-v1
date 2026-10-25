@@ -29,9 +29,9 @@ describe('persistencia en el navegador', () => {
 
   test('lealtad: el programa vinculado se recuerda', () => {
     const first = renderHook(() => useLoyalty(), { wrapper: LoyaltyProvider })
-    act(() => first.result.current.link('iberia'))
+    act(() => first.result.current.link('millas'))
     first.unmount()
-    expect(renderHook(() => useLoyalty(), { wrapper: LoyaltyProvider }).result.current.activeId).toBe('iberia')
+    expect(renderHook(() => useLoyalty(), { wrapper: LoyaltyProvider }).result.current.activeId).toBe('millas')
   })
 
   test('loadStored: JSON roto o forma inválida devuelven el valor por defecto', () => {

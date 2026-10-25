@@ -1,3 +1,4 @@
+import { AGENT_NAME } from './lib/agentName.js'
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { ProvenanceBadge } from './components/ProvenanceBadge.jsx'
 import { Header } from './components/shell/Header.jsx'
@@ -11,12 +12,12 @@ import { CustomersView } from './views/customers/CustomersView.jsx'
 import { MochiView } from './views/mochi/MochiView.jsx'
 import { OverviewView } from './views/overview/OverviewView.jsx'
 
-// Tres vistas alrededor de 4 preguntas (docs/superpowers/plans/2026-10-22-panel-rediseno.md): el Resumen para la
-// gerencia y RappiAds, y un detalle para cada público.
+// Tres vistas alrededor de 4 preguntas (el porqué, en docs/decisiones.md): el Resumen para la gerencia y RappiAds, y un
+// detalle para cada público.
 export const VIEWS = [
   { id: 'resumen', label: 'Resumen', View: OverviewView },
   { id: 'clientes', label: 'Retención y venta cruzada', short: 'Clientes', View: CustomersView },
-  { id: 'mochi', label: 'Mochi y búsquedas', short: 'Mochi', View: MochiView },
+  { id: 'mochi', label: `${AGENT_NAME} y búsquedas`, short: AGENT_NAME, View: MochiView },
 ]
 const VIEW_IDS = VIEWS.map((view) => view.id)
 

@@ -15,7 +15,7 @@ import './offline-demo-panel.css'
 const VISITS = [
   ['supermercado', 'Súper'],
   ['farmacia', 'Farmacia'],
-  ['mall', 'Retail'],
+  ['mall', 'Rappi Mall'],
   ['licores', 'Licores'],
   ['conveniencia', 'Express'],
   ['chocolateria', 'Chocolates'],

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { currentFine, fineExpectation, homeVerticals, stepSignal, targetStep } from './motor'
-import { COMBOS, LABELS } from './testMeta'
+import { COMBOS, LABELS } from '../../test/offlineMeta'
 
 const NOW = Date.UTC(2026, 9, 17, 15)
 const MIN = 60_000

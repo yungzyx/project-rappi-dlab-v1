@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { API_URL } from '../api/client'
-import { fixture, stubApi } from '../api/testing'
+import { fixture, stubApi } from '../test/api'
 import { userId, userToken } from '../api/user'
 import ConnectionGate from './ConnectionGate'
 

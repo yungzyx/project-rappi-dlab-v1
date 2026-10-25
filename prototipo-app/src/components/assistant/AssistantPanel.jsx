@@ -21,7 +21,7 @@ import BackButton from '../BackButton'
 import ForgetConfirm, { FORGET_TITLE } from '../ForgetConfirm'
 import Sheet from '../Sheet'
 import AgentMessage from './AgentMessage'
-import AskMochiRow from './AskMochiRow'
+import AskAgentRow from './AskAgentRow'
 import DiscoverSection from './DiscoverSection'
 import Mascot from './Mascot'
 import { SparkleIcon } from './SmartBar'
@@ -36,7 +36,7 @@ const FOR_YOU_WAIT_MS = 3000 // lo que el saludo espera lo que se pide al abrir;
 
 const DISCOVER_ROWS = 3
 
-const GREETING = `¡Hola! Soy ${AGENT_NAME}, tu asistente Rappi 🧡 ¿Qué se te antoja hoy?`
+const GREETING = `¡Hola! Soy ${AGENT_NAME}, tu asistente de compras 🧡 ¿Qué se te antoja hoy?`
 const OFFLINE = 'Sin conexión'
 const NOTHING_TO_PAIR = 'No se me ocurre nada para acompañar eso'
 const NOTHING_TO_TRY = 'No se me ocurre nada nuevo para probar'
@@ -486,7 +486,7 @@ export default function AssistantPanel({ push, vertical, depth = 1 }) {
       <div ref={bodyRef} className="agent-search-body">
         {search.hasQuery ? (
           <div className="agent-block">
-            <AskMochiRow
+            <AskAgentRow
               query={search.query.trim()}
               question={looksLikeQuestion(search.query)}
               hintId={askHintId}
@@ -517,7 +517,7 @@ export default function AssistantPanel({ push, vertical, depth = 1 }) {
                 <span>
                   <strong>{AGENT_NAME}</strong>
                   <small>
-                    <i className="assistant-online" /> Tu asistente Rappi
+                    <i className="assistant-online" /> Tu asistente de compras
                   </small>
                 </span>
               </header>

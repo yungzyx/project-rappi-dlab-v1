@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { offer, plans } from './agent'
-import { fixture, stubApi } from './testing'
+import { fixture, stubApi } from '../test/api'
 import { userId } from './user'
 
 afterEach(() => vi.unstubAllGlobals())

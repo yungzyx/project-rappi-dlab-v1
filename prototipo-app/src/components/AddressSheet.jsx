@@ -4,7 +4,7 @@ import Sheet from './Sheet'
 import { useToast } from './Toast'
 import './address-sheet.css'
 
-/** Hoja para elegir la dirección de entrega (se abre desde la Home y desde Account → Addresses). */
+/** Hoja para elegir la dirección de entrega (se abre desde la Home y desde Cuenta → Direcciones). */
 export default function AddressSheet() {
   const address = useAddress()
   const toast = useToast()
@@ -15,7 +15,7 @@ export default function AddressSheet() {
   }
 
   return (
-    <Sheet open={address.sheetOpen} onClose={address.closeSheet} title="Where should we deliver?">
+    <Sheet open={address.sheetOpen} onClose={address.closeSheet} title="¿Dónde te lo llevamos?">
       <ul className="address-list">
         {address.addresses.map((item) => {
           const isSelected = item.id === address.selected.id
@@ -39,7 +39,7 @@ export default function AddressSheet() {
         })}
       </ul>
       <button type="button" className="address-add tap" onClick={() => toast()}>
-        + Add new address
+        + Agregar dirección
       </button>
     </Sheet>
   )

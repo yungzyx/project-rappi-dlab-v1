@@ -1,26 +1,18 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import BackButton from '../../components/BackButton'
 import { useToast } from '../../components/Toast'
-import hero1 from '../../assets/v/travel-hero1.webp'
-import hero2 from '../../assets/v/travel-hero2.webp'
+import hero from '../../assets/v/travel-hero1.webp'
 import hoteles from '../../assets/v/travel-hoteles.webp'
 import vuelos from '../../assets/v/travel-vuelos.webp'
 import paquetes from '../../assets/v/travel-paquetes.webp'
 import tours from '../../assets/v/travel-tours.webp'
 import autos from '../../assets/v/travel-autos.webp'
-import marriott from '../../assets/v/travel-marriott.webp'
 import proWeek from '../../assets/v/travel-proweek.webp'
 import './travel.css'
 
-// Los botones del hero (volver, campana, Ayuda, Mis Viajes, "Ver destinos") vienen dibujados en la imagen,
-// iguales en ambos banners; por eso el carrusel es un fundido y encima van zonas táctiles invisibles
-// (medidas en % del hero de 402 × 335, para que sigan sobre el botón en un teléfono más angosto).
-const HEROES = [
-  { id: 'hoteles40', img: hero1, cta: { left: '9%', top: '71%', width: '20.4%', height: '6%' } },
-  { id: 'bonvoy', img: hero2, cta: { left: '36.6%', top: '72.8%', width: '26.9%', height: '6.6%' } },
-]
-const HERO_MS = 4500
-const SWIPE_PX = 40
+// Los botones del hero (volver, campana, Ayuda, Mis Viajes, "Ver destinos") vienen dibujados en la imagen; encima van
+// zonas táctiles invisibles (en % del hero de 402 × 335, para que sigan sobre el botón en un teléfono más angosto).
+const HERO_CTA = { left: '9%', top: '71%', width: '20.4%', height: '6%' }
 
 const TILES = [
   { id: 'hoteles', label: 'Hoteles', img: hoteles },
@@ -28,51 +20,22 @@ const TILES = [
   { id: 'paquetes', label: 'Paquetes', img: paquetes },
   { id: 'tours', label: 'Tours y Actividades', img: tours },
   { id: 'autos', label: 'Autos', img: autos },
-  { id: 'marriott', label: 'Marriott Bonvoy', img: marriott },
 ]
 
-/** RappiTravel (capturas IMG_9127 y 9128). Reservas de viaje: simuladas con avisos. */
+/** RappiTravel (de las capturas de la app iOS). Reservas de viaje: simuladas con avisos. */
 export default function TravelScreen({ back }) {
   const toast = useToast()
-  const [index, setIndex] = useState(0)
   const [query, setQuery] = useState('')
-  const startX = useRef(null)
-
-  useEffect(() => {
-    const timer = setTimeout(() => setIndex((i) => (i + 1) % HEROES.length), HERO_MS)
-    return () => clearTimeout(timer)
-  }, [index])
-
-  const onPointerDown = (e) => {
-    startX.current = e.clientX
-  }
-  const onPointerUp = (e) => {
-    if (startX.current === null) return
-    const dx = e.clientX - startX.current
-    startX.current = null
-    if (Math.abs(dx) < SWIPE_PX) return
-    setIndex((i) => (i + (dx < 0 ? 1 : HEROES.length - 1)) % HEROES.length)
-  }
 
   const submit = (e) => {
     e.preventDefault()
     toast(query.trim() ? `Buscando viajes a “${query.trim()}”…` : 'Escribe un destino')
   }
 
-  const hero = HEROES[index]
-
   return (
     <div className="screen travel">
-      <div className="travel-hero" onPointerDown={onPointerDown} onPointerUp={onPointerUp}>
-        {HEROES.map((item, i) => (
-          <img
-            key={item.id}
-            src={item.img}
-            alt=""
-            draggable="false"
-            className={i === index ? 'is-active' : undefined}
-          />
-        ))}
+      <div className="travel-hero">
+        <img src={hero} alt="" draggable="false" />
         <BackButton className="travel-hit travel-hit--back" icon={false} onClick={back} />
         <button
           type="button"
@@ -91,7 +54,7 @@ export default function TravelScreen({ back }) {
           type="button"
           className="travel-hit"
           aria-label="Ver destinos"
-          style={hero.cta}
+          style={HERO_CTA}
           onClick={() => toast('Las reservas no están en el prototipo')}
         />
       </div>

@@ -12,7 +12,7 @@ import {
   verticalStores,
 } from './catalog'
 import { ApiError, toPrototypeProduct } from './client'
-import { fixture, stubApi } from './testing'
+import { fixture, stubApi } from '../test/api'
 
 afterEach(() => vi.unstubAllGlobals())
 

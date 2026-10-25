@@ -13,7 +13,7 @@ import OfflineNotice from '../OfflineNotice'
 import ProductRow from '../ProductRow'
 import StoreList from '../StoreList'
 
-// Sugerencias sacadas de los textos que rota el buscador de la Home, en español: la búsqueda es del catálogo chileno.
+// Las mismas ideas que rota el buscador de la Home (PlainSearchBar).
 const IDEAS = ['Plátano', 'Agua', 'Chocolate', 'Hamburguesa', 'Cerveza', 'Pizza']
 const POPULAR_COUNT = 6
 // Productos que se ven de cada vertical; «Ver más» muestra el resto de lo que trajo la API.
@@ -23,7 +23,7 @@ const NO_RESULT_ORIGIN = 'agent-sin_resultado'
 export function SearchIdeas({ onPick }) {
   return (
     <>
-      <h2 className="search-heading">Search ideas</h2>
+      <h2 className="search-heading">Ideas para buscar</h2>
       <div className="search-chips">
         {IDEAS.map((term) => (
           <button key={term} type="button" className="search-chip tap" onClick={() => onPick(term)}>
@@ -41,7 +41,7 @@ export function PopularStores({ onOpen }) {
   if (!data?.nearbyStores.length) return null
   return (
     <>
-      <h2 className="search-heading">Popular stores</h2>
+      <h2 className="search-heading">Tiendas populares</h2>
       <StoreList stores={data.nearbyStores.slice(0, POPULAR_COUNT)} onOpen={onOpen} />
     </>
   )
@@ -79,7 +79,7 @@ export function SearchResults({
     return loading ? null : onOpenVertical ? (
       <AgentEmpty key={text} query={text} onOpenVertical={onOpenVertical} onTryAnother={onTryAnother} />
     ) : (
-      <p className="search-empty">No results for “{text}”.</p>
+      <p className="search-empty">Sin resultados para «{text}».</p>
     )
 
   return (

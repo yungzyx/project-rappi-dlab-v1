@@ -7,14 +7,14 @@ import { useProfile } from '../../state/ProfileContext'
 import { LANGUAGES, NOTIFICATION_CHANNELS } from './data'
 
 const TITLES = {
-  language: 'Language',
-  notifications: 'Notifications',
-  logout: 'Log out?',
-  'logout-all': 'Log out of all sessions?',
+  language: 'Idioma',
+  notifications: 'Notificaciones',
+  logout: '¿Cerrar sesión?',
+  'logout-all': '¿Cerrar todas las sesiones?',
   forget: FORGET_TITLE,
 }
 
-/** Hojas de Account: idioma, notificaciones y confirmación de cierre de sesión (simulados), y «Borrar mis datos» (real). */
+/** Hojas de Cuenta: idioma, notificaciones y confirmación de cierre de sesión (simulados), y «Borrar mis datos» (real). */
 export default function AccountSheets({ sheet, onClose }) {
   const toast = useToast()
   const forgetAll = useForgetAll()
@@ -88,12 +88,12 @@ export default function AccountSheets({ sheet, onClose }) {
 
       {(shown === 'logout' || shown === 'logout-all') && (
         <div className="sheet-confirm">
-          <p>You can log back in anytime with your phone number.</p>
+          <p>Puedes volver a entrar cuando quieras con tu número de teléfono.</p>
           <button type="button" className="sheet-confirm-primary tap" onClick={confirmLogout}>
-            Log out
+            Cerrar sesión
           </button>
           <button type="button" className="sheet-confirm-secondary tap" onClick={onClose}>
-            Cancel
+            Cancelar
           </button>
         </div>
       )}

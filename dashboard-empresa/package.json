@@ -1,7 +1,7 @@
 {
   "name": "dashboard-empresa",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.1.0",
   "type": "module",
   "engines": {
     "node": "^22.22.0 || >=24.15.0"
@@ -16,7 +16,8 @@
     "fixtures": "node scripts/update-fixtures.mjs",
     "screenshots": "node scripts/screenshots.mjs",
     "panel:snapshot": "node scripts/panel-snapshot.mjs",
-    "panel:html": "node scripts/panel-html.mjs"
+    "panel:html": "node scripts/panel-html.mjs",
+    "format:check": "prettier --check src scripts"
   },
   "dependencies": {
     "@fontsource-variable/figtree": "^5.3.0",

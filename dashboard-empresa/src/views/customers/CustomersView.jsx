@@ -1,3 +1,4 @@
+import { AGENT_NAME } from '../../lib/agentName.js'
 import { Async } from '../../components/Async.jsx'
 import { ProvenanceBadge } from '../../components/ProvenanceBadge.jsx'
 import { SourceNote } from '../../components/SourceNote.jsx'
@@ -14,8 +15,8 @@ function Ladder() {
       <RetentionLadder rappi={rappi} />
       <p className="block-note">
         {rappi.nota} Retail agrupa todo el comercio que no es restaurante ni Turbo; Favor no tiene una combinación con
-        un grupo más en la tabla. Mochi ofrece el paso como «vertical por probar»; solo un grupo de control mide si
-        sumar la vertical hace volver.
+        un grupo más en la tabla. {AGENT_NAME} ofrece el paso como «vertical por probar»; solo un grupo de control mide
+        si sumar la vertical hace volver.
       </p>
     </>
   )

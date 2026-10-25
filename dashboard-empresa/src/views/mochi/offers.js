@@ -1,5 +1,6 @@
 // Cuentas de las ofertas de Mochi (/analytics/offers, por momento) y de sus sugerencias entre verticales
 // (/analytics/suggestions, por concepto y vertical). Aceptada: la oferta se agregó al carro.
+import { AGENT_NAME } from '../../lib/agentName.js'
 
 /** Con menos mostradas que esto (una demo en vivo) un % no dice nada: se muestran solo las cuentas. */
 export const MIN_SHOWN_FOR_RATE = 10
@@ -32,7 +33,7 @@ const MOMENT_HINTS = {
   recompra: '«¿Repetimos?» cuando le toca según su ciclo',
   volver: '«¿Volvemos a…?» a algo que dejó de pedir',
   perfil: 'Los peldaños de su perfil de gusto',
-  pregunta: 'Al preguntarle a Mochi',
+  pregunta: `Al preguntarle a ${AGENT_NAME}`,
   para_ti: 'En «Para ti», al abrir el buscador',
   sin_momento: 'Sin registro de dónde se hizo',
 }

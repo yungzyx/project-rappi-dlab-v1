@@ -137,7 +137,6 @@ export default function App() {
                               <AgentPresence
                                 screen={current.name}
                                 homeTab={homeTab}
-                                push={push}
                                 raised={SCREENS_WITH_NAV.has(current.name)}
                               />
                               <AssistantPanel push={push} vertical={vertical} depth={stack.length} />

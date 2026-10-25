@@ -24,7 +24,7 @@ export default function SearchScreen({ back, push, params }) {
           <input
             autoFocus
             type="search"
-            placeholder="What do you want today?"
+            placeholder="¿Qué quieres hoy?"
             value={query}
             maxLength={500}
             onChange={(e) => setQuery(e.target.value)}

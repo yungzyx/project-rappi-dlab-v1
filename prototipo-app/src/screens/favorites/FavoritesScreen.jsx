@@ -12,7 +12,7 @@ const BEST_RESTAURANTS = 4
 const BEST_SUPERMARKETS = 2
 
 /**
- * Pestaña Favorites. «Tus favoritos» son las tiendas marcadas con ♥ en la página de tienda (se guardan en el navegador);
+ * Pestaña Favoritos. «Tus favoritos» son las tiendas marcadas con ♥ en la página de tienda (se guardan en el navegador);
  * «Los mejores» salen del catálogo: son un extra, y si no llegan (o falla la API) no se muestran.
  */
 export default function FavoritesScreen({ push }) {
@@ -22,7 +22,7 @@ export default function FavoritesScreen({ push }) {
   const openStore = (store) => push('store', { store })
 
   return (
-    <TabPage title="My Favorites" color="#ee7d3e" className="favorites">
+    <TabPage title="Mis favoritos" color="#ee7d3e" className="favorites">
       <Section title="Tus favoritos" modifier="first">
         {favorites.stores.length > 0 ? (
           <HScroll className="favorites-logos">

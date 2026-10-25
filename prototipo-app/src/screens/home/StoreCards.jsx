@@ -4,7 +4,7 @@ import { EtaIcon, StoreMeta } from '../../components/StoreMeta'
 import './home.css'
 
 /**
- * Tarjeta ancha de restaurante o tienda (Home, Deals, Favorites).
+ * Tarjeta ancha de restaurante o tienda (Inicio, Ofertas, Favoritos).
  * Campos opcionales: rating, deliveryLabel (píldora amarilla), fee (costo de envío), distance, logo (la foto es un logo y
  * se ve entera).
  */

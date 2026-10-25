@@ -1,7 +1,7 @@
 // Cliente de la API de rappi-ia para el panel. Si una consulta de datos simulados falla o tarda demasiado, usa la
-// respuesta guardada en src/fixtures (npm run fixtures, make contract) y la anota, con el origen y la fecha que trae el
-// archivo, para avisar que el panel está en modo sin conexión. El uso del MVP (fuente prototipo) no tiene respaldo: sin
-// la base viva no hay nada honesto que mostrar. En el panel en un solo HTML (npm run panel:html) no hay API: las
+// respuesta guardada en src/fixtures/sin-conexion (npm run fixtures: todas de una misma foto de la API) y la anota, con
+// el origen y la fecha que trae el archivo, para avisar que el panel está en modo sin conexión. El uso del MVP (fuente
+// prototipo) no tiene respaldo: sin la base viva no hay nada honesto que mostrar. En el panel en un solo HTML (npm run panel:html) no hay API: las
 // respuestas vienen grabadas en el archivo (`virtual:panel-snapshot`, ver vite.config.js), cada una con su fuente.
 import snapshot from 'virtual:panel-snapshot'
 
@@ -27,12 +27,12 @@ const TIMEOUT_MS = 30_000
 
 export const SOURCES = ['synthetic', 'prototype']
 
-// Solo las respuestas que usa el panel (concepts.json y health.json quedan como referencia de la API). El HTML suelto
-// no las necesita (no tiene API que pueda fallar) y no las lleva.
+// Una por métrica, solo simuladas (el prototipo no tiene respaldo): cada una se carga recién si su consulta falla. El
+// HTML suelto no las necesita (no tiene API que pueda fallar) y no las lleva.
 const savedResponses =
   import.meta.env.MODE === 'panel-html'
     ? {}
-    : import.meta.glob('../fixtures/*.{synthetic,prototype}.json', { import: 'default' })
+    : import.meta.glob('../fixtures/sin-conexion/*.json', { import: 'default' })
 
 /** De cuándo y de qué base son las respuestas grabadas (`{ fecha, base }`), o null con la API en vivo. */
 export const SNAPSHOT_INFO = snapshot?.grabado ?? null
@@ -79,7 +79,7 @@ async function fetchLive({ path, expected, name }) {
 }
 
 async function fetchSaved({ key, expected, name }) {
-  const load = savedResponses[`../fixtures/${key}.json`]
+  const load = savedResponses[`../fixtures/sin-conexion/${name}.json`]
   if (!load) throw new Error(`Sin conexión y sin datos guardados para "${key}"`)
   const body = await load()
   return { data: dataFrom(body, expected, name), saved: body.guardado ?? null }

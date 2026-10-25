@@ -7,7 +7,7 @@ import Img from './Img'
 import Sheet from './Sheet'
 import './cart.css'
 
-/** Barra flotante "View cart" (aparece con productos) y la hoja con el detalle del carrito. */
+/** Barra flotante «Ver carro» (aparece con productos) y la hoja con el detalle del carro. */
 export default function CartBar({ raised, push }) {
   const cart = useCart()
   const events = useEvents()
@@ -35,14 +35,14 @@ export default function CartBar({ raised, push }) {
           onClick={() => setOpen(true)}
         >
           <span className="cart-bar-count">{cart.count}</span>
-          View cart
+          Ver carro
           <span className="cart-bar-total">{formatPrice(cart.total)}</span>
         </button>
       )}
 
-      <Sheet open={open} onClose={() => setOpen(false)} title="Your cart">
+      <Sheet open={open} onClose={() => setOpen(false)} title="Tu carro">
         {cart.items.length === 0 ? (
-          <p className="cart-empty">Your cart is empty.</p>
+          <p className="cart-empty">Tu carro está vacío.</p>
         ) : (
           <>
             <ul className="cart-lines">
@@ -65,10 +65,10 @@ export default function CartBar({ raised, push }) {
               <strong>{formatPrice(cart.total)}</strong>
             </div>
             <button type="button" className="cart-checkout tap" onClick={checkout}>
-              Go to checkout
+              Ir a pagar
             </button>
             <button type="button" className="cart-clear" onClick={emptyCart}>
-              Empty cart
+              Vaciar carro
             </button>
           </>
         )}

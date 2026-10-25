@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { ask, detectConcepts, matchProducts, namesQuery, search } from './search'
-import { META, product } from './testMeta'
+import { META, product } from '../../test/offlineMeta'
 
 const coffee = product(1, { name: 'Café molido 250 g' })
 const coffeeCookies = product(2, { name: 'Galletas sabor café', concept: 'galletas' })

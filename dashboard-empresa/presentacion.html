@@ -117,7 +117,7 @@
               src="/presentacion/buscador-mochi.jpg"
               width="804"
               height="1748"
-              alt="Buscador con Mochi: productos reales de Licores para un carrete y una sugerencia de jugos y néctares de Express"
+              alt="Buscador con Mochi: productos reales de Express para un carrete y una sugerencia de salsas y aderezos del Súper"
               loading="lazy"
             />
           </figure>
@@ -125,8 +125,8 @@
             <h3>Un ejemplo con el catálogo real</h3>
             <p>
               Alguien toca «Arma un carrete». Mochi, el asistente del prototipo, responde con
-              productos reales de Licores y agrega una sola sugerencia de otro vertical: jugos y néctares de
-              Express, con la razón a la vista.
+              productos reales de Express (snacks y bebidas: sin alcohol si no se lo piden) y agrega una sola sugerencia
+              de otro vertical: salsas y aderezos del Súper, con la razón a la vista.
             </p>
             <ul class="rules">
               <li>Como máximo una sugerencia cruzada por respuesta.</li>
@@ -197,14 +197,14 @@
               src="/presentacion/home-dinamica.jpg"
               width="804"
               height="1748"
-              alt="Home con los accesos reordenados: Chocolates y Retail primero, con la leyenda «Ordenadas según lo que más usas»"
+              alt="Home con los accesos reordenados: Chocolates y Rappi Mall primero, con la leyenda «Ordenadas según lo que más usas»"
               loading="lazy"
             />
           </figure>
           <div class="example-copy">
-            <h3>La Home de alguien que abrió Chocolates y Retail</h3>
+            <h3>La Home de alguien que abrió Chocolates y Rappi Mall</h3>
             <p>
-              Entró dos veces a Chocolates y una a Retail, y esos accesos suben al principio con la leyenda «Ordenadas
+              Entró dos veces a Chocolates y una a Rappi Mall, y esos accesos suben al principio con la leyenda «Ordenadas
               según lo que más usas». Quien no tiene historial ve el orden de siempre, y en «Rappi hoy» la Home no aprende.
             </p>
             <ul class="rules">
@@ -344,8 +344,8 @@
           </div>
           <div>
             <dt>Calidad del orden de resultados (nDCG@10)</dt>
-            <dd>0,917</dd>
-            <p>Búsqueda híbrida, frente a 0,849 solo vectorial y 0,776 solo por palabras. 124 consultas en los 8 verticales.</p>
+            <dd>0,905</dd>
+            <p>Búsqueda híbrida, frente a 0,835 solo vectorial y 0,765 solo por palabras. 131 consultas en los 8 verticales.</p>
           </div>
           <div>
             <dt>Ítems con concepto asignado</dt>
@@ -354,15 +354,15 @@
           </div>
           <div>
             <dt>Tests automáticos</dt>
-            <dd>3.376</dd>
-            <p>Capa de IA 2.416, scraper 271, prototipo 560 y panel 129, con integración continua en cada cambio.</p>
+            <dd>4.085</dd>
+            <p>Capa de IA 2.974, scraper 305, prototipo 688 y panel 118 (24-10-2026), con integración continua en cada cambio.</p>
           </div>
         </dl>
         <p class="figures-note">
           Lo que no es evidencia: los indicadores del panel y lo que el motor aprende de la población salen de
           usuarios simulados y muestran la mecánica. La
           evaluación de búsqueda juzga la relevancia automáticamente por concepto, y el modo híbrido refuerza ese mismo
-          concepto: sin el refuerzo obtiene 0,860, una diferencia con el vectorial que no es concluyente. Falta un juicio
+          concepto: sin el refuerzo obtiene 0,842, una diferencia con el vectorial (0,835) que no es concluyente. Falta un juicio
           humano.
         </p>
       </section>
@@ -376,7 +376,7 @@
             <p>
               Un comando levanta la API, el prototipo y el panel. Necesita Postgres 17 con pgvector y la base del
               catálogo, Python 3.13, Node y un modelo local de texto (~1 GB). El prototipo no abre sin la API. La guía
-              está en <code>docs/instalacion.md</code>, con una revisión automática que recorre el MVP en Chrome (7
+              está en <code>docs/instalacion.md</code>, con una revisión automática que recorre el MVP en Chrome (8
               revisiones).
             </p>
           </div>
@@ -410,7 +410,7 @@
 
     <footer class="site-footer">
       <div class="container">
-        <p>rappi-dlab. Desarrollo asistido por IA con Claude Code. Repositorio privado en GitHub.</p>
+        <p>rappi-dlab · prototipo independiente del programa dLab, no afiliado a Rappi.</p>
       </div>
     </footer>
   </body>

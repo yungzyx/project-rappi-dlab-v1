@@ -1,7 +1,9 @@
 // Genera las capturas de docs/screenshots recorriendo la app como un usuario (npm run screenshots).
-// Usa el Chrome instalado (playwright-core, sin descargar navegadores) y un servidor Vite propio en el 5199.
-// La app no abre sin la API: antes de capturar hay que tener el MVP corriendo (`make mvp`). El recorrido paga una compra
-// y deja eventos en la base de la API: por eso no corre sin `SCREENSHOTS_ALLOW_WRITES=1`, y se corre sobre una copia
+// Usa el Chrome instalado (playwright-core, sin descargar navegadores; CHROME_PATH apunta a otro ejecutable y
+// PLAYWRIGHT_CHANNEL a otro canal, p. ej. chrome-beta) y un servidor Vite propio en el 5199.
+// La app no abre sin la API: antes de capturar hay que tener el MVP corriendo (`make mvp`), o una API propia en otro
+// puerto (`VITE_API_URL`, la misma variable que lee la app). El recorrido paga una compra y deja eventos en la base de
+// la API: por eso no corre sin `SCREENSHOTS_ALLOW_WRITES=1`, y se corre sobre una copia
 // (`DATABASE_URL=postgresql:///rappi_staging make mvp`), nunca sobre `rappi`.
 // «¿Repetimos?» necesita tres compras con ritmo: esa oferta sale del fixture del contrato, con un café real del catálogo.
 import { mkdirSync, readFileSync } from 'node:fs'
@@ -11,10 +13,12 @@ import { createServer } from 'vite'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
 const OUT = `${ROOT}docs/screenshots`
-const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+const CHROME_PATH = process.env.CHROME_PATH
+const CHROME_CHANNEL = process.env.PLAYWRIGHT_CHANNEL || 'chrome'
 const PORT = 5199
 const BASE = `http://localhost:${PORT}/`
-const API = 'http://localhost:8000'
+// La app del servidor Vite de abajo lee la misma variable (import.meta.env.VITE_API_URL).
+const API = (process.env.VITE_API_URL ?? 'http://localhost:8000').replace(/\/+$/, '')
 const API_HEALTH = `${API}/health`
 const REPEAT_FIXTURE = `${ROOT}src/api/fixtures/agent-offer-recompra.json`
 
@@ -85,8 +89,8 @@ async function run(page) {
   for (const [name, open, ready] of [
     ['10-restaurants', () => tap('.home-tile--restaurants'), ['.rest-list .featured-card']],
     ['11-turbo', () => tap('.home-tile--turbo'), ['.turbo-grid .product-card']],
-    ['15-grocery', () => shortcut('Grocery'), ['.vertical-store', '.vertical-product-row .product-card']],
-    ['16-liquor', () => shortcut('Liquor'), ['.vertical-store', '.vertical-product-row .product-card']],
+    ['15-grocery', () => shortcut('Súper'), ['.vertical-store', '.vertical-product-row .product-card']],
+    ['16-liquor', () => shortcut('Licores'), ['.vertical-store', '.vertical-product-row .product-card']],
     ['17-rappitravel', () => shortcut('RappiTravel')],
   ]) {
     await open()
@@ -96,19 +100,19 @@ async function run(page) {
     await settle(400)
   }
   for (const [name, label, ready] of [
-    ['12-deals', 'Offers', ['.deals .product-card', '.deals .featured-card']],
+    ['12-deals', 'Ofertas', ['.deals .product-card', '.deals .featured-card']],
     [
       '13-favorites',
-      'Favorites',
+      'Favoritos',
       ['.favorites-row:not(.favorites-row--restaurants) .featured-card', '.favorites-row--restaurants .featured-card'],
     ],
-    ['14-account', 'Account'],
+    ['14-account', 'Cuenta'],
   ]) {
     await tab(label)
     await loaded(ready)
     await shot(name)
   }
-  await tab('Home')
+  await tab('Inicio')
   await page.keyboard.press('d') // Rappi hoy → prototipo final
   await settle(400)
 
@@ -121,7 +125,7 @@ async function run(page) {
   await tap('[role="dialog"] .search-back')
   await wait(600)
 
-  await tab('Offers')
+  await tab('Ofertas')
   // Un producto de las bajas de precio reales: el primero con la marca +18 (como la cerveza de antes) o, si no hay, el primero.
   await page.locator('.product-card').first().waitFor() // las bajas de precio llegan juntas, de una sola llamada
   const restricted = page.locator('.product-card').filter({ has: page.getByLabel('Solo mayores de 18') })
@@ -142,8 +146,8 @@ async function run(page) {
   await back()
   await settle(400)
 
-  await tab('Account')
-  await tap('.account-row', 'Loyalty')
+  await tab('Cuenta')
+  await tap('.account-row', 'Lealtad')
   await wait(700)
   await tap('.loyalty-row')
   await wait(500)
@@ -151,17 +155,17 @@ async function run(page) {
   await wait(900)
   await shot('28-loyalty-vinculado')
 
-  // --- La Home que aprende: otra persona entra dos veces a Chocolates y una a Retail ---
+  // --- La Home que aprende: otra persona entra dos veces a Chocolates y una a Rappi Mall ---
   await reset()
   await wait(4200) // el saludo de Mochi
-  for (const label of ['Chocolates', 'Chocolates', 'Retail']) {
+  for (const label of ['Chocolates', 'Chocolates', 'Rappi Mall']) {
     await shortcut(label)
     await page.locator('.vertical-store').first().waitFor()
     await back()
     await settle(400)
   }
   await page.getByText('Ordenadas según lo que más usas').waitFor()
-  // Abrir Retail corrió la fila hacia la derecha: vuelve al principio, como la ve quien llega a la Home.
+  // Abrir Rappi Mall corrió la fila hacia la derecha: vuelve al principio, como la ve quien llega a la Home.
   await page.locator('.home-shortcuts').evaluate((row) => {
     for (const el of [row, ...row.querySelectorAll('*')]) el.scrollLeft = 0
   })
@@ -180,8 +184,8 @@ async function run(page) {
     const response = await route.fetch() // la API real (204 para esta persona): sus cabeceras CORS
     await route.fulfill({ response, status: 200, json: repeat })
   })
-  await tab('Offers')
-  await tab('Home') // al volver a estar arriba, la Home pide la recompra
+  await tab('Ofertas')
+  await tab('Inicio') // al volver a estar arriba, la Home pide la recompra
   const block = page.locator('.live-card--repeat')
   await block.waitFor()
   // La Home baja hasta que los dos accesos grandes quedan justo bajo la barra de estado: se ven los accesos y el bloque.
@@ -240,7 +244,7 @@ async function main() {
   let browser
   try {
     await server.listen()
-    browser = await chromium.launch({ executablePath: CHROME })
+    browser = await chromium.launch(CHROME_PATH ? { executablePath: CHROME_PATH } : { channel: CHROME_CHANNEL })
     const page = await browser.newPage({ viewport: { width: 560, height: 960 }, deviceScaleFactor: 2 })
     console.log(`Capturas en ${OUT}`)
     await run(page)

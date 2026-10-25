@@ -1,5 +1,6 @@
 // Las 4 preguntas del Resumen, cada una con su cifra, su contexto (comparación o tendencia) y una acción sugerida.
 // Funciones puras sobre las respuestas de /analytics: `{ figure, unit, context, delta?, action? }`.
+import { AGENT_NAME } from '../../lib/agentName.js'
 import { formatDate, formatNumber, formatPct, formatPoints, formatSignedPct } from '../../lib/format.js'
 import { comboLabel, demandLabel, verticalLabel } from '../../lib/labels.js'
 import { biggestStep } from '../customers/ladder.js'
@@ -26,7 +27,7 @@ export function crossSellDecision(combos) {
     figure: formatPct(step.from.pct_usuarios),
     unit: `de los usuarios de Rappi (${formatNumber(step.from.usuarios)}) ${single ? 'solo pide' : 'pide'} en ${from}`,
     context: `Vuelven al mes siguiente el ${formatPct(step.fromPct, 0)}; quienes además piden en ${added}, el ${formatPct(step.toPct, 0)} (${formatPoints(step.gain, 0)}). Es una correlación, no un efecto.`,
-    action: `Que Mochi ofrezca ${added} a quien ${single ? 'solo ' : ''}pide en ${from} («vertical por probar») y medirlo contra un grupo de control.`,
+    action: `Que ${AGENT_NAME} ofrezca ${added} a quien ${single ? 'solo ' : ''}pide en ${from} («vertical por probar») y medirlo contra un grupo de control.`,
   }
 }
 
@@ -47,7 +48,7 @@ export function churnDecision(kpis, winback) {
     context: `Pasaron el doble de su ritmo sin pedir y todavía se pueden recuperar. Otras ${formatNumber(lost)} pasaron el triple y se dan por perdidas.`,
     action:
       winback.califican > 0
-        ? `Invitar a volver con «¿Volvemos a…?» de Mochi: ${winback.dia ? `al ${formatDate(winback.dia)}` : 'hoy'} califican ${people(winback.califican)} que dejaron algo que pedían con ritmo. Fuera de la app, solo a quien aceptó avisos.`
+        ? `Invitar a volver con «¿Volvemos a…?» de ${AGENT_NAME}: ${winback.dia ? `al ${formatDate(winback.dia)}` : 'hoy'} califican ${people(winback.califican)} que dejaron algo que pedían con ritmo. Fuera de la app, solo a quien aceptó avisos.`
         : 'Recordarles su concepto top en su ritmo; fuera de la app, solo a quien aceptó avisos.',
   }
 }
@@ -56,12 +57,16 @@ export function churnDecision(kpis, winback) {
 export function mochiDecision(offers, suggestions) {
   const totals = offerTotals(offers.momentos)
   if (!totals.shown) {
-    return { figure: '0', unit: 'ofertas de Mochi mostradas', context: 'Mochi todavía no hizo ofertas en esta fuente.' }
+    return {
+      figure: '0',
+      unit: `ofertas de ${AGENT_NAME} mostradas`,
+      context: `${AGENT_NAME} todavía no hizo ofertas en esta fuente.`,
+    }
   }
   if (totals.rate === null) {
     return {
       figure: formatNumber(totals.shown),
-      unit: totals.shown === 1 ? 'oferta de Mochi mostrada' : 'ofertas de Mochi mostradas',
+      unit: totals.shown === 1 ? `oferta de ${AGENT_NAME} mostrada` : `ofertas de ${AGENT_NAME} mostradas`,
       context: `${formatNumber(totals.accepted)} ${totals.accepted === 1 ? 'aceptada' : 'aceptadas'}; la tasa aparece desde ${MIN_SHOWN_FOR_RATE} mostradas.`,
     }
   }
@@ -76,7 +81,7 @@ export function mochiDecision(offers, suggestions) {
   }
   return {
     figure: formatPct(totals.rate),
-    unit: 'de las ofertas de Mochi se aceptan',
+    unit: `de las ofertas de ${AGENT_NAME} se aceptan`,
     context,
     action: mochiAction(offers.momentos, worst, best, suggestions),
   }
@@ -122,7 +127,7 @@ export function demandDecision({ kpis, weekly, asOf, opportunities, unmet }) {
   const base = series.latest
     ? {
         figure: formatPct(series.latest.value),
-        unit: 'de las búsquedas y preguntas a Mochi no encontraron nada la última semana',
+        unit: `de las búsquedas y preguntas a ${AGENT_NAME} no encontraron nada la última semana`,
         delta:
           series.change === null
             ? null
@@ -130,7 +135,7 @@ export function demandDecision({ kpis, weekly, asOf, opportunities, unmet }) {
       }
     : {
         figure: formatPct(kpis.busquedas_sin_resultado_pct),
-        unit: 'de las búsquedas y preguntas a Mochi no encontraron nada en 30 días',
+        unit: `de las búsquedas y preguntas a ${AGENT_NAME} no encontraron nada en 30 días`,
         delta: null,
       }
   const [top] = [...opportunities].sort((a, b) => b.usuarios - a.usuarios)

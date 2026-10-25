@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { apiUrl, getFallbacks, loadAnalytics, refreshSource, retryConnection, subscribeConnection } from './api.js'
-import savedKpis from '../fixtures/kpis.synthetic.json'
-import savedWeekly from '../fixtures/weekly.synthetic.json'
-import savedSuggestions from '../fixtures/suggestions.synthetic.json'
-import savedOffers from '../fixtures/offers.synthetic.json'
+import savedKpis from '../fixtures/sin-conexion/kpis.json'
+import savedWeekly from '../fixtures/sin-conexion/weekly.json'
+import savedSuggestions from '../fixtures/sin-conexion/suggestions.json'
+import savedOffers from '../fixtures/sin-conexion/offers.json'
 
 const jsonResponse = (body, status = 200) => ({ ok: status < 400, status, json: async () => body })
 

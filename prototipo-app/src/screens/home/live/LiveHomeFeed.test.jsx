@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
-import { fixture, stubApi } from '../../../api/testing'
+import { fixture, stubApi } from '../../../test/api'
 import { routeForScreen } from '../../../data/verticals'
 import { today } from '../../../utils/today'
 
@@ -999,8 +999,8 @@ describe('Home del prototipo final', () => {
       stubAgent({ 'GET /profile/*': fixture('profile-verticales') })
       const { container } = await renderHome()
       await advance(300)
-      expect(tiles(container).slice(0, 2)).toEqual(['Pharmacy', 'Grocery'])
-      expect(tiles(container).slice(-2)).toEqual(['Loyalty', 'Benefits Pro'])
+      expect(tiles(container).slice(0, 2)).toEqual(['Farmacia', 'Súper'])
+      expect(tiles(container).slice(-2)).toEqual(['Lealtad', 'Beneficios Pro'])
       expect(screen.getByText('Ordenadas según lo que más usas')).toBeTruthy()
     })
 
@@ -1008,25 +1008,32 @@ describe('Home del prototipo final', () => {
       stubAgent({ 'GET /profile/*': fixture('profile-verticales-nueva') })
       const { container } = await renderHome()
       await advance(300)
-      expect(tiles(container).slice(0, 6)).toEqual(['Grocery', 'Pharmacy', 'Retail', 'Liquor', 'Express', 'Chocolates'])
+      expect(tiles(container).slice(0, 6)).toEqual([
+        'Súper',
+        'Farmacia',
+        'Rappi Mall',
+        'Licores',
+        'Express',
+        'Chocolates',
+      ])
       expect(screen.queryByText('Ordenadas según lo que más usas')).toBeNull()
     })
 
-    test('con la API caída, el orden fijo y sin el texto (Loyalty y Benefits Pro al final)', async () => {
+    test('con la API caída, el orden fijo y sin el texto (Lealtad y Beneficios Pro al final)', async () => {
       stubAgent({ 'GET /profile/*': 'offline' })
       const { container } = await renderHome()
       await advance(300)
       expect(tiles(container)).toEqual([
-        'Grocery',
-        'Pharmacy',
-        'Retail',
-        'Liquor',
+        'Súper',
+        'Farmacia',
+        'Rappi Mall',
+        'Licores',
         'Express',
         'Chocolates',
         'RappiTravel',
         '🛵RappiFavor',
-        'Loyalty',
-        'Benefits Pro',
+        'Lealtad',
+        'Beneficios Pro',
       ])
       expect(screen.queryByText('Ordenadas según lo que más usas')).toBeNull()
     })
@@ -1043,9 +1050,9 @@ describe('Home del prototipo final', () => {
       try {
         const { container, rerender } = await renderHome()
         await advance(300)
-        expect(tiles(container)[0]).toBe('Grocery')
+        expect(tiles(container)[0]).toBe('Súper')
         const home = container.querySelector('.home--live')
-        fireEvent.click(screen.getByText('Pharmacy'))
+        fireEvent.click(screen.getByText('Farmacia'))
         rerender(homeTree({ active: false })) // otra pantalla encima
         await advance(300)
         expect(orderRequests()).toBe(1)
@@ -1053,7 +1060,7 @@ describe('Home del prototipo final', () => {
         await advance(300)
         expect(flushed).toEqual([1]) // primero los toques, después el orden
         expect(orderRequests()).toBe(2)
-        expect(tiles(container).slice(0, 2)).toEqual(['Pharmacy', 'Grocery'])
+        expect(tiles(container).slice(0, 2)).toEqual(['Farmacia', 'Súper'])
         expect(screen.getByText('Ordenadas según lo que más usas')).toBeTruthy()
         expect(container.querySelector('.home--live')).toBe(home) // la misma Home: no se volvió a montar
       } finally {
@@ -1061,17 +1068,17 @@ describe('Home del prototipo final', () => {
       }
     })
 
-    test('tocar un vertical manda vertical_open con su código; RappiTravel y RappiFavor, service_opened una vez; Loyalty nada', async () => {
+    test('tocar un vertical manda vertical_open con su código; RappiTravel y RappiFavor, service_opened una vez; Lealtad nada', async () => {
       stubAgent({ 'GET /profile/*': fixture('profile-verticales') })
       const push = vi.fn()
       await renderHome({ push })
       await advance(300)
-      fireEvent.click(screen.getByText('Pharmacy'))
+      fireEvent.click(screen.getByText('Farmacia'))
       expect(events.track).toHaveBeenCalledWith('vertical_open', { vertical: 'farmacia' })
-      fireEvent.click(screen.getByText('Restaurants'))
+      fireEvent.click(screen.getByText('Restaurantes'))
       fireEvent.click(screen.getByText('Turbo'))
       expect(opened().map(([, fields]) => fields.vertical)).toEqual(['farmacia', 'restaurantes', 'turbo'])
-      for (const name of ['Loyalty', 'RappiTravel', 'RappiFavor', 'Benefits Pro'])
+      for (const name of ['Lealtad', 'RappiTravel', 'RappiFavor', 'Beneficios Pro'])
         fireEvent.click(screen.getByText(name))
       expect(opened()).toHaveLength(3)
       // Abrir un servicio desde la Home cuenta igual que desde Mochi: así la escalera no lo vuelve a ofrecer.

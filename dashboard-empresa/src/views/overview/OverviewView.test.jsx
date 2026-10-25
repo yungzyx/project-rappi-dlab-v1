@@ -23,19 +23,19 @@ describe('OverviewView', () => {
     expect(within(crossSell).getByText(/Es una correlación, no un efecto\./)).toBeTruthy()
 
     const churn = decision('¿A quién estamos perdiendo?')
-    expect(within(churn).getByText('230')).toBeTruthy()
-    expect(within(churn).getByText(/Otras 254 pasaron el triple/)).toBeTruthy()
+    expect(within(churn).getByText('280')).toBeTruthy()
+    expect(within(churn).getByText(/Otras 564 pasaron el triple/)).toBeTruthy()
     expect(within(churn).getByText('Simulado')).toBeTruthy()
 
     const mochi = decision('¿Funciona lo que ofrece Mochi?')
     expect(within(mochi).getByText('43,8%')).toBeTruthy()
 
     const demand = decision('¿Qué buscan y no encuentran?')
-    expect(within(demand).getByText('26,9%')).toBeTruthy() // la última semana completa al corte
-    expect(within(demand).getByText('+8,6 puntos')).toBeTruthy()
+    expect(within(demand).getByText('23,5%')).toBeTruthy() // la última semana completa al corte
+    expect(within(demand).getByText('+4,0 puntos')).toBeTruthy()
     expect(
       within(demand).getByText(
-        /🇵🇪 Comida peruana en Restaurantes, 721 personas en total \(\+42% en las últimas 4 semanas\)/,
+        /🇵🇪 Comida peruana en Restaurantes, 708 personas en total \(\+31% en las últimas 4 semanas\)/,
       ),
     ).toBeTruthy()
     expect(within(demand).getByText(/^Revisar primero el buscador/)).toBeTruthy()
@@ -51,10 +51,10 @@ describe('OverviewView', () => {
     await renderWithData(<OverviewView source="synthetic" onNavigate={() => {}} />)
 
     const active = screen.getByRole('article', { name: 'Personas activas' })
-    expect(within(active).getByText('560')).toBeTruthy()
-    expect(within(active).getByText('−12%')).toBeTruthy()
+    expect(within(active).getByText('558')).toBeTruthy()
+    expect(within(active).getByText('−1%')).toBeTruthy()
     expect(within(active).getByRole('img', { name: 'Personas activas, últimas 12 semanas completas' })).toBeTruthy()
-    expect(within(screen.getByRole('article', { name: 'Frecuencia (30 días)' })).getByText('2,34')).toBeTruthy()
+    expect(within(screen.getByRole('article', { name: 'Frecuencia (30 días)' })).getByText('1,50')).toBeTruthy()
     expect(screen.getByRole('table', { name: 'Serie semanal' })).toBeTruthy()
     expect(screen.getByText('Ver la serie semanal completa')).toBeTruthy()
   })

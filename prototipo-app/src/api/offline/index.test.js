@@ -1,7 +1,7 @@
 import { beforeEach, expect, test } from 'vitest'
 import { route } from './index'
 import { readState } from './state'
-import { META, product } from './testMeta'
+import { META, product } from '../../test/offlineMeta'
 
 const snapshot = {
   meta: META,

@@ -1,4 +1,4 @@
-// Íconos de línea de la pantalla Account (y del selector de dirección), dibujados a partir del video.
+// Íconos de línea de la pantalla Cuenta (y del selector de dirección), dibujados a partir del video.
 function Line({ size = 24, children, strokeWidth = 1.9 }) {
   return (
     <svg

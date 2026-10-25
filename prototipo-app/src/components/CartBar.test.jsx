@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { useEffect } from 'react'
 import { afterEach, expect, test, vi } from 'vitest'
 import { toPrototypeProduct } from '../api/client'
-import { fixture } from '../api/testing'
+import { fixture } from '../test/api'
 import { AssistantProvider } from '../state/AssistantContext'
 import { CartProvider, useCart } from '../state/CartContext'
 import { DemoProvider } from '../state/DemoContext'
@@ -38,11 +38,11 @@ test('vaciar el carro lo registra (una salida por línea con sus unidades): si n
       </ProfileProvider>
     </DemoProvider>,
   )
-  fireEvent.click(screen.getByText('View cart'))
-  fireEvent.click(screen.getByText('Empty cart'))
+  fireEvent.click(screen.getByText('Ver carro'))
+  fireEvent.click(screen.getByText('Vaciar carro'))
 
   const removes = events.track.mock.calls.filter(([type]) => type === 'cart_remove').map(([, fields]) => fields)
   expect(removes.map((r) => r.payload.qty).sort()).toEqual([1, 2])
   expect(new Set(removes.map((r) => r.cart_id)).size).toBe(1)
-  expect(screen.queryByText('View cart')).toBeNull()
+  expect(screen.queryByText('Ver carro')).toBeNull()
 })
